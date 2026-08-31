@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    { "rolls": 1, "entries": [ { "type": "minecraft:item", "name": "fts_geology:hot_spring" } ], "conditions": [ { "condition": "minecraft:survives_explosion" } ] }
+  ]
+}

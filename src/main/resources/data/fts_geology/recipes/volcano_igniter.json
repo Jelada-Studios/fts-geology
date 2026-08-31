@@ -1,0 +1,1 @@
+{ "type": "minecraft:crafting_shaped", "pattern": [ "BLB", "LML", "BLB" ], "key": { "B": { "item": "minecraft:blaze_powder" }, "L": { "item": "minecraft:magma_block" }, "M": { "item": "minecraft:obsidian" } }, "result": { "item": "fts_geology:volcano_igniter" } }

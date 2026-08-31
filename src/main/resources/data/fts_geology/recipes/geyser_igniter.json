@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " P ",
+    "PMP",
+    " P "
+  ],
+  "key": {
+    "P": { "item": "minecraft:prismarine_shard" },
+    "M": { "item": "minecraft:magma_block" }
+  },
+  "result": {
+    "item": "fts_geology:geyser_igniter"
+  }
+}

@@ -1,0 +1,49 @@
+modLoader = "javafml"
+loaderVersion = "[47,)"
+license = "MIT"
+issueTrackerURL = "https://github.com/Jelada-Studios/fts-geology/issues"
+
+[[mods]]
+modId = "fts_geology"
+version = "${file.jarVersion}"
+displayName = "FT's Geology"
+authors = "Jelada Studios"
+displayURL = "https://jeladastudios.com/fts-geology/"
+description = '''
+A simulated geology layer for Minecraft: tectonic plates with real motion, fault lines that
+produce the landforms they should, earthquakes, volcanoes shaped by their setting, geysers with
+actual thermodynamics, hot springs and travertine terraces.
+Retrogen-safe: bolts onto existing worlds without touching builds. Reads the world biome source
+rather than replacing worldgen, so it stacks on top of Terralith and Tectonic instead of fighting
+them. Plays nicely with Flowing Fluids (finite water) and Water Erosion.
+'''
+
+# --- Dependencies ---
+[[dependencies.fts_geology]]
+    modId = "forge"
+    mandatory = true
+    versionRange = "[47,)"
+    ordering = "NONE"
+    side = "BOTH"
+
+[[dependencies.fts_geology]]
+    modId = "minecraft"
+    mandatory = true
+    versionRange = "[1.20.1,1.21)"
+    ordering = "NONE"
+    side = "BOTH"
+
+# Optional integrations — soft deps so we load after them when present.
+[[dependencies.fts_geology]]
+    modId = "flowing_fluids"
+    mandatory = false
+    versionRange = "*"
+    ordering = "AFTER"
+    side = "BOTH"
+
+[[dependencies.fts_geology]]
+    modId = "water_erosion"
+    mandatory = false
+    versionRange = "*"
+    ordering = "AFTER"
+    side = "BOTH"

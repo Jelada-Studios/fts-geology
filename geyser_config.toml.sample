@@ -1,0 +1,117 @@
+# =====================================================================
+#  Hydrothermal Geysers — geyser_config.toml (COMMON)
+#  Generated into  <world>/serverconfig/geyser_config.toml  on first run.
+#  Every value is hot-reloadable. Ticks: 20 = 1 second.
+# =====================================================================
+
+[thermodynamics]
+    # Degrees C added per tick per adjacent lava/magma block (lowered so it doesn't boil instantly).
+    heatPerLavaNeighbor = 0.30
+    # Passive heat loss per tick when no heat source is adjacent.
+    ambientCoolingPerTick = 0.10
+    # Temperature at which water starts flashing to steam pressure.
+    boilingPointC = 100.0
+    # Hard cap on chamber temperature.
+    maxTemperatureC = 450.0
+    # Abstract volume expansion of 1 water block -> steam (~1600:1).
+    steamExpansionRatio = 1600
+
+[pressure]
+    # P at which an eruption fires.
+    eruptionThreshold = 4000.0
+    # P below which the jet field is removed and venting stops.
+    safeThreshold = 800.0
+    # P at which the rock cap above the core begins to crack.
+    crustErosionPressure = 2500.0
+    # Explosion power at the vent mouth. NONE interaction = no block damage; safe for builds.
+    explosionPower = 1.5
+    # Sustained updraft velocity in the active vent column (gentle steady flow).
+    jetUpwardVelocity = 0.5
+    # Extra updraft at eruption onset, decaying over time. The whole jet is hard-capped in code
+    # (~1.6/tick) so overlapping vents can't fling you 100+ blocks.
+    jetBurstVelocity = 0.5
+    # Time constant (ticks) for the onset burst to fade (~40 = a couple seconds).
+    jetBurstDecayTicks = 40
+    # One-time upward velocity at breakthrough (~1.2 throws a player ~8-10 blocks up).
+    onsetLaunchVelocity = 1.2
+    # How many surrounding pool-water cells get flung/flashed at breakthrough (scaled by size).
+    onsetWaterScatter = 6
+    # If you plug the vent with tough/placed blocks, let a high-pressure eruption blast through
+    # them (small explosions) rather than staying sealed. Natural terrain is always cleared;
+    # bedrock is never broken.
+    ventBreaksObstructions = true
+    # Pressure at which the vent force-breaches a tough cap it can't reroute around.
+    ventForceBreachPressure = 6000.0
+
+[worldgen]
+    # Master switch for retroactive generation into existing chunks.
+    retrogenEnabled = true
+    # SAFETY CEILING: generation never edits blocks at or above this Y. Protects builds.
+    retrogenMaxY = -30
+    # Deepest Y scanned when carving a chamber.
+    retrogenMinY = -60
+    # Interior vertical size of a carved chamber.
+    chamberTargetHeight = 5
+    # Per-chunk probability that a chunk receives a geyser system.
+    chamberSpawnChance = 0.006
+    # Carve a thin vent from the deep chamber up to the surface so eruptions reach daylight.
+    # Build-safe: aborts (vent stays buried) if the path would hit non-natural terrain.
+    carveSurfaceShaft = true
+    # Safety cap on how many blocks a surface shaft may rise from the cap.
+    shaftMaxLength = 160
+
+[branching]
+    # Grow thin root-like side vents branching upward; tips reaching caves/air become
+    # weaker secondary fumaroles.
+    branchingVentsEnabled = true
+    # Upper bound on simultaneous growth heads (scaled down for small geysers).
+    branchMaxCount = 6
+    # Maximum length of a single branch before it terminates.
+    branchMaxLength = 18
+    # Total cells that may be carved across ALL branches of one system (TPS guard).
+    branchCarveBudget = 160
+    # Per-step probability that a growing branch splits into two.
+    branchSplitChance = 0.12
+
+[cycle]
+    # Minimum recharge time after an eruption (6000 = 5 min).
+    cooldownTicksMin = 6000
+    # Maximum recharge time after an eruption (12000 = 10 min).
+    cooldownTicksMax = 12000
+    # Fraction of erupted surface water drawn back into the vent (cone gates ~20%).
+    rechargeIntakeFraction = 0.20
+    # Eruption cycles before a Tuff/Calcite cone starts forming.
+    coneBuildEruptions = 4
+    # Eruption (spouting) duration per size unit. Total spout time = magnitude * this.
+    # 2400 -> radius-5 ~10 min, radius-20 ~40 min. Use 3600 for ~60 min at radius 20.
+    eruptionTicksPerMagnitude = 2400
+    # Precipitate Calcite/Tuff sinter terraces where erupted water pools (Water Erosion-safe:
+    # deposits only under settled source water at pool edges, not the fast flowing channel).
+    travertineEnabled = true
+    # Per-second, per-column deposit probability during eruption (low = slow terrace growth).
+    travertineDepositChance = 0.08
+    # While erupting, the basin loses one water cell every N ticks (visibly empties). 60 = 1/sec.
+    chamberDrainIntervalTicks = 60
+    # While recharging/cooling, the basin regains one water cell every N ticks.
+    chamberRefillIntervalTicks = 100
+
+[emergent]
+    # Let PLAYER-BUILT water-over-rock-over-lava setups become live geysers. ON by default.
+    # WARNING: with emergentDestructive=true this can blow up bases you didn't intend as geysers.
+    emergentEnabled = true
+    # If true, emergent eruptions break blocks ("blows up your house"); if false they vent safely.
+    emergentDestructive = true
+    # How often (ticks) each loaded player's surroundings are scanned.
+    emergentScanIntervalTicks = 60
+    # Radius around a player scanned for water+rock+lava columns.
+    emergentScanRadius = 10
+    # Minimum connected water cells above the rock before a setup ignites.
+    emergentMinWater = 4
+    # How many blocks below the rock layer to look for lava.
+    emergentLavaDepth = 3
+    # Never ignite a new emergent core within this many blocks of an existing one (one rig = one
+    # geyser, not a swarm of overlapping cores).
+    emergentMinSpacing = 12
+    # Half-width of the throat an emergent eruption punches UP through its cap: 0 = 1-wide (just
+    # the plug), 1 = 3-wide. Clears a column upward (not a sphere), works underwater.
+    emergentDestroyRadius = 0

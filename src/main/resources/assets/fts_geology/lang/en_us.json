@@ -1,0 +1,26 @@
+{
+  "block.fts_geology.geyser_core": "Geyser Core",
+  "block.fts_geology.geyser_chamber": "Geyser Chamber",
+  "block.fts_geology.geyser_igniter": "Geyser Igniter",
+  "block.fts_geology.volcano_core": "Volcano Core",
+  "block.fts_geology.volcano_igniter": "Volcano Igniter",
+  "block.fts_geology.hot_spring": "Hot Spring",
+  "block.fts_geology.native_sulfur": "Native Sulfur",
+  "block.fts_geology.sinter": "Sinter",
+  "block.fts_geology.microbial_mat_orange": "Orange Microbial Mat",
+  "block.fts_geology.microbial_mat_yellow": "Yellow Microbial Mat",
+  "block.fts_geology.microbial_mat_brown": "Brown Microbial Mat",
+  "block.fts_geology.microbial_mat_green": "Green Microbial Mat",
+
+  "item.fts_geology.geyser_core": "Geyser Core",
+  "item.fts_geology.geyser_chamber": "Geyser Chamber",
+  "item.fts_geology.geyser_igniter": "Geyser Igniter",
+  "item.fts_geology.volcano_igniter": "Volcano Igniter",
+  "item.fts_geology.hot_spring": "Hot Spring",
+  "item.fts_geology.native_sulfur": "Native Sulfur",
+  "item.fts_geology.sinter": "Sinter",
+  "item.fts_geology.microbial_mat_orange": "Orange Microbial Mat",
+  "item.fts_geology.microbial_mat_yellow": "Yellow Microbial Mat",
+  "item.fts_geology.microbial_mat_brown": "Brown Microbial Mat",
+  "item.fts_geology.microbial_mat_green": "Green Microbial Mat"
+}

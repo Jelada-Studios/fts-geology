@@ -1,0 +1,1 @@
+{ "type": "minecraft:block", "pools": [ { "rolls": 1, "entries": [ { "type": "minecraft:item", "name": "fts_geology:volcano_igniter" } ], "conditions": [ { "condition": "minecraft:survives_explosion" } ] } ] }
