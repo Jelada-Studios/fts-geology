@@ -123,6 +123,8 @@ public final class GeyserConfig {
     // --- Earthquakes --------------------------------------------------------
     public static final ForgeConfigSpec.BooleanValue QUAKES_ENABLED;
     public static final ForgeConfigSpec.BooleanValue QUAKES_BREAK_BUILDS;  // default OFF
+    public static final ForgeConfigSpec.BooleanValue UNSUPPORTED_BLOCKS_FALL;   // default ON
+    public static final ForgeConfigSpec.BooleanValue FALLING_INCLUDES_BUILDS;   // default ON
     public static final ForgeConfigSpec.IntValue QUAKE_BLOCKS_PER_TICK;    // main-thread apply budget
     public static final ForgeConfigSpec.IntValue QUAKE_AMBIENT_INTERVAL;   // ticks between ambient rolls
     public static final ForgeConfigSpec.DoubleValue QUAKE_RECURRENCE_DAYS; // mean interval between ruptures
@@ -536,6 +538,21 @@ public final class GeyserConfig {
                         "rest of the mod: only natural terrain is ever deformed, so a base on a fault",
                         "line is safe. Turn on for full realism at your own risk.")
                 .define("quakesBreakBuilds", false);
+        UNSUPPORTED_BLOCKS_FALL = b
+                .comment("After the ground moves, bring down anything the quake left hanging in the",
+                        "air. Nothing is destroyed: the stack is set back down on the new ground, so a",
+                        "tree keeps its trunk and a wall keeps its blocks - they just end up lower.",
+                        "The one exception is plant matter whose ground fell more than three blocks:",
+                        "that slope did not subside, it failed, and a fresh landslide scarp is bare.")
+                .define("unsupportedBlocksFall", true);
+        FALLING_INCLUDES_BUILDS = b
+                .comment("Whether player-placed material falls too. ON by default: a floating house is",
+                        "a worse outcome than a house that settled, and falling is not breaking - every",
+                        "block survives the drop. Turn OFF to leave builds hanging exactly where they",
+                        "are. Independent of quakesBreakBuilds, which decides whether the quake may",
+                        "deform a build in the first place; this only decides what happens to one that",
+                        "has already been undermined.")
+                .define("fallingIncludesPlayerBlocks", true);
         QUAKE_BLOCKS_PER_TICK = b
                 .comment("How many block edits a quake applies per tick on the server thread.",
                         "This is not just a performance budget: real ruptures travel along a fault at",
