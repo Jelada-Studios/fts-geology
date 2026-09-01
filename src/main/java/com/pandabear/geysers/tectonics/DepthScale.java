@@ -3,6 +3,8 @@ package com.pandabear.geysers.tectonics;
 import com.pandabear.geysers.config.GeyserConfig;
 import net.minecraft.world.level.LevelReader;
 
+import java.util.Locale;
+
 /**
  * Maps Minecraft blocks onto real geological depths.
  *
@@ -62,8 +64,8 @@ public final class DepthScale {
      */
     public static String format(double metres) {
         double abs = Math.abs(metres);
-        if (abs >= 1000.0) return String.format("%.1f km", metres / 1000.0);
-        return String.format("%.0f m", metres);
+        if (abs >= 1000.0) return String.format(Locale.ROOT, "%.1f km", metres / 1000.0);
+        return String.format(Locale.ROOT, "%.0f m", metres);
     }
 
     /**

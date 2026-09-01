@@ -35,9 +35,12 @@ public final class GeothermalSuitability {
      * Placement multipliers for one column, applied on top of the configured base spawn chance.
      * Volcano is 0..1; geyser and hot spring may exceed 1 inside a hotspot geyser basin, where the
      * ground really is several times more thermally active than anywhere else on the planet.
-     * {@code reason} explains the verdict in plain language for the inspection command.
+     * {@code reasonKey} explains the verdict in plain language for the inspection command. It is a
+     * translation key rather than a finished sentence: this class runs on the server and has no
+     * business deciding what language the player reads, and the text has to be reachable from a
+     * lang file for the mod to be translatable at all.
      */
-    public record Suitability(double volcano, double geyser, double hotSpring, String reason) {
+    public record Suitability(double volcano, double geyser, double hotSpring, String reasonKey) {
 
         public boolean anything() {
             return volcano > 0 || geyser > 0 || hotSpring > 0;
@@ -53,7 +56,7 @@ public final class GeothermalSuitability {
         // activity fade out naturally as you walk away from the line.
         double s = plate.stress();
         double volcano = 0, geyser = 0, hotSpring = 0;
-        String reason;
+        String reasonKey;
 
         switch (plate.faultType()) {
             case CONVERGENT_SUBDUCTION -> {
@@ -61,36 +64,35 @@ public final class GeothermalSuitability {
                 volcano = 1.00 * s;
                 geyser = 0.90 * s;
                 hotSpring = 1.00 * s;
-                reason = "Subduction arc: melting slab feeds volcanoes, geysers and hot springs.";
+                reasonKey = "command.fts_geology.suitability.reason.subduction";
             }
             case DIVERGENT -> {
                 // Rift / spreading ridge: Iceland, East African Rift.
                 volcano = 0.75 * s;
                 geyser = 1.00 * s;
                 hotSpring = 1.00 * s;
-                reason = "Spreading rift: decompression melting drives fissure volcanism and geysers.";
+                reasonKey = "command.fts_geology.suitability.reason.rift";
             }
             case CONVERGENT_COLLISION -> {
                 // Himalaya: enormous mountains and abundant hot springs, but no magma at all.
                 volcano = 0.0;
                 geyser = 0.0;
                 hotSpring = 0.65 * s;
-                reason = "Continental collision: no magma, so no volcanoes or geysers - "
-                        + "but thrust faults let water circulate deep, giving hot springs.";
+                reasonKey = "command.fts_geology.suitability.reason.collision";
             }
             case TRANSFORM -> {
                 // San Andreas, North Anatolian: faults conduct water, but generate no melt.
                 volcano = 0.0;
                 geyser = 0.0;
                 hotSpring = 0.55 * s;
-                reason = "Strike-slip fault: no volcanism, but the fault conducts hot water upward.";
+                reasonKey = "command.fts_geology.suitability.reason.transform";
             }
             case INTERIOR -> {
                 // Deep sedimentary basins still host warm springs (Bath, Hungary), just barely.
                 hotSpring = 0.05;
-                reason = "Stable plate interior: geothermally quiet.";
+                reasonKey = "command.fts_geology.suitability.reason.interior";
             }
-            default -> reason = "Unknown setting.";
+            default -> reasonKey = "command.fts_geology.suitability.reason.unknown";
         }
 
         // --- Hotspot contribution -------------------------------------------
@@ -111,17 +113,15 @@ public final class GeothermalSuitability {
             if (ThermalBiomes.allowsVolcano(level, x, z)) volcano = Math.max(volcano, 1.00 * h);
             geyser = Math.max(geyser, h * boost);   // the richest geyser fields on Earth
             hotSpring = Math.max(hotSpring, h * boost);
-            reason = basin > 0.15
-                    ? "Mantle hotspot, inside a geyser basin: the densest thermal ground there is "
-                        + "(Yellowstone's Upper Basin, Iceland's Haukadalur)."
-                    : "Mantle hotspot: a plume burning through the plate. Geysers here cluster into "
-                        + "basins - keep walking to find one.";
+            reasonKey = basin > 0.15
+                    ? "command.fts_geology.suitability.reason.hotspot_basin"
+                    : "command.fts_geology.suitability.reason.hotspot";
         } else if (hot.onTrail()) {
             // The extinct chain the plate carried off the plume: old cones, no live heat.
             double remaining = 1.0 - hot.trailAge();
             volcano = Math.max(volcano, 0.35 * remaining);
             hotSpring = Math.max(hotSpring, 0.30 * remaining);
-            reason = "Hotspot trail: extinct volcanoes carried off the plume by plate drift.";
+            reasonKey = "command.fts_geology.suitability.reason.hotspot_trail";
         }
 
         // Volcano stays a plain 0..1 probability multiplier. Geyser and hot-spring may exceed 1
@@ -132,6 +132,6 @@ public final class GeothermalSuitability {
                 Mth.clamp(volcano, 0.0, 1.0),
                 Mth.clamp(geyser, 0.0, ceiling),
                 Mth.clamp(hotSpring, 0.0, ceiling),
-                reason);
+                reasonKey);
     }
 }

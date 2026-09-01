@@ -12,6 +12,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
+
+import java.util.Locale;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -67,31 +69,23 @@ public final class GeyserCommands {
             if (d < best) { best = d; found = p.immutable(); core = c; }
         }
         if (core == null) {
-            source.sendFailure(Component.literal(
-                    "No geyser core found in the column here (scanned "
-                            + level.getMinBuildHeight() + " to " + (at.getY() + 8)
-                            + "). Stand right on a geyser vent."));
+            source.sendFailure(Component.translatable("command.fts_geology.no_geyser_core_found_in_the_column_here_", level.getMinBuildHeight(), (at.getY() + 8)));
             return 0;
         }
         final BlockPos fp = found;
         final GeyserCoreBlockEntity c = core;
-        source.sendSuccess(() -> Component.literal(String.format(
-                "Geyser @ %d,%d,%d | phase=%s temp=%.0f°C P=%.0f (thr %.0f) water=%.1f room=%.1f heat=%.2f mag=%d ventMouthY=%s eruptTicks=%d",
-                fp.getX(), fp.getY(), fp.getZ(), c.getPhase(), c.getTemperatureC(), c.getPressure(),
-                GeyserConfig.PRESSURE_ERUPTION_THRESHOLD.get(),
-                c.getWaterVolume(), c.getRoomVolume(), c.getHeatWeight(), c.getMagnitude(),
-                c.getVentMouthYRaw() == Integer.MIN_VALUE ? "unset" : String.valueOf(c.getVentMouthYRaw()),
-                c.getEruptionTicks())), false);
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.geyser.debug", fp.getX(), fp.getY(), fp.getZ(), c.getPhase(), dec(c.getTemperatureC(), 0), dec(c.getPressure(), 0), dec(GeyserConfig.PRESSURE_ERUPTION_THRESHOLD.get(), 0), dec(c.getWaterVolume(), 1), dec(c.getRoomVolume(), 1), dec(c.getHeatWeight(), 2), c.getMagnitude(), c.getVentMouthYRaw() == Integer.MIN_VALUE ? "unset" : String.valueOf(c.getVentMouthYRaw()), c.getEruptionTicks()), false);
         // Second line: the structural truth around the core — is it actually ticking, and is the
         // magma bed / chamber water really there? This tells us bug vs. broken-structure at a glance.
         String below = level.getBlockState(fp.below()).getBlock().getName().getString();
         String above = level.getBlockState(fp.above()).getBlock().getName().getString();
-        source.sendSuccess(() -> Component.literal(String.format(
-                "  ticks=%d ventTopY=%s | below(core-1)=%s above(core+1)=%s",
-                c.getTickCount(),
-                c.getVentTopY() == Integer.MIN_VALUE ? "unset" : String.valueOf(c.getVentTopY()),
-                below, above)), false);
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.ticks_d_venttopy_s_below_core_1_s_above_", c.getTickCount(), c.getVentTopY() == Integer.MIN_VALUE ? "unset" : String.valueOf(c.getVentTopY()), below, above), false);
         return 1;
+    }
+
+    /** See {@code TectonicCommands.dec} - a lang file cannot carry %.Nf, so decimals render here. */
+    private static String dec(double v, int places) {
+        return String.format(Locale.ROOT, "%." + places + "f", v);
     }
 
     private static int spawn(CommandContext<CommandSourceStack> ctx, int requestedMagnitude) {
@@ -113,17 +107,13 @@ public final class GeyserCommands {
             boolean placed = RetrogenHandler.forcePlace(level, corePos, magnitude, level.random);
             if (placed) {
                 final int mag = magnitude;
-                source.sendSuccess(() -> Component.literal(
-                        "Geyser (magnitude " + mag + ") placed at " + corePos.getX() + ", " + coreY + ", "
-                                + corePos.getZ() + " — it will heat up and surface shortly."), true);
+                source.sendSuccess(() -> Component.translatable("command.fts_geology.geyser_magnitude_s_placed_at_s_s_s_it_wi", mag, corePos.getX(), coreY, corePos.getZ()), true);
                 return 1;
             }
-            source.sendFailure(Component.literal(
-                    "Couldn't place a geyser here: the deep column below you isn't clear natural rock "
-                            + "(a cave, fluid, or build is in the way). Try flat ground away from structures."));
+            source.sendFailure(Component.translatable("command.fts_geology.couldn_t_place_a_geyser_here_the_deep_co"));
             return 0;
         } catch (Exception e) {
-            source.sendFailure(Component.literal("Geyser spawn failed: " + e));
+            source.sendFailure(Component.translatable("command.fts_geology.geyser_spawn_failed_s", e));
             return 0;
         }
     }
