@@ -181,9 +181,13 @@ public final class VolcanoEruption {
             FluidState fs = level.getBlockState(p).getFluidState();
             // Any lava - full source OR a thin flowing "half" block - but only where it RESTS ON
             // SOLID GROUND, so a mid-air stream is never frozen into a floating spike.
-            // Runoff never sets anything alight: fire started by a flow is put out as it cools.
+            // Fire the flow started is put out as it cools, unless eruptionsStartFires says the
+            // burn is allowed to outlive the lava - which is what actually happens when a flow
+            // reaches a forest, and what fire-spread mods are there to carry on with.
             if (level.getBlockState(p).is(Blocks.FIRE)) {
-                level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                if (!GeyserConfig.ERUPTIONS_START_FIRES.get()) {
+                    level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                }
                 continue;
             }
             if (!fs.is(net.minecraft.tags.FluidTags.LAVA)) continue;

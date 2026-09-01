@@ -31,6 +31,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue ONSET_LAUNCH_VELOCITY;     // one-time blast at breakthrough
     public static final ForgeConfigSpec.IntValue ONSET_WATER_SCATTER;          // pool cells flung at onset
     public static final ForgeConfigSpec.BooleanValue VENT_BREAKS_OBSTRUCTIONS;  // blast through deliberate caps
+    public static final ForgeConfigSpec.BooleanValue ERUPTIONS_START_FIRES;     // default ON
     public static final ForgeConfigSpec.DoubleValue VENT_FORCE_BREACH_PRESSURE; // P needed to blast a hard cap
 
     // --- Retrogen / worldgen ------------------------------------------------
@@ -310,6 +311,15 @@ public final class GeyserConfig {
                         "and turns to basalt behind its own front, which is both what happens and",
                         "what actually looks like an eruption.")
                 .defineInRange("volcanoLavaBudget", 24, 0, 400);
+        ERUPTIONS_START_FIRES = b
+                .comment("Let a lava flow set the countryside alight. A flow reaching the tree line",
+                        "really does start a fire, and the lava budget above already stops the flow",
+                        "itself from running away, so the burn stays a consequence of where the",
+                        "eruption went rather than something that spreads forever on its own.",
+                        "Fire was previously put out as the flow cooled; turn this off to get that",
+                        "behaviour back. Worth leaving on alongside mods that model fire spread",
+                        "properly, such as Burnt.")
+                .define("eruptionsStartFires", true);
         b.pop();
 
         b.push("cycle");

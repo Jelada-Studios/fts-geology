@@ -469,6 +469,17 @@ public final class EruptionHandler {
         // that made earthquakes refuse to move grassy terrain and left gaps in hot-spring walls:
         // a tuft of grass on top of the soil read as a player block, so every safety check bailed.
         if (com.jeladastudios.ftsgeology.worldgen.TerrainProbe.isVegetation(s)) return true;
+        // Trees are grown by the world, not built by anybody. Leaving them out made every log and
+        // leaf read as a build, which had three visible consequences: earthquakes left forests
+        // hanging in mid-air because the rule that puts them back down refused to touch them,
+        // volcanoes built their cone around stray trunks instead of through them, and lava stopped
+        // at the tree line. The cost is that a log cabin now reads as terrain too - accepted
+        // deliberately, since a floating forest is the worse outcome of the two.
+        if (s.is(BlockTags.LOGS) || s.is(BlockTags.LEAVES) || s.is(BlockTags.WART_BLOCKS)
+                || s.is(Blocks.MANGROVE_ROOTS) || s.is(Blocks.MUSHROOM_STEM)
+                || s.is(Blocks.BROWN_MUSHROOM_BLOCK) || s.is(Blocks.RED_MUSHROOM_BLOCK)) {
+            return true;
+        }
         if (s.is(BlockTags.BASE_STONE_OVERWORLD)      // stone, granite, diorite, andesite, tuff, deepslate (+modded)
                 || s.is(BlockTags.BASE_STONE_NETHER)  // netherrack, basalt, blackstone (+modded)
                 || s.is(BlockTags.DIRT)
