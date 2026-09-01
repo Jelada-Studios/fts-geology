@@ -75,10 +75,9 @@ public class GeyserIgniterBlockEntity extends BlockEntity {
 
         Player near = level.getNearestPlayer(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, 48, false);
         if (near != null) {
-            near.sendSystemMessage(Component.literal(placed
-                    ? "A geyser is forming deep below (Y=" + coreY + "). Give it ~a minute to heat, "
-                            + "pressurise and surface here."
-                    : "The igniter couldn't form a geyser here."));
+            near.sendSystemMessage(placed
+                    ? Component.translatable("message.fts_geology.geyser_forming", coreY)
+                    : Component.translatable("message.fts_geology.geyser_failed"));
         }
     }
 

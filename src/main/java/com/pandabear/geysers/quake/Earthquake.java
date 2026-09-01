@@ -29,6 +29,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Locale;
 import java.util.Random;
 import com.pandabear.geysers.quake.QuakePlanner;
 import java.util.concurrent.CompletableFuture;
@@ -359,9 +360,10 @@ public final class Earthquake {
 
     private static void announce(ServerLevel level, BlockPos at, FaultType type,
                                  double magnitude, double depthMetres) {
-        Component msg = Component.literal(String.format(
-                        "Earthquake  M%.1f  %s  at %s depth", magnitude, label(type),
-                        DepthScale.format(depthMetres)))
+        // The magnitude is formatted here, not in the lang file: Minecraft's translation formatter
+        // only understands %s, %d and positional %N$s, and throws on a %.1f.
+        Component msg = Component.translatable("message.fts_geology.earthquake",
+                String.format(Locale.ROOT, "%.1f", magnitude), label(type), DepthScale.format(depthMetres))
                 .withStyle(ChatFormatting.RED);
         double radius = 260 + magnitude * 60;
         double r2 = radius * radius;

@@ -52,9 +52,9 @@ public class VolcanoIgniterBlockEntity extends BlockEntity {
 
             Player near = server.getNearestPlayer(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, 64, false);
             if (near != null) {
-                near.sendSystemMessage(Component.literal(built
-                        ? "A volcano has formed here. It will rumble, then erupt periodically — stand well back."
-                        : "Not enough vertical room here for a volcano (needs a tall mountain / open sky)."));
+                near.sendSystemMessage(built
+                        ? Component.translatable("message.fts_geology.volcano_formed")
+                        : Component.translatable("message.fts_geology.volcano_failed"));
             }
         }
     }

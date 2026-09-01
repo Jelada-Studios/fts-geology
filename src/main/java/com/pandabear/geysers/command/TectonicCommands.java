@@ -31,6 +31,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -90,8 +91,7 @@ public final class TectonicCommands {
                                 .then(Commands.literal("cancel").executes(ctx -> {
                                     int n = com.pandabear.geysers.quake.Earthquake.cancelAll();
                                     int v = com.pandabear.geysers.volcano.VolcanoJob.clear();
-                                    ctx.getSource().sendSuccess(() -> Component.literal(
-                                            "Cancelled " + n + " running earthquake(s) and " + v + " volcano build(s).")
+                                    ctx.getSource().sendSuccess(() -> Component.translatable("command.fts_geology.cancelled_s_running_earthquake_s_and_s_v", n, v)
                                             .withStyle(ChatFormatting.YELLOW), true);
                                     return 1;
                                 }))
@@ -118,62 +118,46 @@ public final class TectonicCommands {
     private static int plate(CommandContext<CommandSourceStack> ctx) {
         CommandSourceStack source = ctx.getSource();
         if (!GeyserConfig.TECTONICS_ENABLED.get()) {
-            source.sendFailure(Component.literal("Tectonics are disabled in the config."));
+            source.sendFailure(Component.translatable("command.fts_geology.tectonics_are_disabled_in_the_config"));
             return 0;
         }
         ServerLevel level = source.getLevel();
         BlockPos at = BlockPos.containing(source.getPosition());
         PlateSample s = TectonicMap.sample(level, at.getX(), at.getZ());
 
-        source.sendSuccess(() -> Component.literal("== Tectonics @ " + at.getX() + ", " + at.getZ() + " ==")
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.tectonics_s_s", at.getX(), at.getZ())
                 .withStyle(ChatFormatting.GOLD), false);
-        source.sendSuccess(() -> Component.literal(String.format(
-                "  Plate %s (%s), drifting %.0f deg at %.2f",
-                TectonicMap.plateCode(s.plateId()), s.plateKind(), s.plateBearing(), s.plateSpeed())), false);
-        source.sendSuccess(() -> Component.literal(String.format(
-                "  Nearest boundary: %s, %.0f blocks away", s.faultType(), s.faultDistance()))
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.tectonics.plate", TectonicMap.plateCode(s.plateId()), s.plateKind(), dec(s.plateBearing(), 0), dec(s.plateSpeed(), 2)), false);
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.tectonics.boundary", s.faultType(), dec(s.faultDistance(), 0))
                 .withStyle(colorOf(s.faultType())), false);
-        source.sendSuccess(() -> Component.literal(String.format(
-                "  Against plate %s (%s) | convergence %+.2f, shear %.2f",
-                TectonicMap.plateCode(s.neighbourId()), s.neighbourKind(),
-                s.convergence(), s.shear())), false);
-        source.sendSuccess(() -> Component.literal(String.format(
-                "  Stress %.2f  %s", s.stress(), bar(s.stress()))), false);
-        source.sendSuccess(() -> Component.literal("  " + describe(s)).withStyle(ChatFormatting.GRAY), false);
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.tectonics.neighbour", TectonicMap.plateCode(s.neighbourId()), s.neighbourKind(), String.format(Locale.ROOT, "%+.2f", s.convergence()), dec(s.shear(), 2)), false);
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.tectonics.stress", dec(s.stress(), 2), bar(s.stress())), false);
+        source.sendSuccess(() -> Component.translatable(describeKey(s)).withStyle(ChatFormatting.GRAY), false);
 
         // Hotspot state: the intraplate story a boundary map alone cannot tell.
         HotspotMap.Hotspot hot = HotspotMap.sample(level, at.getX(), at.getZ());
         if (hot.strength() > 0) {
-            source.sendSuccess(() -> Component.literal(String.format(
-                    "  Mantle hotspot directly below, strength %.2f %s",
-                    hot.strength(), bar(hot.strength()))).withStyle(ChatFormatting.LIGHT_PURPLE), false);
+            source.sendSuccess(() -> Component.translatable("command.fts_geology.tectonics.hotspot", dec(hot.strength(), 2), bar(hot.strength())).withStyle(ChatFormatting.LIGHT_PURPLE), false);
         } else if (hot.onTrail()) {
-            source.sendSuccess(() -> Component.literal(String.format(
-                    "  On a hotspot trail, %.0f%% of the way to extinct",
-                    hot.trailAge() * 100)).withStyle(ChatFormatting.LIGHT_PURPLE), false);
+            source.sendSuccess(() -> Component.translatable("command.fts_geology.tectonics.hotspot_trail", dec(hot.trailAge() * 100, 0)).withStyle(ChatFormatting.LIGHT_PURPLE), false);
         }
 
         // Depth reported in real units via the scale, not in blocks.
         int surfaceY = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE,
                 at.getX(), at.getZ());
-        source.sendSuccess(() -> Component.literal(String.format(
-                "  Scaled crust here: %s thick | typical quake focus: %s",
-                DepthScale.format(DepthScale.crustBaseMetres(level, surfaceY)),
-                s.faultType() == FaultType.INTERIOR ? "n/a"
-                        : DepthScale.format(s.faultType().typicalQuakeDepth() * 1000.0)))
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.scaled_crust_here_s_thick_typical_quake_", DepthScale.format(DepthScale.crustBaseMetres(level, surfaceY)), s.faultType() == FaultType.INTERIOR ? "n/a"
+                        : DepthScale.format(s.faultType().typicalQuakeDepth() * 1000.0))
                 .withStyle(ChatFormatting.DARK_AQUA), false);
 
         GeothermalSuitability.Suitability fit = GeothermalSuitability.at(level, at.getX(), at.getZ());
-        source.sendSuccess(() -> Component.literal(String.format(
-                "  Suitability - volcano %.2f, geyser %.2f, hot spring %.2f",
-                fit.volcano(), fit.geyser(), fit.hotSpring())), false);
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.tectonics.suitability", dec(fit.volcano(), 2), dec(fit.geyser(), 2), dec(fit.hotSpring(), 2)), false);
         return 1;
     }
 
     private static int map(CommandContext<CommandSourceStack> ctx, int requestedStep) {
         CommandSourceStack source = ctx.getSource();
         if (!GeyserConfig.TECTONICS_ENABLED.get()) {
-            source.sendFailure(Component.literal("Tectonics are disabled in the config."));
+            source.sendFailure(Component.translatable("command.fts_geology.tectonics_are_disabled_in_the_config"));
             return 0;
         }
         ServerLevel level = source.getLevel();
@@ -184,8 +168,7 @@ public final class TectonicCommands {
                 : Math.max(16, (int) (GeyserConfig.PLATE_SCALE.get() * 2.0 / MAP_SIZE));
         int half = MAP_SIZE / 2;
 
-        source.sendSuccess(() -> Component.literal(
-                "== Plate map, " + step + " blocks per cell ==").withStyle(ChatFormatting.GOLD), false);
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.plate_map_s_blocks_per_cell", step).withStyle(ChatFormatting.GOLD), false);
 
         // 625 columns of Voronoi and hotspot maths is far too much to do inside a tick, and none of
         // it touches the world, so it is computed on a worker thread and only the finished glyph
@@ -197,12 +180,11 @@ public final class TectonicCommands {
                     for (MutableComponent row : rows) {
                         source.sendSuccess(() -> row, false);
                     }
-                    source.sendSuccess(() -> Component.literal(
-                            "  ^ collision  V subduction  ~ rift  = transform  * hotspot  . interior")
+                    source.sendSuccess(() -> Component.translatable("command.fts_geology.collision_v_subduction_rift_transform_ho")
                             .withStyle(ChatFormatting.GRAY), false);
                 }, level.getServer())
                 .exceptionally(t -> {
-                    source.sendFailure(Component.literal("Map failed: " + t));
+                    source.sendFailure(Component.translatable("command.fts_geology.map_failed_s", t));
                     return null;
                 });
         return 1;
@@ -212,6 +194,9 @@ public final class TectonicCommands {
     private static List<MutableComponent> renderGrid(ServerLevel level, BlockPos at, int step, int half) {
         List<MutableComponent> rows = new ArrayList<>();
         for (int row = -half; row <= half; row++) {
+            // Literals, not translation keys: these are map symbols, not language. The legend below
+            // the map is translated, but the glyphs themselves have to stay one character wide and
+            // match that legend, so they are not something a translator should be able to change.
             MutableComponent line = Component.literal("");
             for (int col = -half; col <= half; col++) {
                 int wx = at.getX() + col * step;
@@ -253,19 +238,37 @@ public final class TectonicCommands {
     }
 
     /** Plain-language note on what this boundary would build in the real world. */
-    private static String describe(PlateSample s) {
+    private static String describeKey(PlateSample s) {
         return switch (s.faultType()) {
-            case CONVERGENT_COLLISION ->
-                    "Two continents crumpling: a high mountain belt, big shallow quakes, no volcanoes.";
-            case CONVERGENT_SUBDUCTION ->
-                    "Oceanic crust diving under: a volcanic arc, deep trenches and the strongest quakes.";
-            case DIVERGENT ->
-                    "Crust pulling apart: a rift valley or spreading ridge, with hot springs and geysers.";
-            case TRANSFORM ->
-                    "Plates grinding past each other: a strike-slip fault with sharp, shallow quakes.";
-            case INTERIOR ->
-                    "Stable plate interior. The nearest boundary is too far to matter here.";
+            case CONVERGENT_COLLISION  -> "command.fts_geology.tectonics.setting.collision";
+            case CONVERGENT_SUBDUCTION -> "command.fts_geology.tectonics.setting.subduction";
+            case DIVERGENT             -> "command.fts_geology.tectonics.setting.rift";
+            case TRANSFORM             -> "command.fts_geology.tectonics.setting.transform";
+            case INTERIOR              -> "command.fts_geology.tectonics.setting.interior";
         };
+    }
+
+    /** What the boundary should have left in the column here, for reading a section against. */
+    private static String expectedKey(FaultType type) {
+        return switch (type) {
+            case CONVERGENT_COLLISION  -> "command.fts_geology.column.expected.collision";
+            case CONVERGENT_SUBDUCTION -> "command.fts_geology.column.expected.subduction";
+            case DIVERGENT             -> "command.fts_geology.column.expected.rift";
+            case TRANSFORM             -> "command.fts_geology.column.expected.transform";
+            case INTERIOR              -> "command.fts_geology.column.expected.interior";
+        };
+    }
+
+    /**
+     * Renders a decimal for display.
+     *
+     * <p>Minecraft's translation formatter only understands {@code %s}, {@code %d} and positional
+     * {@code %N$s} - a {@code %.2f} left in a lang file throws when the line is drawn. So decimals
+     * are converted here and handed to the component as finished text. {@link Locale#ROOT} keeps
+     * the separator a dot whatever locale the server JVM happened to boot in.</p>
+     */
+    private static String dec(double v, int places) {
+        return String.format(Locale.ROOT, "%." + places + "f", v);
     }
 
     private static String bar(double v) {
@@ -283,11 +286,11 @@ public final class TectonicCommands {
     private static int mapItem(CommandContext<CommandSourceStack> ctx, int requestedPixel) {
         CommandSourceStack source = ctx.getSource();
         if (!GeyserConfig.TECTONICS_ENABLED.get()) {
-            source.sendFailure(Component.literal("Tectonics are disabled in the config."));
+            source.sendFailure(Component.translatable("command.fts_geology.tectonics_are_disabled_in_the_config"));
             return 0;
         }
         if (!(source.getEntity() instanceof net.minecraft.server.level.ServerPlayer player)) {
-            source.sendFailure(Component.literal("Only a player can be handed a map."));
+            source.sendFailure(Component.translatable("command.fts_geology.only_a_player_can_be_handed_a_map"));
             return 0;
         }
         ServerLevel level = source.getLevel();
@@ -298,7 +301,7 @@ public final class TectonicCommands {
                 : Math.max(1, (int) (GeyserConfig.PLATE_SCALE.get() * 2.0 / 128));
         final int fx = at.getX(), fz = at.getZ(), fpp = perPixel;
 
-        source.sendSuccess(() -> Component.literal("Surveying the plates...")
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.surveying_the_plates")
                 .withStyle(ChatFormatting.GRAY), false);
 
         // 16384 pixels of Voronoi maths is far too much for a tick, and none of it touches the
@@ -310,12 +313,10 @@ public final class TectonicCommands {
                     if (!player.getInventory().add(stack)) {
                         player.drop(stack, false);
                     }
-                    source.sendSuccess(() -> Component.literal(
-                            "Fault map drawn at " + fpp + " blocks per pixel - "
-                                    + (fpp * 128) + " blocks across.").withStyle(ChatFormatting.GREEN), false);
+                    source.sendSuccess(() -> Component.translatable("command.fts_geology.fault_map_drawn_at_s_blocks_per_pixel_s_", fpp, (fpp * 128)).withStyle(ChatFormatting.GREEN), false);
                 }, level.getServer())
                 .exceptionally(t -> {
-                    source.sendFailure(Component.literal("Map failed: " + t));
+                    source.sendFailure(Component.translatable("command.fts_geology.map_failed_s", t));
                     return null;
                 });
         return 1;
@@ -342,9 +343,7 @@ public final class TectonicCommands {
                 net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, at.getX(), at.getZ());
         int bottom = level.getMinBuildHeight();
 
-        source.sendSuccess(() -> Component.literal(String.format(
-                "== Section at %d, %d  |  %s, stress %.2f ==",
-                at.getX(), at.getZ(), s.faultType(), s.stress())).withStyle(ChatFormatting.GOLD), false);
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.column.header", at.getX(), at.getZ(), s.faultType(), dec(s.stress(), 2)).withStyle(ChatFormatting.GOLD), false);
 
         // Walk down, collapsing runs of the same block so a 380-block column reads as a dozen lines.
         List<String> lines = new ArrayList<>();
@@ -370,23 +369,18 @@ public final class TectonicCommands {
         if (runName != null && shown < 26) {
             lines.add(String.format("  Y %4d..%4d  %s", bottom, runTop, runName));
         }
+        // Literal: each line is a column-aligned "Y  64.. 71  Stone" row built by String.format, and
+        // the block name inside it is already localised by Minecraft.
         for (String line : lines) {
             source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GRAY), false);
         }
 
         // Name what the boundary should have left here, so the section can be read against it.
-        String expected = switch (s.faultType()) {
-            case CONVERGENT_COLLISION -> "folded calcite / tuff / diorite bands (metamorphic root)";
-            case CONVERGENT_SUBDUCTION -> "a basalt-blackstone slab deep down, granite/diorite higher";
-            case DIVERGENT -> "near-vertical basalt dykes, open fractures near the axis";
-            case TRANSFORM -> "a narrow band of cobbled deepslate, gravel and tuff";
-            case INTERIOR -> "nothing - this is plate interior";
-        };
-        source.sendSuccess(() -> Component.literal("  Expected here: " + expected)
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.expected_here_s",
+                        Component.translatable(expectedKey(s.faultType())))
                 .withStyle(ChatFormatting.DARK_AQUA), false);
         if (s.stress() < 0.25 && s.faultType() != FaultType.INTERIOR) {
-            source.sendSuccess(() -> Component.literal(
-                    "  Stress is below 0.25, so this column is outside the active part of the zone.")
+            source.sendSuccess(() -> Component.translatable("command.fts_geology.stress_is_below_0_25_so_this_column_is_o")
                     .withStyle(ChatFormatting.YELLOW), false);
         }
         return 1;
@@ -433,19 +427,14 @@ public final class TectonicCommands {
         final int count = done;
         final int placed = blocks;
         final String why = note;
-        source.sendSuccess(() -> Component.literal(String.format(
-                "Deep structure regenerated for %d chunk(s) around %d, %d (%s, stress %.2f). "
-                        + "%d blocks placed. Use /geology column to read the section.",
-                count, cp0(centre), cp1(centre), s.faultType(), s.stress(),
-                placed)).withStyle(ChatFormatting.GREEN), false);
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.deepgen.done", count, cp0(centre), cp1(centre), s.faultType(), dec(s.stress(), 2), placed).withStyle(ChatFormatting.GREEN), false);
         if (placed == 0 && why != null) {
             final String w = why;
-            source.sendSuccess(() -> Component.literal("  Nothing placed: " + w)
+            source.sendSuccess(() -> Component.translatable("command.fts_geology.nothing_placed_s", w)
                     .withStyle(ChatFormatting.YELLOW), false);
         }
         if (s.stress() < 0.25) {
-            source.sendSuccess(() -> Component.literal(
-                    "  Note: stress here is too low for deep structure. Use /geology find <type> tp first.")
+            source.sendSuccess(() -> Component.translatable("command.fts_geology.note_stress_here_is_too_low_for_deep_str")
                     .withStyle(ChatFormatting.GRAY), false);
         }
         return 1;
@@ -467,7 +456,7 @@ public final class TectonicCommands {
         ServerLevel level = source.getLevel();
         BlockPos at = BlockPos.containing(source.getPosition());
 
-        source.sendSuccess(() -> Component.literal("Searching for the nearest " + what + "...")
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.searching_for_the_nearest_s", what)
                 .withStyle(ChatFormatting.GRAY), false);
 
         // Searching outward can mean a hundred thousand plate samples before a rare setting turns
@@ -477,8 +466,7 @@ public final class TectonicCommands {
                 .supplyAsync(() -> search(level, at, what), Util.backgroundExecutor())
                 .thenAcceptAsync(hit -> {
                     if (hit == null) {
-                        source.sendFailure(Component.literal("No " + what
-                                + " found within about 21000 blocks. Try another setting or world."));
+                        source.sendFailure(Component.translatable("command.fts_geology.no_s_found_within_about_21000_blocks_try", what));
                         return;
                     }
                     // Only now, on the server thread: generate the one destination chunk so the
@@ -486,15 +474,13 @@ public final class TectonicCommands {
                     level.getChunk(hit.x() >> 4, hit.z() >> 4);
                     int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE,
                             hit.x(), hit.z());
-                    source.sendSuccess(() -> Component.literal(String.format(
-                            "Nearest %s: %d, %d, %d  (about %d blocks away)",
-                            what, hit.x(), y, hit.z(), hit.distance())).withStyle(ChatFormatting.GREEN), false);
+                    source.sendSuccess(() -> Component.translatable("command.fts_geology.nearest_s_d_d_d_about_d_blocks_away", what, hit.x(), y, hit.z(), hit.distance()).withStyle(ChatFormatting.GREEN), false);
                     if (teleport && source.getEntity() instanceof net.minecraft.server.level.ServerPlayer p) {
                         p.teleportTo(level, hit.x() + 0.5, y + 1, hit.z() + 0.5, p.getYRot(), p.getXRot());
                     }
                 }, level.getServer())
                 .exceptionally(t -> {
-                    source.sendFailure(Component.literal("Search failed: " + t));
+                    source.sendFailure(Component.translatable("command.fts_geology.search_failed_s", t));
                     return null;
                 });
         return 1;
@@ -545,29 +531,25 @@ public final class TectonicCommands {
         BlockPos at = BlockPos.containing(source.getPosition());
         GeothermalSuitability.Suitability fit = GeothermalSuitability.at(level, at.getX(), at.getZ());
 
-        source.sendSuccess(() -> Component.literal("== Geothermal suitability here ==")
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.geothermal_suitability_here")
                 .withStyle(ChatFormatting.GOLD), false);
-        source.sendSuccess(() -> Component.literal(String.format(
-                "  Volcano %.2f %s", fit.volcano(), bar(fit.volcano()))), false);
-        source.sendSuccess(() -> Component.literal(String.format(
-                "  Geyser  %.2f %s", fit.geyser(), bar(fit.geyser()))), false);
-        source.sendSuccess(() -> Component.literal(String.format(
-                "  Springs %.2f %s", fit.hotSpring(), bar(fit.hotSpring()))), false);
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.suitability.volcano", dec(fit.volcano(), 2), bar(fit.volcano())), false);
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.suitability.geyser", dec(fit.geyser(), 2), bar(fit.geyser())), false);
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.suitability.springs", dec(fit.hotSpring(), 2), bar(fit.hotSpring())), false);
         String painted = com.pandabear.geysers.tectonics.ThermalBiomes.label(level, at.getX(), at.getZ());
         if (!painted.isEmpty()) {
-            source.sendSuccess(() -> Component.literal(
-                    "  The world generator already put " + painted + " here, so the model treats "
-                            + "this as a mantle hotspot.").withStyle(ChatFormatting.LIGHT_PURPLE), false);
+            source.sendSuccess(() -> Component.translatable("command.fts_geology.the_world_generator_already_put_s_here_s", painted).withStyle(ChatFormatting.LIGHT_PURPLE), false);
         }
         HotspotMap.Hotspot spot = HotspotMap.sample(level, at.getX(), at.getZ());
         if (spot.strength() > 0) {
             double basin = HotspotMap.basinStrength(level, at.getX(), at.getZ());
-            source.sendSuccess(() -> Component.literal(String.format(
-                    "  Geyser basin %.2f %s  %s", basin, bar(basin),
-                    basin > 0.15 ? "(dense thermal ground)" : "(quiet ground between basins)"))
+            source.sendSuccess(() -> Component.translatable("command.fts_geology.suitability.basin", dec(basin, 2), bar(basin),
+                    Component.translatable(basin > 0.15
+                            ? "command.fts_geology.suitability.basin_dense"
+                            : "command.fts_geology.suitability.basin_quiet"))
                     .withStyle(ChatFormatting.LIGHT_PURPLE), false);
         }
-        source.sendSuccess(() -> Component.literal("  " + fit.reason())
+        source.sendSuccess(() -> Component.translatable(fit.reasonKey())
                 .withStyle(ChatFormatting.GRAY), false);
         return 1;
     }
@@ -586,9 +568,7 @@ public final class TectonicCommands {
 
         if (forcedType == null) {
             if (!Earthquake.triggerHere(level, at, magnitude)) {
-                source.sendFailure(Component.literal(
-                        "No fault here - plate interiors do not rupture. Use /geology find <type> tp, "
-                                + "or force one with /geology quake <type>."));
+                source.sendFailure(Component.translatable("command.fts_geology.no_fault_here_plate_interiors_do_not_rup"));
                 return 0;
             }
             return 1;
@@ -602,7 +582,7 @@ public final class TectonicCommands {
             default -> null;
         };
         if (type == null) {
-            source.sendFailure(Component.literal("Unknown fault type: " + forcedType));
+            source.sendFailure(Component.translatable("command.fts_geology.unknown_fault_type_s", forcedType));
             return 0;
         }
         // Use the real local strike when there is one, so a forced quake still lines up with the
@@ -616,10 +596,7 @@ public final class TectonicCommands {
         // read as a bug. Plain /geology quake with no type uses the real local fault.
         final FaultType real = s.faultType();
         if (real != type) {
-            source.sendSuccess(() -> Component.literal(String.format(
-                    "Forcing a %s rupture here - the real boundary at this spot is %s. "
-                            + "Use /geology quake with no type to rupture the actual fault.",
-                    forcedType, real)).withStyle(ChatFormatting.YELLOW), false);
+            source.sendSuccess(() -> Component.translatable("command.fts_geology.forcing_a_s_rupture_here_the_real_bounda", forcedType, real).withStyle(ChatFormatting.YELLOW), false);
         }
         Earthquake.trigger(level, at, type, mag, sx, sz, true);   // command picked the type
         return 1;
@@ -665,9 +642,9 @@ public final class TectonicCommands {
             default -> ok = false;
         }
         final boolean done = ok;
-        source.sendSuccess(() -> Component.literal(done
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.s_s_here", done
                 ? "Placed " + what + " here (suitability gate bypassed). Large volcanoes build over a few seconds."
-                : "Could not place " + what + " here."), false);
+                : "Could not place ", what), false);
         return done ? 1 : 0;
     }
 }
