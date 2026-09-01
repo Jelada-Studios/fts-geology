@@ -4,7 +4,7 @@ plugins {
 }
 
 version = '0.9.0-alpha'
-group = 'com.pandabear.geysers'
+group = 'com.jeladastudios.ftsgeology'
 archivesBaseName = 'fts-geology'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
