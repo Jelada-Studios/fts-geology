@@ -37,11 +37,13 @@ occurrence of the string `com.pandabear.geysers` throughout `src/`, not just the
 
 ### Outside Java
 
-`build.gradle`:
+`build.gradle`, line 7 — the last remaining occurrence of the old name outside Java:
 ```
-group = 'com.pandabear.geysers'          ->  group = 'com.jeladastudios.ftsgeology'
-'Specification-Vendor'  : 'pandabear',   ->  'Specification-Vendor'  : 'Jelada Studios',
+group = 'com.pandabear.geysers'   ->   group = 'com.jeladastudios.ftsgeology'
 ```
+
+The jar manifest attributes in the same file have already been corrected to
+`FT's Geology` / `Jelada Studios`. Leave them as they are.
 
 ## Two stale names to fix while you are in there
 

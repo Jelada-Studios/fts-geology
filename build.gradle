@@ -37,8 +37,8 @@ dependencies {
 tasks.named('jar') {
     manifest {
         attributes([
-            'Specification-Title'   : 'geysers',
-            'Specification-Vendor'  : 'pandabear',
+            'Specification-Title'   : 'FT\'s Geology',
+            'Specification-Vendor'  : 'Jelada Studios',
             'Specification-Version' : '1',
             'Implementation-Title'  : project.name,
             'Implementation-Version': project.version
