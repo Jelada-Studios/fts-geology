@@ -644,10 +644,33 @@ public final class QuakePlanner {
         return Mth.clamp((int) Math.round(slip * (4 + magnitude * 2.4)), 2, 20);
     }
 
-    /** How far the overriding plate is heaved up behind a trench. */
+    /**
+     * How far inland the overriding plate is heaved up behind a trench.
+     *
+     * <p>Scaled off the same flexural length as the trench, so the two sides of the margin stay in
+     * proportion as magnitude grows. It is deliberately the <b>wider</b> of the two: the seaward
+     * side ends at {@code trenchReach * OUTER_RISE_END}, and this is about a quarter as far again.
+     * That is the right way round. A subduction margin is lopsided inland - the trench sits a
+     * hundred-odd kilometres offshore and the outer rise dies not far beyond it, while on the other
+     * side the Altiplano is hundreds of kilometres wide and the deformation front runs on past it
+     * into the Sub-Andean belt. It was previously capped at 44 blocks against a seaward reach of
+     * 112, which is not just too narrow but lopsided the wrong way.</p>
+     */
     private static int arcHalfWidth(int core) {
-        return Mth.clamp(core * 4, 10, 44);
+        return Mth.clamp((int) Math.round(flexuralLength(core) * 7.8), 12, 145);
     }
+
+    /** Where the volcanic arc crest stands, measured inland from the boundary. */
+    private static int arcCrest(int core) {
+        return Math.max(3, (int) Math.round(flexuralLength(core) * 1.6));
+    }
+
+    /**
+     * How high the back-arc plateau stands as a fraction of the arc crest. The high ground behind a
+     * volcanic arc does not fall straight off the back of it; it holds up as a plateau and only then
+     * declines into the foreland.
+     */
+    private static final double BACK_ARC_PLATEAU = 0.55;
 
     /** The natural scale of the down-going plate's bend; everything about the trench follows it. */
     private static double flexuralLength(int core) {
@@ -746,11 +769,26 @@ public final class QuakePlanner {
         if (across >= 0) {
             int arcHalf = arcHalfWidth(core);
             if (across > arcHalf) return 0;
-            int arcPeak = Math.max(2, (int) Math.round(arcHalf * 0.45));
+            int crest = Math.min(arcCrest(core), arcHalf - 1);
             int maxLift = Mth.clamp((int) Math.round(slip * magnitudeAmplitude(magnitude, 22.0) * 0.7), 1, 20);
-            double span = across < arcPeak ? arcPeak + 1 : arcHalf - arcPeak + 1;
-            double t = Mth.clamp((across - arcPeak) / span, -1.0, 1.0);
-            return (int) Math.round(maxLift * 0.5 * (1.0 + Math.cos(t * Math.PI)));
+
+            double shape;
+            if (across < crest) {
+                // Boundary to arc: climbs from nothing, so the margin itself stays an inflection
+                // rather than a wall standing at the water's edge.
+                shape = 0.5 * (1.0 - Math.cos(Math.PI * across / crest));
+            } else {
+                // Arc to foreland. Two terms: a quick drop off the back of the crest, and a broad
+                // plateau under it that only gives way near the far edge. Their sum falls from the
+                // crest to the plateau within the first fifth of the tail and then declines slowly
+                // across the rest of it, which is what makes the uplift a REGION rather than a
+                // ridge - the whole point of the change.
+                double u = (across - crest) / (double) (arcHalf - crest);
+                double taper = 0.5 * (1.0 + Math.cos(Math.PI * u));   // 1 at the crest, 0 at the edge
+                double offCrest = Math.exp(-u * 6.0);                 // the drop off the back
+                shape = taper * (BACK_ARC_PLATEAU + (1.0 - BACK_ARC_PLATEAU) * offCrest);
+            }
+            return (int) Math.round(maxLift * shape);
         }
 
         double d = -across;
