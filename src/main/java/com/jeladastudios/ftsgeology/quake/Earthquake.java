@@ -129,11 +129,31 @@ public final class Earthquake {
         }
         final BlockPos epicentreOnFault = epi;
 
+        // Give the margin a fixed polarity.
+        //
+        // Subduction and collision are both one-sided: one plate goes under, and which side gets the
+        // trench or the foreland basin is decided by the sign of `across`, which comes from the
+        // strike, which comes from a normal pointing from OUR plate to the neighbour. Sample the
+        // same boundary from the other side and that normal is negated, so the whole margin
+        // mirrors. Two quakes on one boundary could therefore drop the side the previous one had
+        // lifted - which is geological nonsense: the ocean floor dives under the continent no
+        // matter where you happen to be standing when it goes off.
+        //
+        // So the direction is taken from the BOUNDARY rather than from the sampled side. The
+        // oceanic plate is the one that dives; between two of a kind the lower plate id does, which
+        // is arbitrary but stable, and stability is the whole point here.
+        double sx = strikeX, sz = strikeZ;
+        if ((type == FaultType.CONVERGENT_SUBDUCTION || type == FaultType.CONVERGENT_COLLISION)
+                && downGoingIsOurs(here)) {
+            sx = -strikeX;
+            sz = -strikeZ;
+        }
+
         // Every stage is timed and logged. Three rounds of guessing where the cost was did not find
         // it; the log naming the slow stage - or stopping before one of these lines - will.
         long t0 = System.nanoTime();
         List<QuakePlanner.TracePoint> trace =
-                QuakePlanner.traceFault(level, epicentreOnFault, type, magnitude, strikeX, strikeZ, forced);
+                QuakePlanner.traceFault(level, epicentreOnFault, type, magnitude, sx, sz, forced);
         long t1 = System.nanoTime();
         GeysersMod.LOGGER.info("quake trace: {} points, {} blocks long, corridor +/-{} in {} ms",
                 trace.size(), QuakePlanner.ruptureLengthBlocks(magnitude),
@@ -354,6 +374,20 @@ public final class Earthquake {
      * strike-slip quakes are shallow crustal events - which is exactly why the shallow ones do so
      * much surface damage for their size.
      */
+    /**
+     * Is the plate the sample was taken on the one that goes under?
+     *
+     * <p>Dense oceanic crust always loses. Between two plates of the same kind nothing in the
+     * physics picks a winner, so the lower id is used: arbitrary, but the same answer from either
+     * side of the line, which is what stops the margin mirroring between quakes.</p>
+     */
+    private static boolean downGoingIsOurs(PlateSample s) {
+        boolean ours = s.plateKind().isOceanic();
+        boolean theirs = s.neighbourKind().isOceanic();
+        if (ours != theirs) return ours;
+        return Long.compareUnsigned(s.plateId(), s.neighbourId()) < 0;
+    }
+
     public static double quakeDepthMetres(FaultType type, RandomSource rng) {
         double base = type.typicalQuakeDepth() * 1000.0;   // the enum reports kilometres
         return base * (0.5 + rng.nextDouble());
