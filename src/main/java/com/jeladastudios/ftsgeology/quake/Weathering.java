@@ -11,6 +11,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
@@ -125,6 +126,32 @@ public final class Weathering {
     private static final Deque<Job> QUEUE = new ArrayDeque<>();
 
     /**
+     * Columns whose chunk was not loaded when the settling pass reached them, parked by chunk.
+     *
+     * <p>Without this they were simply dropped. A rupture corridor is tens of thousands of columns
+     * and a player stands in one place, so most of it is unloaded while the passes run - the ground
+     * a player flew out to look at afterwards had never been settled at all, and that is why trees
+     * were still hanging over it. The quake itself already solves this for its own edits, by parking
+     * them in {@link PendingEdits} until the chunk comes back; the settling that follows had no
+     * such thing.</p>
+     *
+     * <p>In memory only, like the quake's own parking: a restart loses whatever had not settled
+     * yet, which costs a little tidiness and no correctness.</p>
+     */
+    private static final java.util.Map<String, LongOpenHashSet> PARKED = new java.util.HashMap<>();
+
+    private static String parkKey(ResourceKey<Level> dim, int cx, int cz) {
+        return dim.location() + "@" + cx + "," + cz;
+    }
+
+    /** Re-queues the settling that was parked for a chunk, now that it is back. */
+    public static void onChunkLoaded(ServerLevel level, ChunkPos cp) {
+        LongOpenHashSet cols = PARKED.remove(parkKey(level.dimension(), cp.x, cp.z));
+        if (cols == null || cols.isEmpty()) return;
+        QUEUE.add(new Job(level.dimension(), cols.toLongArray()));
+    }
+
+    /**
      * Queues the corridor of a finished quake for weathering. The column list is taken from the
      * edits that were actually planned, so this touches exactly the ground the quake moved.
      */
@@ -151,6 +178,7 @@ public final class Weathering {
     public static int clear() {
         int n = QUEUE.size();
         QUEUE.clear();
+        PARKED.clear();
         return n;
     }
 
@@ -177,6 +205,14 @@ public final class Weathering {
             long k = job.columns[job.cursor++];
             done++;
             int cx = (int) (k >> 32), cz = (int) k;
+
+            // Park rather than drop. Never force a load: the settling waits for the next visit,
+            // exactly as parked deformation does.
+            if (level.getChunkSource().getChunkNow(cx >> 4, cz >> 4) == null) {
+                PARKED.computeIfAbsent(parkKey(job.dimension, cx >> 4, cz >> 4),
+                        key -> new LongOpenHashSet()).add(k);
+                continue;
+            }
             // Passes 0 and PASSES-1 bring down what is left hanging; the ones between take the raw
             // edges off the rock. With falling switched off, every pass goes to the rock rules
             // rather than being wasted.
