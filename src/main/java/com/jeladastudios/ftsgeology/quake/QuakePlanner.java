@@ -124,7 +124,10 @@ public final class QuakePlanner {
     public static int deformationHalfWidth(FaultType type, double magnitude) {
         int core = ruptureHalfWidth(magnitude);
         return switch (type) {
-            case DIVERGENT -> grabenHalfFloor(magnitude, 1.0) + 4;
+            case DIVERGENT -> {
+                int floor = grabenHalfFloor(magnitude, 1.0);
+                yield floor + riftShoulderReach(floor) + 4;
+            }
             case TRANSFORM -> strikeSlipHalfWidth(magnitude) + strikeSlipOffset(magnitude, 1.0) + 4;
             case CONVERGENT_SUBDUCTION ->
                     Math.max(arcHalfWidth(core), (int) Math.round(trenchReach(core) * OUTER_RISE_END)) + 4;
@@ -639,10 +642,31 @@ public final class QuakePlanner {
 
     // === Shape parameters, shared with deformationHalfWidth =================
 
-    /** Half-width of the dropped graben floor at a rift. */
+    /**
+     * Half-width of the dropped graben floor at a rift.
+     *
+     * <p>Was capped at 20, which made a rift 40 blocks across while a subduction margin ran past a
+     * hundred and a collision belt seventy - the narrowest thing the model built, when in the
+     * ground a rift valley is one of the widest. The East African Rift is thirty to a hundred
+     * kilometres from shoulder to shoulder.</p>
+     */
     private static int grabenHalfFloor(double magnitude, double slip) {
-        return Mth.clamp((int) Math.round(slip * (4 + magnitude * 2.4)), 2, 20);
+        return Mth.clamp((int) Math.round(slip * (6 + magnitude * 5.0)), 3, 46);
     }
+
+    /**
+     * How far the flexural shoulder reaches beyond the graben floor.
+     *
+     * <p>Stretching crust does not only drop the middle: unloading it lets the flanks rebound, so a
+     * real rift is a valley between two RAISED shoulders. That is the escarpment you stand on to
+     * look down into the Great Rift Valley, and the model had none of it.</p>
+     */
+    private static int riftShoulderReach(int halfFloor) {
+        return Math.max(6, (int) Math.round(halfFloor * 0.9));
+    }
+
+    /** Shoulder height as a fraction of the graben's own drop. Subordinate on purpose. */
+    private static final double RIFT_SHOULDER_FRACTION = 0.35;
 
     /**
      * How far inland the overriding plate is heaved up behind a trench.
@@ -732,12 +756,27 @@ public final class QuakePlanner {
     private static int riftDelta(double across, double slip, double magnitude, RandomGenerator rng) {
         if (slip <= 0.02) return 0;
         int halfFloor = grabenHalfFloor(magnitude, slip);
+        int shoulder = riftShoulderReach(halfFloor);
         double d = Math.abs(across);
-        if (d > halfFloor) return 0;
+        if (d > halfFloor + shoulder) return 0;
 
         int drop = Mth.clamp((int) Math.round(slip * magnitudeAmplitude(magnitude, 9.0) * 1.4), 1, 8);
-        double edge = 1.0 - d / (halfFloor + 1.0);
-        int cut = Math.max(1, (int) Math.round(drop * edge));
+
+        if (d > halfFloor) {
+            // The raised shoulder. A half sine: zero where it meets the valley rim and zero again
+            // where it dies out, so it swells up between the two and joins the floor without a
+            // step. Flexural uplift really does crest a little way back from the border fault
+            // rather than right on it, which is what this shape says.
+            double u = (d - halfFloor) / (double) shoulder;
+            int lift = (int) Math.round(drop * RIFT_SHOULDER_FRACTION * Math.sin(Math.PI * u));
+            return lift;
+        }
+
+        // The floor. Smoothstep rather than a straight line, and NOT floored at one block: the old
+        // profile kept a minimum cut of 1 all the way out, so the valley ended in a one-block step
+        // instead of running out into the countryside.
+        double t = smoothstep(1.0 - d / (halfFloor + 1.0));
+        int cut = (int) Math.round(drop * t);
 
         // The fissure itself: a narrow, much deeper opening right on the axis.
         if (d <= 1.2) {
@@ -745,7 +784,7 @@ public final class QuakePlanner {
                     * (0.55 + 0.45 * rng.nextDouble()));
             cut = Math.max(cut, depth);
         }
-        return -cut;
+        return cut <= 0 ? 0 : -cut;
     }
 
     /**

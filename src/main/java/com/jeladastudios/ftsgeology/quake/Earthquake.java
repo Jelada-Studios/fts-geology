@@ -285,8 +285,9 @@ public final class Earthquake {
             ServerPlayer p = players.get(level.random.nextInt(players.size()));
 
             // Look for a fault a little way off, so the epicentre is nearby but not underfoot.
-            int ox = level.random.nextInt(257) - 128;
-            int oz = level.random.nextInt(257) - 128;
+            int reach = GeyserConfig.QUAKE_SEARCH_RADIUS.get();
+            int ox = level.random.nextInt(reach * 2 + 1) - reach;
+            int oz = level.random.nextInt(reach * 2 + 1) - reach;
             int x = p.blockPosition().getX() + ox;
             int z = p.blockPosition().getZ() + oz;
             PlateSample s = TectonicMap.sample(level, x, z);

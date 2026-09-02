@@ -128,6 +128,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue FALLING_INCLUDES_BUILDS;   // default ON
     public static final ForgeConfigSpec.IntValue QUAKE_BLOCKS_PER_TICK;    // main-thread apply budget
     public static final ForgeConfigSpec.IntValue QUAKE_AMBIENT_INTERVAL;   // ticks between ambient rolls
+    public static final ForgeConfigSpec.IntValue QUAKE_SEARCH_RADIUS;      // how far from a player to look
     public static final ForgeConfigSpec.DoubleValue QUAKE_RECURRENCE_DAYS; // mean interval between ruptures
     public static final ForgeConfigSpec.IntValue QUAKE_MAX_FISSURE_DEPTH;  // divergent rift depth cap
     public static final ForgeConfigSpec.IntValue QUAKE_MAX_RUPTURE;        // cap on rupture length, blocks
@@ -573,6 +574,14 @@ public final class GeyserConfig {
                 .comment("Ticks between ambient earthquake rolls. 0 disables ambient quakes entirely",
                         "(the /geology quake command still works).")
                 .defineInRange("quakeAmbientInterval", 6000, 0, 1728000);
+        QUAKE_SEARCH_RADIUS = b
+                .comment("How far from a player an ambient quake looks for a fault, in blocks.",
+                        "This is the knob that actually decides how often you feel one. Each roll",
+                        "picks a single random point inside this radius, and if that point is plate",
+                        "interior nothing happens at all - so a player who is not near a boundary can",
+                        "go a very long time without a quake however low the recurrence is set.",
+                        "Raise it to find faults further off; lower it to make quakes strictly local.")
+                .defineInRange("quakeSearchRadius", 128, 16, 2048);
         QUAKE_RECURRENCE_DAYS = b
                 .comment("Average in-game days between ruptures on a fully stressed fault.",
                         "Real faults rupture on a recurrence interval - decades to centuries - rather",
