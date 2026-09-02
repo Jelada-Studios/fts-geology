@@ -65,8 +65,24 @@ public final class Weathering {
      */
     private static final int PASSES = 5;
 
-    /** How far above the new ground a column is searched for something left hanging. */
-    private static final int SEARCH = 24;
+    /**
+     * How far above the new ground to look for the underside of whatever is left hanging.
+     *
+     * <p>Has to cover the deepest the ground can drop, which is {@link QuakePlanner#MAX_CAPTURE_DEPTH}
+     * plus room for the weathering passes to lower it further.</p>
+     */
+    private static final int GAP_SEARCH = 40;
+
+    /**
+     * How tall a hanging stack may be before it is left alone.
+     *
+     * <p>Separate from {@link #GAP_SEARCH} on purpose. These used to be one number, and a single
+     * 24-block window had to hold the gap AND the whole tree: a large quake drops the ground twenty
+     * blocks, which put the canopy beyond the end of the window, so the trunk was cleared and the
+     * leaves were left floating to decay on vanilla's slow timer. That is the "logs gone, leaves
+     * still up there" report. Terralith's big trees need most of this.</p>
+     */
+    private static final int STACK_LIMIT = 48;
 
     /** A tree can ride the ground down this far. Past it, the slope failed and took the tree. */
     private static final int RIDE_LIMIT = 3;
@@ -177,11 +193,13 @@ public final class Weathering {
 
         // The gap: how far the ground fell out from under whatever is up there.
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-        int limit = Math.min(g + 1 + SEARCH, level.getMaxBuildHeight() - 1);
+        int roof = level.getMaxBuildHeight() - 1;
+        int gapLimit = Math.min(g + 1 + GAP_SEARCH, roof);
         int base = g + 1;
-        while (base < limit && level.getBlockState(m.set(x, base, z)).isAir()) base++;
+        while (base < gapLimit && level.getBlockState(m.set(x, base, z)).isAir()) base++;
         int drop = base - (g + 1);
-        if (drop <= 0 || base >= limit) return false;
+        if (drop <= 0 || base >= gapLimit) return false;
+        int limit = Math.min(base + STACK_LIMIT, roof);
 
         // Read the hanging stack. Anything solid comes down; only a fluid stops the column, because
         // dropping a stack through standing water would drain the lake it is sitting in.

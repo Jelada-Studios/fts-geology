@@ -80,7 +80,7 @@ public final class VolcanoBuilder {
 
         // 3. A caldera does the opposite: it excavates its floor and throws up a ring scarp.
         if (c.type.excavates()) {
-            forEachRow(job, c.craterR + 6, dx -> lvl -> carveCalderaRow(lvl, c, dx));
+            forEachRow(job, calderaRingReach(c), dx -> lvl -> carveCalderaRow(lvl, c, dx));
         }
 
         // 4. The debris apron that blends whatever we built into the countryside.
@@ -348,13 +348,32 @@ public final class VolcanoBuilder {
      * Building it as a low wide cone, which is what happened before, produced a flat basalt disc
      * sitting on the landscape and nothing that read as Yellowstone at all.
      */
+    /**
+     * Radius of the ring fault at one bearing.
+     *
+     * <p>Shared with {@link #buildApronRow} and {@link #calderaRingReach} on purpose. It used to be
+     * written out separately in each place, and they drifted: the carve loop ran to
+     * {@code craterR + 7} while this can reach {@code craterR * 1.34}, so wherever the ring bulged
+     * the scarp was simply cut off, and the apron started at a fixed radius that left bare ground
+     * wherever the ring was narrow. That is the "caldera, then a strip of grass, then a basalt wall"
+     * report.</p>
+     */
+    private static double ringRadius(Ctx c, double ang) {
+        return c.craterR * (1.0 + 0.22 * Math.sin(2 * ang + c.phaseA)
+                + 0.12 * Math.sin(3 * ang + c.phaseB));
+    }
+
+    /** How far out the ring fault can possibly reach, scarp included. */
+    private static int calderaRingReach(Ctx c) {
+        return (int) Math.ceil(c.craterR * 1.34) + 7;
+    }
+
     private static void carveCalderaRow(ServerLevel level, Ctx c, int dx) {
-        int reach = c.craterR + 7;
+        int reach = calderaRingReach(c);
         for (int dz = -reach; dz <= reach; dz++) {
             double dist = Math.sqrt(dx * dx + dz * dz);
             double ang = Math.atan2(dz, dx);
-            double rr = c.craterR * (1.0 + 0.22 * Math.sin(2 * ang + c.phaseA)
-                    + 0.12 * Math.sin(3 * ang + c.phaseB));
+            double rr = ringRadius(c, ang);
             int gx = c.x + dx, gz = c.z + dz;
             int ground = TerrainProbe.groundY(level, gx, gz);
             if (ground == Integer.MIN_VALUE) continue;
@@ -434,20 +453,27 @@ public final class VolcanoBuilder {
         // crack itself: what a rift erupts is a flood-basalt FIELD spreading out from the line, so an
         // annulus with bare ground in the middle would have been exactly backwards. The ponds are cut
         // into this field afterwards.
+        // The smallest the inner edge can be, used only to bail out early; a caldera recomputes it
+        // per column below, because its ring fault is not a circle.
         int inner = switch (c.type) {
-            case CALDERA -> (int) Math.round(c.craterR * 1.35) + 5;
+            case CALDERA -> (int) Math.round(c.craterR * 0.66) + 6;
             case FISSURE -> 0;
             default -> c.coneBaseR;
         };
         if (inner >= reach) return;
         for (int dz = -reach; dz <= reach; dz++) {
             double dist = Math.sqrt(dx * dx + dz * dz);
-            if (dist <= inner || dist > reach) continue;
+            if (dist > reach) continue;
             double ang = Math.atan2(dz, dx);
+            // A caldera's apron starts just outside the scarp AT THIS BEARING. With a fixed radius
+            // it left a band of untouched grass wherever the ring came in narrow, which read as a
+            // moat between the volcano and its own skirt.
+            double localInner = c.type == VolcanoType.CALDERA ? ringRadius(c, ang) + 6 : inner;
+            if (dist <= localInner) continue;
             double edge = reach * (0.84 + 0.16 * Math.sin(3 * ang + c.phaseC));
-            if (dist > edge) continue;
+            if (dist > edge || localInner >= edge) continue;
 
-            double t = 1.0 - (dist - inner) / Math.max(1.0, edge - inner);
+            double t = 1.0 - (dist - localInner) / Math.max(1.0, edge - localInner);
             // Speckling: certain near the cone, sparse at the rim. This is what dissolves the hard
             // boundary the player was seeing between basalt and native terrain.
             if (level.random.nextDouble() > Mth.clamp(t * 1.7, 0.0, 1.0)) continue;

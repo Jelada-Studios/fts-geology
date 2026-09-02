@@ -13,7 +13,9 @@ description = '''
 A simulated geology layer for Minecraft: tectonic plates with real motion, fault lines that
 produce the landforms they should, earthquakes, volcanoes shaped by their setting, geysers with
 actual thermodynamics, hot springs and travertine terraces.
-Retrogen-safe: bolts onto existing worlds without touching builds. Reads the world biome source
+Retrogen-safe: bolts onto existing worlds. Nothing is destroyed, but ground that loses its support
+falls, builds included - there is a config toggle if you would rather they stayed put. Reads the
+world biome source
 rather than replacing worldgen, so it stacks on top of Terralith and Tectonic instead of fighting
 them. Plays nicely with Flowing Fluids (finite water) and Water Erosion.
 '''
