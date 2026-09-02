@@ -487,13 +487,17 @@ public final class RetrogenHandler {
 
         int placed = 0;
         int px = x, pz = z, waterY = centre - 1;        // recessed: water sits BELOW the rim
+        // Every water cell cut so far. Each pool hands it to the next so a lower terrace cannot
+        // clear, or tile sinter over, the water of the one above it.
+        java.util.Set<BlockPos> taken = new java.util.HashSet<>();
         for (int i = 0; i < terraces; i++) {
             int radius = terraced
                     ? Math.max(2, 5 - relief / 3) + level.random.nextInt(3)
                     : 5 + level.random.nextInt(3);
-            if (carveTerrace(level, px, pz, waterY, radius, i == 0)) placed++;
-            // Step downhill for the next pool in the chain.
-            int stride = radius + 2 + level.random.nextInt(2);
+            if (carveTerrace(level, px, pz, waterY, radius, i == 0, taken)) placed++;
+            // Step downhill for the next pool in the chain. A full diameter plus a gap: the old
+            // stride was one radius, so consecutive pools sat on top of each other.
+            int stride = radius * 2 + 2 + level.random.nextInt(2);
             px += stepX * stride;
             pz += stepZ * stride;
             int nextGround = TerrainProbe.groundY(level, px, pz);
@@ -517,7 +521,7 @@ public final class RetrogenHandler {
      * @param core true for the first pool of a system, which gets the ticking hot-spring block
      */
     private static boolean carveTerrace(ServerLevel level, int cx, int cz, int waterY, int radius,
-                                        boolean core) {
+                                        boolean core, java.util.Set<BlockPos> taken) {
         double phaseA = level.random.nextDouble() * Math.PI * 2;
         double phaseB = level.random.nextDouble() * Math.PI * 2;
 
@@ -546,6 +550,10 @@ public final class RetrogenHandler {
             TerrainProbe.clearVegetation(level, w.getX(), waterY, w.getZ(), 3);
             for (int up = 1; up <= 2; up++) {
                 BlockPos a = w.above(up);
+                // Never clear a cell an upstream pool is using as its water. Terraces step down one
+                // block at a time and their reaches overlap, so this loop used to empty the pool
+                // above it - which is why terraced springs came out dry.
+                if (taken.contains(a)) continue;
                 BlockState as = level.getBlockState(a);
                 if (!as.isAir() && !EruptionHandler.isPlayerPlaced(as)) {
                     level.setBlock(a, Blocks.AIR.defaultBlockState(), 2);
@@ -565,6 +573,9 @@ public final class RetrogenHandler {
                 if (pool.contains(edge)) continue;
                 for (int up = 0; up <= 1; up++) {
                     BlockPos p = edge.above(up);
+                    // The rim writes sinter unconditionally at up == 0, which would tile straight
+                    // over the water of the pool one terrace up.
+                    if (taken.contains(p)) continue;
                     BlockState s = level.getBlockState(p);
                     if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) continue;
                     if (up == 0 || s.isAir() || !s.getFluidState().isEmpty()
@@ -602,6 +613,7 @@ public final class RetrogenHandler {
                 level.setBlock(any.below(), ModBlocks.HOT_SPRING.get().defaultBlockState(), 2);
             }
         }
+        taken.addAll(pool);
         return true;
     }
 
@@ -625,12 +637,21 @@ public final class RetrogenHandler {
                                           int cx, int cz, int waterY) {
         if (pool.isEmpty()) return;
 
+        // Band order runs OUTWARD from the water, and it is the order Grand Prismatic actually
+        // shows: a white sinter shelf, a narrow green fringe at the waterline, then yellow, then
+        // orange, and rust-brown at the dry edge.
+        //
+        // It used to end on green, which put the brightest colour in the mod hard against the
+        // grass and made the whole spring read as painted on. In the ground the outermost ring is
+        // the brown one, and it blends into bare earth on its own - the transition needs no help
+        // once the order is right. The green fringe is kept narrow because in a real spring it is
+        // not really a mat at all: it is blue water seen shallow over the yellow one.
         int[] band = {
                 1 + level.random.nextInt(2),   // the sinter shelf
-                2 + level.random.nextInt(3),   // orange, hottest
+                1 + level.random.nextInt(2),   // green, the shallow fringe at the waterline
                 2 + level.random.nextInt(3),   // yellow
-                2 + level.random.nextInt(4),   // brown
-                2 + level.random.nextInt(4),   // green, coolest
+                2 + level.random.nextInt(3),   // orange
+                2 + level.random.nextInt(4),   // brown, coolest and driest
         };
         int reach = 0;
         for (int b : band) reach += b;
@@ -678,13 +699,13 @@ public final class RetrogenHandler {
         double edge = band[0];
         if (d <= edge) return ModBlocks.SINTER.get();
         edge += band[1];
-        if (d <= edge) return ModBlocks.MICROBIAL_MAT_ORANGE.get();
+        if (d <= edge) return ModBlocks.MICROBIAL_MAT_GREEN.get();
         edge += band[2];
         if (d <= edge) return ModBlocks.MICROBIAL_MAT_YELLOW.get();
         edge += band[3];
-        if (d <= edge) return ModBlocks.MICROBIAL_MAT_BROWN.get();
+        if (d <= edge) return ModBlocks.MICROBIAL_MAT_ORANGE.get();
         edge += band[4];
-        if (d <= edge) return ModBlocks.MICROBIAL_MAT_GREEN.get();
+        if (d <= edge) return ModBlocks.MICROBIAL_MAT_BROWN.get();
         return null;
     }
     /**

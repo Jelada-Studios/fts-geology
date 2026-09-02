@@ -371,14 +371,34 @@ public final class Weathering {
         if (g == Integer.MIN_VALUE) return false;
 
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-        int top = Math.min(g + 1 + GAP_SEARCH + STACK_LIMIT, level.getMaxBuildHeight() - 1);
+        int roof = Math.min(g + 1 + GAP_SEARCH + STACK_LIMIT, level.getMaxBuildHeight() - 1);
         boolean changed = false;
-        for (int y = g + 1; y <= top; y++) {
-            BlockState s = level.getBlockState(m.set(x, y, z));
-            if (s.getFluidState().isEmpty()) continue;
-            if (!level.getBlockState(m.set(x, y - 1, z)).isAir()) continue;   // it still has a floor
-            level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2);
+
+        // Walk up from the ground looking for the BOTTOM of a body of water that has air under it,
+        // then take the whole body.
+        //
+        // Testing each cell on its own was not enough: in a pond left hanging by a quake, only the
+        // lowest layer has air beneath it - every cell above has water below, so nothing read as
+        // unsupported and the pond stayed up there whole. That is the "all the water is hanging in
+        // the air and it did not even pour out" report.
+        int y = g + 1;
+        while (y <= roof) {
+            if (!level.getBlockState(m.set(x, y, z)).isAir()) { y++; continue; }
+            // Found air. Anything directly above it that is fluid is a hanging body.
+            int base = y + 1;
+            if (base > roof || level.getBlockState(m.set(x, base, z)).getFluidState().isEmpty()) {
+                y++;
+                continue;
+            }
+            int top = base;
+            while (top <= roof && !level.getBlockState(m.set(x, top, z)).getFluidState().isEmpty()) {
+                top++;
+            }
+            for (int c = base; c < top; c++) {
+                level.setBlock(new BlockPos(x, c, z), Blocks.AIR.defaultBlockState(), 2);
+            }
             changed = true;
+            y = top;
         }
         return changed;
     }

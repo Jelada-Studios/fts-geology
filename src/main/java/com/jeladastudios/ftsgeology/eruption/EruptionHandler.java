@@ -304,6 +304,26 @@ public final class EruptionHandler {
             level.setBlock(mouth, Blocks.WATER.defaultBlockState(), 3);
             level.scheduleTick(mouth, Fluids.WATER, 5);
         }
+
+        // Vanilla only, and only on the first second of the eruption: lay the pool once as real
+        // sources rather than re-laying a sheet every tick. Finite-water mods get the mouth alone
+        // and move the rest themselves.
+        if (hasFiniteWater() || spilled == null || !spilled.isEmpty()) return;
+        if (!level.getBlockState(mouth.above()).isAir()) return;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) continue;
+                int cx = mouth.getX() + dx, cz = mouth.getZ() + dz;
+                int cy = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, cx, cz);
+                if (cy > mouth.getY() + 1 || cy < mouth.getY() - 24) continue;   // downhill only
+                BlockPos p = new BlockPos(cx, cy, cz);
+                BlockState below = level.getBlockState(p.below());
+                if (!level.getBlockState(p).isAir()) continue;
+                if (below.isAir() || !below.getFluidState().isEmpty()) continue;
+                level.setBlock(p, Blocks.WATER.defaultBlockState(), 3);
+                spilled.add(p.asLong());
+            }
+        }
     }
 
     /**
@@ -321,7 +341,26 @@ public final class EruptionHandler {
      * itself within a second of it stopping. It is still genuine fluid, so Flowing Fluids and Water
      * Erosion see what they expect.</p>
      */
+    /**
+     * True when a mod that gives water real physics is present, in which case the runoff is left
+     * for it to move instead of being managed here.
+     *
+     * <p>Resolved once: {@code ModList} does not change after load, and this is asked from a tick.</p>
+     */
+    private static Boolean finiteWater;
+
+    public static boolean hasFiniteWater() {
+        if (finiteWater == null) {
+            finiteWater = net.minecraftforge.fml.ModList.get().isLoaded("flowing_fluids");
+        }
+        return finiteWater;
+    }
+
     public static void refreshRunoff(ServerLevel level, BlockPos mouth) {
+        // With finite water installed the pool is that mod's to move: it drains on its own when the
+        // jet stops, so re-laying it every tick would fight it and make the surface stutter.
+        if (hasFiniteWater()) return;
+
         // Only once the vent has actually opened at the surface - while it is still boring upward
         // its mouth is capped, and laying water then would build a standing column.
         if (!level.getBlockState(mouth.above()).isAir()) return;
@@ -364,14 +403,36 @@ public final class EruptionHandler {
         if (spilled == null) return;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         for (long key : spilled) {
-            m.set(BlockPos.getX(key), BlockPos.getY(key), BlockPos.getZ(key));
-            if (!level.hasChunkAt(m)) continue;
-            BlockState s = level.getBlockState(m);
-            if (s.is(Blocks.WATER)) {
-                level.setBlock(m.immutable(), Blocks.AIR.defaultBlockState(), 3);
+            int bx = BlockPos.getX(key), by = BlockPos.getY(key), bz = BlockPos.getZ(key);
+            // Take the cell back, and sweep its neighbours for water vanilla promoted.
+            //
+            // Two horizontally adjacent sources turn the flowing cell between them into a source
+            // as well, and that cell was never in this set - so clearing only what we placed left
+            // a seed behind and the pool grew back. One ring is enough: a promoted cell is by
+            // definition touching two of ours.
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    m.set(bx + dx, by, bz + dz);
+                    if (!level.hasChunkAt(m)) continue;
+                    boolean ours = dx == 0 && dz == 0;
+                    if (!ours && !spilled.contains(m.asLong()) && !isPromoted(level, m, spilled)) continue;
+                    if (level.getBlockState(m).is(Blocks.WATER)) {
+                        level.setBlock(m.immutable(), Blocks.AIR.defaultBlockState(), 3);
+                    }
+                }
             }
         }
         spilled.clear();
+    }
+
+    /** A water cell touching two cells this eruption filled is water this eruption is answerable for. */
+    private static boolean isPromoted(ServerLevel level, BlockPos p, LongOpenHashSet spilled) {
+        if (!level.getBlockState(p).is(Blocks.WATER)) return false;
+        int touching = 0;
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            if (spilled.contains(p.relative(d).asLong())) touching++;
+        }
+        return touching >= 2;
     }
 
     // === RECHARGING =========================================================

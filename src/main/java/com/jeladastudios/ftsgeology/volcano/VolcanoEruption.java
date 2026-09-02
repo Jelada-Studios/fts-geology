@@ -232,8 +232,15 @@ public final class VolcanoEruption {
                 BlockState s = level.getBlockState(p);
                 if (s.is(Blocks.BEDROCK)) continue;
                 FluidState fs = s.getFluidState();
-                if (d2 <= 1) {
-                    // centre: keep it molten so the vent can never seal itself
+                if (d2 < (r - 1) * (r - 1)) {
+                    // The whole floor inside the rim is refilled, not just the middle cell.
+                    //
+                    // This ran at the END of every eruption and only ever filled d2 <= 1, leaving
+                    // the ring between there and the rim as whatever the eruption happened to
+                    // leave. So the crater kept its full width while the lava in it was a blob in
+                    // the centre - the "the pit gets wider but no new lava appears in the widened
+                    // part, so it just looks empty" report. Only air is filled, so cooled basalt
+                    // the eruption laid down is left where it is.
                     if (fs.isEmpty()) level.setBlock(p, Blocks.LAVA.defaultBlockState(), 3);
                 } else if (d2 >= (r - 1) * (r - 1)) {
                     // rim: cooled volcanic rock, occasionally still smouldering
