@@ -13,6 +13,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayDeque;
@@ -84,8 +85,19 @@ public final class Weathering {
      */
     private static final int STACK_LIMIT = 48;
 
-    /** A tree can ride the ground down this far. Past it, the slope failed and took the tree. */
-    private static final int RIDE_LIMIT = 3;
+    /**
+     * A tree can ride the ground down this far before the slope counts as having failed.
+     *
+     * <p>Zero: undermine a tree at all and it comes down. Three blocks of subsidence really would
+     * carry a tree with it, but the survivors read as trees the quake had missed rather than as
+     * trees that rode it out, and one left standing on a pillar spoils the whole scene.</p>
+     */
+    private static final int RIDE_LIMIT = 0;
+
+    /**
+     * How far from a leaf a log may be before the leaf counts as orphaned. Vanilla's own limit.
+     */
+    private static final int LEAF_SUPPORT_RANGE = 6;
 
     /** Columns examined per tick. Low on purpose: this is meant to be watched, not to happen. */
     private static final int COLUMNS_PER_TICK = 250;
@@ -120,7 +132,16 @@ public final class Weathering {
         if (edits.isEmpty()) return;
         LongOpenHashSet seen = new LongOpenHashSet();
         for (QuakePlanner.Edit e : edits) {
-            seen.add(key(e.pos().getX(), e.pos().getZ()));
+            // Dilated by the leaf-support range. A canopy hangs over columns whose ground the quake
+            // never touched, so a set built from the edits alone stops one tree-width short of the
+            // leaves it just orphaned. Dilating a long thin corridor grows it by its perimeter, not
+            // its area - about 15% more columns on a big rupture.
+            int ex = e.pos().getX(), ez = e.pos().getZ();
+            for (int dx = -LEAF_SUPPORT_RANGE; dx <= LEAF_SUPPORT_RANGE; dx++) {
+                for (int dz = -LEAF_SUPPORT_RANGE; dz <= LEAF_SUPPORT_RANGE; dz++) {
+                    seen.add(key(ex + dx, ez + dz));
+                }
+            }
         }
         QUEUE.add(new Job(level.dimension(), seen.toLongArray()));
         GeysersMod.LOGGER.info("weathering queued: {} columns", seen.size());
@@ -161,7 +182,16 @@ public final class Weathering {
             // rather than being wasted.
             boolean fallPass = (job.pass == 0 || job.pass == PASSES - 1)
                     && GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get();
-            if (fallPass ? reseat(level, cx, cz) : relax(level, cx, cz)) job.moved++;
+            boolean moved;
+            if (fallPass) {
+                moved = reseat(level, cx, cz);
+                // On the last pass the trunks are already gone, so anything still hanging is
+                // canopy that lost its tree.
+                if (job.pass == PASSES - 1) moved |= dropOrphanedLeaves(level, cx, cz);
+            } else {
+                moved = relax(level, cx, cz);
+            }
+            if (moved) job.moved++;
         }
     }
 
@@ -239,6 +269,69 @@ public final class Weathering {
             level.setBlock(new BlockPos(x, g + 1 + i, z), stack[i], 2);
         }
         return true;
+    }
+
+    /**
+     * Clears leaves the quake has orphaned.
+     *
+     * <h2>Why this is needed at all</h2>
+     * A canopy spreads over columns whose ground never moved, so {@link #reseat} never looks at
+     * them: the trunk column drops and is cleared, and the leaves around it are left hanging over
+     * untouched ground with a drop of zero.
+     *
+     * <p>Vanilla would normally rot them away. It cannot here. Leaf decay is driven by the
+     * {@code distance} property, which is only recomputed when a neighbour update arrives, and
+     * every edit this mod makes is written with flag 2 - client update, <b>no neighbour
+     * notification</b>. So the leaves keep whatever distance they had, {@code randomTick} never
+     * sees the 7 that would rot them, and they hang there permanently. They were not decaying
+     * slowly; most of them were never going to decay at all.</p>
+     *
+     * <p>Rather than send neighbour updates for hundreds of thousands of quake edits, the canopy is
+     * checked directly: a leaf with no log within {@link #LEAF_SUPPORT_RANGE} has lost its tree and
+     * goes immediately. The search walks outward in rings and stops at the first log, so a leaf
+     * still attached to something costs almost nothing to clear; only genuinely orphaned canopy
+     * pays for the full box, and the pass runs under the same wall-clock deadline as everything
+     * else here.</p>
+     *
+     * @return true if this column changed
+     */
+    private static boolean dropOrphanedLeaves(ServerLevel level, int x, int z) {
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE) return false;
+
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int top = Math.min(g + 1 + GAP_SEARCH + STACK_LIMIT, level.getMaxBuildHeight() - 1);
+        boolean changed = false;
+        for (int y = g + 1; y <= top; y++) {
+            BlockState s = level.getBlockState(m.set(x, y, z));
+            if (!s.is(BlockTags.LEAVES)) continue;
+            if (s.hasProperty(LeavesBlock.PERSISTENT) && s.getValue(LeavesBlock.PERSISTENT)) continue;
+            if (hasLogNear(level, x, y, z)) continue;
+            level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2);
+            changed = true;
+        }
+        return changed;
+    }
+
+    /** Is there a log within {@link #LEAF_SUPPORT_RANGE}? Searched in rings, nearest first. */
+    private static boolean hasLogNear(ServerLevel level, int x, int y, int z) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int floor = level.getMinBuildHeight(), roof = level.getMaxBuildHeight() - 1;
+        for (int r = 1; r <= LEAF_SUPPORT_RANGE; r++) {
+            for (int dy = -r; dy <= r; dy++) {
+                int wy = y + dy;
+                if (wy < floor || wy > roof) continue;
+                for (int dx = -r; dx <= r; dx++) {
+                    for (int dz = -r; dz <= r; dz++) {
+                        // Only the shell of this ring; the inside was covered by a smaller r.
+                        if (Math.max(Math.abs(dx), Math.max(Math.abs(dy), Math.abs(dz))) != r) continue;
+                        if (!level.hasChunkAt(m.set(x + dx, wy, z + dz))) continue;
+                        if (level.getBlockState(m).is(BlockTags.LOGS)) return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /** Everything a tree or a plant is made of, and nothing else. */
