@@ -270,8 +270,11 @@ public final class EruptionHandler {
             e.fallDistance = 0;
         }
 
-        // (Water is placed by ventEruption once per second, and only after the mouth reaches the
-        // surface — never here per-tick — so a climbing vent doesn't leave a tall water column.)
+        // The mouth source is placed once per second by ventEruption, and only after the vent has
+        // reached the surface, so a climbing vent never leaves a tall water column. The runoff
+        // sheet around it IS refreshed per tick: it is flowing water, which drains in a few ticks,
+        // so anything slower than this would visibly flicker.
+        refreshRunoff(level, mouth);
 
         // A tight vertical fountain — narrow column, not a wide cloud.
         double x = mouth.getX() + 0.5, z = mouth.getZ() + 0.5;
@@ -301,20 +304,44 @@ public final class EruptionHandler {
             level.setBlock(mouth, Blocks.WATER.defaultBlockState(), 3);
             level.scheduleTick(mouth, Fluids.WATER, 5);
         }
+    }
+
+    /**
+     * Keeps a sheet of running water on the ground around the vent while it is spouting.
+     *
+     * <h2>Why this is flowing water and not more sources</h2>
+     * The runoff used to be laid down as SOURCE blocks, one per surrounding column. In vanilla a
+     * flowing cell with two horizontally adjacent sources becomes a source itself, so a ring of
+     * them seeded a pool that grew and then stayed - the geyser ran forever after its first
+     * eruption. Taking back the cells we placed was not enough either, because the ones vanilla
+     * promoted in between were never ours to take.
+     *
+     * <p>Only the mouth is a source now. One source alone can never promote anything, so nothing
+     * outlives the eruption: the sheet is re-laid every tick while the vent spouts and drains by
+     * itself within a second of it stopping. It is still genuine fluid, so Flowing Fluids and Water
+     * Erosion see what they expect.</p>
+     */
+    public static void refreshRunoff(ServerLevel level, BlockPos mouth) {
+        // Only once the vent has actually opened at the surface - while it is still boring upward
+        // its mouth is capped, and laying water then would build a standing column.
+        if (!level.getBlockState(mouth.above()).isAir()) return;
+
+        BlockState flowing = Blocks.WATER.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.LiquidBlock.LEVEL, 1);
         for (int dx = -1; dx <= 1; dx++) {
             for (int dz = -1; dz <= 1; dz++) {
                 if (dx == 0 && dz == 0) continue;
-                if (level.random.nextDouble() < 0.25) continue; // ~25% less spread water than before
                 int cx = mouth.getX() + dx, cz = mouth.getZ() + dz;
                 int cy = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, cx, cz);
                 if (cy > mouth.getY() + 1 || cy < mouth.getY() - 24) continue; // downhill only
                 BlockPos p = new BlockPos(cx, cy, cz);
+                BlockState at = level.getBlockState(p);
+                // Never touch standing water that was already there: a vent beside a pond is not
+                // entitled to rewrite the pond.
+                if (!at.isAir() && !(at.is(Blocks.WATER) && !at.getFluidState().isSource())) continue;
                 BlockState below = level.getBlockState(p.below());
-                if (level.getBlockState(p).isAir() && !below.isAir() && below.getFluidState().isEmpty()) {
-                    level.setBlock(p, Blocks.WATER.defaultBlockState(), 3);
-                    level.scheduleTick(p, Fluids.WATER, 5);
-                    if (spilled != null) spilled.add(p.asLong());
-                }
+                if (below.isAir() || !below.getFluidState().isEmpty()) continue;
+                level.setBlock(p, flowing, 2);
             }
         }
     }
@@ -376,7 +403,34 @@ public final class EruptionHandler {
      * fast-climbing vent (a few blocks per second) still leaves a CONTINUOUS calcite tube instead
      * of disconnected rings floating in a cave.</p>
      */
+    /**
+     * Takes the tree off the top of a vent.
+     *
+     * <p>{@link #buildChimneyRim} only fills air, water and soft rock, and a log is none of those,
+     * so the rim was built around any trunk in the way and left it standing over the mouth with its
+     * roots gone - half a tree balanced on a geyser. A vent breaking the surface through a tree
+     * takes the tree with it.</p>
+     *
+     * <p>Kept to the vent and its rim rather than a clearing: a geyser is a hole in the ground, not
+     * a logging operation.</p>
+     */
+    public static void clearVentCanopy(ServerLevel level, BlockPos mouth) {
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                for (int dy = -1; dy <= 12; dy++) {
+                    BlockPos p = mouth.offset(dx, dy, dz);
+                    BlockState s = level.getBlockState(p);
+                    if (s.is(BlockTags.LOGS) || s.is(BlockTags.LEAVES)
+                            || s.is(Blocks.MANGROVE_ROOTS)) {
+                        level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                    }
+                }
+            }
+        }
+    }
+
     public static void buildChimneyRim(ServerLevel level, BlockPos mouth) {
+        clearVentCanopy(level, mouth);
         for (int dy = 0; dy <= CHIMNEY_WALL_SPAN; dy++) {
             BlockPos ring = mouth.below(dy);
             for (Direction d : Direction.Plane.HORIZONTAL) {

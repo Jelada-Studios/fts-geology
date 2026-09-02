@@ -223,7 +223,10 @@ public final class Weathering {
                 moved = reseat(level, cx, cz);
                 // On the last pass the trunks are already gone, so anything still hanging is
                 // canopy that lost its tree.
-                if (job.pass == PASSES - 1) moved |= dropOrphanedLeaves(level, cx, cz);
+                if (job.pass == PASSES - 1) {
+                    moved |= dropOrphanedLeaves(level, cx, cz);
+                    moved |= dropUnsupportedWater(level, cx, cz);
+                }
             } else {
                 moved = relax(level, cx, cz);
             }
@@ -343,6 +346,37 @@ public final class Weathering {
             if (!s.is(BlockTags.LEAVES)) continue;
             if (s.hasProperty(LeavesBlock.PERSISTENT) && s.getValue(LeavesBlock.PERSISTENT)) continue;
             if (hasLogNear(level, x, y, z)) continue;
+            level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2);
+            changed = true;
+        }
+        return changed;
+    }
+
+    /**
+     * Drops water the quake left standing in mid-air.
+     *
+     * <p>Carving the ground out from under a pond leaves its cells hanging. Vanilla would collapse
+     * them, but only on a neighbour update, and the quake writes with flag 2 - so the pond simply
+     * stays up there in the shape of the ground that used to hold it. Same root cause as the
+     * canopy, and just as visible.</p>
+     *
+     * <p>A cell is only cleared when the block under it is open air, so a pool that still has a
+     * floor is left exactly as it is. Clearing from the bottom up lets one pass take a whole
+     * hanging column rather than peeling one layer per pass.</p>
+     *
+     * @return true if this column changed
+     */
+    private static boolean dropUnsupportedWater(ServerLevel level, int x, int z) {
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE) return false;
+
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int top = Math.min(g + 1 + GAP_SEARCH + STACK_LIMIT, level.getMaxBuildHeight() - 1);
+        boolean changed = false;
+        for (int y = g + 1; y <= top; y++) {
+            BlockState s = level.getBlockState(m.set(x, y, z));
+            if (s.getFluidState().isEmpty()) continue;
+            if (!level.getBlockState(m.set(x, y - 1, z)).isAir()) continue;   // it still has a floor
             level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2);
             changed = true;
         }
