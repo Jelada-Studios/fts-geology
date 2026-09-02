@@ -2,6 +2,7 @@ package com.jeladastudios.ftsgeology.eruption;
 
 import com.jeladastudios.ftsgeology.blockentity.GeyserCoreBlockEntity;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
+import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
@@ -478,6 +479,23 @@ public final class EruptionHandler {
         if (s.is(BlockTags.LOGS) || s.is(BlockTags.LEAVES) || s.is(BlockTags.WART_BLOCKS)
                 || s.is(Blocks.MANGROVE_ROOTS) || s.is(Blocks.MUSHROOM_STEM)
                 || s.is(Blocks.BROWN_MUSHROOM_BLOCK) || s.is(Blocks.RED_MUSHROOM_BLOCK)) {
+            return true;
+        }
+        // The mod's own deposits are ground the mod itself laid down, so they have to read as
+        // terrain or every safety check treats them as somebody's build and works around them.
+        // That is why an earthquake ran straight past a hot-spring field and left it standing on an
+        // untouched island: sinter, the mats and the spring bed were all "player blocks" to this.
+        //
+        // The five functional blocks are deliberately NOT in here. A geyser core, its chamber and
+        // the two igniters are machinery rather than landscape; leaving them protected means a
+        // quake cannot cut a working geyser in half and leave an orphaned chamber behind.
+        if (s.is(ModBlocks.HOT_SPRING.get())
+                || s.is(ModBlocks.SINTER.get())
+                || s.is(ModBlocks.NATIVE_SULFUR.get())
+                || s.is(ModBlocks.MICROBIAL_MAT_ORANGE.get())
+                || s.is(ModBlocks.MICROBIAL_MAT_YELLOW.get())
+                || s.is(ModBlocks.MICROBIAL_MAT_BROWN.get())
+                || s.is(ModBlocks.MICROBIAL_MAT_GREEN.get())) {
             return true;
         }
         if (s.is(BlockTags.BASE_STONE_OVERWORLD)      // stone, granite, diorite, andesite, tuff, deepslate (+modded)
