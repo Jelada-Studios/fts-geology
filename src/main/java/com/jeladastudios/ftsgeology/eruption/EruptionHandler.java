@@ -3,6 +3,7 @@ package com.jeladastudios.ftsgeology.eruption;
 import com.jeladastudios.ftsgeology.blockentity.GeyserCoreBlockEntity;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
@@ -286,10 +287,16 @@ public final class EruptionHandler {
      * Ejects a real water source block at the mouth so surface mods (Flowing Fluids / Water
      * Erosion) get genuine fluid. Only ever fills air, so it never overwrites terrain or builds.
      */
-    public static void ventEruption(ServerLevel level, BlockPos mouth) {
+    public static void ventEruption(ServerLevel level, BlockPos mouth, LongOpenHashSet spilled) {
         // Fill the mouth, then lay a small water patch over the surrounding surface — each column at
         // ITS OWN surface height (so it works on slopes) — so a visible pool forms and runs off,
         // rather than the mouth water just draining straight down the open shaft.
+        //
+        // Every cell filled is recorded in {@code spilled} so the eruption can take it back
+        // afterwards. These are real SOURCE blocks, and in vanilla two adjacent sources make
+        // infinite water: without the record the patch outlived the eruption and the geyser ran
+        // forever. Installations with Flowing Fluids never saw it, because finite water drains on
+        // its own - which is exactly why it went unnoticed for so long.
         if (level.getBlockState(mouth).isAir()) {
             level.setBlock(mouth, Blocks.WATER.defaultBlockState(), 3);
             level.scheduleTick(mouth, Fluids.WATER, 5);
@@ -306,6 +313,7 @@ public final class EruptionHandler {
                 if (level.getBlockState(p).isAir() && !below.isAir() && below.getFluidState().isEmpty()) {
                     level.setBlock(p, Blocks.WATER.defaultBlockState(), 3);
                     level.scheduleTick(p, Fluids.WATER, 5);
+                    if (spilled != null) spilled.add(p.asLong());
                 }
             }
         }
@@ -313,11 +321,30 @@ public final class EruptionHandler {
 
     // === Eruption teardown ==================================================
 
-    /** Clears the water source we forced at the mouth so backflow resumes. */
-    public static void removeJetField(ServerLevel level, BlockPos mouth) {
+    /**
+     * Takes back the water the eruption put down, so the geyser stops flowing when it stops
+     * erupting.
+     *
+     * <p>Only cells this eruption actually filled are touched, and only while they still hold
+     * water. A pond that happened to be next to the vent is not ours and is left alone; a cell a
+     * player has since built in, or that another mod's finite water has already drained, no longer
+     * reads as water and is skipped.</p>
+     */
+    public static void removeJetField(ServerLevel level, BlockPos mouth, LongOpenHashSet spilled) {
         if (level.getBlockState(mouth).getFluidState().is(FluidTags.WATER)) {
             level.setBlock(mouth, Blocks.AIR.defaultBlockState(), 3);
         }
+        if (spilled == null) return;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (long key : spilled) {
+            m.set(BlockPos.getX(key), BlockPos.getY(key), BlockPos.getZ(key));
+            if (!level.hasChunkAt(m)) continue;
+            BlockState s = level.getBlockState(m);
+            if (s.is(Blocks.WATER)) {
+                level.setBlock(m.immutable(), Blocks.AIR.defaultBlockState(), 3);
+            }
+        }
+        spilled.clear();
     }
 
     // === RECHARGING =========================================================

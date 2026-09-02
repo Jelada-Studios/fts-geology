@@ -111,6 +111,13 @@ public class GeyserCoreBlockEntity extends BlockEntity {
     private long[] fumaroleTips = new long[0];
 
     /**
+     * Cells this eruption has filled with water, so {@link #endEruption} can take them back.
+     * Persisted: a chunk unloading mid-eruption must not leave the pool behind for good.
+     */
+    private final it.unimi.dsi.fastutil.longs.LongOpenHashSet spilledWater =
+            new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+
+    /**
      * True for a geyser that formed from a <em>player-built</em> water-over-rock-over-lava
      * setup (see {@code EmergentGeyserHandler}). When {@code emergentDestructive} is on, its
      * eruption uses a block-breaking blast — the "it blows up your house" behaviour — instead
@@ -469,7 +476,7 @@ public class GeyserCoreBlockEntity extends BlockEntity {
                 boolean hasWater = !emergent || waterVolume >= 1.0;
                 boolean atExit = level.getBlockState(mouth.above()).isAir();
                 if (hasWater && atExit) {
-                    EruptionHandler.ventEruption(level, mouth);
+                    EruptionHandler.ventEruption(level, mouth, spilledWater);
                     EruptionHandler.depositTravertineRunoff(level, mouth, magnitude);
                     // A sealed rig (emergent) drains ONLY while it's actually spouting — so its
                     // water isn't wasted during the boring phase — and dies when the basin empties.
@@ -532,7 +539,8 @@ public class GeyserCoreBlockEntity extends BlockEntity {
 
     private void endEruption(ServerLevel level, BlockPos pos, BlockPos mouth) {
         phase = Phase.RECHARGING;
-        EruptionHandler.removeJetField(level, mouth);
+        EruptionHandler.removeJetField(level, mouth, spilledWater);
+        setChanged();
         invalidateChamberCache(); // geometry settled; refresh cell set for the recharge survey
     }
 
@@ -681,6 +689,9 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         if (fumaroleTips.length > 0) {
             tag.putLongArray("FumaroleTips", fumaroleTips);
         }
+        if (!spilledWater.isEmpty()) {
+            tag.putLongArray("SpilledWater", spilledWater.toLongArray());
+        }
         if (chamberCells != null) {
             tag.putLongArray("ChamberCells", chamberCells);
         }
@@ -706,6 +717,10 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         ventTopY = tag.contains("VentTopY") ? tag.getInt("VentTopY") : UNKNOWN_MOUTH_Y;
         emergent = tag.getBoolean("Emergent");
         fumaroleTips = tag.contains("FumaroleTips") ? tag.getLongArray("FumaroleTips") : new long[0];
+        spilledWater.clear();
+        if (tag.contains("SpilledWater")) {
+            for (long key : tag.getLongArray("SpilledWater")) spilledWater.add(key);
+        }
         chamberCells = tag.contains("ChamberCells") ? tag.getLongArray("ChamberCells") : null;
     }
 
