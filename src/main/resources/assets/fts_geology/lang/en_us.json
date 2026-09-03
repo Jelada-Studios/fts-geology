@@ -94,6 +94,9 @@
   "message.fts_geology.volcano_failed": "Not enough vertical room here for a volcano (needs a tall mountain / open sky).",
   "message.fts_geology.suggest_flowing_fluids": "FT's Geology works with vanilla water, but geyser runoff and flooding look far better with Flowing Fluids installed. Optional — nothing here needs it.",
 
+  "subtitles.fts_geology.quake_siren": "Seismograph sounds the alarm",
+  "subtitles.fts_geology.quake_rumble": "The ground moves",
+
   "block.fts_geology.seismograph": "Seismograph",
   "item.fts_geology.seismograph": "Seismograph",
   "item.fts_geology.geologists_hammer": "Geologist's Hammer",

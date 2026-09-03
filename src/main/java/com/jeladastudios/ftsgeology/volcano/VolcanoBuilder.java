@@ -275,6 +275,43 @@ public final class VolcanoBuilder {
      * it. The outline is warped with two sine lobes so no volcano is a circle, and the surface itself
      * is roughened so the profile does not round into visible contour rings.
      */
+    /**
+     * Thickness the apron has where it meets the foot of the cone.
+     *
+     * <p>This single number is what stops the mountain and its skirt being two separate objects.
+     * The cone's profile now bottoms out at exactly this height rather than at zero, and the apron
+     * starts at exactly this height rather than at its own maximum, so the two meet without a gap
+     * or a step - see {@link #coneTargetY}.</p>
+     */
+    private static double seamHeight(Ctx c) {
+        return 1.0 + c.magnitude / 8.0;
+    }
+
+    /**
+     * Height the finished mountain should reach at this point, or {@link Integer#MIN_VALUE} outside
+     * it.
+     *
+     * <h2>Why the flank stops at the seam height and not at zero</h2>
+     * It used to taper to zero at {@code coneRadius}, and that produced the "mountain, then a strip
+     * of soil, then a basalt wall" the tests kept finding - for three rounds, because the apron was
+     * being blamed and the apron was not the cause. Worked through:
+     *
+     * <p>The height is rounded to whole blocks, and {@code buildConeRow} skips a column whose target
+     * is not above its own ground. So the cone silently stops placing anything once
+     * {@code round(X * frac)} falls below 1, i.e. once {@code frac < 0.5 / X}. For a stratocone,
+     * X is about 24 and the flank exponent 1.8, which puts that at {@code t = 0.884} - so the cone
+     * ends at distance 31.6 while the apron was told to start at 35. A three to four block band of
+     * untouched ground, at every bearing, on every stratocone. The shield's is 2.2.
+     *
+     * <p>And the apron was thickest exactly where it started ({@code t = 1} at its inner edge), so
+     * what stood on the far side of that band was a four-block step rising straight out of the
+     * grass. Gap plus step reads as a free-standing wall, which is precisely what it was.
+     *
+     * <p>So the profile is continuous by construction now: the flank falls to
+     * {@link #seamHeight} at {@code coneRadius} - never to zero - and the apron picks up from that
+     * same value and fades out over its own length. Neither piece can leave a hole for the other to
+     * fall into, whatever the bearing or the magnitude.</p>
+     */
     private static int coneTargetY(Ctx c, int gx, int gz, int localGround, double dist, double ang) {
         if (c.coneHeight <= 0) return Integer.MIN_VALUE;
         double baseR = coneRadius(c, ang);
@@ -283,15 +320,17 @@ public final class VolcanoBuilder {
         if (dist <= innerR) return c.summitY;
         double t = (dist - innerR) / Math.max(1.0, baseR - innerR);
         double frac = Math.pow(1.0 - t, c.type.flankExponent());
-        // Roughness fades out at the rim so the edge still meets the ground cleanly.
+        // Roughness fades out at the rim so the edge still meets the apron cleanly.
         double rough = surfaceNoise(c, gx, gz) * Math.max(1.0, c.coneHeight * 0.09) * (1.0 - t);
         // Measured from THIS column's own ground, not the summit column's.
         //
         // Returning c.baseY at the outer edge meant every column inside the base radius was filled
         // up to the elevation of whoever ran the command: stand on a hill and you got a plateau at
         // your own feet rather than a volcano. Anchoring the taper to the local ground makes the
-        // edifice ADD a decreasing amount of rock and reach exactly zero at its rim.
-        return localGround + (int) Math.round((c.baseY - localGround + c.coneHeight) * frac + rough);
+        // edifice ADD a decreasing amount of rock.
+        double seam = seamHeight(c);
+        double span = Math.max(0.0, c.baseY - localGround + c.coneHeight - seam);
+        return localGround + (int) Math.round(span * frac + seam + rough);
     }
 
     /**
@@ -538,9 +577,17 @@ public final class VolcanoBuilder {
             // most of the build cost.
             if (!level.getBlockState(new BlockPos(gx, ground + 1, gz)).getFluidState().isEmpty()) continue;
 
-            // Kept thin on purpose. The apron is there to blend an edge, not to raise the countryside:
-            // five blocks of basalt over a forty-block radius is a plateau, not a skirt.
-            int thickness = (int) Math.round(t * (1 + c.magnitude / 8.0));
+            // Picks up at exactly the height the flank came down to, and fades from there.
+            //
+            // It used to be `round(t * (1 + magnitude/8))`, which puts the apron at its THICKEST
+            // right where it starts - a four-block step rising straight out of open ground on a
+            // magnitude 12 volcano. That step, plus the band the cone was leaving short of here
+            // (see coneTargetY), is the free-standing wall the tests kept reporting. Now the two
+            // meet at the same height and the swell dies away over the apron's own length. The 1.5
+            // power keeps it close to the mountain rather than laying an even shelf, which is also
+            // how a real debris apron thins.
+            double u = 1.0 - t;                       // 0 at the seam, 1 at the outer edge
+            int thickness = (int) Math.round(seamHeight(c) * Math.pow(1.0 - u, 1.5));
             TerrainProbe.clearVegetation(level, gx, ground, gz, 2);
             BlockState native0 = level.getBlockState(new BlockPos(gx, ground, gz));
             for (int h = 0; h <= Math.max(0, thickness); h++) {
@@ -671,7 +718,9 @@ public final class VolcanoBuilder {
      * of narrowing to nothing, and the funnel is shallower so the floor is in view from the rim.
      */
     private static void carveFunnelPit(ServerLevel level, Ctx c) {
-        int poolR = Math.max(2, (int) Math.round(c.craterR * 0.35));
+        // 0.55, not 0.35: at a 6-block crater the old fraction gave a pool of radius 2 - thirteen
+        // cells, which reads from above as a few scattered lava blocks rather than a lava lake.
+        int poolR = Math.max(2, (int) Math.round(c.craterR * 0.55));
         int depth = Mth.clamp(c.craterR + 1, 3, 7);
         int floorY = c.summitY - depth;
         for (int d = 0; d <= depth; d++) {

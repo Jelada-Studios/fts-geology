@@ -314,9 +314,15 @@ public final class Earthquake {
                     v.z + (level.random.nextDouble() - 0.5) * kick);
             p.hurtMarked = true;
         }
-        // The rumble sound was removed on request - GENERIC_EXPLODE read as an explosion, not an
-        // earthquake. A replacement goes here: fired every dozen ticks while run.shakeTicks > 0,
-        // at run.epicentre, scaled by run.plan.magnitude().
+        // The rumble. GENERIC_EXPLODE used to stand in for this and read as an explosion rather
+        // than as ground movement. The clip is twenty-one seconds, so it is restarted on that
+        // cadence instead of every few ticks - overlapping copies of a rumble turn into a drone.
+        if (run.ticks % 420 == 0) {
+            level.playSound(null, run.epicentre,
+                    com.jeladastudios.ftsgeology.registry.ModSounds.QUAKE_RUMBLE.get(),
+                    net.minecraft.sounds.SoundSource.BLOCKS,
+                    (float) Mth.clamp(1.5 + run.plan.magnitude() / 4.0, 1.5, 4.0), 1.0f);
+        }
     }
 
     // === Ambient quakes =====================================================

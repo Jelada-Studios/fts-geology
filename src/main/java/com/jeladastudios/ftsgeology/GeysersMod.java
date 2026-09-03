@@ -39,6 +39,7 @@ public class GeysersMod {
         ModBlocks.BLOCKS.register(modBus);
         ModItems.ITEMS.register(modBus);
         ModBlockEntities.BLOCK_ENTITIES.register(modBus);
+        com.jeladastudios.ftsgeology.registry.ModSounds.SOUNDS.register(modBus);
 
         // Populate the creative menu once tabs are built (mod bus event).
         modBus.addListener(this::onBuildCreativeTabs);

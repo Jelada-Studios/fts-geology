@@ -1,0 +1,12 @@
+{
+  "quake_siren": {
+    "category": "block",
+    "subtitle": "subtitles.fts_geology.quake_siren",
+    "sounds": [ { "name": "fts_geology:quake_siren", "stream": false } ]
+  },
+  "quake_rumble": {
+    "category": "block",
+    "subtitle": "subtitles.fts_geology.quake_rumble",
+    "sounds": [ { "name": "fts_geology:quake_rumble", "stream": false } ]
+  }
+}

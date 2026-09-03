@@ -30,6 +30,12 @@ import net.minecraft.world.phys.AABB;
  */
 public class HotSpringBlockEntity extends BlockEntity {
 
+    /**
+     * Whether this bed has already reported that its pool is dry, so it says so once and not every
+     * second for the rest of the world's life.
+     */
+    private boolean reportedDry;
+
     public HotSpringBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.HOT_SPRING.get(), pos, state);
     }
@@ -37,6 +43,22 @@ public class HotSpringBlockEntity extends BlockEntity {
     public static void serverTick(Level level, BlockPos pos, BlockState state, HotSpringBlockEntity be) {
         if (!(level instanceof ServerLevel server)) return;
         long time = server.getGameTime();
+
+        // Does this spring still have its water?
+        //
+        // Terraced springs have come out dry over several rounds of testing and every fix so far has
+        // been correct but incomplete. The check at generation time now reports nothing at all -
+        // a whole session with not one warning - which says the water IS placed and IS still there
+        // when carveTerrace returns. So it is being taken afterwards, by something else, and the
+        // only way to catch that is to look later. This bed sits directly under its own pool, so
+        // "no fluid above me" is exactly the symptom, and it prints the coordinate to go and look at.
+        if (time % 200L == 0L && !be.reportedDry
+                && server.getBlockState(pos.above()).getFluidState().isEmpty()) {
+            be.reportedDry = true;
+            com.jeladastudios.ftsgeology.GeysersMod.LOGGER.warn(
+                    "hot spring at {} has no water above it (block above is {})",
+                    pos, server.getBlockState(pos.above()).getBlock());
+        }
 
         // Steam over the whole pool, not just the one column above the vent.
         //

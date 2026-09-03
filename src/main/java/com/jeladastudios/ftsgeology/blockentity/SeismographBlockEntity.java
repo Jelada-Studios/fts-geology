@@ -4,6 +4,7 @@ import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.instrument.SeismicNetwork;
 import com.jeladastudios.ftsgeology.instrument.SeismicWave;
 import com.jeladastudios.ftsgeology.registry.ModBlockEntities;
+import com.jeladastudios.ftsgeology.registry.ModSounds;
 import com.jeladastudios.ftsgeology.tectonics.DepthScale;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -172,8 +173,8 @@ public class SeismographBlockEntity extends BlockEntity {
         if (groundMoves > level.getGameTime() + 5L) {
             warnUntil = groundMoves;
             pendingSignal = sig;
-            level.playSound(null, pos, SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.BLOCKS,
-                    1.0f, 1.8f);   // alarm raised
+            // One ten-second wail, started here and left to run for the length of the window.
+            level.playSound(null, pos, ModSounds.QUAKE_SIREN.get(), SoundSource.BLOCKS, 3.0f, 1.0f);
         } else {
             signal = sig;
             shake = SHAKE_TICKS;
@@ -189,10 +190,12 @@ public class SeismographBlockEntity extends BlockEntity {
      * as an alarm rather than a note. Loud enough to hear across a room, brief enough not to become
      * a nuisance over a ten-second window.
      */
+    /**
+     * The visible half of the alert. The siren itself is a single ten-second clip started once when
+     * the warning begins - retriggering it every few ticks would stack a dozen overlapping copies
+     * of the same wail, which is noise rather than an alarm.
+     */
     private void siren(ServerLevel level, BlockPos pos, long now) {
-        float pitch = (now / 8L) % 2L == 0L ? 1.9f : 1.5f;
-        level.playSound(null, pos, SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.BLOCKS,
-                0.8f, pitch);
         level.sendParticles(ParticleTypes.NOTE,
                 pos.getX() + 0.5, pos.getY() + 1.05, pos.getZ() + 0.5, 1, 0.2, 0.0, 0.2, 0.0);
     }

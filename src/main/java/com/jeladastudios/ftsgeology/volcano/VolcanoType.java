@@ -101,7 +101,7 @@ public enum VolcanoType {
     /** Multiplier on the summit crater radius. */
     public double craterScale() {
         return switch (this) {
-            case STRATOVOLCANO -> 0.7;
+            case STRATOVOLCANO -> 1.1;   // was 0.7: a 6-block crater held a 13-cell lava pool
             case SHIELD -> 1.6;
             case FISSURE -> 0.5;
             case CALDERA -> 4.5;   // Yellowstone is sixty kilometres across; this is a landmark
