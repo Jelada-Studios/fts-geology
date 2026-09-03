@@ -11,14 +11,24 @@ authors = "Jelada Studios"
 credits = "See CREDITS.md — community reports and questions that shaped the mod."
 displayURL = "https://jeladastudios.com/fts-geology/"
 description = '''
-A simulated geology layer for Minecraft: tectonic plates with real motion, fault lines that
-produce the landforms they should, earthquakes, volcanoes shaped by their setting, geysers with
-actual thermodynamics, hot springs and travertine terraces.
-Retrogen-safe: bolts onto existing worlds. Nothing is destroyed, but ground that loses its support
-falls, builds included - there is a config toggle if you would rather they stayed put. Reads the
-world biome source
-rather than replacing worldgen, so it stacks on top of Terralith and Tectonic instead of fighting
-them. Plays nicely with Flowing Fluids (finite water) and Water Erosion.
+A geology layer for Minecraft: real plate tectonics driving real landforms.
+
+Most world-generation mods decide what a place looks like. This one decides why. A volcano's shape
+is not picked from a list - it comes from the plate boundary it sits on, and so does the rock under
+it, the earthquakes that shake it, and the springs around it. The aim is a world you can read.
+
+Four fault types, each producing the landforms it should. Four volcano types, chosen by their
+setting. Earthquakes with ten seconds of early warning on a seismograph. Geysers, hot springs and
+travertine terraces. Boundary geology underground - dig beneath a volcanic arc and you find granite,
+because that is what is there. Instruments to read all of it.
+
+Strongly recommended alongside Terralith and Flowing Fluids.
+
+Reads the world's biome source rather than replacing worldgen, so it stacks on top of Terralith and
+Tectonic instead of fighting them. Retrogen-safe: it bolts onto worlds that already exist.
+
+Nothing is destroyed, but ground that loses its support falls - builds included. That, and whether
+earthquakes may deform player blocks at all, are config toggles.
 '''
 
 # --- Dependencies ---
