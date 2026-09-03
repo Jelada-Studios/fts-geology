@@ -529,7 +529,11 @@ public final class VolcanoBuilder {
             TerrainProbe.clearVegetation(level, gx, ground, gz, 2);
             BlockState native0 = level.getBlockState(new BlockPos(gx, ground, gz));
             for (int h = 0; h <= Math.max(0, thickness); h++) {
-                setRock(level, new BlockPos(gx, ground + h, gz), apronRock(level, t, native0));
+                // The blend-into-the-ground pass-through only makes sense for the surface cell.
+                // Handing it back at h > 0 would stack a copy of the local ground in the air - a
+                // grass block floating over the apron.
+                setRock(level, new BlockPos(gx, ground + h, gz),
+                        apronRock(level, t, h == 0 ? native0 : null));
             }
         }
     }
@@ -549,14 +553,16 @@ public final class VolcanoBuilder {
      * apron finishes by dissolving into the countryside rather than by changing colour.</p>
      *
      * @param t 1 at the apron's inner edge, 0 at its outer edge
-     * @param native0 the block already at the surface here, so the far edge can blend into it
+     * @param native0 the block already at the surface here, so the far edge can blend into it, or
+     *                null when the caller is filling a cell above the surface and must not be
+     *                handed a copy of the ground
      */
     private static BlockState apronRock(ServerLevel level, double t, BlockState native0) {
         double r = level.random.nextDouble();
 
         // Outermost cells sometimes stay as they are. Ramps in below t = 0.3 and reaches roughly a
         // third of cells at the very edge - enough to fray the boundary, not enough to leave holes.
-        if (t < 0.3 && r > t / 0.3 * 0.7 + 0.3) return native0;
+        if (native0 != null && t < 0.3 && r > t / 0.3 * 0.7 + 0.3) return native0;
 
         // Basalt dominates near the cone, tephra at the rim; both are present throughout.
         double basalt = Mth.clamp(t * 1.15, 0.0, 1.0);
@@ -997,6 +1003,22 @@ public final class VolcanoBuilder {
         if (hi - g > 6) return null;
         if (g <= level.getSeaLevel() + 1) return null;   // never at the waterline
 
+        // Check the WHOLE site before touching any of it.
+        //
+        // Both loops below used to bail out with `return null` partway through, after they had
+        // already removed blocks - so a rejected site was left with a half-shaved notch in it, or a
+        // basalt collar with no lava inside. A site is either usable or it is left exactly as it
+        // was found; there is no half-built vent.
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                for (int y = g; y <= g + 6; y++) {
+                    BlockState s = level.getBlockState(new BlockPos(vx + dx, y, vz + dz));
+                    if (s.isAir()) continue;
+                    if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) return null;
+                }
+            }
+        }
+
         // Shave the bench down to that level. Only ever removes; nothing is stacked up, so the
         // outlet cannot end up perched on a plinth of its own making.
         for (int dx = -2; dx <= 2; dx++) {
@@ -1005,9 +1027,7 @@ public final class VolcanoBuilder {
                 TerrainProbe.clearVegetation(level, x, g, z, 3);
                 for (int y = g + 1; y <= g + 6; y++) {
                     BlockPos p = new BlockPos(x, y, z);
-                    BlockState s = level.getBlockState(p);
-                    if (s.isAir()) continue;
-                    if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) return null;
+                    if (level.getBlockState(p).isAir()) continue;
                     level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
                 }
             }
@@ -1016,10 +1036,8 @@ public final class VolcanoBuilder {
         BlockPos lava = new BlockPos(vx, g, vz);
         for (int dx = -1; dx <= 1; dx++) {
             for (int dz = -1; dz <= 1; dz++) {
-                BlockPos p = new BlockPos(vx + dx, g, vz + dz);
-                BlockState s = level.getBlockState(p);
-                if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) return null;
                 if (dx == 0 && dz == 0) continue;
+                BlockPos p = new BlockPos(vx + dx, g, vz + dz);
                 level.setBlock(p.above(), Blocks.BASALT.defaultBlockState(), 2);
                 level.setBlock(p, Blocks.BASALT.defaultBlockState(), 2);
             }

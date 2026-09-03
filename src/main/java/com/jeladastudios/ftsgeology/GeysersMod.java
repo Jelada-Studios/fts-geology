@@ -82,6 +82,12 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.quake.Weathering.clear();
         com.jeladastudios.ftsgeology.quake.PendingEdits.clear();
         com.jeladastudios.ftsgeology.instrument.SeismicNetwork.clear();
+        // Also the quakes still mid-application. Without this a rupture that was half applied when
+        // the world closed stayed in the static list, and the next world loaded in the same session
+        // - a different save, the same dimension key - had those edits written into it. The warning
+        // window makes it easier to hit: a quake can now sit there for ten seconds doing nothing
+        // before it writes its first block.
+        com.jeladastudios.ftsgeology.quake.Earthquake.cancelAll();
     }
     /**
      * Tells a joining player, once, about the optional mods this one reads.

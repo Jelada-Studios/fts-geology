@@ -274,6 +274,10 @@ public class SeismographBlockEntity extends BlockEntity {
         pendingSignal = tag.getInt("PendingSignal");
         readings.clear();
         for (Tag t : tag.getList("Readings", Tag.TAG_COMPOUND)) {
+            // Bounded on the way in, not just on the way out. The drum only ever writes LOG_SIZE
+            // lines, so a longer list means the tag was edited or corrupted, and there is no reason
+            // to let it grow the list without limit.
+            if (readings.size() >= LOG_SIZE) break;
             CompoundTag c = (CompoundTag) t;
             readings.add(new Reading(c.getLong("Id"), c.getDouble("Sp"),
                     c.getDouble("Amp"), c.getLong("At")));

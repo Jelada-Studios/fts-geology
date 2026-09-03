@@ -595,9 +595,12 @@ public final class RetrogenHandler {
             // cells of the same pool roofed over by the original surface - water underneath, lid on
             // top. That is the dryness that survived the last round, and why it was "some of them"
             // rather than all: it needs bumpy ground, which is exactly where it was reported.
+            // Clamped at 4: the cell filter only admits ground up to waterY+3, so anything larger
+            // means the terrain moved under us between building the pool and cutting it. Bounded so
+            // a surprise can never turn into a shaft driven up through the hillside.
             int cellGround = TerrainProbe.groundY(level, w.getX(), w.getZ());
             int open = cellGround == Integer.MIN_VALUE
-                    ? 2 : Math.max(2, cellGround - waterY);
+                    ? 2 : Mth.clamp(cellGround - waterY, 2, 4);
             for (int up = 1; up <= open; up++) {
                 BlockPos a = w.above(up);
                 // Never clear a cell an upstream pool is using as its water. Terraces step down one

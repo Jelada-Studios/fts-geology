@@ -255,14 +255,17 @@ public final class Earthquake {
         long deadline = System.nanoTime()
                 + com.jeladastudios.ftsgeology.util.TickBudget.remaining();
 
-        long now = event.getServer().overworld().getGameTime();
         ACTIVE.removeIf(run -> {
             ServerLevel level = event.getServer().getLevel(run.dimension);
             if (level == null) return true;
 
             // Still in the warning window: filed, seismographs alerting, but the ground has not
             // moved yet. Hold the whole run until its start time arrives.
-            if (now < run.startAt) return false;
+            //
+            // Read from the run's own level rather than the overworld. Game time happens to be
+            // shared across dimensions today, so both give the same answer, but startAt was set
+            // from this level and comparing a clock against itself does not rely on that.
+            if (level.getGameTime() < run.startAt) return false;
 
             int placed = 0;
             int examined = 0;
