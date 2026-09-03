@@ -102,6 +102,18 @@ public final class Weathering {
      */
     private static final int LEAF_SUPPORT_RANGE = 6;
 
+    /**
+     * How far the corridor is widened before settling, so orphaned canopy is actually visited.
+     *
+     * <p>Wider than {@link #LEAF_SUPPORT_RANGE} on purpose. The support range asks "is this leaf
+     * still attached to a tree", and six blocks is the right answer to that. But the dilation asks a
+     * different question - "which columns might hold a leaf the quake orphaned" - and a large
+     * canopy is wider than six blocks from the trunk column, so its outermost leaves sat in columns
+     * the job never looked at. That is the small clumps left hanging in the air after the big
+     * material had already come down.</p>
+     */
+    private static final int CORRIDOR_DILATION = 12;
+
     /** Columns examined per tick. Low on purpose: this is meant to be watched, not to happen. */
     private static final int COLUMNS_PER_TICK = 250;
 
@@ -171,18 +183,17 @@ public final class Weathering {
         Long2IntOpenHashMap seen = new Long2IntOpenHashMap();
         seen.defaultReturnValue(Integer.MIN_VALUE);
         for (QuakePlanner.Edit e : edits) {
-            // Dilated by the leaf-support range. A canopy hangs over columns whose ground the quake
-            // never touched, so a set built from the edits alone stops one tree-width short of the
-            // leaves it just orphaned. Dilating a long thin corridor grows it by its perimeter, not
-            // its area - about 15% more columns on a big rupture.
+            // Dilated by CORRIDOR_DILATION. A canopy hangs over columns whose ground the quake
+            // never touched, so a set built from the edits alone stops short of the leaves it just
+            // orphaned. Dilating a long thin corridor grows it by its perimeter, not its area.
             int ex = e.pos().getX(), ez = e.pos().getZ();
             // How deep the quake emptied this column, carried through the dilation so the ring
             // around the corridor inherits its neighbour's floor. A hint that turns out to be
             // above the local ground simply finds solid rock straight away and does nothing, so
             // spreading it outward is safe.
             int airTop = e.state().isAir() ? e.pos().getY() : Integer.MIN_VALUE;
-            for (int dx = -LEAF_SUPPORT_RANGE; dx <= LEAF_SUPPORT_RANGE; dx++) {
-                for (int dz = -LEAF_SUPPORT_RANGE; dz <= LEAF_SUPPORT_RANGE; dz++) {
+            for (int dx = -CORRIDOR_DILATION; dx <= CORRIDOR_DILATION; dx++) {
+                for (int dz = -CORRIDOR_DILATION; dz <= CORRIDOR_DILATION; dz++) {
                     long k = key(ex + dx, ez + dz);
                     if (airTop > seen.get(k)) seen.put(k, airTop);
                     else seen.putIfAbsent(k, Integer.MIN_VALUE);

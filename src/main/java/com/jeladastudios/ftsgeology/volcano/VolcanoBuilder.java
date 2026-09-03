@@ -527,32 +527,59 @@ public final class VolcanoBuilder {
             // five blocks of basalt over a forty-block radius is a plateau, not a skirt.
             int thickness = (int) Math.round(t * (1 + c.magnitude / 8.0));
             TerrainProbe.clearVegetation(level, gx, ground, gz, 2);
+            BlockState native0 = level.getBlockState(new BlockPos(gx, ground, gz));
             for (int h = 0; h <= Math.max(0, thickness); h++) {
-                setRock(level, new BlockPos(gx, ground + h, gz), apronRock(level, t));
+                setRock(level, new BlockPos(gx, ground + h, gz), apronRock(level, t, native0));
             }
         }
     }
 
-    /** Coarse tephra and ash at the far edge, solid lava rock closer in. */
-    private static BlockState apronRock(ServerLevel level, double t) {
-        if (t < 0.35) {
-            return (level.random.nextInt(3) == 0 ? Blocks.GRAVEL : Blocks.TUFF).defaultBlockState();
+    /**
+     * Coarse tephra and ash at the far edge, solid lava rock closer in.
+     *
+     * <h2>Mixed, not banded</h2>
+     * This used to switch material on two hard thresholds - gravel and tuff below 0.35, tuff and
+     * basalt below 0.7, basalt above. Three discrete zones drawn on a smooth radial gradient are
+     * three visible contour rings, and the brown one at the outside is what read as a second,
+     * separate ring around the mountain in testing.
+     *
+     * <p>So the mix is continuous instead: the odds of each material slide across the whole apron
+     * and the three overlap everywhere, which is how a real ash fall grades - coarse near the vent,
+     * finer outward, never a line. At the very edge the local ground is part of the mix too, so the
+     * apron finishes by dissolving into the countryside rather than by changing colour.</p>
+     *
+     * @param t 1 at the apron's inner edge, 0 at its outer edge
+     * @param native0 the block already at the surface here, so the far edge can blend into it
+     */
+    private static BlockState apronRock(ServerLevel level, double t, BlockState native0) {
+        double r = level.random.nextDouble();
+
+        // Outermost cells sometimes stay as they are. Ramps in below t = 0.3 and reaches roughly a
+        // third of cells at the very edge - enough to fray the boundary, not enough to leave holes.
+        if (t < 0.3 && r > t / 0.3 * 0.7 + 0.3) return native0;
+
+        // Basalt dominates near the cone, tephra at the rim; both are present throughout.
+        double basalt = Mth.clamp(t * 1.15, 0.0, 1.0);
+        if (level.random.nextDouble() < basalt) {
+            return (level.random.nextInt(4) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT)
+                    .defaultBlockState();
         }
-        if (t < 0.7) {
-            return (level.random.nextInt(2) == 0 ? Blocks.TUFF : Blocks.BASALT).defaultBlockState();
-        }
-        return (level.random.nextInt(4) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT).defaultBlockState();
+        return (level.random.nextInt(3) == 0 ? Blocks.GRAVEL : Blocks.TUFF).defaultBlockState();
     }
     /**
      * Strips trees and ground cover from the footprint so the mountain never grows through them.
      *
      * <h2>Why the edge frays</h2>
      * Clearing a clean disc left every volcano standing in a circle of mown lawn with the forest
-     * resuming at a perfect radius, and nothing says "pasted in" louder than that. What is actually
-     * around a volcano is a fringe of standing dead timber - trees killed by ash and gas but still
-     * upright, thinning outward until the living forest takes over. So the edifice takes its ground
-     * outright, and beyond it the clearing fades: more and more trunks are left standing, stripped of
-     * their crowns.
+     * resuming at a perfect radius, and nothing says "pasted in" louder than that. So the edifice
+     * takes its ground outright and beyond it the clearing fades, with more and more trees left
+     * alone until the living forest takes over.
+     *
+     * <p>The fringe used to be made of <b>stripped trunks</b> - leaves removed, trunk left standing,
+     * the idea being dead timber killed by ash. In game that reads as a bug rather than as a dead
+     * forest: bare logs in a row look like something half-finished. So a spared tree is now spared
+     * <em>whole</em>. The probability curve is unchanged, so the edge still thins outward at the
+     * same rate; what changes is that every tree is either entirely there or entirely gone.</p>
      */
     private static void clearSiteRow(ServerLevel level, Ctx c, int dx) {
         int radius = c.clearReach;
@@ -563,9 +590,17 @@ public final class VolcanoBuilder {
             int g = TerrainProbe.groundY(level, c.x + dx, c.z + dz);
             if (g == Integer.MIN_VALUE) continue;
 
-            // The further out past the edifice, the likelier a trunk survives as a snag.
+            // The further out past the edifice, the likelier a tree is left standing - whole.
+            //
+            // Decided from the surface noise rather than from a per-column dice roll, and that is
+            // not a detail: a tree covers a dozen columns, so rolling per column would clear some
+            // of them and spare others, and the result is half a canopy or a bare trunk - which is
+            // the thing this change exists to stop. The noise field varies over fifteen to thirty
+            // blocks, so a whole tree falls on one side of the threshold or the other, and the
+            // boundary comes out as an organic edge instead of a grid.
             double out = Mth.clamp((dist - solid) / Math.max(1.0, radius - solid), 0.0, 1.0);
-            boolean snag = dist > solid && level.random.nextDouble() < out;
+            double spare = (surfaceNoise(c, c.x + dx, c.z + dz) + 1.85) / 3.7;
+            if (dist > solid && spare < out) continue;
 
             // Stop at the top of whatever actually stands in this column rather than always
             // walking a fixed 24 blocks of air. The footprint now covers the apron too, so most
@@ -577,10 +612,8 @@ public final class VolcanoBuilder {
                 BlockPos p = new BlockPos(c.x + dx, y, c.z + dz);
                 BlockState s = level.getBlockState(p);
                 if (s.isAir()) continue;
-                boolean log = s.is(BlockTags.LOGS);
-                boolean tree = log || s.is(BlockTags.LEAVES);
+                boolean tree = s.is(BlockTags.LOGS) || s.is(BlockTags.LEAVES);
                 if (!tree && !TerrainProbe.isVegetation(s)) break;
-                if (snag && log) continue;                  // a dead trunk left standing
                 level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
             }
         }
@@ -924,22 +957,59 @@ public final class VolcanoBuilder {
     }
 
     /**
-     * Seats a lava outlet INTO the hillside instead of dropping it on top: the site has to be level,
-     * dry and free of builds, and the lava is then recessed a block below the surrounding ground with
-     * a basalt collar around it. Lava that sits lower than everything around it has nowhere to flow,
-     * so containment comes from the shape of the terrain rather than from a fence.
+     * Seats a lava outlet INTO the hillside instead of dropping it on top. The lava ends up recessed
+     * below the rock around it with a basalt collar, so containment comes from the shape of the
+     * ground rather than from a fence built afterwards.
      *
-     * @return the lava cell, or null if this spot was unsuitable
+     * <h2>It cuts its own bench</h2>
+     * This used to <em>demand</em> level ground - {@code findLevelSite(.., radius 2, tolerance 1)},
+     * which with its guard ring means a 7x7 patch flat to within one block. A volcano flank is a
+     * slope by definition, and on a stratocone it is close to 1:1, so a seven-block span drops six.
+     * The test therefore almost never passed, {@code c.vents} came back empty, and since both
+     * {@code seepVent} and the idle smoke are guarded on {@code surfaceVents.length > 0} the
+     * mountain had no working outlets at all: no lava on the flanks, and nothing to make the
+     * particles the eruption was supposed to show.
+     *
+     * <p>So it levels the patch itself now, down to the lowest ground in it. Taking the LOW point
+     * rather than an average is what keeps the old guarantee intact - the pool still sits below
+     * everything around it and still has nowhere to run. A real spatter vent builds itself the same
+     * small platform.</p>
+     *
+     * @return the lava cell, or null if this spot was genuinely unusable
      */
     private static BlockPos carveSeatedOutlet(ServerLevel level, int vx, int vz) {
-        TerrainProbe.Site site = TerrainProbe.findLevelSite(level, vx, vz, 2, 1);
-        if (!site.ok()) return null;
-        int g = site.groundY();
-        if (g <= level.getSeaLevel() + 1) return null;   // never at the waterline
-
+        // The lowest real ground in the 5x5 the outlet will occupy. Anything that is not ground at
+        // all - a cliff edge, open air - still disqualifies the site.
+        int g = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
         for (int dx = -2; dx <= 2; dx++) {
             for (int dz = -2; dz <= 2; dz++) {
-                TerrainProbe.clearVegetation(level, vx + dx, g, vz + dz, 3);
+                int h = TerrainProbe.groundY(level, vx + dx, vz + dz);
+                if (h == Integer.MIN_VALUE) return null;
+                if (TerrainProbe.hasFluidAbove(level, vx + dx, vz + dz)) return null;  // lake or sea
+                g = Math.min(g, h);
+                hi = Math.max(hi, h);
+            }
+        }
+        if (g == Integer.MAX_VALUE) return null;
+        // Willing to cut a bench, not to gouge a cliff. Six blocks of relief across five is a steep
+        // flank and still fine; past that the notch would read as a bite taken out of the mountain,
+        // and there are plenty of other bearings to try.
+        if (hi - g > 6) return null;
+        if (g <= level.getSeaLevel() + 1) return null;   // never at the waterline
+
+        // Shave the bench down to that level. Only ever removes; nothing is stacked up, so the
+        // outlet cannot end up perched on a plinth of its own making.
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                int x = vx + dx, z = vz + dz;
+                TerrainProbe.clearVegetation(level, x, g, z, 3);
+                for (int y = g + 1; y <= g + 6; y++) {
+                    BlockPos p = new BlockPos(x, y, z);
+                    BlockState s = level.getBlockState(p);
+                    if (s.isAir()) continue;
+                    if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) return null;
+                    level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                }
             }
         }
 

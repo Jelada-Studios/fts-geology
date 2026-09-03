@@ -127,6 +127,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue UNSUPPORTED_BLOCKS_FALL;   // default ON
     public static final ForgeConfigSpec.BooleanValue FALLING_INCLUDES_BUILDS;   // default ON
     public static final ForgeConfigSpec.IntValue QUAKE_BLOCKS_PER_TICK;    // main-thread apply budget
+    public static final ForgeConfigSpec.IntValue QUAKE_WARNING_TICKS;      // alert window before the ground moves
     public static final ForgeConfigSpec.IntValue QUAKE_AMBIENT_INTERVAL;   // ticks between ambient rolls
     public static final ForgeConfigSpec.IntValue QUAKE_SEARCH_RADIUS;      // how far from a player to look
     public static final ForgeConfigSpec.DoubleValue QUAKE_RECURRENCE_DAYS; // mean interval between ruptures
@@ -134,7 +135,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue QUAKE_MAX_RUPTURE;        // cap on rupture length, blocks
     public static final ForgeConfigSpec.IntValue QUAKE_PENDING_LIMIT;      // deferred edits held for unloaded chunks
     public static final ForgeConfigSpec.IntValue QUAKE_MAX_EDITS;          // hard cap on one quake
-    public static final ForgeConfigSpec.IntValue QUAKE_TICK_BUDGET_MS;     // wall-clock brake per tick
+    public static final ForgeConfigSpec.IntValue TICK_BUDGET_MS;           // wall-clock brake, whole mod
     public static final ForgeConfigSpec.BooleanValue QUAKE_LAYERED;        // move the whole fault at once
     public static final ForgeConfigSpec.IntValue DEEP_STRUCTURE_BUDGET;    // block edits per chunk
 
@@ -576,6 +577,15 @@ public final class GeyserConfig {
                         "kilometres per second and a large quake lasts tens of seconds, so letting the",
                         "deformation spread over a few seconds is more accurate than an instant snap.")
                 .defineInRange("quakeBlocksPerTick", 150, 8, 20000);
+        QUAKE_WARNING_TICKS = b
+                .comment("Ticks between a quake being detected and the ground actually starting to",
+                        "move. A seismograph is told the instant the rupture is triggered and sounds",
+                        "its siren through this window, so a warning system has time to react before",
+                        "the shaking arrives - which is exactly how real early warning works, the",
+                        "alert travelling at the speed of light while the seismic waves do not.",
+                        "20 = 1 second; 200 is ten seconds. Set 0 for no warning: the ground moves at",
+                        "once and the siren and the shaking coincide.")
+                .defineInRange("quakeWarningTicks", 200, 0, 1200);
         QUAKE_AMBIENT_INTERVAL = b
                 .comment("Ticks between ambient earthquake rolls. 0 disables ambient quakes entirely",
                         "(the /geology quake command still works).")
@@ -597,13 +607,19 @@ public final class GeyserConfig {
                         "often. The /geology quake command still fires one instantly whenever you",
                         "want to demonstrate or test.")
                 .defineInRange("quakeRecurrenceDays", 8.0, 0.05, 1000.0);
-        QUAKE_TICK_BUDGET_MS = b
-                .comment("Milliseconds a quake may spend on the server thread per tick.",
-                        "This is a hard wall-clock brake, not an estimate: whatever the block budget",
-                        "works out to, the tick stops here. A quake can therefore only ever make the",
-                        "game slower, never lock it up. Half of it also covers replaying deformation",
-                        "into chunks that have just loaded.")
-                .defineInRange("quakeTickBudgetMs", 8, 1, 40);
+        TICK_BUDGET_MS = b
+                .comment("Milliseconds the WHOLE MOD may spend on the server thread per tick.",
+                        "A hard wall-clock brake shared by everything: the quake itself, deformation",
+                        "replayed into chunks that just loaded, ground settling afterwards, volcano",
+                        "construction and chunk geology. When it runs out, all of it stops until the",
+                        "next tick however much work is queued, so the mod can only ever make the",
+                        "game a little slower and never lock it up.",
+                        "",
+                        "It used to be per-system, and each of the five measured it from its own",
+                        "start - so a bad tick could hand the mod 32 ms of a 20 ms tick. 5 is a",
+                        "quarter of a tick and leaves room for a heavily modded server; raise it if",
+                        "you want geology to appear faster and have the headroom to spare.")
+                .defineInRange("tickBudgetMs", 5, 1, 40);
         QUAKE_LAYERED = b
                 .comment("Move the whole boundary together instead of tearing along it from one end.",
                         "An earthquake really does nucleate at a point and rip outward, but the",

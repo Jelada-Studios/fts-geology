@@ -13,8 +13,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
@@ -56,14 +54,23 @@ public final class Earthquake {
         final BlockPos epicentre;
         final QuakePlanner.Plan plan;
         final Deque<QuakePlanner.Edit> pending;
+        /**
+         * Game time the ground is allowed to start moving. The quake is filed with the seismic
+         * network the instant it is triggered, but the deformation is held back until here, so a
+         * station has a warning window to sound its siren in before anything shakes - which is the
+         * whole point of an early-warning network, and only possible because the alert travels
+         * faster than the ground does.
+         */
+        long startAt;
         int shakeTicks;
         int applied;
         int ticks;
 
-        Running(ResourceKey<Level> dimension, QuakePlanner.Plan plan) {
+        Running(ResourceKey<Level> dimension, QuakePlanner.Plan plan, long startAt) {
             this.dimension = dimension;
             this.epicentre = plan.epicentre();
             this.plan = plan;
+            this.startAt = startAt;
             this.pending = new ArrayDeque<>(plan.edits());
             // The ground keeps deforming for as long as the edit list lasts, but the SHAKING is
             // capped: a 400k-edit megathrust would otherwise rattle the camera for a solid minute,
@@ -181,7 +188,12 @@ public final class Earthquake {
                 .record(level, epicentreOnFault, type, magnitude, depthM);
 
         announce(level, epicentreOnFault, type, magnitude, depthM);
-        level.playSound(null, epicentreOnFault, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 3.0f, 0.35f);
+
+        // No sound here any more. It used to fire a GENERIC_EXPLODE at trigger time; the warning
+        // and the boom now belong to the instruments and the ground itself. The ground is also
+        // held back by the warning window, so the planning below has that long to finish in - a
+        // large rupture that used to snap into being now has ten seconds of runway.
+        long startAt = level.getGameTime() + GeyserConfig.QUAKE_WARNING_TICKS.get();
 
         // Worker thread: the expensive half. Touches nothing but the immutable snapshot.
         CompletableFuture
@@ -194,7 +206,7 @@ public final class Earthquake {
                     return plan;
                 }, Util.backgroundExecutor())
                 .thenAcceptAsync(plan -> {
-                    ACTIVE.add(new Running(dim, plan));
+                    ACTIVE.add(new Running(dim, plan, startAt));
                     GeysersMod.LOGGER.info("quake apply starting: {} edits queued", plan.edits().size());
                 }, level.getServer())
                 .exceptionally(t -> {
@@ -222,22 +234,35 @@ public final class Earthquake {
     }
 
     private static void applyPending(TickEvent.ServerTickEvent event) {
+        // Shares the whole mod's tick budget with retrogen and volcano construction; see TickBudget.
+        com.jeladastudios.ftsgeology.util.TickBudget.open(event.getServer().getTickCount());
+
         // Replay any parked rupture whose chunk has arrived. Time-budgeted, on the server thread.
         PendingEdits.drain(event.getServer(),
-                GeyserConfig.QUAKE_TICK_BUDGET_MS.get() * 500_000L);   // half the tick budget
+                com.jeladastudios.ftsgeology.util.TickBudget.slice(0.4));
 
         // Ground the last quake tore up goes on settling in the background.
-        Weathering.drain(event.getServer(), GeyserConfig.QUAKE_TICK_BUDGET_MS.get() * 500_000L);
+        Weathering.drain(event.getServer(),
+                com.jeladastudios.ftsgeology.util.TickBudget.slice(0.3));
 
         if (ACTIVE.isEmpty()) return;
         int budget = GeyserConfig.QUAKE_BLOCKS_PER_TICK.get();
         // Hard wall-clock brake. However badly the block count is mis-estimated, a tick can never
         // run away: the quake just takes longer. This is what stops the game locking up.
-        long deadline = System.nanoTime() + GeyserConfig.QUAKE_TICK_BUDGET_MS.get() * 1_000_000L;
+        //
+        // The visible half of the mod, so it may use everything the tick has left rather than a
+        // fixed share: a player is standing there watching the ground move.
+        long deadline = System.nanoTime()
+                + com.jeladastudios.ftsgeology.util.TickBudget.remaining();
 
+        long now = event.getServer().overworld().getGameTime();
         ACTIVE.removeIf(run -> {
             ServerLevel level = event.getServer().getLevel(run.dimension);
             if (level == null) return true;
+
+            // Still in the warning window: filed, seismographs alerting, but the ground has not
+            // moved yet. Hold the whole run until its start time arrives.
+            if (now < run.startAt) return false;
 
             int placed = 0;
             int examined = 0;
@@ -286,10 +311,9 @@ public final class Earthquake {
                     v.z + (level.random.nextDouble() - 0.5) * kick);
             p.hurtMarked = true;
         }
-        if (level.getGameTime() % 12L == 0L) {
-            level.playSound(null, run.epicentre, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS,
-                    2.0f, 0.3f + level.random.nextFloat() * 0.15f);
-        }
+        // The rumble sound was removed on request - GENERIC_EXPLODE read as an explosion, not an
+        // earthquake. A replacement goes here: fired every dozen ticks while run.shakeTicks > 0,
+        // at run.epicentre, scaled by run.plan.magnitude().
     }
 
     // === Ambient quakes =====================================================

@@ -52,6 +52,9 @@ public class SeismographBlockEntity extends BlockEntity {
     /** Ticks the needle keeps twitching, and the redstone signal stays up, after an arrival. */
     private static final int SHAKE_TICKS = 100;
 
+    /** Redstone the station holds through the warning window: full, so a bell rings without wiring. */
+    private static final int WARNING_SIGNAL = 15;
+
     /** One line of the station's own paper trace. Measured values only. */
     public record Reading(long eventId, double spSeconds, double amplitudeMm, long gameTime) {
 
@@ -84,12 +87,21 @@ public class SeismographBlockEntity extends BlockEntity {
     private int shake;
     /** Redstone output while shaking. */
     private int signal;
+    /**
+     * Game time the ground will start moving, while the station is in its warning phase; 0 when it
+     * is not. This is the early-warning window: the quake was detected, the siren is wailing, and
+     * nothing has shaken yet.
+     */
+    private long warnUntil;
+    /** The arrival's redstone strength, held over from detection until the shaking actually lands. */
+    private int pendingSignal;
 
     public SeismographBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.SEISMOGRAPH.get(), pos, state);
     }
 
     public int signal() {
+        if (warnUntil > 0) return WARNING_SIGNAL;   // full through the alert
         return shake > 0 ? signal : 0;
     }
 
@@ -104,13 +116,32 @@ public class SeismographBlockEntity extends BlockEntity {
             be.setChanged();
         }
 
+        long now = level.getGameTime();
+
+        // Warning phase: the quake is on its way but the ground has not moved. The siren wails and
+        // the redstone is held full until the moment the shaking is due, when it hands off to the
+        // ordinary arrival pulse.
+        if (be.warnUntil > 0) {
+            if (now >= be.warnUntil) {
+                be.warnUntil = 0;
+                be.signal = be.pendingSignal;
+                be.shake = SHAKE_TICKS;
+                level.playSound(null, pos, SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.BLOCKS,
+                        0.9f, 0.6f);   // the ground is moving now
+                level.updateNeighborsAt(pos, state.getBlock());
+                be.setChanged();
+            } else if (now % 8L == 0L) {
+                be.siren(server, pos, now);
+            }
+        }
+
         if (be.shake > 0 && --be.shake == 0) {
             level.updateNeighborsAt(pos, state.getBlock());   // the signal drops
             be.setChanged();
         }
-        if (be.shake > 0 && level.getGameTime() % 4L == 0L) be.scratch(server, pos);
+        if (be.shake > 0 && now % 4L == 0L) be.scratch(server, pos);
 
-        if (level.getGameTime() % 20L != 0L) return;   // catching up is a once-a-second job
+        if (now % 20L != 0L) return;   // catching up is a once-a-second job
         for (SeismicNetwork.Event e : SeismicNetwork.since(server.dimension(), be.seen)) {
             be.seen = Math.max(be.seen, e.id());
             be.consider(server, pos, state, e);
@@ -132,12 +163,38 @@ public class SeismographBlockEntity extends BlockEntity {
         readings.add(0, new Reading(e.id(), SeismicWave.spSeconds(d), amp, e.gameTime()));
         while (readings.size() > LOG_SIZE) readings.remove(readings.size() - 1);
 
-        signal = SeismicWave.signal(amp);
-        shake = SHAKE_TICKS;
+        int sig = SeismicWave.signal(amp);
+        // The ground moves warningTicks after the quake was filed. If that is still ahead of us,
+        // this station has caught the alert early and enters its warning phase; if the window has
+        // already passed - warnings disabled, or a station reading back through old events - the
+        // arrival is treated as happening now.
+        long groundMoves = e.gameTime() + GeyserConfig.QUAKE_WARNING_TICKS.get();
+        if (groundMoves > level.getGameTime() + 5L) {
+            warnUntil = groundMoves;
+            pendingSignal = sig;
+            level.playSound(null, pos, SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.BLOCKS,
+                    1.0f, 1.8f);   // alarm raised
+        } else {
+            signal = sig;
+            shake = SHAKE_TICKS;
+            level.playSound(null, pos, SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.BLOCKS,
+                    0.9f, 0.6f);
+        }
         level.updateNeighborsAt(pos, state.getBlock());
-        level.playSound(null, pos, SoundEvents.NOTE_BLOCK_HAT.value(), SoundSource.BLOCKS,
-                0.6f, 1.6f);
         setChanged();
+    }
+
+    /**
+     * The warning wail: two alternating tones, a couple of blocks around the station, so it reads
+     * as an alarm rather than a note. Loud enough to hear across a room, brief enough not to become
+     * a nuisance over a ten-second window.
+     */
+    private void siren(ServerLevel level, BlockPos pos, long now) {
+        float pitch = (now / 8L) % 2L == 0L ? 1.9f : 1.5f;
+        level.playSound(null, pos, SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.BLOCKS,
+                0.8f, pitch);
+        level.sendParticles(ParticleTypes.NOTE,
+                pos.getX() + 0.5, pos.getY() + 1.05, pos.getZ() + 0.5, 1, 0.2, 0.0, 0.2, 0.0);
     }
 
     /** The needle scratching across the paper: a little dust and a tick, while it is still moving. */
@@ -193,6 +250,8 @@ public class SeismographBlockEntity extends BlockEntity {
         tag.putLong("Seen", seen);
         tag.putInt("Shake", shake);
         tag.putInt("Signal", signal);
+        tag.putLong("WarnUntil", warnUntil);
+        tag.putInt("PendingSignal", pendingSignal);
         ListTag list = new ListTag();
         for (Reading r : readings) {
             CompoundTag t = new CompoundTag();
@@ -211,6 +270,8 @@ public class SeismographBlockEntity extends BlockEntity {
         seen = tag.contains("Seen") ? tag.getLong("Seen") : -1L;
         shake = tag.getInt("Shake");
         signal = tag.getInt("Signal");
+        warnUntil = tag.getLong("WarnUntil");
+        pendingSignal = tag.getInt("PendingSignal");
         readings.clear();
         for (Tag t : tag.getList("Readings", Tag.TAG_COMPOUND)) {
             CompoundTag c = (CompoundTag) t;

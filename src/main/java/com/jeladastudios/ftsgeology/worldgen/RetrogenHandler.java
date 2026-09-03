@@ -3,6 +3,7 @@ package com.jeladastudios.ftsgeology.worldgen;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.blockentity.GeyserCoreBlockEntity;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
+import com.jeladastudios.ftsgeology.util.TickBudget;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.tectonics.GeothermalSuitability;
@@ -177,11 +178,17 @@ public final class RetrogenHandler {
         if (event.phase != net.minecraftforge.event.TickEvent.Phase.END) return;
         if (event.getServer() == null) return;
 
+        // One budget for the whole mod, opened by whichever tick handler runs first. Both of these
+        // shares are small on purpose: this is background construction, and it must not be able to
+        // empty the tick before the earthquake handler - which a player is actually watching - gets
+        // its turn. See TickBudget for what went wrong when every system kept its own deadline.
+        TickBudget.open(event.getServer().getTickCount());
+
         // Volcanoes under construction get their slice first. They are the heaviest thing the mod
         // builds, so they are emitted as steps and drained against a wall-clock deadline rather than
         // raised in one tick - a large shield covers thousands of columns.
         com.jeladastudios.ftsgeology.volcano.VolcanoJob.drain(event.getServer(),
-                GeyserConfig.QUAKE_TICK_BUDGET_MS.get() * 1_000_000L);
+                TickBudget.slice(0.3));
 
         // A volcano under construction slows chunk geology down rather than stopping it. Blocking
         // outright looked tidier but would let the chunk queue grow without bound while exploring a
@@ -192,7 +199,7 @@ public final class RetrogenHandler {
         if (!QUEUE.isEmpty()) {
             // A wall-clock brake as well as a chunk count, so the count above is a permission rather
             // than a promise: whichever runs out first stops the tick.
-            long deadline = System.nanoTime() + GeyserConfig.QUAKE_TICK_BUDGET_MS.get() * 1_000_000L;
+            long deadline = System.nanoTime() + TickBudget.slice(0.3);
             for (int i = 0; i < budget && System.nanoTime() < deadline; i++) {
                 QueuedChunk q = pollNearest(event.getServer());
                 if (q == null) break;
@@ -581,7 +588,17 @@ public final class RetrogenHandler {
         for (BlockPos w : pool) {
             // Clear anything standing over the basin, then cut it: water, calcite floor, magma bed.
             TerrainProbe.clearVegetation(level, w.getX(), waterY, w.getZ(), 3);
-            for (int up = 1; up <= 2; up++) {
+            // Open the cell to its OWN ground, not to a fixed two blocks.
+            //
+            // The cell filter accepts ground up to three blocks above the water
+            // (|g - (waterY+1)| <= 2), so on lumpy terrain a fixed two-block clear still left some
+            // cells of the same pool roofed over by the original surface - water underneath, lid on
+            // top. That is the dryness that survived the last round, and why it was "some of them"
+            // rather than all: it needs bumpy ground, which is exactly where it was reported.
+            int cellGround = TerrainProbe.groundY(level, w.getX(), w.getZ());
+            int open = cellGround == Integer.MIN_VALUE
+                    ? 2 : Math.max(2, cellGround - waterY);
+            for (int up = 1; up <= open; up++) {
                 BlockPos a = w.above(up);
                 // Never clear a cell an upstream pool is using as its water. Terraces step down one
                 // block at a time and their reaches overlap, so this loop used to empty the pool
@@ -660,10 +677,11 @@ public final class RetrogenHandler {
      * trunk, so the basin was cut <em>underneath</em> one, and the crowns roofed the whole colour
      * field over. Both are visible in the test shots.</p>
      *
-     * <p>The edge is frayed exactly the way {@code VolcanoBuilder.clearSiteRow} frays a volcano's:
-     * the basin is taken outright, and further out more and more trunks are left standing as bare
-     * snags. A spring does kill the trees around it - Yellowstone's basins are ringed with dead
-     * standing timber - but it does not mow a perfect circle.</p>
+     * <p>The edge frays the same way a volcano's does: the basin is taken outright, and further out
+     * more and more trees are left alone. A spared tree is spared <b>whole</b> - stripping the
+     * leaves and leaving the trunk was tried and reads as a bug rather than as dead timber - and the
+     * decision comes from a smooth field rather than a per-column roll, because a tree covers a
+     * dozen columns and rolling per column would leave half a canopy standing.</p>
      */
     private static void clearSpringCanopy(ServerLevel level, int cx, int cz, int radius) {
         double solid = radius * 0.5;
@@ -675,9 +693,9 @@ public final class RetrogenHandler {
                 int g = TerrainProbe.groundY(level, gx, gz);
                 if (g == Integer.MIN_VALUE) continue;
 
-                // The further out, the likelier a trunk survives as a snag.
+                // The further out, the likelier a whole tree survives.
                 double out = Mth.clamp((dist - solid) / Math.max(1.0, radius - solid), 0.0, 1.0);
-                boolean snag = dist > solid && level.random.nextDouble() < out;
+                if (dist > solid && spareField(gx, gz) < out) continue;
 
                 // Stop at the top of whatever actually stands here rather than always walking a
                 // fixed 24 blocks of air: on open ground that is one lookup instead of two dozen,
@@ -687,14 +705,24 @@ public final class RetrogenHandler {
                     BlockPos p = new BlockPos(gx, y, gz);
                     BlockState s = level.getBlockState(p);
                     if (s.isAir()) continue;
-                    boolean log = s.is(net.minecraft.tags.BlockTags.LOGS);
-                    boolean tree = log || s.is(net.minecraft.tags.BlockTags.LEAVES);
+                    boolean tree = s.is(net.minecraft.tags.BlockTags.LOGS)
+                            || s.is(net.minecraft.tags.BlockTags.LEAVES);
                     if (!tree && !TerrainProbe.isVegetation(s)) break;   // something real: stop
-                    if (snag && log) continue;                          // a dead trunk left standing
                     level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
                 }
             }
         }
+    }
+
+    /**
+     * A smooth 0..1 field used to decide whether a tree is spared, coherent over roughly twenty
+     * blocks so a whole tree lands on one side of the threshold.
+     */
+    private static double spareField(int x, int z) {
+        double n = Math.sin(x * 0.17) * Math.cos(z * 0.21)
+                + 0.5 * Math.sin((x + z) * 0.09)
+                + 0.35 * Math.sin((x - z) * 0.29);
+        return Mth.clamp((n + 1.85) / 3.7, 0.0, 1.0);
     }
 
     /**
