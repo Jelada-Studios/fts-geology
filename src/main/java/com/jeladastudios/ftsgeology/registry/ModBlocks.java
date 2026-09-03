@@ -5,6 +5,7 @@ import com.jeladastudios.ftsgeology.block.GeyserChamberBlock;
 import com.jeladastudios.ftsgeology.block.GeyserCoreBlock;
 import com.jeladastudios.ftsgeology.block.GeyserIgniterBlock;
 import com.jeladastudios.ftsgeology.block.HotSpringBlock;
+import com.jeladastudios.ftsgeology.block.SeismographBlock;
 import com.jeladastudios.ftsgeology.block.VolcanoCoreBlock;
 import com.jeladastudios.ftsgeology.block.VolcanoIgniterBlock;
 import net.minecraft.world.level.block.Block;
@@ -58,6 +59,21 @@ public final class ModBlocks {
             () -> new VolcanoIgniterBlock(BlockBehaviour.Properties.copy(Blocks.MAGMA_BLOCK)
                     .lightLevel(s -> 9)
                     .strength(2.0F)));
+
+    /**
+     * A seismograph station: a drum of paper, a pen, and a mass too heavy to be moved by the
+     * ground it is standing on.
+     *
+     * <p>The first instrument in the mod that is <em>read</em> rather than watched. It measures two
+     * things off its own trace and works everything else out from them, which means one station can
+     * tell you how far away an earthquake was but never which way - so the interesting thing to do
+     * with it is build three. See {@code SeismographBlockEntity}.</p>
+     */
+    public static final RegistryObject<Block> SEISMOGRAPH = BLOCKS.register("seismograph",
+            () -> new SeismographBlock(BlockBehaviour.Properties.copy(Blocks.LODESTONE)
+                    .mapColor(MapColor.COLOR_LIGHT_GRAY)
+                    .strength(2.5F)
+                    .noOcclusion()));
 
     /**
      * Native sulfur: the yellow crust that grows around volcanic fumaroles and vents as escaping

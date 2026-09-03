@@ -144,6 +144,9 @@ public final class GeyserConfig {
 
     // --- Integration with other mods ----------------------------------------
     public static final ForgeConfigSpec.BooleanValue SUGGEST_OPTIONAL_MODS;   // default ON
+
+    // --- Instruments ---------------------------------------------------------
+    public static final ForgeConfigSpec.IntValue SEISMOGRAPH_RANGE;   // blocks a station can hear
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
 
@@ -664,6 +667,18 @@ public final class GeyserConfig {
                         "limit rather than anything here, and a player has no way of knowing that.",
                         "Turn off if you are assembling a pack and would rather say it yourself.")
                 .define("suggestOptionalMods", true);
+        b.pop();
+
+        b.push("instruments");
+        SEISMOGRAPH_RANGE = b
+                .comment("How far away, in blocks, a seismograph will look at an earthquake at all.",
+                        "This is a housekeeping bound, not the physics: what really decides whether",
+                        "a station records something is whether the trace clears the drum's noise",
+                        "floor, and by that rule a large quake is detectable from absurdly far away",
+                        "- which is true of real stations and not much use in a game. 4000 blocks is",
+                        "100 km at the default horizontal scale, comfortably wider than anywhere a",
+                        "player is likely to have built a second station.")
+                .defineInRange("seismographRange", 4000, 64, 100000);
         b.pop();
 
         SPEC = b.build();

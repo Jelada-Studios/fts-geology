@@ -1,6 +1,8 @@
 package com.jeladastudios.ftsgeology.registry;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
+import com.jeladastudios.ftsgeology.item.FaultCompassItem;
+import com.jeladastudios.ftsgeology.item.GeologistsHammerItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.registries.DeferredRegister;
@@ -51,6 +53,24 @@ public final class ModItems {
 
     public static final RegistryObject<Item> MICROBIAL_MAT_GREEN = ITEMS.register("microbial_mat_green",
             () -> new BlockItem(ModBlocks.MICROBIAL_MAT_GREEN.get(), new Item.Properties()));
+
+    // --- Instruments ---------------------------------------------------------
+    //
+    // These are the first things in the mod a player holds rather than stumbles across. Everything
+    // the simulation knows was previously reachable only through /geology, which means it was
+    // reachable only by someone who already knew the mod was there. An instrument makes the model
+    // discoverable, and in a classroom it is the difference between a demonstration and a lesson.
+
+    public static final RegistryObject<Item> SEISMOGRAPH = ITEMS.register("seismograph",
+            () -> new BlockItem(ModBlocks.SEISMOGRAPH.get(), new Item.Properties()));
+
+    /** Reads a rock and the beds under it. Durable, because it is struck against stone. */
+    public static final RegistryObject<Item> GEOLOGISTS_HAMMER = ITEMS.register("geologists_hammer",
+            () -> new GeologistsHammerItem(new Item.Properties().durability(256).stacksTo(1)));
+
+    /** Strike of the nearest boundary, and what the two plates are doing across it. */
+    public static final RegistryObject<Item> FAULT_COMPASS = ITEMS.register("fault_compass",
+            () -> new FaultCompassItem(new Item.Properties().stacksTo(1)));
 
     private ModItems() {}
 }

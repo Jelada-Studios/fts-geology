@@ -174,6 +174,12 @@ public final class Earthquake {
         long t3 = System.nanoTime();
         GeysersMod.LOGGER.info("quake register done in {} ms", (t3 - t2) / 1_000_000);
 
+        // Filed for the instruments. A seismograph in an unloaded chunk cannot be told about this
+        // now, so the network keeps it and the station reads back through whatever it missed when
+        // its chunk comes round again - which is what an unattended station does.
+        com.jeladastudios.ftsgeology.instrument.SeismicNetwork
+                .record(level, epicentreOnFault, type, magnitude, depthM);
+
         announce(level, epicentreOnFault, type, magnitude, depthM);
         level.playSound(null, epicentreOnFault, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 3.0f, 0.35f);
 

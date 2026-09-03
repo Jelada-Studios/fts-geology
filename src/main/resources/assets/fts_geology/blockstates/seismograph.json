@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "fts_geology:block/seismograph" },
+    "facing=east":  { "model": "fts_geology:block/seismograph", "y": 90 },
+    "facing=south": { "model": "fts_geology:block/seismograph", "y": 180 },
+    "facing=west":  { "model": "fts_geology:block/seismograph", "y": 270 }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " C ",
+    "CAC",
+    " C "
+  ],
+  "key": {
+    "C": { "item": "minecraft:copper_ingot" },
+    "A": { "item": "minecraft:amethyst_shard" }
+  },
+  "result": { "item": "fts_geology:fault_compass" }
+}

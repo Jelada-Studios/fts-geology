@@ -69,6 +69,7 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.volcano.VolcanoJob.clear();
         com.jeladastudios.ftsgeology.quake.Weathering.clear();
         com.jeladastudios.ftsgeology.quake.PendingEdits.clear();
+        com.jeladastudios.ftsgeology.instrument.SeismicNetwork.clear();
     }
     /**
      * Tells a joining player, once, about the optional mods this one reads.
@@ -92,6 +93,13 @@ public class GeysersMod {
     /** Adds the technical block items to the Natural Blocks creative tab for testing/debugging. */
     @SubscribeEvent
     public void onBuildCreativeTabs(BuildCreativeModeTabContentsEvent event) {
+        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
+            // The instruments belong with the tools, not with the terrain: they are the only
+            // things in the mod a player is meant to carry.
+            event.accept(ModItems.SEISMOGRAPH.get());
+            event.accept(ModItems.GEOLOGISTS_HAMMER.get());
+            event.accept(ModItems.FAULT_COMPASS.get());
+        }
         if (event.getTabKey() == CreativeModeTabs.NATURAL_BLOCKS) {
             event.accept(ModItems.GEYSER_IGNITER.get());
             event.accept(ModItems.VOLCANO_IGNITER.get());
