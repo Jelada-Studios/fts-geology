@@ -314,14 +314,19 @@ public final class Earthquake {
                     v.z + (level.random.nextDouble() - 0.5) * kick);
             p.hurtMarked = true;
         }
-        // The rumble. GENERIC_EXPLODE used to stand in for this and read as an explosion rather
-        // than as ground movement. The clip is twenty-one seconds, so it is restarted on that
-        // cadence instead of every few ticks - overlapping copies of a rumble turn into a drone.
-        if (run.ticks % 420 == 0) {
+        // The rumble, started on the FIRST tick of the shaking and restarted at the clip's own
+        // length. `% 420 == 0` was wrong twice over: ticks is incremented before this runs, so it
+        // is never zero, and the shaking only lasts 40 to 400 ticks anyway - so the sound could
+        // not fire at all, which is why none was heard.
+        //
+        // Volume above 1 is what sets the audible range in Minecraft (16 blocks per unit), so it
+        // is scaled to reach about as far as the ground is actually moving rather than being left
+        // at a polite 1.0 and going unheard by everyone the quake is happening to.
+        if (run.ticks % 420 == 1) {
             level.playSound(null, run.epicentre,
                     com.jeladastudios.ftsgeology.registry.ModSounds.QUAKE_RUMBLE.get(),
                     net.minecraft.sounds.SoundSource.BLOCKS,
-                    (float) Mth.clamp(1.5 + run.plan.magnitude() / 4.0, 1.5, 4.0), 1.0f);
+                    (float) Mth.clamp(4.0 + run.plan.magnitude(), 4.0, 12.0), 1.0f);
         }
     }
 
