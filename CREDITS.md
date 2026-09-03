@@ -4,17 +4,18 @@
 
 Code, design and worldgen: Jelada Studios.
 
-## Thanks
+## Special thanks
 
-The people below shaped the mod from the outside: questions that turned into features, reports
-that turned into fixes, and the odd bit of encouragement at the right moment.
+To the people below, for their support: questions that turned into features, reports that turned
+into fixes, and encouragement at the right moment.
 
-<!--
-Names go in only once the person has agreed to it. Reddit and GitHub handles are public, but
-being listed in someone else's project is not the same thing as posting a comment, so ask first.
--->
+- **u/LLoadin** — the first person to ask how to follow the project.
+- **u/Best_Tradition1679**
+- **u/AstronomerSenior4236**
+- **u/ankle_biter50**
 
-- _(nobody yet — the list starts with the next release)_
+All from the r/feedthebeast launch thread. If you are listed here and would rather not be, say so
+and you come straight off.
 
 ## Built on
 
