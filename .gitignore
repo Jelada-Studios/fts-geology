@@ -31,3 +31,6 @@ desktop.ini
 
 # Delivery bundles rebuilt from docs/site and docs/trailer-cards
 docs/*.zip
+
+# Dedicated-server smoke test working directory
+run/

@@ -64,9 +64,17 @@ public final class ModItems {
     public static final RegistryObject<Item> SEISMOGRAPH = ITEMS.register("seismograph",
             () -> new BlockItem(ModBlocks.SEISMOGRAPH.get(), new Item.Properties()));
 
-    /** Reads a rock and the beds under it. Durable, because it is struck against stone. */
+    /**
+     * Reads a rock and the beds under it. Durable, because it is struck against stone.
+     *
+     * <p>No {@code stacksTo(1)} here: {@code durability()} already sets the stack size to one, and
+     * asking for both throws "Unable to have damage AND stack" - at <em>registration</em> time, so
+     * it compiles cleanly and then takes the whole mod down on launch. Caught by booting a
+     * dedicated server rather than by the compiler, which is the argument for doing that every
+     * time an item is added.</p>
+     */
     public static final RegistryObject<Item> GEOLOGISTS_HAMMER = ITEMS.register("geologists_hammer",
-            () -> new GeologistsHammerItem(new Item.Properties().durability(256).stacksTo(1)));
+            () -> new GeologistsHammerItem(new Item.Properties().durability(256)));
 
     /** Strike of the nearest boundary, and what the two plates are doing across it. */
     public static final RegistryObject<Item> FAULT_COMPASS = ITEMS.register("fault_compass",

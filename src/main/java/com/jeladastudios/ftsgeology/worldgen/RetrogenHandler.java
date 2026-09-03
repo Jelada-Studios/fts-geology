@@ -266,7 +266,19 @@ public final class RetrogenHandler {
             if (level == null || level.getChunkSource().getChunkNow(q.pos().x, q.pos().z) == null) continue;
 
             double d = distanceToNearestPlayer(level, q.pos());
-            if (d < bestDist) {
+            // `best == null` first, and it is not a tidiness detail - it is the whole reason this
+            // worked in single player and did nothing at all on a dedicated server.
+            //
+            // With nobody online, distanceToNearestPlayer has no player to measure to and returns
+            // Double.MAX_VALUE for every chunk. `d < bestDist` is then MAX_VALUE < MAX_VALUE, which
+            // is false, so no candidate was ever chosen, everything went straight back on the queue
+            // and this returned null forever. A server that generated its spawn area before anyone
+            // joined sat there with 529 chunks queued and placed nothing, for as long as it ran.
+            //
+            // Taking the first valid candidate unconditionally degrades to plain queue order when
+            // there is no player to sort by - which is the right behaviour anyway. An idle server
+            // has nothing better to do than get its geology in before the first player arrives.
+            if (best == null || d < bestDist) {
                 if (best != null) parked.add(best);
                 bestDist = d;
                 best = q;
