@@ -1,6 +1,13 @@
 # =====================================================================
-#  Hydrothermal Geysers — geyser_config.toml (COMMON)
-#  Generated into  <world>/serverconfig/geyser_config.toml  on first run.
+#  FT's Geology — fts_geology.toml (SERVER)
+#
+#  Written to  <world>/serverconfig/fts_geology.toml  when a world is first
+#  loaded, and sent to every client that joins: the server decides.
+#
+#  Because it lives with the world, a NEW world starts from the defaults.
+#  To carry your own settings into every world you make, drop this file in
+#  the instance's  defaultconfigs/  folder.
+#
 #  Every value is hot-reloadable. Ticks: 20 = 1 second.
 # =====================================================================
 

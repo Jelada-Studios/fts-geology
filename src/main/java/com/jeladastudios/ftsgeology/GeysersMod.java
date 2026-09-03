@@ -43,11 +43,23 @@ public class GeysersMod {
         // Populate the creative menu once tabs are built (mod bus event).
         modBus.addListener(this::onBuildCreativeTabs);
 
-        // Config file renamed with the mod. A Forge config file is only created once: changing a
-        // DEFAULT never reaches a world that already has the file, which silently kept several
-        // rounds of performance tuning from ever taking effect. The new name gives everyone a clean
-        // file with the current defaults, once.
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, GeyserConfig.SPEC, "fts_geology.toml");
+        // SERVER, not COMMON.
+        //
+        // Every setting here decides what the world does - how often a fault ruptures, how deep a
+        // chamber is cut, whether unsupported ground falls. That is the server's business, and a
+        // COMMON config is not: it is written on both sides and never synced, so a client joining a
+        // server kept its own copy and quietly disagreed with the world it was standing in. SERVER
+        // configs are sent to the client on join, which makes the server authoritative - the
+        // behaviour you actually want the moment two people share a world.
+        //
+        // Two consequences worth knowing. The file moves to <world>/serverconfig/fts_geology.toml,
+        // so settings now travel with the world instead of the installation. And because it is
+        // per-world, a new world starts from the defaults - put a tuned file in the instance's
+        // `defaultconfigs/` folder and Forge copies it into every world you create after that.
+        //
+        // Done during alpha on purpose: changing the type orphans any existing config file, and the
+        // cheapest moment to pay that is while almost nobody has one.
+        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, GeyserConfig.SPEC, "fts_geology.toml");
 
         // RetrogenHandler subscribes to the Forge bus via @EventBusSubscriber, so it
         // registers automatically. EruptionHandler is a stateless static utility (no events).
