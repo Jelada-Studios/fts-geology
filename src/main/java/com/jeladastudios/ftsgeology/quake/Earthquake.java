@@ -63,6 +63,16 @@ public final class Earthquake {
          */
         long startAt;
         int shakeTicks;
+        /**
+         * How long the ground goes on rumbling, separately from how long the camera shakes.
+         *
+         * <p>These are two different things and were sharing one number. Strong motion - the part
+         * that throws you off your feet - is over in tens of seconds even for an M9, which is why
+         * {@link #shakeTicks} is capped at 400. The NOISE of a large rupture lasts a great deal
+         * longer, and so does this mod's deformation: a 400,000 edit quake takes minutes to apply,
+         * so the sound was finishing while the ground was still visibly moving.</p>
+         */
+        final int rumbleTicks;
         int applied;
         int ticks;
 
@@ -78,6 +88,11 @@ public final class Earthquake {
             // motion lasts tens of seconds even for an M9.
             this.shakeTicks = Mth.clamp(plan.edits().size()
                     / Math.max(1, GeyserConfig.QUAKE_BLOCKS_PER_TICK.get()) + 40, 40, 400);
+            // Scaled by magnitude: about twenty seconds for a small tremor, a full minute for a
+            // great earthquake. Real strong-motion duration does climb roughly with magnitude -
+            // Tohoku shook for six minutes - and it is the part of an earthquake you experience
+            // for longest, so cutting it short at twenty seconds sold the whole event short.
+            this.rumbleTicks = Mth.clamp((int) Math.round(plan.magnitude() * 145), 400, 1300);
         }
     }
 
@@ -299,6 +314,7 @@ public final class Earthquake {
 
     /** Rattles players near the epicentre while the ground is still moving. */
     private static void shake(ServerLevel level, Running run) {
+        rumble(level, run);   // outlives the camera shake; see Running.rumbleTicks
         if (run.shakeTicks <= 0) return;
         double radius = 40 + run.plan.magnitude() * 14;
         double r2 = radius * radius;
@@ -314,20 +330,28 @@ public final class Earthquake {
                     v.z + (level.random.nextDouble() - 0.5) * kick);
             p.hurtMarked = true;
         }
-        // The rumble, started on the FIRST tick of the shaking and restarted at the clip's own
-        // length. `% 420 == 0` was wrong twice over: ticks is incremented before this runs, so it
-        // is never zero, and the shaking only lasts 40 to 400 ticks anyway - so the sound could
-        // not fire at all, which is why none was heard.
-        //
-        // Volume above 1 is what sets the audible range in Minecraft (16 blocks per unit), so it
-        // is scaled to reach about as far as the ground is actually moving rather than being left
-        // at a polite 1.0 and going unheard by everyone the quake is happening to.
-        if (run.ticks % 420 == 1) {
-            level.playSound(null, run.epicentre,
-                    com.jeladastudios.ftsgeology.registry.ModSounds.QUAKE_RUMBLE.get(),
-                    net.minecraft.sounds.SoundSource.BLOCKS,
-                    (float) Mth.clamp(4.0 + run.plan.magnitude(), 4.0, 12.0), 1.0f);
-        }
+    }
+
+    /**
+     * The ground noise, restarted at the clip's own length until the rumble is over.
+     *
+     * <p>Two separate bugs got it here. It was keyed on {@code ticks % 420 == 0}, which cannot ever
+     * match - ticks is incremented before the check, so it is never zero - and it sat behind the
+     * {@code shakeTicks} guard, which expires after at most twenty seconds while a large rupture is
+     * still visibly tearing the ground open minutes later. So a quake either made no sound at all
+     * or went quiet long before it had finished.</p>
+     *
+     * <p>Volume above 1 is what sets the audible radius in Minecraft - sixteen blocks per unit - so
+     * it is scaled to carry about as far as the ground is actually moving, rather than being left
+     * at a polite 1.0 and going unheard by everyone the earthquake is happening to.</p>
+     */
+    private static void rumble(ServerLevel level, Running run) {
+        if (run.ticks > run.rumbleTicks) return;
+        if (run.ticks % 420 != 1) return;              // the clip is 21 seconds long
+        level.playSound(null, run.epicentre,
+                com.jeladastudios.ftsgeology.registry.ModSounds.QUAKE_RUMBLE.get(),
+                net.minecraft.sounds.SoundSource.BLOCKS,
+                (float) Mth.clamp(4.0 + run.plan.magnitude(), 4.0, 12.0), 1.0f);
     }
 
     // === Ambient quakes =====================================================
