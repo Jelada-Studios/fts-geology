@@ -193,7 +193,7 @@ public final class VolcanoEruption {
      * Bounded scan for performance.
      */
     public static void coolScatteredLava(ServerLevel level, BlockPos summit, int craterR, int reach,
-                                         long[] keepVents) {
+                                         long[] keepVents, long[] molten) {
         int keep2 = (craterR + 1) * (craterR + 1);
         BlockPos lo = summit.offset(-reach, -reach, -reach);
         BlockPos hi = summit.offset(reach, 6, reach);
@@ -209,6 +209,12 @@ public final class VolcanoEruption {
             // dark after the very first eruption while the core kept firing its particles out of
             // them: the "the lava pool has vanished but the eruption still comes from there" report.
             if (isKept(keepVents, p)) continue;
+            // Cells the volcano was BUILT with as lava - the summit pool, a caldera's crescent
+            // lake, a fissure's ponds. The radius check above cannot express those shapes: a
+            // caldera's lake reaches 0.85 of the crater radius while its keep radius was a third of
+            // it, so after one eruption most of the lake had been turned to basalt and formCrater
+            // never refilled it. That is the "hardly any lava in the crater" report.
+            if (isKept(molten, p)) continue;
             FluidState fs = level.getBlockState(p).getFluidState();
             // Any lava - full source OR a thin flowing "half" block - but only where it RESTS ON
             // SOLID GROUND, so a mid-air stream is never frozen into a floating spike.
@@ -256,7 +262,18 @@ public final class VolcanoEruption {
      * ring lands on the actual rim instead of inside the lava lake, where it used to slowly plug
      * the crater.
      */
-    public static void formCrater(ServerLevel level, BlockPos summit, int craterR) {
+    public static void formCrater(ServerLevel level, BlockPos summit, int craterR, long[] molten) {
+        // Refill every cell the volcano was built with as lava, wherever it is. The radius loop
+        // below only reaches the summit pool; a caldera's lake and a fissure's ponds sit outside it
+        // and would stay as whatever the eruption left them.
+        if (molten != null) {
+            for (long key : molten) {
+                BlockPos p = BlockPos.of(key);
+                if (level.getBlockState(p).isAir()) {
+                    level.setBlock(p, Blocks.LAVA.defaultBlockState(), 3);
+                }
+            }
+        }
         int r = Math.max(1, craterR);
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {

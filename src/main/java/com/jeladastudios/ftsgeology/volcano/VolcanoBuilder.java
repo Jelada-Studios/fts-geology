@@ -135,6 +135,19 @@ public final class VolcanoBuilder {
         int coreCraterR = 3;
         final List<BlockPos> ventSites = new ArrayList<>();
         final List<BlockPos> vents = new ArrayList<>();
+        /**
+         * Cells that are MEANT to be lava between eruptions - the crater pool, a caldera's lake
+         * crescent, every pond of a fissure swarm.
+         *
+         * <p>{@code coolScatteredLava} used to protect them with a radius, {@code coreCraterR}, and
+         * a radius is the wrong shape for two of the four summit styles. A caldera's lake is a
+         * crescent reaching {@code craterR * 0.85} while its keep radius was {@code craterR / 3}, and
+         * a fissure's ponds are strung along a line while its keep radius was 2 - so after the first
+         * eruption most of the lava a volcano was built with had been turned to basalt and never
+         * refilled. That is the "hardly any lava in the crater" report. Listing the actual cells
+         * makes the protection exactly the shape of the thing it is protecting.</p>
+         */
+        final List<BlockPos> molten = new ArrayList<>();
     }
 
     private static Ctx layout(ServerLevel level, BlockPos base, int magnitude, VolcanoType type) {
@@ -433,8 +446,10 @@ public final class VolcanoBuilder {
                 if (lake) {
                     // Recessed by one block, exactly like the flank vents: the lake is the lowest
                     // point of its own basin and so has nowhere to flow.
-                    setRock(level, new BlockPos(gx, target - 1, gz), Blocks.LAVA.defaultBlockState());
+                    BlockPos molten = new BlockPos(gx, target - 1, gz);
+                    setRock(level, molten, Blocks.LAVA.defaultBlockState());
                     clearNatural(level, new BlockPos(gx, target, gz));
+                    c.molten.add(molten);   // this cell is MEANT to stay lava; see Ctx.molten
                 } else if (level.random.nextInt(6) == 0) {
                     setRock(level, new BlockPos(gx, target, gz), Blocks.TUFF.defaultBlockState());
                 }
@@ -691,6 +706,7 @@ public final class VolcanoBuilder {
                 if (dist <= poolR) {
                     setRock(level, p, Blocks.LAVA.defaultBlockState());
                     clearNatural(level, p.above());
+                    c.molten.add(p);
                 } else {
                     setRock(level, p, (level.random.nextInt(3) == 0
                             ? Blocks.MAGMA_BLOCK : Blocks.BLACKSTONE).defaultBlockState());
@@ -724,6 +740,7 @@ public final class VolcanoBuilder {
                 } else {
                     setRock(level, surf, Blocks.LAVA.defaultBlockState());
                     clearNatural(level, surf.above());
+                    c.molten.add(surf);
                 }
             }
         }
@@ -828,6 +845,7 @@ public final class VolcanoBuilder {
         if (level.getBlockEntity(corePos) instanceof VolcanoCoreBlockEntity core) {
             core.setMagnitude(c.magnitude);
             core.setCraterRadius(c.coreCraterR);
+            core.setMoltenCells(c.molten);
         }
         setRock(level, c.vent, Blocks.LAVA.defaultBlockState());
     }
@@ -960,6 +978,12 @@ public final class VolcanoBuilder {
         if (level.getBlockEntity(c.vent.below()) instanceof VolcanoCoreBlockEntity core) {
             core.setSurfaceVents(c.vents);
         }
+        // Said out loud, because "it feels like the vents do nothing" is not something you can act
+        // on. carveSeatedOutlet returns null silently when a site will not do, so a mountain with
+        // no working outlets looked exactly like a mountain whose particles were broken. Now the
+        // ratio is in the log and the two can be told apart.
+        GeysersMod.LOGGER.info("volcano {} vents: {} cut of {} sites, {} molten cells",
+                c.type, c.vents.size(), c.ventSites.size(), c.molten.size());
     }
 
     /**

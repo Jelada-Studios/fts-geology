@@ -68,8 +68,18 @@ public final class DeepStructure {
             report.type = centre.faultType().toString();
             report.stress = centre.stress();
         }
-        if (centre.stress() < 0.25) {   // only the living part of a fault zone has structure
-            if (report != null) report.note = "stress below 0.25 - too far from the boundary";
+        // Cheap early out, and ONLY that.
+        //
+        // This used to be the real decision: one sample at the chunk's centre, and if its stress
+        // was under 0.25 the whole chunk got nothing. A chunk at 0.251 was fully built and its
+        // neighbour at 0.249 was untouched, which drew a hard, chunk-aligned edge across the
+        // landscape - sixteen blocks of geology, then sixteen blocks of none. Reported three times
+        // as "the separate basalt wall outside the volcano"; it was never the volcano.
+        //
+        // The gate is per column now, further down, and it fades rather than cuts. The margin here
+        // is generous because a chunk's corner can be a good deal more stressed than its middle.
+        if (centre.stress() < 0.10) {
+            if (report != null) report.note = "stress below 0.10 across the chunk - deep interior";
             return;
         }
 
@@ -89,8 +99,16 @@ public final class DeepStructure {
             int z = cp.getMinBlockZ() + (k & 15);
             PlateSample col = TectonicMap.sampleCached(level, x, z);
             if (col.faultType() == com.jeladastudios.ftsgeology.tectonics.FaultType.INTERIOR) continue;
+            if (col.stress() < 0.25) continue;   // this column is too far from the boundary
 
-                int top = columnTop(level, x, z, hardCeiling, outcrop, soil);
+            // How much soil this column keeps over its bedrock, faded by stress.
+            //
+            // A fixed depth plus a hard stress cut is what produced the wall. Rock that simply
+            // retreats deeper as the boundary weakens has no edge at all: at the fault it reaches
+            // the surface, and a few hundred blocks out it is buried far enough that nothing shows
+            // until something cuts through. Same total structure, no line across the map.
+            int localSoil = outcropDepth(col.stress(), soil);
+            int top = columnTop(level, x, z, hardCeiling, outcrop, localSoil);
             if (top <= floor + 4) continue;
 
             int placed = switch (col.faultType()) {
@@ -148,6 +166,27 @@ public final class DeepStructure {
     }
 
     private static final int[][] NEIGHBOURS = { {1, 0}, {-1, 0}, {0, 1}, {0, -1} };
+
+    /**
+     * How deep the soil cover is for a column of this stress: the configured minimum right on an
+     * active boundary, deepening to {@link #BURIED_SOIL} as the stress falls away to the 0.25 floor.
+     *
+     * <p>This is the whole fix for the hard edge. The rock is still generated either way - the
+     * question is only how far under the surface its top sits, and pushing that down smoothly means
+     * the transition from "outcrops in the meadow" to "invisible without digging" happens over
+     * hundreds of blocks instead of at one chunk border. It is also what actually happens: bedrock
+     * is everywhere, and you see it where erosion or tectonics has stripped the cover off.</p>
+     */
+    private static int outcropDepth(double stress, int minSoil) {
+        double t = Mth.clamp((stress - 0.25) / 0.75, 0.0, 1.0);
+        return (int) Math.round(BURIED_SOIL + (minSoil - BURIED_SOIL) * t);
+    }
+
+    /**
+     * Soil depth at the quiet end of the fade. Deep enough that the boundary rock is out of sight
+     * from the surface, shallow enough that a ravine or a mine still cuts into it.
+     */
+    private static final int BURIED_SOIL = 24;
 
     /**
      * The descending slab, the mantle wedge above it, and the arc's plutonic root.

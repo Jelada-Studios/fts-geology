@@ -667,6 +667,26 @@ public final class RetrogenHandler {
             }
         }
         taken.addAll(pool);
+
+        // Count the water back.
+        //
+        // Terraced springs have come out dry three rounds in a row, and each round I found a real
+        // cause, fixed it, measured the fix, and it was still not the whole story. So rather than
+        // guess a fourth time: the pool knows how many cells it filled, and if any of them are not
+        // water by the time the method returns, something in here took them and the log will say
+        // how many and where. Cheap - one block read per pool cell, once, at generation.
+        int wet = 0;
+        for (BlockPos w : pool) {
+            if (!level.getBlockState(w).getFluidState().isEmpty()) wet++;
+        }
+        if (wet < pool.size()) {
+            GeysersMod.LOGGER.warn(
+                    "hot spring lost water: {} of {} cells dry at {},{},{} (biome {}, core={})",
+                    pool.size() - wet, pool.size(), cx, waterY, cz,
+                    level.getBiome(new BlockPos(cx, waterY, cz)).unwrapKey()
+                            .map(k -> k.location().toString()).orElse("?"),
+                    core);
+        }
         return true;
     }
 

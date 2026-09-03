@@ -38,6 +38,8 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
     private int spilled = 0;
     /** Surface lava outlets across the mountainside: they smoke idle and seep lava mid-eruption. */
     private long[] surfaceVents = new long[0];
+    /** Cells that must stay lava between eruptions; see setMoltenCells. */
+    private long[] moltenCells = new long[0];
     private int craterR = 3;
 
     public VolcanoCoreBlockEntity(BlockPos pos, BlockState state) {
@@ -55,6 +57,21 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         long[] arr = new long[vents.size()];
         for (int i = 0; i < arr.length; i++) arr[i] = vents.get(i).asLong();
         this.surfaceVents = arr;
+        setChanged();
+    }
+
+    /**
+     * The cells that are meant to be lava between eruptions - the summit pool, a caldera's lake, a
+     * fissure's ponds.
+     *
+     * <p>Kept as an explicit list because the cooling sweep used to protect them with a radius, and
+     * a radius is the wrong shape for a crescent or a line of ponds: most of the lava a volcano was
+     * built with got turned to basalt after its first eruption and was never refilled.</p>
+     */
+    public void setMoltenCells(List<BlockPos> cells) {
+        long[] arr = new long[cells.size()];
+        for (int i = 0; i < arr.length; i++) arr[i] = cells.get(i).asLong();
+        this.moltenCells = arr;
         setChanged();
     }
 
@@ -107,7 +124,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                 // what you watch is a lava tongue turning to rock behind its own front.
                 if (be.eruptionTicks % 60 == 0) {
                     VolcanoEruption.coolScatteredLava(server, summit, be.craterR,
-                            20 + be.magnitude, be.surfaceVents);
+                            20 + be.magnitude, be.surfaceVents, be.moltenCells);
                 }
                 // The outlets trickle gently while it erupts — one random outlet each second.
                 if (be.surfaceVents.length > 0) {
@@ -115,11 +132,11 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                             BlockPos.of(be.surfaceVents[server.random.nextInt(be.surfaceVents.length)]).above());
                 }
                 if ((be.timer -= 20) <= 0) {
-                    VolcanoEruption.formCrater(server, summit, be.craterR);
+                    VolcanoEruption.formCrater(server, summit, be.craterR, be.moltenCells);
                     // Everything spilled OUTSIDE the crater cools to basalt/tuff; the crater lake
                     // stays molten, and the outlet trickles cool too.
                     VolcanoEruption.coolScatteredLava(server, summit, be.craterR, 20 + be.magnitude,
-                            be.surfaceVents);
+                            be.surfaceVents, be.moltenCells);
                     for (long v : be.surfaceVents) {
                         VolcanoEruption.dryVent(server, BlockPos.of(v).above());
                     }
@@ -194,6 +211,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         tag.putInt("Magnitude", magnitude);
         tag.putInt("CraterR", craterR);
         if (surfaceVents.length > 0) tag.putLongArray("SurfaceVents", surfaceVents);
+        if (moltenCells.length > 0) tag.putLongArray("MoltenCells", moltenCells);
     }
 
     @Override
@@ -205,5 +223,6 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         magnitude = tag.contains("Magnitude") ? tag.getInt("Magnitude") : 12;
         craterR = tag.contains("CraterR") ? tag.getInt("CraterR") : 3;
         surfaceVents = tag.contains("SurfaceVents") ? tag.getLongArray("SurfaceVents") : new long[0];
+        moltenCells = tag.contains("MoltenCells") ? tag.getLongArray("MoltenCells") : new long[0];
     }
 }
