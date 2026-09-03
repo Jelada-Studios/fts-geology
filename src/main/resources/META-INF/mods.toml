@@ -8,6 +8,7 @@ modId = "fts_geology"
 version = "${file.jarVersion}"
 displayName = "FT's Geology"
 authors = "Jelada Studios"
+credits = "See CREDITS.md — community reports and questions that shaped the mod."
 displayURL = "https://jeladastudios.com/fts-geology/"
 description = '''
 A simulated geology layer for Minecraft: tectonic plates with real motion, fault lines that

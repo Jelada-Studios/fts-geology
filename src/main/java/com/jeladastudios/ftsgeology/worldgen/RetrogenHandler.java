@@ -473,7 +473,11 @@ public final class RetrogenHandler {
         // --- Layout: one broad basin on the flat, terraces on a slope ---------
         // Flat ground gives a single wide pool; a gentle slope gives the stepped travertine
         // terraces you see at Pamukkale, each pool a little lower than the one above it.
-        boolean terraced = relief >= 2;
+        //
+        // Two blocks of relief is noise on any forest floor, not a slope. Chaining on that put a
+        // terrace system on ground that had nowhere to step down to, which is what drove the
+        // descent below into the ground.
+        boolean terraced = relief >= 4;
         int terraces = terraced ? 2 + level.random.nextInt(3) : 1;
 
         // Downhill direction, from the height difference across the site.
@@ -486,7 +490,8 @@ public final class RetrogenHandler {
         if (stepX == 0 && stepZ == 0) stepX = 1;        // pick a direction on dead-flat ground
 
         int placed = 0;
-        int px = x, pz = z, waterY = centre - 1;        // recessed: water sits BELOW the rim
+        int px = x, pz = z;
+        int ground = centre, waterY = centre - 1;       // recessed: water sits BELOW the rim
         // Every water cell cut so far. Each pool hands it to the next so a lower terrace cannot
         // clear, or tile sinter over, the water of the one above it.
         java.util.Set<BlockPos> taken = new java.util.HashSet<>();
@@ -502,7 +507,20 @@ public final class RetrogenHandler {
             pz += stepZ * stride;
             int nextGround = TerrainProbe.groundY(level, px, pz);
             if (nextGround == Integer.MIN_VALUE) break;
-            waterY = Math.min(waterY - 1, nextGround - 1);   // always one step further down
+            // The chain follows the hill; it never digs one for itself.
+            //
+            // It used to drop the water a block per terrace whatever the ground did
+            // (`min(waterY - 1, nextGround - 1)`), while carveTerrace only ever opens TWO blocks
+            // above the water. On level ground the third pool onward was therefore roofed over by
+            // the original surface: the water was cut, it just had a lid on it, and the colour
+            // bands were then painted across that lid. That is the "terraced springs are dry"
+            // report - and, further down the chain, the pit in the ground.
+            //
+            // Now every pool sits exactly one block under ITS OWN ground, so two blocks of
+            // clearance is always enough, and the chain simply stops where the hill does.
+            if (nextGround >= ground) break;
+            ground = nextGround;
+            waterY = nextGround - 1;
             if (waterY <= lo - 6) break;
         }
         if (placed == 0) return false;
@@ -544,6 +562,9 @@ public final class RetrogenHandler {
             }
         }
         if (pool.size() < 6) return false;
+
+        // Take the canopy off the whole terrace - basin and colour bands - before any of it is cut.
+        clearSpringCanopy(level, cx, cz, radius + 18);
 
         for (BlockPos w : pool) {
             // Clear anything standing over the basin, then cut it: water, calcite floor, magma bed.
@@ -619,6 +640,52 @@ public final class RetrogenHandler {
 
 
     /**
+     * Strips the canopy off a terrace before it is cut.
+     *
+     * <p>{@link TerrainProbe#clearVegetation} deliberately never touches logs or leaves - a cabin is
+     * made of logs - and it stops dead at the first block that is not ground cover. It was the only
+     * clearing a spring ever did, so a wooded site kept its trees: {@code groundY} walks past a
+     * trunk, so the basin was cut <em>underneath</em> one, and the crowns roofed the whole colour
+     * field over. Both are visible in the test shots.</p>
+     *
+     * <p>The edge is frayed exactly the way {@code VolcanoBuilder.clearSiteRow} frays a volcano's:
+     * the basin is taken outright, and further out more and more trunks are left standing as bare
+     * snags. A spring does kill the trees around it - Yellowstone's basins are ringed with dead
+     * standing timber - but it does not mow a perfect circle.</p>
+     */
+    private static void clearSpringCanopy(ServerLevel level, int cx, int cz, int radius) {
+        double solid = radius * 0.5;
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                double dist = Math.sqrt((double) dx * dx + (double) dz * dz);
+                if (dist > radius) continue;
+                int gx = cx + dx, gz = cz + dz;
+                int g = TerrainProbe.groundY(level, gx, gz);
+                if (g == Integer.MIN_VALUE) continue;
+
+                // The further out, the likelier a trunk survives as a snag.
+                double out = Mth.clamp((dist - solid) / Math.max(1.0, radius - solid), 0.0, 1.0);
+                boolean snag = dist > solid && level.random.nextDouble() < out;
+
+                // Stop at the top of whatever actually stands here rather than always walking a
+                // fixed 24 blocks of air: on open ground that is one lookup instead of two dozen,
+                // and a spring field is mostly open ground.
+                int top = Math.min(g + 24, level.getHeight(Heightmap.Types.WORLD_SURFACE, gx, gz));
+                for (int y = g + 1; y <= top; y++) {
+                    BlockPos p = new BlockPos(gx, y, gz);
+                    BlockState s = level.getBlockState(p);
+                    if (s.isAir()) continue;
+                    boolean log = s.is(net.minecraft.tags.BlockTags.LOGS);
+                    boolean tree = log || s.is(net.minecraft.tags.BlockTags.LEAVES);
+                    if (!tree && !TerrainProbe.isVegetation(s)) break;   // something real: stop
+                    if (snag && log) continue;                          // a dead trunk left standing
+                    level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                }
+            }
+        }
+    }
+
+    /**
      * Rings a hot spring with the coloured bands that make one recognisable from the air.
      *
      * <h2>The colours are alive</h2>
@@ -684,6 +751,10 @@ public final class RetrogenHandler {
                 int g = TerrainProbe.groundY(level, x, z);
                 if (g == Integer.MIN_VALUE) continue;
                 if (Math.abs(g - waterY) > 2) continue;      // stays on the flat apron
+                // Never repaint the floor of standing water. groundY walks past a fluid, so the
+                // cell it returns inside a neighbouring pool is that pool's calcite bed - painting
+                // a mat there leaves the water sitting on a microbial mat instead of sinter.
+                if (!level.getBlockState(new BlockPos(x, g + 1, z)).getFluidState().isEmpty()) continue;
                 BlockPos p = new BlockPos(x, g, z);
                 BlockState s = level.getBlockState(p);
                 if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) continue;

@@ -45,3 +45,12 @@ tasks.named('jar') {
         ])
     }
 }
+
+// Gradle names the jar after the version, so every version bump leaves the old
+// one behind in build/libs. Sweep them so the folder always holds exactly the
+// build that just ran — copying a stale jar into the mods folder is too easy.
+tasks.named('jar') {
+    doFirst {
+        delete fileTree(layout.buildDirectory.dir('libs')) { include '*.jar' }
+    }
+}

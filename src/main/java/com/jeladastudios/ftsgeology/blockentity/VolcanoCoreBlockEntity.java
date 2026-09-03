@@ -75,14 +75,14 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         switch (be.phase) {
             case DORMANT -> {
                 if (!hasLava(server, pos)) return; // dead until it has lava again
-                be.idleSmoke(server, summit, 0.4f); // lazy smoke off the crater + a vent or two
+                be.idleSmoke(server, summit, 0.4f, true); // lazy smoke off the crater + a vent or two
                 if ((be.timer -= 20) <= 0) {
                     be.phase = Phase.RUMBLING;
                     be.timer = GeyserConfig.VOLCANO_RUMBLE_TICKS.get();
                 }
             }
             case RUMBLING -> {
-                be.idleSmoke(server, summit, 1.0f); // building: heavier smoke from pool + all vents
+                be.idleSmoke(server, summit, 1.0f, true); // building: heavier smoke from pool + all vents
                 if ((be.timer -= 20) <= 0) {
                     be.phase = Phase.ERUPTING;
                     be.eruptionTicks = 0;
@@ -91,6 +91,11 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                 }
             }
             case ERUPTING -> {
+                // The mountainside smokes hardest while it is actually erupting. It used to smoke
+                // only when DORMANT and RUMBLING: at the one moment the flank outlets are pouring
+                // lava they were completely silent, so the vents ran dry-looking while the summit
+                // had the whole show to itself.
+                be.idleSmoke(server, summit, 1.0f, false);
                 // Well lava up the crater so it spills down the mountain - but only so much of it.
                 // A real flow chills against the ground and stops; without a budget the mountain
                 // simply kept pouring until the whole flank was molten.
@@ -126,8 +131,16 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         be.setChanged();
     }
 
-    /** Black smoke off the crater lava lake itself and off the surface vents; intensity 0..1. */
-    private void idleSmoke(ServerLevel level, BlockPos summit, float intensity) {
+    /**
+     * Black smoke off the crater lava lake itself and off the surface vents; intensity 0..1.
+     *
+     * @param deposit whether the vents also lay down sulfur. Only while the volcano is quiet:
+     *                sulfur is a fumarole product, laid by gas escaping through a cool opening. An
+     *                erupting vent is pouring lava, not fuming - and at one attempt per vent per
+     *                second, a twenty-minute eruption across nineteen outlets would have painted
+     *                the whole mountain yellow.
+     */
+    private void idleSmoke(ServerLevel level, BlockPos summit, float intensity, boolean deposit) {
         // A few random samples of the crater lava pool.
         int puffs = 1 + Math.round(intensity * 3);
         for (int i = 0; i < puffs; i++) {
@@ -143,13 +156,17 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
             for (long v : surfaceVents) {
                 BlockPos vp = BlockPos.of(v);
                 VolcanoEruption.smokeAt(level, vp);
-                com.jeladastudios.ftsgeology.eruption.SulfurDeposits.depositAround(level, vp.above());
+                if (deposit) {
+                    com.jeladastudios.ftsgeology.eruption.SulfurDeposits.depositAround(level, vp.above());
+                }
             }
         } else if (surfaceVents.length > 0 && level.random.nextInt(3) == 0) {
             BlockPos v = BlockPos.of(surfaceVents[level.random.nextInt(surfaceVents.length)]);
             VolcanoEruption.smokeAt(level, v);
             // Escaping gas oxidises at the opening and leaves a yellow sulfur crust behind.
-            com.jeladastudios.ftsgeology.eruption.SulfurDeposits.depositAround(level, v.above());
+            if (deposit) {
+                com.jeladastudios.ftsgeology.eruption.SulfurDeposits.depositAround(level, v.above());
+            }
         }
     }
 

@@ -141,6 +141,9 @@ public final class GeyserConfig {
     // --- Sulfur -------------------------------------------------------------
     public static final ForgeConfigSpec.BooleanValue SULFUR_ENABLED;
     public static final ForgeConfigSpec.DoubleValue SULFUR_DEPOSIT_CHANCE;
+
+    // --- Integration with other mods ----------------------------------------
+    public static final ForgeConfigSpec.BooleanValue SUGGEST_OPTIONAL_MODS;   // default ON
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
 
@@ -651,6 +654,16 @@ public final class GeyserConfig {
         SULFUR_DEPOSIT_CHANCE = b
                 .comment("Per-attempt chance that a fumarole or vent lays down a sulfur block.")
                 .defineInRange("sulfurDepositChance", 0.25, 0.0, 1.0);
+        b.pop();
+
+        b.push("integration");
+        SUGGEST_OPTIONAL_MODS = b
+                .comment("Mention the optional mods this one works better with, once, the first time",
+                        "a player joins a world without them. The mod has no hard dependencies and",
+                        "never will; but water is the one place where vanilla's own physics is the",
+                        "limit rather than anything here, and a player has no way of knowing that.",
+                        "Turn off if you are assembling a pack and would rather say it yourself.")
+                .define("suggestOptionalMods", true);
         b.pop();
 
         SPEC = b.build();

@@ -70,6 +70,25 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.quake.Weathering.clear();
         com.jeladastudios.ftsgeology.quake.PendingEdits.clear();
     }
+    /**
+     * Tells a joining player, once, about the optional mods this one reads.
+     *
+     * <p>There are no hard dependencies and there will not be any: the mod has to run on a bare
+     * Forge install, in a school as much as in a pack. But water is the one place where the ceiling
+     * is vanilla's own physics rather than anything here - an infinite source cannot be made to
+     * drain, so geyser runoff has to be laid and taken back by hand - and a player has no way of
+     * knowing that a different mod would make it behave properly. So it is mentioned, once, and
+     * never again.</p>
+     */
+    @SubscribeEvent
+    public void onPlayerJoin(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
+        if (!GeyserConfig.SUGGEST_OPTIONAL_MODS.get()) return;
+        if (com.jeladastudios.ftsgeology.eruption.EruptionHandler.hasFiniteWater()) return;
+        event.getEntity().sendSystemMessage(
+                net.minecraft.network.chat.Component.translatable("message.fts_geology.suggest_flowing_fluids")
+                        .withStyle(net.minecraft.ChatFormatting.GRAY));
+    }
+
     /** Adds the technical block items to the Natural Blocks creative tab for testing/debugging. */
     @SubscribeEvent
     public void onBuildCreativeTabs(BuildCreativeModeTabContentsEvent event) {

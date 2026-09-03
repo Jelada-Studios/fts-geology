@@ -161,7 +161,13 @@ public final class VolcanoBuilder {
             c.coneBaseR = 6 + magnitude;
         }
         c.apronReach = c.coneBaseR + (int) Math.round(c.coneBaseR * type.apronReach()) + 6;
-        c.clearReach = Math.max(c.coneBaseR, c.craterR) + 6;
+        // Everything the volcano will lay rock on, not just the edifice. The clearing used to stop
+        // at the cone while the apron ran a third further out, so the outer band of debris was
+        // spread UNDER a standing forest - buildApronRow only calls clearVegetation, which by
+        // design leaves logs and leaves alone. That is the forest growing out of the basalt in the
+        // test shots. The fringe of snags in clearSiteRow scales with the radius, so widening it
+        // frays the edge further rather than mowing a bigger circle.
+        c.clearReach = Math.max(Math.max(c.coneBaseR, c.craterR), c.apronReach) + 6;
 
         // The site check scales with what we are actually about to occupy.
         if (!siteIsSuitable(level, c)) return null;
@@ -258,8 +264,7 @@ public final class VolcanoBuilder {
      */
     private static int coneTargetY(Ctx c, int gx, int gz, int localGround, double dist, double ang) {
         if (c.coneHeight <= 0) return Integer.MIN_VALUE;
-        double baseR = c.coneBaseR * (1.0 + 0.14 * Math.sin(3 * ang + c.phaseA)
-                + 0.07 * Math.sin(5 * ang + c.phaseB));
+        double baseR = coneRadius(c, ang);
         double innerR = c.craterR * (1.0 + 0.10 * Math.sin(2 * ang + c.phaseB));
         if (dist >= baseR) return Integer.MIN_VALUE;
         if (dist <= innerR) return c.summitY;
@@ -277,6 +282,29 @@ public final class VolcanoBuilder {
     }
 
     /**
+     * Radius of the cone's foot at one bearing.
+     *
+     * <p>Shared with {@link #buildConeRow} and {@link #buildApronRow} on purpose, and for exactly
+     * the reason {@link #ringRadius} is shared on a caldera: this is a lobed outline, not a circle,
+     * and the two places that needed it had drifted apart. The apron started at the flat
+     * {@code coneBaseR} while the cone's own foot swings between {@code coneBaseR * 0.79} and
+     * {@code coneBaseR * 1.21}. Wherever the lobe pulled in, a belt of untouched grass was left
+     * between the mountain and its own skirt - and since the apron is at its thickest right at its
+     * inner edge, what stood beyond that grass was a free-standing wall of basalt. That is the
+     * "the outermost basalt ring still reads as a wall" report, and it is the same bug the caldera
+     * had before {@code ringRadius} was pulled out.</p>
+     */
+    private static double coneRadius(Ctx c, double ang) {
+        return c.coneBaseR * (1.0 + 0.14 * Math.sin(3 * ang + c.phaseA)
+                + 0.07 * Math.sin(5 * ang + c.phaseB));
+    }
+
+    /** How far the cone's foot can possibly reach, lobes included. */
+    private static int coneReach(Ctx c) {
+        return (int) Math.ceil(c.coneBaseR * 1.21) + 2;
+    }
+
+    /**
      * A little roughness for the height field.
      *
      * <p>The profile is perfectly smooth, but rounding a smooth profile to whole blocks turns every
@@ -291,7 +319,9 @@ public final class VolcanoBuilder {
     }
 
     private static void buildConeRow(ServerLevel level, Ctx c, int dx) {
-        int reach = c.coneBaseR + 2;
+        // The lobed foot can swing a fifth further out than coneBaseR, and the old reach clipped
+        // it off flat wherever it did.
+        int reach = coneReach(c);
         for (int dz = -reach; dz <= reach; dz++) {
             double dist = Math.sqrt(dx * dx + dz * dz);
             double ang = Math.atan2(dz, dx);
@@ -455,20 +485,27 @@ public final class VolcanoBuilder {
         // into this field afterwards.
         // The smallest the inner edge can be, used only to bail out early; a caldera recomputes it
         // per column below, because its ring fault is not a circle.
+        // The smallest the inner edge can be for THIS type, used only to bail out early; both a
+        // caldera and a cone recompute it per column below, because neither outline is a circle.
         int inner = switch (c.type) {
             case CALDERA -> (int) Math.round(c.craterR * 0.66) + 6;
             case FISSURE -> 0;
-            default -> c.coneBaseR;
+            default -> (int) Math.floor(c.coneBaseR * 0.79);
         };
         if (inner >= reach) return;
         for (int dz = -reach; dz <= reach; dz++) {
             double dist = Math.sqrt(dx * dx + dz * dz);
             if (dist > reach) continue;
             double ang = Math.atan2(dz, dx);
-            // A caldera's apron starts just outside the scarp AT THIS BEARING. With a fixed radius
-            // it left a band of untouched grass wherever the ring came in narrow, which read as a
-            // moat between the volcano and its own skirt.
-            double localInner = c.type == VolcanoType.CALDERA ? ringRadius(c, ang) + 6 : inner;
+            // The apron starts where the edifice actually ENDS at this bearing, not at a fixed
+            // radius. A fixed one left a band of untouched grass wherever the outline came in
+            // narrow, which read as a moat between the volcano and its own skirt - and with the
+            // apron at its thickest right at its inner edge, as a wall standing on that grass.
+            double localInner = switch (c.type) {
+                case CALDERA -> ringRadius(c, ang) + 6;
+                case FISSURE -> inner;
+                default -> coneRadius(c, ang);
+            };
             if (dist <= localInner) continue;
             double edge = reach * (0.84 + 0.16 * Math.sin(3 * ang + c.phaseC));
             if (dist > edge || localInner >= edge) continue;
@@ -530,7 +567,13 @@ public final class VolcanoBuilder {
             double out = Mth.clamp((dist - solid) / Math.max(1.0, radius - solid), 0.0, 1.0);
             boolean snag = dist > solid && level.random.nextDouble() < out;
 
-            for (int y = g + 1; y <= g + 24; y++) {
+            // Stop at the top of whatever actually stands in this column rather than always
+            // walking a fixed 24 blocks of air. The footprint now covers the apron too, so most
+            // of these columns are open ground - one lookup each instead of two dozen.
+            int top = Math.min(g + 24,
+                    level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE,
+                            c.x + dx, c.z + dz));
+            for (int y = g + 1; y <= top; y++) {
                 BlockPos p = new BlockPos(c.x + dx, y, c.z + dz);
                 BlockState s = level.getBlockState(p);
                 if (s.isAir()) continue;

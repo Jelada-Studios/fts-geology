@@ -125,11 +125,42 @@ public final class VolcanoEruption {
                 p.getX() + 0.5, p.getY() + 1.1, p.getZ() + 0.5, 2, 0.25, 0.15, 0.25, 0.01);
     }
 
-    /** Seeps lava out of a surface vent during an eruption (spills, then cools to basalt later). */
+    /**
+     * Seeps lava out of a surface vent during an eruption (spills, then cools to basalt later).
+     *
+     * <p>The outlet is given its own spatter and a low hiss. It used to place the lava and send
+     * nothing at all, so a flank vent quietly filled with lava while every particle in the mod came
+     * out of the summit - the "no steam or soot off the lava veins" report.</p>
+     */
     public static void seepVent(ServerLevel level, BlockPos vent) {
-        if (level.getBlockState(vent).isAir()) {
+        boolean opened = level.getBlockState(vent).isAir();
+        if (opened) {
             level.setBlock(vent, Blocks.LAVA.defaultBlockState(), 3);
             level.scheduleTick(vent, Fluids.LAVA, 5);
+        }
+        double x = vent.getX() + 0.5, y = vent.getY() + 1.0, z = vent.getZ() + 0.5;
+        level.sendParticles(ParticleTypes.LAVA, x, y, z, opened ? 4 : 1, 0.3, 0.1, 0.3, 0.0);
+        level.sendParticles(ParticleTypes.LARGE_SMOKE, x, y + 0.4, z, 3, 0.3, 0.3, 0.3, 0.02);
+        if (opened) {
+            level.playSound(null, vent, SoundEvents.LAVA_POP, SoundSource.BLOCKS, 0.8f, 0.6f);
+        }
+    }
+
+    /**
+     * A puff of steam where a lava cell touches water.
+     *
+     * <p>This is the single most visible thing about a real flow reaching a shoreline or a stream,
+     * and the mod was producing none of it: {@link #coolScatteredLava} already walks every cell the
+     * eruption spilled, so the check rides along on a sweep that was happening anyway.</p>
+     */
+    private static void steamIfWet(ServerLevel level, BlockPos p) {
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+            if (!level.getBlockState(p.relative(d)).getFluidState()
+                    .is(net.minecraft.tags.FluidTags.WATER)) continue;
+            level.sendParticles(ParticleTypes.CLOUD,
+                    p.getX() + 0.5, p.getY() + 1.0, p.getZ() + 0.5, 6, 0.4, 0.3, 0.4, 0.03);
+            level.playSound(null, p, SoundEvents.LAVA_EXTINGUISH, SoundSource.BLOCKS, 0.6f, 1.2f);
+            return;
         }
     }
 
@@ -191,6 +222,9 @@ public final class VolcanoEruption {
                 continue;
             }
             if (!fs.is(net.minecraft.tags.FluidTags.LAVA)) continue;
+            // Quench steam wherever the flow has reached water. Sampled rather than fired on every
+            // cell of every sweep, so a long shoreline hisses instead of turning white.
+            if (level.random.nextInt(3) == 0) steamIfWet(level, p);
             BlockState below = level.getBlockState(p.below());
             if (below.isAir() || !below.getFluidState().isEmpty()) continue;   // must rest on solid ground
             boolean aboveSummit = p.getY() > summit.getY();

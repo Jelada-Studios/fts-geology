@@ -91,5 +91,6 @@
   "message.fts_geology.geyser_forming": "A geyser is forming deep below (Y=%s). Give it ~a minute to heat, pressurise and surface here.",
   "message.fts_geology.geyser_failed": "The igniter couldn't form a geyser here.",
   "message.fts_geology.volcano_formed": "A volcano has formed here. It will rumble, then erupt periodically — stand well back.",
-  "message.fts_geology.volcano_failed": "Not enough vertical room here for a volcano (needs a tall mountain / open sky)."
+  "message.fts_geology.volcano_failed": "Not enough vertical room here for a volcano (needs a tall mountain / open sky).",
+  "message.fts_geology.suggest_flowing_fluids": "FT's Geology works with vanilla water, but geyser runoff and flooding look far better with Flowing Fluids installed. Optional — nothing here needs it."
 }

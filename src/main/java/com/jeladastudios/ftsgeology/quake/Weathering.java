@@ -4,6 +4,8 @@ import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
+import it.unimi.dsi.fastutil.longs.Long2IntMap;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -113,13 +115,22 @@ public final class Weathering {
     private static final class Job {
         final ResourceKey<Level> dimension;
         final long[] columns;
+        /**
+         * Per column, the highest Y the quake actually turned to air, or {@link Integer#MIN_VALUE}.
+         *
+         * <p>This is the anchor {@link #reseat} needs and could not get from the world itself. See
+         * the note there: {@code groundY} cannot tell a floating slab from the ground, but the
+         * quake knows exactly how deep it dug, and nothing below that is any of our business.</p>
+         */
+        final Long2IntMap excavated;
         int cursor;
         int pass;
         int moved;
 
-        Job(ResourceKey<Level> dimension, long[] columns) {
+        Job(ResourceKey<Level> dimension, long[] columns, Long2IntMap excavated) {
             this.dimension = dimension;
             this.columns = columns;
+            this.excavated = excavated;
         }
     }
 
@@ -138,7 +149,7 @@ public final class Weathering {
      * <p>In memory only, like the quake's own parking: a restart loses whatever had not settled
      * yet, which costs a little tidiness and no correctness.</p>
      */
-    private static final java.util.Map<String, LongOpenHashSet> PARKED = new java.util.HashMap<>();
+    private static final java.util.Map<String, Long2IntOpenHashMap> PARKED = new java.util.HashMap<>();
 
     private static String parkKey(ResourceKey<Level> dim, int cx, int cz) {
         return dim.location() + "@" + cx + "," + cz;
@@ -146,9 +157,9 @@ public final class Weathering {
 
     /** Re-queues the settling that was parked for a chunk, now that it is back. */
     public static void onChunkLoaded(ServerLevel level, ChunkPos cp) {
-        LongOpenHashSet cols = PARKED.remove(parkKey(level.dimension(), cp.x, cp.z));
+        Long2IntOpenHashMap cols = PARKED.remove(parkKey(level.dimension(), cp.x, cp.z));
         if (cols == null || cols.isEmpty()) return;
-        QUEUE.add(new Job(level.dimension(), cols.toLongArray()));
+        QUEUE.add(new Job(level.dimension(), cols.keySet().toLongArray(), cols));
     }
 
     /**
@@ -157,20 +168,28 @@ public final class Weathering {
      */
     public static void enqueue(ServerLevel level, List<QuakePlanner.Edit> edits) {
         if (edits.isEmpty()) return;
-        LongOpenHashSet seen = new LongOpenHashSet();
+        Long2IntOpenHashMap seen = new Long2IntOpenHashMap();
+        seen.defaultReturnValue(Integer.MIN_VALUE);
         for (QuakePlanner.Edit e : edits) {
             // Dilated by the leaf-support range. A canopy hangs over columns whose ground the quake
             // never touched, so a set built from the edits alone stops one tree-width short of the
             // leaves it just orphaned. Dilating a long thin corridor grows it by its perimeter, not
             // its area - about 15% more columns on a big rupture.
             int ex = e.pos().getX(), ez = e.pos().getZ();
+            // How deep the quake emptied this column, carried through the dilation so the ring
+            // around the corridor inherits its neighbour's floor. A hint that turns out to be
+            // above the local ground simply finds solid rock straight away and does nothing, so
+            // spreading it outward is safe.
+            int airTop = e.state().isAir() ? e.pos().getY() : Integer.MIN_VALUE;
             for (int dx = -LEAF_SUPPORT_RANGE; dx <= LEAF_SUPPORT_RANGE; dx++) {
                 for (int dz = -LEAF_SUPPORT_RANGE; dz <= LEAF_SUPPORT_RANGE; dz++) {
-                    seen.add(key(ex + dx, ez + dz));
+                    long k = key(ex + dx, ez + dz);
+                    if (airTop > seen.get(k)) seen.put(k, airTop);
+                    else seen.putIfAbsent(k, Integer.MIN_VALUE);
                 }
             }
         }
-        QUEUE.add(new Job(level.dimension(), seen.toLongArray()));
+        QUEUE.add(new Job(level.dimension(), seen.keySet().toLongArray(), seen));
         GeysersMod.LOGGER.info("weathering queued: {} columns", seen.size());
     }
 
@@ -209,8 +228,14 @@ public final class Weathering {
             // Park rather than drop. Never force a load: the settling waits for the next visit,
             // exactly as parked deformation does.
             if (level.getChunkSource().getChunkNow(cx >> 4, cz >> 4) == null) {
-                PARKED.computeIfAbsent(parkKey(job.dimension, cx >> 4, cz >> 4),
-                        key -> new LongOpenHashSet()).add(k);
+                Long2IntOpenHashMap park = PARKED.computeIfAbsent(
+                        parkKey(job.dimension, cx >> 4, cz >> 4),
+                        key -> {
+                            Long2IntOpenHashMap m = new Long2IntOpenHashMap();
+                            m.defaultReturnValue(Integer.MIN_VALUE);
+                            return m;
+                        });
+                park.put(k, job.excavated.get(k));   // the floor hint has to survive the wait too
                 continue;
             }
             // Passes 0 and PASSES-1 bring down what is left hanging; the ones between take the raw
@@ -220,7 +245,7 @@ public final class Weathering {
                     && GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get();
             boolean moved;
             if (fallPass) {
-                moved = reseat(level, cx, cz);
+                moved = reseat(level, cx, cz, job.excavated.get(k));
                 // On the last pass the trunks are already gone, so anything still hanging is
                 // canopy that lost its tree.
                 if (job.pass == PASSES - 1) {
@@ -251,10 +276,29 @@ public final class Weathering {
      * <p>A gap filled with fluid is left alone, rather than punching a hole in a lake to move a tree
      * through it.</p>
      *
+     * <h2>Where the ground is measured from</h2>
+     * Not from {@link TerrainProbe#groundY}, which is what this used to do and what left ice
+     * shelves and soil rafts hanging over a rift for good. {@code groundY} walks down from the
+     * heightmap and skips air, fluid, plants and tree parts - so a slab of ice or dirt floating in
+     * mid-air <b>is</b> the ground as far as it is concerned. It returned the top of the raft,
+     * {@code base = g + 1} was open sky, the drop came out as zero, and the method gave up before
+     * it had looked at anything. A tree standing on such a raft rode out the same way, which is the
+     * rest of the "some trees are still in the air" report.
+     *
+     * <p>So the anchor comes from the quake instead: {@code excavatedTop} is the highest cell it
+     * actually turned to air in this column, and the real ground is the first solid block at or
+     * below that. Nothing under the excavation is ever examined, which is what keeps this from
+     * mistaking a cave roof for a raft and dropping the countryside into it. Columns with no hint -
+     * the dilated ring, where there is orphaned canopy but never a raft - keep the old behaviour.</p>
+     *
+     * @param excavatedTop highest Y the quake emptied here, or {@link Integer#MIN_VALUE} if it
+     *                     never touched this column
      * @return true if this column changed
      */
-    private static boolean reseat(ServerLevel level, int x, int z) {
-        int g = TerrainProbe.groundY(level, x, z);
+    private static boolean reseat(ServerLevel level, int x, int z, int excavatedTop) {
+        int g = excavatedTop == Integer.MIN_VALUE
+                ? TerrainProbe.groundY(level, x, z)
+                : solidAtOrBelow(level, x, excavatedTop, z);
         if (g == Integer.MIN_VALUE) return false;
         if (!level.hasChunkAt(new BlockPos(x, g, z))) return false;
 
@@ -422,6 +466,30 @@ public final class Weathering {
             }
         }
         return false;
+    }
+
+    /**
+     * First real ground at or below {@code top}, using the same idea of "ground" as
+     * {@link TerrainProbe#groundY} - air, fluid, plants and tree parts are not it - but starting
+     * from a height the caller chooses instead of from the heightmap.
+     *
+     * <p>That one difference is the whole point: started from the top of the world it would find
+     * a floating raft, started from the floor of the quake's own excavation it cannot.</p>
+     *
+     * @return the Y of the ground, or {@link Integer#MIN_VALUE} if there is none within reach
+     */
+    private static int solidAtOrBelow(ServerLevel level, int x, int top, int z) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int start = Math.min(top, level.getMaxBuildHeight() - 1);
+        int floor = Math.max(level.getMinBuildHeight(), start - (GAP_SEARCH + STACK_LIMIT));
+        for (int y = start; y >= floor; y--) {
+            BlockState s = level.getBlockState(m.set(x, y, z));
+            if (s.isAir()) continue;
+            if (!s.getFluidState().isEmpty()) continue;
+            if (isPlant(s) || s.is(Blocks.MANGROVE_ROOTS)) continue;
+            return y;
+        }
+        return Integer.MIN_VALUE;
     }
 
     /** Everything a tree or a plant is made of, and nothing else. */
