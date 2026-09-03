@@ -817,8 +817,17 @@ public final class RetrogenHandler {
                 2 + level.random.nextInt(3),   // orange
                 2 + level.random.nextInt(4),   // brown, coolest and driest
         };
-        int reach = 0;
-        for (int b : band) reach += b;
+        int bandReach = 0;
+        for (int b : band) bandReach += b;
+        // Beyond the last mat, the ground a spring poisons.
+        //
+        // The colours used to stop dead and ordinary soil began at the next block, which read as
+        // the spring having been dropped onto the landscape. The bare ring is real - silica,
+        // sulfate and arsenic in the runoff kill the soil and the heat finishes the roots - but it
+        // has to LOOK killed rather than look unfinished. So it is a pale crusted skin that thins
+        // outward into whatever was there, and the trees standing in it are dead.
+        int halo = 5 + level.random.nextInt(6);
+        int reach = bandReach + halo;
         double phase = level.random.nextDouble() * Math.PI * 2;
 
         int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
@@ -842,12 +851,25 @@ public final class RetrogenHandler {
                 double ang = Math.atan2(z - cz, x - cx);
                 double wobble = 1.0 + 0.28 * Math.sin(3 * ang + phase)
                         + 0.15 * Math.sin(5 * ang - phase);
-                Block b = bandFor(d / Math.max(0.4, wobble), band);
-                if (b == null) continue;
+                double scaled = d / Math.max(0.4, wobble);
+                Block b = bandFor(scaled, band);
+                // Past the last mat: the sterile halo, thinning out into the countryside.
+                boolean inHalo = false;
+                if (b == null) {
+                    double out = (scaled - bandReach) / halo;   // 0 at the brown edge, 1 outside
+                    if (out < 0.0 || out > 1.0) continue;
+                    // Fades rather than ends: nearly every cell right against the mats, hardly any
+                    // at the far edge, so the crust breaks up instead of drawing another ring.
+                    if (level.random.nextDouble() > 1.0 - out) continue;
+                    b = haloBlock(level);
+                    inHalo = true;
+                }
 
                 int g = TerrainProbe.groundY(level, x, z);
                 if (g == Integer.MIN_VALUE) continue;
-                if (Math.abs(g - waterY) > 2) continue;      // stays on the flat apron
+                // The mats keep to the flat apron. The halo may climb a little further, because
+                // ground poisoned by the runoff does not stop at a contour line.
+                if (Math.abs(g - waterY) > (inHalo ? 4 : 2)) continue;
                 // Never repaint the floor of standing water. groundY walks past a fluid, so the
                 // cell it returns inside a neighbouring pool is that pool's calcite bed - painting
                 // a mat there leaves the water sitting on a microbial mat instead of sinter.
@@ -858,8 +880,50 @@ public final class RetrogenHandler {
                 if (!s.getFluidState().isEmpty()) continue;
                 TerrainProbe.clearVegetation(level, x, g, z, 2);
                 level.setBlock(p, b.defaultBlockState(), 2);
+                if (inHalo && level.random.nextInt(30) == 0) deadTree(level, p);
             }
         }
+    }
+
+    /**
+     * The crust of the sterile halo: pale, dry and broken.
+     *
+     * <p>No new block for it. What is wanted is bare poisoned ground, and coarse dirt with gravel
+     * through it and the odd patch of the spring's own sinter already reads as exactly that -
+     * lighter and drier than the soil around it, without being another flat colour.</p>
+     */
+    private static Block haloBlock(ServerLevel level) {
+        int r = level.random.nextInt(10);
+        if (r < 4) return Blocks.COARSE_DIRT;
+        if (r < 7) return Blocks.GRAVEL;
+        if (r < 9) return ModBlocks.SINTER.get();
+        return Blocks.TUFF;
+    }
+
+    /**
+     * A dead tree standing in the halo.
+     *
+     * <h2>Why bare trunks are right here and were wrong around a volcano</h2>
+     * Stripping the leaves off a volcano's trees and leaving the trunks read as a bug, and it was
+     * removed. The difference is the ground: a leafless oak standing in green grass looks like
+     * something failed to finish, while a barkless, bleached trunk standing on pale dead crust is
+     * the single most recognisable thing about a geothermal basin - Yellowstone's "bobby socks"
+     * trees, killed by silica-laden water and left white to the knee where it wicked up the wood.
+     *
+     * <p>So this only ever runs on a cell that has just been turned into halo crust, and it uses
+     * stripped logs, which are already pale and barkless, with sinter around the base.</p>
+     */
+    private static void deadTree(ServerLevel level, BlockPos ground) {
+        Block trunk = level.random.nextBoolean() ? Blocks.STRIPPED_SPRUCE_LOG : Blocks.STRIPPED_OAK_LOG;
+        int height = 3 + level.random.nextInt(4);
+        for (int h = 1; h <= height; h++) {
+            BlockPos p = ground.above(h);
+            BlockState s = level.getBlockState(p);
+            if (!s.isAir() && !TerrainProbe.isVegetation(s)) return;   // something is in the way
+            level.setBlock(p, trunk.defaultBlockState(), 2);
+        }
+        // The white foot: silica drawn up out of the ground, which is where the name comes from.
+        level.setBlock(ground, ModBlocks.SINTER.get().defaultBlockState(), 2);
     }
 
     /** Which band a given distance from the water falls in, or null past the last one. */
