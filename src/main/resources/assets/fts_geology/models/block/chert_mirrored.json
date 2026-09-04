@@ -1,0 +1,6 @@
+{
+    "textures":  {
+                     "all":  "fts_geology:block/chert"
+                 },
+    "parent":  "minecraft:block/cube_mirrored_all"
+}

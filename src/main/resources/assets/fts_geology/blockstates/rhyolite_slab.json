@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "type=bottom": { "model": "fts_geology:block/rhyolite_slab" },
+    "type=double": { "model": "fts_geology:block/rhyolite" },
+    "type=top": { "model": "fts_geology:block/rhyolite_slab_top" }
+  }
+}

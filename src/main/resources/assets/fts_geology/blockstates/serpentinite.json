@@ -1,5 +1,20 @@
 {
-  "variants": {
-    "": { "model": "fts_geology:block/serpentinite" }
-  }
+    "variants":  {
+                     "":  [
+                              {
+                                  "model":  "fts_geology:block/serpentinite"
+                              },
+                              {
+                                  "model":  "fts_geology:block/serpentinite_mirrored"
+                              },
+                              {
+                                  "model":  "fts_geology:block/serpentinite",
+                                  "y":  180
+                              },
+                              {
+                                  "model":  "fts_geology:block/serpentinite_mirrored",
+                                  "y":  180
+                              }
+                          ]
+                 }
 }

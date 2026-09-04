@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "type=bottom": { "model": "fts_geology:block/quartzite_slab" },
+    "type=double": { "model": "fts_geology:block/quartzite" },
+    "type=top": { "model": "fts_geology:block/quartzite_slab_top" }
+  }
+}

@@ -120,6 +120,9 @@ public class GeysersMod {
             event.accept(ModItems.GEOLOGISTS_HAMMER.get());
             event.accept(ModItems.FAULT_COMPASS.get());
         }
+        if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
+            acceptWorkedRocks(event);
+        }
         if (event.getTabKey() == CreativeModeTabs.NATURAL_BLOCKS) {
             event.accept(ModItems.GEYSER_IGNITER.get());
             event.accept(ModItems.VOLCANO_IGNITER.get());
@@ -138,6 +141,7 @@ public class GeysersMod {
             event.accept(ModItems.QUARTZITE.get());
             event.accept(ModItems.SHALE.get());
             event.accept(ModItems.CHERT.get());
+            acceptWorkedRocks(event);
             event.accept(ModItems.MICROBIAL_MAT_ORANGE.get());
             event.accept(ModItems.MICROBIAL_MAT_YELLOW.get());
             event.accept(ModItems.MICROBIAL_MAT_BROWN.get());
@@ -145,5 +149,67 @@ public class GeysersMod {
             event.accept(ModItems.GEYSER_CORE.get());
             event.accept(ModItems.GEYSER_CHAMBER.get());
         }
+    }
+
+    private void acceptWorkedRocks(BuildCreativeModeTabContentsEvent event) {
+        event.accept(ModItems.POLISHED_TRAVERTINE.get());
+        event.accept(ModItems.TRAVERTINE_SLAB.get());
+        event.accept(ModItems.TRAVERTINE_STAIRS.get());
+        event.accept(ModItems.TRAVERTINE_WALL.get());
+
+        event.accept(ModItems.POLISHED_RHYOLITE.get());
+        event.accept(ModItems.RHYOLITE_SLAB.get());
+        event.accept(ModItems.RHYOLITE_STAIRS.get());
+        event.accept(ModItems.RHYOLITE_WALL.get());
+
+        event.accept(ModItems.POLISHED_GABBRO.get());
+        event.accept(ModItems.GABBRO_SLAB.get());
+        event.accept(ModItems.GABBRO_STAIRS.get());
+        event.accept(ModItems.GABBRO_WALL.get());
+
+        event.accept(ModItems.POLISHED_PERIDOTITE.get());
+        event.accept(ModItems.PERIDOTITE_SLAB.get());
+        event.accept(ModItems.PERIDOTITE_STAIRS.get());
+        event.accept(ModItems.PERIDOTITE_WALL.get());
+
+        event.accept(ModItems.POLISHED_SERPENTINITE.get());
+        event.accept(ModItems.SERPENTINITE_SLAB.get());
+        event.accept(ModItems.SERPENTINITE_STAIRS.get());
+        event.accept(ModItems.SERPENTINITE_WALL.get());
+
+        event.accept(ModItems.POLISHED_SCHIST.get());
+        event.accept(ModItems.SCHIST_SLAB.get());
+        event.accept(ModItems.SCHIST_STAIRS.get());
+        event.accept(ModItems.SCHIST_WALL.get());
+
+        event.accept(ModItems.POLISHED_GNEISS.get());
+        event.accept(ModItems.GNEISS_SLAB.get());
+        event.accept(ModItems.GNEISS_STAIRS.get());
+        event.accept(ModItems.GNEISS_WALL.get());
+
+        event.accept(ModItems.POLISHED_SLATE.get());
+        event.accept(ModItems.SLATE_SLAB.get());
+        event.accept(ModItems.SLATE_STAIRS.get());
+        event.accept(ModItems.SLATE_WALL.get());
+
+        event.accept(ModItems.POLISHED_MARBLE.get());
+        event.accept(ModItems.MARBLE_SLAB.get());
+        event.accept(ModItems.MARBLE_STAIRS.get());
+        event.accept(ModItems.MARBLE_WALL.get());
+
+        event.accept(ModItems.POLISHED_QUARTZITE.get());
+        event.accept(ModItems.QUARTZITE_SLAB.get());
+        event.accept(ModItems.QUARTZITE_STAIRS.get());
+        event.accept(ModItems.QUARTZITE_WALL.get());
+
+        event.accept(ModItems.POLISHED_SHALE.get());
+        event.accept(ModItems.SHALE_SLAB.get());
+        event.accept(ModItems.SHALE_STAIRS.get());
+        event.accept(ModItems.SHALE_WALL.get());
+
+        event.accept(ModItems.POLISHED_CHERT.get());
+        event.accept(ModItems.CHERT_SLAB.get());
+        event.accept(ModItems.CHERT_STAIRS.get());
+        event.accept(ModItems.CHERT_WALL.get());
     }
 }

@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:stonecutting",
+  "count": 1,
+  "ingredient": { "item": "fts_geology:peridotite" },
+  "result": "fts_geology:peridotite_wall"
+}

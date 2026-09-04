@@ -1,0 +1,16 @@
+{
+  "values": [
+    "fts_geology:travertine_stairs",
+    "fts_geology:rhyolite_stairs",
+    "fts_geology:gabbro_stairs",
+    "fts_geology:peridotite_stairs",
+    "fts_geology:serpentinite_stairs",
+    "fts_geology:schist_stairs",
+    "fts_geology:gneiss_stairs",
+    "fts_geology:slate_stairs",
+    "fts_geology:marble_stairs",
+    "fts_geology:quartzite_stairs",
+    "fts_geology:shale_stairs",
+    "fts_geology:chert_stairs"
+  ]
+}

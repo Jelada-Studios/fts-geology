@@ -1,5 +1,20 @@
 {
-  "variants": {
-    "": { "model": "fts_geology:block/slate" }
-  }
+    "variants":  {
+                     "":  [
+                              {
+                                  "model":  "fts_geology:block/slate"
+                              },
+                              {
+                                  "model":  "fts_geology:block/slate_mirrored"
+                              },
+                              {
+                                  "model":  "fts_geology:block/slate",
+                                  "y":  180
+                              },
+                              {
+                                  "model":  "fts_geology:block/slate_mirrored",
+                                  "y":  180
+                              }
+                          ]
+                 }
 }

@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:stonecutting",
+  "count": 2,
+  "ingredient": { "item": "fts_geology:rhyolite" },
+  "result": "fts_geology:rhyolite_slab"
+}

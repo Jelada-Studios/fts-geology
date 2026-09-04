@@ -11,6 +11,9 @@ import com.jeladastudios.ftsgeology.block.VolcanoCoreBlock;
 import com.jeladastudios.ftsgeology.block.VolcanoIgniterBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SlabBlock;
+import net.minecraft.world.level.block.StairBlock;
+import net.minecraft.world.level.block.WallBlock;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraftforge.registries.DeferredRegister;
@@ -189,6 +192,116 @@ public final class ModBlocks {
             () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
                     .mapColor(MapColor.TERRACOTTA_BROWN)
                     .strength(1.0F, 3.0F)));
+
+    // --- Worked rock forms (polished, slab, stairs, wall) -------------------
+
+    public static final RegistryObject<Block> POLISHED_TRAVERTINE = BLOCKS.register("polished_travertine",
+            () -> new Block(BlockBehaviour.Properties.copy(TRAVERTINE.get())));
+    public static final RegistryObject<Block> TRAVERTINE_SLAB = BLOCKS.register("travertine_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.copy(TRAVERTINE.get())));
+    public static final RegistryObject<Block> TRAVERTINE_STAIRS = BLOCKS.register("travertine_stairs",
+            () -> new StairBlock(() -> TRAVERTINE.get().defaultBlockState(), BlockBehaviour.Properties.copy(TRAVERTINE.get())));
+    public static final RegistryObject<Block> TRAVERTINE_WALL = BLOCKS.register("travertine_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.copy(TRAVERTINE.get())));
+
+    public static final RegistryObject<Block> POLISHED_RHYOLITE = BLOCKS.register("polished_rhyolite",
+            () -> new Block(BlockBehaviour.Properties.copy(RHYOLITE.get())));
+    public static final RegistryObject<Block> RHYOLITE_SLAB = BLOCKS.register("rhyolite_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.copy(RHYOLITE.get())));
+    public static final RegistryObject<Block> RHYOLITE_STAIRS = BLOCKS.register("rhyolite_stairs",
+            () -> new StairBlock(() -> RHYOLITE.get().defaultBlockState(), BlockBehaviour.Properties.copy(RHYOLITE.get())));
+    public static final RegistryObject<Block> RHYOLITE_WALL = BLOCKS.register("rhyolite_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.copy(RHYOLITE.get())));
+
+    public static final RegistryObject<Block> POLISHED_GABBRO = BLOCKS.register("polished_gabbro",
+            () -> new Block(BlockBehaviour.Properties.copy(GABBRO.get())));
+    public static final RegistryObject<Block> GABBRO_SLAB = BLOCKS.register("gabbro_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.copy(GABBRO.get())));
+    public static final RegistryObject<Block> GABBRO_STAIRS = BLOCKS.register("gabbro_stairs",
+            () -> new StairBlock(() -> GABBRO.get().defaultBlockState(), BlockBehaviour.Properties.copy(GABBRO.get())));
+    public static final RegistryObject<Block> GABBRO_WALL = BLOCKS.register("gabbro_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.copy(GABBRO.get())));
+
+    public static final RegistryObject<Block> POLISHED_PERIDOTITE = BLOCKS.register("polished_peridotite",
+            () -> new Block(BlockBehaviour.Properties.copy(PERIDOTITE.get())));
+    public static final RegistryObject<Block> PERIDOTITE_SLAB = BLOCKS.register("peridotite_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.copy(PERIDOTITE.get())));
+    public static final RegistryObject<Block> PERIDOTITE_STAIRS = BLOCKS.register("peridotite_stairs",
+            () -> new StairBlock(() -> PERIDOTITE.get().defaultBlockState(), BlockBehaviour.Properties.copy(PERIDOTITE.get())));
+    public static final RegistryObject<Block> PERIDOTITE_WALL = BLOCKS.register("peridotite_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.copy(PERIDOTITE.get())));
+
+    public static final RegistryObject<Block> POLISHED_SERPENTINITE = BLOCKS.register("polished_serpentinite",
+            () -> new Block(BlockBehaviour.Properties.copy(SERPENTINITE.get())));
+    public static final RegistryObject<Block> SERPENTINITE_SLAB = BLOCKS.register("serpentinite_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.copy(SERPENTINITE.get())));
+    public static final RegistryObject<Block> SERPENTINITE_STAIRS = BLOCKS.register("serpentinite_stairs",
+            () -> new StairBlock(() -> SERPENTINITE.get().defaultBlockState(), BlockBehaviour.Properties.copy(SERPENTINITE.get())));
+    public static final RegistryObject<Block> SERPENTINITE_WALL = BLOCKS.register("serpentinite_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.copy(SERPENTINITE.get())));
+
+    public static final RegistryObject<Block> POLISHED_SCHIST = BLOCKS.register("polished_schist",
+            () -> new Block(BlockBehaviour.Properties.copy(SCHIST.get())));
+    public static final RegistryObject<Block> SCHIST_SLAB = BLOCKS.register("schist_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.copy(SCHIST.get())));
+    public static final RegistryObject<Block> SCHIST_STAIRS = BLOCKS.register("schist_stairs",
+            () -> new StairBlock(() -> SCHIST.get().defaultBlockState(), BlockBehaviour.Properties.copy(SCHIST.get())));
+    public static final RegistryObject<Block> SCHIST_WALL = BLOCKS.register("schist_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.copy(SCHIST.get())));
+
+    public static final RegistryObject<Block> POLISHED_GNEISS = BLOCKS.register("polished_gneiss",
+            () -> new Block(BlockBehaviour.Properties.copy(GNEISS.get())));
+    public static final RegistryObject<Block> GNEISS_SLAB = BLOCKS.register("gneiss_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.copy(GNEISS.get())));
+    public static final RegistryObject<Block> GNEISS_STAIRS = BLOCKS.register("gneiss_stairs",
+            () -> new StairBlock(() -> GNEISS.get().defaultBlockState(), BlockBehaviour.Properties.copy(GNEISS.get())));
+    public static final RegistryObject<Block> GNEISS_WALL = BLOCKS.register("gneiss_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.copy(GNEISS.get())));
+
+    public static final RegistryObject<Block> POLISHED_SLATE = BLOCKS.register("polished_slate",
+            () -> new Block(BlockBehaviour.Properties.copy(SLATE.get())));
+    public static final RegistryObject<Block> SLATE_SLAB = BLOCKS.register("slate_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.copy(SLATE.get())));
+    public static final RegistryObject<Block> SLATE_STAIRS = BLOCKS.register("slate_stairs",
+            () -> new StairBlock(() -> SLATE.get().defaultBlockState(), BlockBehaviour.Properties.copy(SLATE.get())));
+    public static final RegistryObject<Block> SLATE_WALL = BLOCKS.register("slate_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.copy(SLATE.get())));
+
+    public static final RegistryObject<Block> POLISHED_MARBLE = BLOCKS.register("polished_marble",
+            () -> new Block(BlockBehaviour.Properties.copy(MARBLE.get())));
+    public static final RegistryObject<Block> MARBLE_SLAB = BLOCKS.register("marble_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.copy(MARBLE.get())));
+    public static final RegistryObject<Block> MARBLE_STAIRS = BLOCKS.register("marble_stairs",
+            () -> new StairBlock(() -> MARBLE.get().defaultBlockState(), BlockBehaviour.Properties.copy(MARBLE.get())));
+    public static final RegistryObject<Block> MARBLE_WALL = BLOCKS.register("marble_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.copy(MARBLE.get())));
+
+    public static final RegistryObject<Block> POLISHED_QUARTZITE = BLOCKS.register("polished_quartzite",
+            () -> new Block(BlockBehaviour.Properties.copy(QUARTZITE.get())));
+    public static final RegistryObject<Block> QUARTZITE_SLAB = BLOCKS.register("quartzite_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.copy(QUARTZITE.get())));
+    public static final RegistryObject<Block> QUARTZITE_STAIRS = BLOCKS.register("quartzite_stairs",
+            () -> new StairBlock(() -> QUARTZITE.get().defaultBlockState(), BlockBehaviour.Properties.copy(QUARTZITE.get())));
+    public static final RegistryObject<Block> QUARTZITE_WALL = BLOCKS.register("quartzite_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.copy(QUARTZITE.get())));
+
+    public static final RegistryObject<Block> POLISHED_SHALE = BLOCKS.register("polished_shale",
+            () -> new Block(BlockBehaviour.Properties.copy(SHALE.get())));
+    public static final RegistryObject<Block> SHALE_SLAB = BLOCKS.register("shale_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.copy(SHALE.get())));
+    public static final RegistryObject<Block> SHALE_STAIRS = BLOCKS.register("shale_stairs",
+            () -> new StairBlock(() -> SHALE.get().defaultBlockState(), BlockBehaviour.Properties.copy(SHALE.get())));
+    public static final RegistryObject<Block> SHALE_WALL = BLOCKS.register("shale_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.copy(SHALE.get())));
+
+    public static final RegistryObject<Block> POLISHED_CHERT = BLOCKS.register("polished_chert",
+            () -> new Block(BlockBehaviour.Properties.copy(CHERT.get())));
+    public static final RegistryObject<Block> CHERT_SLAB = BLOCKS.register("chert_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.copy(CHERT.get())));
+    public static final RegistryObject<Block> CHERT_STAIRS = BLOCKS.register("chert_stairs",
+            () -> new StairBlock(() -> CHERT.get().defaultBlockState(), BlockBehaviour.Properties.copy(CHERT.get())));
+    public static final RegistryObject<Block> CHERT_WALL = BLOCKS.register("chert_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.copy(CHERT.get())));
 
 
     // --- Microbial mats ------------------------------------------------------

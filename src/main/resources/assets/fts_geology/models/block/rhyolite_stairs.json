@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/stairs",
+  "textures": {
+    "bottom": "fts_geology:block/rhyolite",
+    "side": "fts_geology:block/rhyolite",
+    "top": "fts_geology:block/rhyolite"
+  }
+}

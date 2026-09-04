@@ -1,0 +1,6 @@
+{
+    "textures":  {
+                     "all":  "fts_geology:block/rhyolite"
+                 },
+    "parent":  "minecraft:block/cube_mirrored_all"
+}

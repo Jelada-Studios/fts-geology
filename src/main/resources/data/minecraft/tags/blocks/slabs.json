@@ -1,0 +1,16 @@
+{
+  "values": [
+    "fts_geology:travertine_slab",
+    "fts_geology:rhyolite_slab",
+    "fts_geology:gabbro_slab",
+    "fts_geology:peridotite_slab",
+    "fts_geology:serpentinite_slab",
+    "fts_geology:schist_slab",
+    "fts_geology:gneiss_slab",
+    "fts_geology:slate_slab",
+    "fts_geology:marble_slab",
+    "fts_geology:quartzite_slab",
+    "fts_geology:shale_slab",
+    "fts_geology:chert_slab"
+  ]
+}

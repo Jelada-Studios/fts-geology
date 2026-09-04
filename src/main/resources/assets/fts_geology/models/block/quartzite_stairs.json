@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/stairs",
+  "textures": {
+    "bottom": "fts_geology:block/quartzite",
+    "side": "fts_geology:block/quartzite",
+    "top": "fts_geology:block/quartzite"
+  }
+}

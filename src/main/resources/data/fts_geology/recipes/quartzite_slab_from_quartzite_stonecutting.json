@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:stonecutting",
+  "count": 2,
+  "ingredient": { "item": "fts_geology:quartzite" },
+  "result": "fts_geology:quartzite_slab"
+}

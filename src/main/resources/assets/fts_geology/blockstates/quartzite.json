@@ -1,5 +1,20 @@
 {
-  "variants": {
-    "": { "model": "fts_geology:block/quartzite" }
-  }
+    "variants":  {
+                     "":  [
+                              {
+                                  "model":  "fts_geology:block/quartzite"
+                              },
+                              {
+                                  "model":  "fts_geology:block/quartzite_mirrored"
+                              },
+                              {
+                                  "model":  "fts_geology:block/quartzite",
+                                  "y":  180
+                              },
+                              {
+                                  "model":  "fts_geology:block/quartzite_mirrored",
+                                  "y":  180
+                              }
+                          ]
+                 }
 }

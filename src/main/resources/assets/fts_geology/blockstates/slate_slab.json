@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "type=bottom": { "model": "fts_geology:block/slate_slab" },
+    "type=double": { "model": "fts_geology:block/slate" },
+    "type=top": { "model": "fts_geology:block/slate_slab_top" }
+  }
+}

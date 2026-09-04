@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:stonecutting",
+  "count": 2,
+  "ingredient": { "item": "fts_geology:gneiss" },
+  "result": "fts_geology:gneiss_slab"
+}

@@ -1,0 +1,6 @@
+{
+    "textures":  {
+                     "all":  "fts_geology:block/travertine"
+                 },
+    "parent":  "minecraft:block/cube_mirrored_all"
+}

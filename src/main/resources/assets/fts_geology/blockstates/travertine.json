@@ -1,5 +1,20 @@
 {
-  "variants": {
-    "": { "model": "fts_geology:block/travertine" }
-  }
+    "variants":  {
+                     "":  [
+                              {
+                                  "model":  "fts_geology:block/travertine"
+                              },
+                              {
+                                  "model":  "fts_geology:block/travertine_mirrored"
+                              },
+                              {
+                                  "model":  "fts_geology:block/travertine",
+                                  "y":  180
+                              },
+                              {
+                                  "model":  "fts_geology:block/travertine_mirrored",
+                                  "y":  180
+                              }
+                          ]
+                 }
 }

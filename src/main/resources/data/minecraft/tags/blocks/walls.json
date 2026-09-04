@@ -1,0 +1,16 @@
+{
+  "values": [
+    "fts_geology:travertine_wall",
+    "fts_geology:rhyolite_wall",
+    "fts_geology:gabbro_wall",
+    "fts_geology:peridotite_wall",
+    "fts_geology:serpentinite_wall",
+    "fts_geology:schist_wall",
+    "fts_geology:gneiss_wall",
+    "fts_geology:slate_wall",
+    "fts_geology:marble_wall",
+    "fts_geology:quartzite_wall",
+    "fts_geology:shale_wall",
+    "fts_geology:chert_wall"
+  ]
+}

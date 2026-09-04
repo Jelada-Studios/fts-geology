@@ -1,5 +1,20 @@
 {
-  "variants": {
-    "": { "model": "fts_geology:block/gabbro" }
-  }
+    "variants":  {
+                     "":  [
+                              {
+                                  "model":  "fts_geology:block/gabbro"
+                              },
+                              {
+                                  "model":  "fts_geology:block/gabbro_mirrored"
+                              },
+                              {
+                                  "model":  "fts_geology:block/gabbro",
+                                  "y":  180
+                              },
+                              {
+                                  "model":  "fts_geology:block/gabbro_mirrored",
+                                  "y":  180
+                              }
+                          ]
+                 }
 }

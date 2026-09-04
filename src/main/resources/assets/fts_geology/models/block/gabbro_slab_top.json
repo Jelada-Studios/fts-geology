@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/slab_top",
+  "textures": {
+    "bottom": "fts_geology:block/gabbro",
+    "side": "fts_geology:block/gabbro",
+    "top": "fts_geology:block/gabbro"
+  }
+}

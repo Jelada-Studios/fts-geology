@@ -1,5 +1,20 @@
 {
-  "variants": {
-    "": { "model": "fts_geology:block/chert" }
-  }
+    "variants":  {
+                     "":  [
+                              {
+                                  "model":  "fts_geology:block/chert"
+                              },
+                              {
+                                  "model":  "fts_geology:block/chert_mirrored"
+                              },
+                              {
+                                  "model":  "fts_geology:block/chert",
+                                  "y":  180
+                              },
+                              {
+                                  "model":  "fts_geology:block/chert_mirrored",
+                                  "y":  180
+                              }
+                          ]
+                 }
 }

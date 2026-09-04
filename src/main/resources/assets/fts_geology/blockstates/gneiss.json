@@ -1,5 +1,20 @@
 {
-  "variants": {
-    "": { "model": "fts_geology:block/gneiss" }
-  }
+    "variants":  {
+                     "":  [
+                              {
+                                  "model":  "fts_geology:block/gneiss"
+                              },
+                              {
+                                  "model":  "fts_geology:block/gneiss_mirrored"
+                              },
+                              {
+                                  "model":  "fts_geology:block/gneiss",
+                                  "y":  180
+                              },
+                              {
+                                  "model":  "fts_geology:block/gneiss_mirrored",
+                                  "y":  180
+                              }
+                          ]
+                 }
 }

@@ -1,5 +1,20 @@
 {
-  "variants": {
-    "": { "model": "fts_geology:block/peridotite" }
-  }
+    "variants":  {
+                     "":  [
+                              {
+                                  "model":  "fts_geology:block/peridotite"
+                              },
+                              {
+                                  "model":  "fts_geology:block/peridotite_mirrored"
+                              },
+                              {
+                                  "model":  "fts_geology:block/peridotite",
+                                  "y":  180
+                              },
+                              {
+                                  "model":  "fts_geology:block/peridotite_mirrored",
+                                  "y":  180
+                              }
+                          ]
+                 }
 }
