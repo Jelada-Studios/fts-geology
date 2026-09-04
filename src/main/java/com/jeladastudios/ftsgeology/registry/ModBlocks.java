@@ -112,6 +112,85 @@ public final class ModBlocks {
                     .mapColor(MapColor.TERRACOTTA_WHITE)
                     .strength(0.9F)));
 
+    // --- Geological rock blocks ---------------------------------------------
+    //
+    // Plain stone-tier blocks for real-world lithologies. Placed by separate
+    // deepgen and tectonics worldgen systems; registered here as decorative and
+    // terrain blocks.
+
+    /** Travertine: banded carbonate deposited around hot spring terraces. */
+    public static final RegistryObject<Block> TRAVERTINE = BLOCKS.register("travertine",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.CALCITE)
+                    .mapColor(MapColor.TERRACOTTA_LIGHT_GRAY)
+                    .strength(1.0F, 3.0F)));
+
+    /** Rhyolite: pale pinkish-grey fine-grained silicic volcanic rock. */
+    public static final RegistryObject<Block> RHYOLITE = BLOCKS.register("rhyolite",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+                    .mapColor(MapColor.TERRACOTTA_PINK)
+                    .strength(1.5F, 6.0F)));
+
+    /** Gabbro: coarse dark intrusive ocean-crust rock, speckled black-green. */
+    public static final RegistryObject<Block> GABBRO = BLOCKS.register("gabbro",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+                    .mapColor(MapColor.COLOR_BLACK)
+                    .strength(2.2F, 6.0F)));
+
+    /** Peridotite: dense dark olive-green granular mantle rock. */
+    public static final RegistryObject<Block> PERIDOTITE = BLOCKS.register("peridotite",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+                    .mapColor(MapColor.TERRACOTTA_GREEN)
+                    .strength(2.2F, 6.0F)));
+
+    /** Serpentinite: altered peridotite; waxy mottled green. */
+    public static final RegistryObject<Block> SERPENTINITE = BLOCKS.register("serpentinite",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+                    .mapColor(MapColor.COLOR_GREEN)
+                    .strength(1.8F, 6.0F)));
+
+    /** Schist: foliated metamorphic rock with glittering layers. */
+    public static final RegistryObject<Block> SCHIST = BLOCKS.register("schist",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+                    .mapColor(MapColor.COLOR_GRAY)
+                    .strength(2.0F, 6.0F)));
+
+    /** Gneiss: high-grade banded metamorphic rock with light and dark bands. */
+    public static final RegistryObject<Block> GNEISS = BLOCKS.register("gneiss",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+                    .mapColor(MapColor.STONE)
+                    .strength(2.4F, 6.0F)));
+
+    /** Slate: fine dark cleaved metamorphic rock. */
+    public static final RegistryObject<Block> SLATE = BLOCKS.register("slate",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.DEEPSLATE)
+                    .mapColor(MapColor.DEEPSLATE)
+                    .strength(2.0F, 6.0F)));
+
+    /** Marble: metamorphosed limestone, white with subtle grey veins. */
+    public static final RegistryObject<Block> MARBLE = BLOCKS.register("marble",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.CALCITE)
+                    .mapColor(MapColor.QUARTZ)
+                    .strength(1.8F, 6.0F)));
+
+    /** Quartzite: hard pale recrystallised quartz sandstone. */
+    public static final RegistryObject<Block> QUARTZITE = BLOCKS.register("quartzite",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+                    .mapColor(MapColor.TERRACOTTA_WHITE)
+                    .strength(2.5F, 6.0F)));
+
+    /** Shale: soft fine dark sedimentary rock with thin fissile laminations. */
+    public static final RegistryObject<Block> SHALE = BLOCKS.register("shale",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.TUFF)
+                    .mapColor(MapColor.COLOR_GRAY)
+                    .strength(0.8F, 3.0F)));
+
+    /** Chert: brittle, fine-grained nodular cryptocrystalline silica. */
+    public static final RegistryObject<Block> CHERT = BLOCKS.register("chert",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+                    .mapColor(MapColor.TERRACOTTA_BROWN)
+                    .strength(1.0F, 3.0F)));
+
+
     // --- Microbial mats ------------------------------------------------------
     //
     // The colours ringing a hot spring are alive. Each band is a different community of heat-loving

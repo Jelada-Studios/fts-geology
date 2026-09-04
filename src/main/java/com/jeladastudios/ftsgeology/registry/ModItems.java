@@ -42,6 +42,42 @@ public final class ModItems {
     public static final RegistryObject<Item> SINTER = ITEMS.register("sinter",
             () -> new BlockItem(ModBlocks.SINTER.get(), new Item.Properties()));
 
+    public static final RegistryObject<Item> TRAVERTINE = ITEMS.register("travertine",
+            () -> new BlockItem(ModBlocks.TRAVERTINE.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> RHYOLITE = ITEMS.register("rhyolite",
+            () -> new BlockItem(ModBlocks.RHYOLITE.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> GABBRO = ITEMS.register("gabbro",
+            () -> new BlockItem(ModBlocks.GABBRO.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> PERIDOTITE = ITEMS.register("peridotite",
+            () -> new BlockItem(ModBlocks.PERIDOTITE.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> SERPENTINITE = ITEMS.register("serpentinite",
+            () -> new BlockItem(ModBlocks.SERPENTINITE.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> SCHIST = ITEMS.register("schist",
+            () -> new BlockItem(ModBlocks.SCHIST.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> GNEISS = ITEMS.register("gneiss",
+            () -> new BlockItem(ModBlocks.GNEISS.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> SLATE = ITEMS.register("slate",
+            () -> new BlockItem(ModBlocks.SLATE.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> MARBLE = ITEMS.register("marble",
+            () -> new BlockItem(ModBlocks.MARBLE.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> QUARTZITE = ITEMS.register("quartzite",
+            () -> new BlockItem(ModBlocks.QUARTZITE.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> SHALE = ITEMS.register("shale",
+            () -> new BlockItem(ModBlocks.SHALE.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> CHERT = ITEMS.register("chert",
+            () -> new BlockItem(ModBlocks.CHERT.get(), new Item.Properties()));
+
     public static final RegistryObject<Item> MICROBIAL_MAT_ORANGE = ITEMS.register("microbial_mat_orange",
             () -> new BlockItem(ModBlocks.MICROBIAL_MAT_ORANGE.get(), new Item.Properties()));
 
