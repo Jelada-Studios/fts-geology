@@ -78,6 +78,9 @@ public final class ModItems {
     public static final RegistryObject<Item> CHERT = ITEMS.register("chert",
             () -> new BlockItem(ModBlocks.CHERT.get(), new Item.Properties()));
 
+    public static final RegistryObject<Item> COOLING_LAVA_CRUST = ITEMS.register("cooling_lava_crust",
+            () -> new BlockItem(ModBlocks.COOLING_LAVA_CRUST.get(), new Item.Properties()));
+
     // --- Worked rock forms (polished, slab, stairs, wall) -------------------
 
     public static final RegistryObject<Item> POLISHED_TRAVERTINE = ITEMS.register("polished_travertine",

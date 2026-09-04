@@ -141,6 +141,7 @@ public class GeysersMod {
             event.accept(ModItems.QUARTZITE.get());
             event.accept(ModItems.SHALE.get());
             event.accept(ModItems.CHERT.get());
+            event.accept(ModItems.COOLING_LAVA_CRUST.get());
             acceptWorkedRocks(event);
             event.accept(ModItems.MICROBIAL_MAT_ORANGE.get());
             event.accept(ModItems.MICROBIAL_MAT_YELLOW.get());

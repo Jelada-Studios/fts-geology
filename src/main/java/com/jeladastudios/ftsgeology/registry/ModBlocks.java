@@ -193,6 +193,14 @@ public final class ModBlocks {
                     .mapColor(MapColor.TERRACOTTA_BROWN)
                     .strength(1.0F, 3.0F)));
 
+    /** Cooling lava crust: basalt-dark crust with glowing orange-red fissures, like a skinned-over lava flow still hot underneath. */
+    public static final RegistryObject<Block> COOLING_LAVA_CRUST = BLOCKS.register("cooling_lava_crust",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.BASALT)
+                    .mapColor(MapColor.COLOR_BLACK)
+                    .lightLevel(s -> 7)
+                    .strength(2.0F, 6.0F)
+                    .requiresCorrectToolForDrops()));
+
     // --- Worked rock forms (polished, slab, stairs, wall) -------------------
 
     public static final RegistryObject<Block> POLISHED_TRAVERTINE = BLOCKS.register("polished_travertine",

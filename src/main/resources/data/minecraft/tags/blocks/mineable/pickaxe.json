@@ -59,6 +59,7 @@
     "fts_geology:polished_chert",
     "fts_geology:chert_slab",
     "fts_geology:chert_stairs",
-    "fts_geology:chert_wall"
+    "fts_geology:chert_wall",
+    "fts_geology:cooling_lava_crust"
   ]
 }
