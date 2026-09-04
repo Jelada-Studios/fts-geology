@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "": [
+      { "model": "fts_geology:block/galena" },
+      { "model": "fts_geology:block/galena_mirrored" },
+      { "model": "fts_geology:block/galena", "y": 180 },
+      { "model": "fts_geology:block/galena_mirrored", "y": 180 }
+    ]
+  }
+}

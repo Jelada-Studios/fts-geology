@@ -98,7 +98,8 @@ public final class ModBlocks {
     public static final RegistryObject<Block> NATIVE_SULFUR = BLOCKS.register("native_sulfur",
             () -> new Block(BlockBehaviour.Properties.copy(Blocks.CALCITE)
                     .mapColor(MapColor.COLOR_YELLOW)
-                    .strength(0.8F)));
+                    .strength(0.8F)
+                    .requiresCorrectToolForDrops()));
 
 
     /**
@@ -114,6 +115,31 @@ public final class ModBlocks {
             () -> new Block(BlockBehaviour.Properties.copy(Blocks.CALCITE)
                     .mapColor(MapColor.TERRACOTTA_WHITE)
                     .strength(0.9F)));
+
+    // --- Geothermal basin blocks ---------------------------------------------
+    //
+    // Terrain blocks forming the floor of active geothermal fields and thermal basins.
+
+    /** Sinter crust: pale, cracked, thin mineral crust over dead geothermal ground. */
+    public static final RegistryObject<Block> SINTER_CRUST = BLOCKS.register("sinter_crust",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.CALCITE)
+                    .mapColor(MapColor.TERRACOTTA_WHITE)
+                    .strength(1.0F, 2.0F)
+                    .requiresCorrectToolForDrops()));
+
+    /** Mud pot: viscous grey-brown bubbling geothermal mud slurry. */
+    public static final RegistryObject<Block> MUD_POT = BLOCKS.register("mud_pot",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.MUD)
+                    .mapColor(MapColor.DIRT)
+                    .strength(0.8F)));
+
+    /** Steam vent: dark hydrothermal rock with a degassing orifice, mineral staining, and faint glow. */
+    public static final RegistryObject<Block> STEAM_VENT = BLOCKS.register("steam_vent",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.BASALT)
+                    .mapColor(MapColor.COLOR_BLACK)
+                    .lightLevel(s -> 3)
+                    .strength(2.0F, 6.0F)
+                    .requiresCorrectToolForDrops()));
 
     // --- Geological rock blocks ---------------------------------------------
     //
@@ -199,6 +225,57 @@ public final class ModBlocks {
                     .mapColor(MapColor.COLOR_BLACK)
                     .lightLevel(s -> 7)
                     .strength(2.0F, 6.0F)
+                    .requiresCorrectToolForDrops()));
+
+    // --- Mineral blocks ------------------------------------------------------
+    //
+    // Real geological minerals and hydrothermal vein deposits.
+
+    /** Pyrite: brassy metallic iron sulfide cubes in dark rock. */
+    public static final RegistryObject<Block> PYRITE = BLOCKS.register("pyrite",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.IRON_ORE)
+                    .strength(3.0F, 3.0F)
+                    .requiresCorrectToolForDrops()));
+
+    /** Chalcopyrite: copper-iron sulfide displaying vibrant iridescent blue-gold tarnish. */
+    public static final RegistryObject<Block> CHALCOPYRITE = BLOCKS.register("chalcopyrite",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.COPPER_ORE)
+                    .strength(3.0F, 3.0F)
+                    .requiresCorrectToolForDrops()));
+
+    /** Malachite: hydrated copper carbonate with rich concentric green banding. */
+    public static final RegistryObject<Block> MALACHITE = BLOCKS.register("malachite",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+                    .mapColor(MapColor.COLOR_GREEN)
+                    .strength(2.5F, 3.0F)
+                    .requiresCorrectToolForDrops()));
+
+    /** Azurite: deep royal-blue basic copper carbonate, commonly associated with malachite. */
+    public static final RegistryObject<Block> AZURITE = BLOCKS.register("azurite",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+                    .mapColor(MapColor.COLOR_BLUE)
+                    .strength(2.5F, 3.0F)
+                    .requiresCorrectToolForDrops()));
+
+    /** Quartz vein: white crystalline hydrothermal quartz seam cutting through grey host stone. */
+    public static final RegistryObject<Block> QUARTZ_VEIN = BLOCKS.register("quartz_vein",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+                    .mapColor(MapColor.QUARTZ)
+                    .strength(3.0F, 6.0F)
+                    .requiresCorrectToolForDrops()));
+
+    /** Cinnabar: hydrothermal vermilion-red mercury sulfide ore. */
+    public static final RegistryObject<Block> CINNABAR = BLOCKS.register("cinnabar",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+                    .mapColor(MapColor.COLOR_RED)
+                    .strength(2.5F, 3.0F)
+                    .requiresCorrectToolForDrops()));
+
+    /** Galena: primary lead sulfide ore with metallic lustre and stepped cubic cleavage. */
+    public static final RegistryObject<Block> GALENA = BLOCKS.register("galena",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+                    .mapColor(MapColor.COLOR_GRAY)
+                    .strength(3.0F, 3.0F)
                     .requiresCorrectToolForDrops()));
 
     // --- Worked rock forms (polished, slab, stairs, wall) -------------------

@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "": [
+      { "model": "fts_geology:block/chalcopyrite" },
+      { "model": "fts_geology:block/chalcopyrite_mirrored" },
+      { "model": "fts_geology:block/chalcopyrite", "y": 180 },
+      { "model": "fts_geology:block/chalcopyrite_mirrored", "y": 180 }
+    ]
+  }
+}

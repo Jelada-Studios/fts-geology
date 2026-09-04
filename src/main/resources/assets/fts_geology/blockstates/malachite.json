@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "": [
+      { "model": "fts_geology:block/malachite" },
+      { "model": "fts_geology:block/malachite_mirrored" },
+      { "model": "fts_geology:block/malachite", "y": 180 },
+      { "model": "fts_geology:block/malachite_mirrored", "y": 180 }
+    ]
+  }
+}

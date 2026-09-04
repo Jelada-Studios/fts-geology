@@ -129,6 +129,9 @@ public class GeysersMod {
             event.accept(ModItems.HOT_SPRING.get());
             event.accept(ModItems.NATIVE_SULFUR.get());
             event.accept(ModItems.SINTER.get());
+            event.accept(ModItems.SINTER_CRUST.get());
+            event.accept(ModItems.MUD_POT.get());
+            event.accept(ModItems.STEAM_VENT.get());
             event.accept(ModItems.TRAVERTINE.get());
             event.accept(ModItems.RHYOLITE.get());
             event.accept(ModItems.GABBRO.get());
@@ -142,6 +145,13 @@ public class GeysersMod {
             event.accept(ModItems.SHALE.get());
             event.accept(ModItems.CHERT.get());
             event.accept(ModItems.COOLING_LAVA_CRUST.get());
+            event.accept(ModItems.PYRITE.get());
+            event.accept(ModItems.CHALCOPYRITE.get());
+            event.accept(ModItems.MALACHITE.get());
+            event.accept(ModItems.AZURITE.get());
+            event.accept(ModItems.QUARTZ_VEIN.get());
+            event.accept(ModItems.CINNABAR.get());
+            event.accept(ModItems.GALENA.get());
             acceptWorkedRocks(event);
             event.accept(ModItems.MICROBIAL_MAT_ORANGE.get());
             event.accept(ModItems.MICROBIAL_MAT_YELLOW.get());

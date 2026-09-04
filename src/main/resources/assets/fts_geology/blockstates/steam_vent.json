@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "": [
+      { "model": "fts_geology:block/steam_vent" },
+      { "model": "fts_geology:block/steam_vent_mirrored" },
+      { "model": "fts_geology:block/steam_vent", "y": 180 },
+      { "model": "fts_geology:block/steam_vent_mirrored", "y": 180 }
+    ]
+  }
+}

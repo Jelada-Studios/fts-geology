@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "": [
+      { "model": "fts_geology:block/mud_pot" },
+      { "model": "fts_geology:block/mud_pot_mirrored" },
+      { "model": "fts_geology:block/mud_pot", "y": 180 },
+      { "model": "fts_geology:block/mud_pot_mirrored", "y": 180 }
+    ]
+  }
+}

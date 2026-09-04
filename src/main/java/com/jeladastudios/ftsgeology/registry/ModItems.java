@@ -42,6 +42,15 @@ public final class ModItems {
     public static final RegistryObject<Item> SINTER = ITEMS.register("sinter",
             () -> new BlockItem(ModBlocks.SINTER.get(), new Item.Properties()));
 
+    public static final RegistryObject<Item> SINTER_CRUST = ITEMS.register("sinter_crust",
+            () -> new BlockItem(ModBlocks.SINTER_CRUST.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> MUD_POT = ITEMS.register("mud_pot",
+            () -> new BlockItem(ModBlocks.MUD_POT.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> STEAM_VENT = ITEMS.register("steam_vent",
+            () -> new BlockItem(ModBlocks.STEAM_VENT.get(), new Item.Properties()));
+
     public static final RegistryObject<Item> TRAVERTINE = ITEMS.register("travertine",
             () -> new BlockItem(ModBlocks.TRAVERTINE.get(), new Item.Properties()));
 
@@ -80,6 +89,29 @@ public final class ModItems {
 
     public static final RegistryObject<Item> COOLING_LAVA_CRUST = ITEMS.register("cooling_lava_crust",
             () -> new BlockItem(ModBlocks.COOLING_LAVA_CRUST.get(), new Item.Properties()));
+
+    // --- Mineral blocks ------------------------------------------------------
+
+    public static final RegistryObject<Item> PYRITE = ITEMS.register("pyrite",
+            () -> new BlockItem(ModBlocks.PYRITE.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> CHALCOPYRITE = ITEMS.register("chalcopyrite",
+            () -> new BlockItem(ModBlocks.CHALCOPYRITE.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> MALACHITE = ITEMS.register("malachite",
+            () -> new BlockItem(ModBlocks.MALACHITE.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> AZURITE = ITEMS.register("azurite",
+            () -> new BlockItem(ModBlocks.AZURITE.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> QUARTZ_VEIN = ITEMS.register("quartz_vein",
+            () -> new BlockItem(ModBlocks.QUARTZ_VEIN.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> CINNABAR = ITEMS.register("cinnabar",
+            () -> new BlockItem(ModBlocks.CINNABAR.get(), new Item.Properties()));
+
+    public static final RegistryObject<Item> GALENA = ITEMS.register("galena",
+            () -> new BlockItem(ModBlocks.GALENA.get(), new Item.Properties()));
 
     // --- Worked rock forms (polished, slab, stairs, wall) -------------------
 

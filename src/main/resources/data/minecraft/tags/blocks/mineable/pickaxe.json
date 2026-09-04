@@ -60,6 +60,18 @@
     "fts_geology:chert_slab",
     "fts_geology:chert_stairs",
     "fts_geology:chert_wall",
-    "fts_geology:cooling_lava_crust"
+    "fts_geology:cooling_lava_crust",
+    "fts_geology:native_sulfur",
+    "fts_geology:sinter",
+    "fts_geology:sinter_crust",
+    "fts_geology:mud_pot",
+    "fts_geology:steam_vent",
+    "fts_geology:pyrite",
+    "fts_geology:chalcopyrite",
+    "fts_geology:malachite",
+    "fts_geology:azurite",
+    "fts_geology:quartz_vein",
+    "fts_geology:cinnabar",
+    "fts_geology:galena"
   ]
 }
