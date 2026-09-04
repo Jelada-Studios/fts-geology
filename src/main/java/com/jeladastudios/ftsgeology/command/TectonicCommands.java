@@ -654,12 +654,14 @@ public final class TectonicCommands {
         BlockPos at = BlockPos.containing(source.getPosition());
         boolean ok;
         switch (what) {
-            // With a stage, the shape is built directly and nothing else is involved - no water
-            // line, no timers. That is the point: it makes what a spring LOOKS like testable apart
-            // from when and where one appears, which is where every bad spring has come from.
-            case "hotspring" -> ok = stage > 0
-                    ? !HotSpringShape.build(level, at.getX(), at.getZ(), stage).isEmpty()
-                    : RetrogenHandler.placeHotSpringAt(level, at.getX(), at.getZ());
+            // With a stage, one age of spring is built here and now, plumbing and all.
+            //
+            // It used to call the shape builder alone, which meant a command-placed spring had no
+            // reservoir and no conduit under it - so digging beneath one found nothing, and testing
+            // the stages this way quietly tested only half the feature. Worse, building a single
+            // stage on untouched ground hid a bug that only appears when stages run in sequence.
+            case "hotspring" -> ok = RetrogenHandler.placeHotSpringAt(
+                    level, at.getX(), at.getZ(), stage > 0 ? stage : HotSpringShape.MAX_STAGE);
             case "volcano", "shield", "strato", "fissure", "caldera" -> {
                 // Ground, not canopy - see TerrainProbe.
                 int y = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, at.getX(), at.getZ());

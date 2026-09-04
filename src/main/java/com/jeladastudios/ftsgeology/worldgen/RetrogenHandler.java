@@ -465,6 +465,11 @@ public final class RetrogenHandler {
      * Public so volcanoes can dot their slopes with thermal pools. Returns true if one was placed.
      */
     public static boolean placeHotSpringAt(ServerLevel level, int x, int z) {
+        return placeHotSpringAt(level, x, z, HotSpringShape.MAX_STAGE);
+    }
+
+    /** @param stage how old the springs come out; the generator always asks for a finished one. */
+    public static boolean placeHotSpringAt(ServerLevel level, int x, int z, int stage) {
         // --- Site analysis ---------------------------------------------------
         // Everything that went wrong before came from skipping this step: pools appeared on
         // shorelines, half in the sea, with their magma bed hanging out of a cliff and the water
@@ -535,7 +540,7 @@ public final class RetrogenHandler {
             // the line is seated, its vent opened, and then run straight to maturity. There is no
             // second pool builder any more, so the two paths cannot drift apart, and what a new
             // world contains is what a recovered spring grows back into.
-            if (openSpring(level, px, pz, radius)) placed++;
+            if (openSpring(level, px, pz, radius, stage)) placed++;
             // Step downhill for the next pool in the chain. A full diameter plus a gap: the old
             // stride was one radius, so consecutive pools sat on top of each other. The bearing is
             // nudged and the stride varied at every step so the chain reads as a stream of pools
@@ -578,7 +583,7 @@ public final class RetrogenHandler {
      * earthquake the same line grows the same spring back over a few in-game days. One builder, so
      * a repaired spring and a generated one cannot look different.</p>
      */
-    private static boolean openSpring(ServerLevel level, int x, int z, int radius) {
+    private static boolean openSpring(ServerLevel level, int x, int z, int radius, int stage) {
         int ground = TerrainProbe.groundY(level, x, z);
         if (ground == Integer.MIN_VALUE) return false;
         if (ground <= level.getSeaLevel() + 2) return false;
@@ -587,12 +592,52 @@ public final class RetrogenHandler {
         if (source == null) return false;
         if (!(level.getBlockEntity(source) instanceof SpringSourceBlockEntity be)) return false;
 
-        // The vent sits on the ground, with the bed under it - the same shape the climb produces.
         BlockPos vent = new BlockPos(x, ground, z);
-        level.setBlock(vent.below(), ModBlocks.HOT_SPRING.get().defaultBlockState(), 2);
-        level.setBlock(vent, Blocks.WATER.defaultBlockState(), 2);
         be.setVent(vent);
-        return be.growToMaturity(level);
+        boolean built = be.growTo(level, stage);
+        if (built) boreConduit(level, source, ground);
+        return built;
+    }
+
+    /**
+     * Cuts the channel from the reservoir up to the pool.
+     *
+     * <h2>Why it has to be cut here</h2>
+     * The mod says a hot spring is water rising from a chamber below, and until now that was only
+     * ever said. {@code openSpring} built the reservoir 28 blocks down and then wrote the vent
+     * straight to the surface, so nothing touched the rock in between: dig under a spring and there
+     * was no channel, because there was no channel. The conduit is bored gradually by
+     * {@link com.jeladastudios.ftsgeology.eruption.VentPathfinder} for a spring that has to work its
+     * way up after being blocked, but a spring that arrives with the world has already done that
+     * work, so it is cut in one go.
+     *
+     * <h2>Why the top of it is choked</h2>
+     * A real vent narrows towards its mouth, because the mineral coming out of solution is deposited
+     * fastest where the water first meets the air. Leaving it open would also drop anything that dug
+     * into it straight down onto the magma bed, which is a nastier surprise than the feature is
+     * worth.
+     */
+    private static void boreConduit(ServerLevel level, BlockPos source, int groundY) {
+        BlockState water = Blocks.WATER.defaultBlockState();
+        BlockState choke = Blocks.CALCITE.defaultBlockState();
+        int x = source.getX(), z = source.getZ();
+
+        for (int y = source.getY() + 4; y < groundY - 1; y++) {
+            BlockPos p = new BlockPos(x, y, z);
+            BlockState s = level.getBlockState(p);
+            if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) continue;
+            // The last few blocks under the pool floor are the throat, sealed with the spring's own
+            // deposit. Everything below that is the water column itself.
+            level.setBlock(p, y >= groundY - 4 ? choke : water, 2);
+            // Skin the wall so the column does not open into a cave it happens to pass.
+            for (Direction d : Direction.Plane.HORIZONTAL) {
+                BlockPos w = p.relative(d);
+                BlockState ws = level.getBlockState(w);
+                if (ws.isAir() || !ws.getFluidState().isEmpty()) {
+                    if (!EruptionHandler.isPlayerPlaced(ws)) level.setBlock(w, choke, 2);
+                }
+            }
+        }
     }
 
     /**

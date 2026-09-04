@@ -100,7 +100,7 @@ public final class HotSpringShape {
 
         RetrogenHandler.clearCanopy(level, x, z, radius + 12);
 
-        List<BlockPos> pool = poolCells(level, x, z, radius, waterY);
+        List<BlockPos> pool = fillHoles(poolCells(level, x, z, radius, waterY), waterY);
         if (pool.size() < 4) return List.of();
 
         BlockState crust = ModBlocks.SINTER.get().defaultBlockState();
@@ -231,7 +231,7 @@ public final class HotSpringShape {
             if (g == Integer.MIN_VALUE) continue;
             if (g > waterY + 2) continue;               // the land rises here: the pool ends
             if (waterY - g > 6) continue;               // a hollow too deep to floor
-            if (TerrainProbe.hasFluidAbove(level, cx, cz) && dist > 1) continue;
+            if (dist > 1 && foreignWater(level, cx, cz, waterY)) continue;
             if (EruptionHandler.isPlayerPlaced(level.getBlockState(new BlockPos(cx, g, cz)))) continue;
 
             out.add(new BlockPos(cx, waterY, cz));
@@ -243,6 +243,87 @@ public final class HotSpringShape {
         return out;
     }
 
+    /**
+     * Standing water the pool must not spread into - a lake, a river, the sea.
+     *
+     * <h2>Why it cannot simply refuse all water</h2>
+     * It used to, and that quietly broke every spring that grows. Stage 1 leaves water on a crust
+     * floor; at stage 2 those cells report standing water, so they were refused, and since they ring
+     * the vent the flood fill could not get past them. Measured over a run of stages, the pool went
+     * <b>13, 5, 5, 5</b> - it shrank at stage 2 and never recovered - where with the guard lifted it
+     * goes 13, 49, 149, 317. Springs placed by command looked right the whole time because a command
+     * builds one stage on untouched ground and never runs a sequence, which is why the screenshots
+     * disagreed with the code.
+     *
+     * <p>The discriminator is what the water is standing on. The spring's own pool sits at its own
+     * water line on the crust it laid; a lake sits on whatever the world put there. With that test
+     * the pool grows normally and still stops dead at a lake pressed against it - measured at 245
+     * cells with the lake untouched.</p>
+     */
+    private static boolean foreignWater(ServerLevel level, int x, int z, int waterY) {
+        if (!TerrainProbe.hasFluidAbove(level, x, z)) return false;
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE) return true;
+        boolean ourLine = g + 1 == waterY;
+        boolean ourFloor = isCrust(level.getBlockState(new BlockPos(x, g, z)));
+        return !(ourLine && ourFloor);
+    }
+
+    /**
+     * Adds the holes the pool has closed around to the pool.
+     *
+     * <p>A flood fill leaves gaps: a knoll a couple of blocks proud, a hollow too deep, a cell that
+     * failed a test. Anything enclosed by the pool is a hole rather than an edge, and leaving it out
+     * had two visible consequences - the overburden pass never cleared it, so it stood in the water
+     * as an island of bare dirt, and {@link #rim} treated it as a piece of shoreline and built a
+     * column of crust on it, which the colour bands then painted. Those are the pillars standing in
+     * the middle of a pool.</p>
+     *
+     * <p>Found by flooding inward from the bounding box: whatever is neither pool nor reachable from
+     * outside it is enclosed.</p>
+     */
+    private static List<BlockPos> fillHoles(List<BlockPos> pool, int waterY) {
+        if (pool.isEmpty()) return pool;
+        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
+        int minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
+        Set<Long> inPool = new HashSet<>();
+        for (BlockPos p : pool) {
+            inPool.add(key(p.getX(), p.getZ()));
+            minX = Math.min(minX, p.getX()); maxX = Math.max(maxX, p.getX());
+            minZ = Math.min(minZ, p.getZ()); maxZ = Math.max(maxZ, p.getZ());
+        }
+        minX--; maxX++; minZ--; maxZ++;
+
+        Set<Long> outside = new HashSet<>();
+        Deque<int[]> queue = new ArrayDeque<>();
+        for (int x = minX; x <= maxX; x++) {
+            queue.add(new int[]{x, minZ}); queue.add(new int[]{x, maxZ});
+        }
+        for (int z = minZ; z <= maxZ; z++) {
+            queue.add(new int[]{minX, z}); queue.add(new int[]{maxX, z});
+        }
+        while (!queue.isEmpty()) {
+            int[] c = queue.poll();
+            int x = c[0], z = c[1];
+            if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
+            long k = key(x, z);
+            if (inPool.contains(k) || !outside.add(k)) continue;
+            queue.add(new int[]{x + 1, z}); queue.add(new int[]{x - 1, z});
+            queue.add(new int[]{x, z + 1}); queue.add(new int[]{x, z - 1});
+        }
+
+        List<BlockPos> full = new ArrayList<>(pool);
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                long k = key(x, z);
+                if (!inPool.contains(k) && !outside.contains(k)) {
+                    full.add(new BlockPos(x, waterY, z));
+                }
+            }
+        }
+        return full;
+    }
+
     /** A course of sinter round the lip, so the pool is held by the spring's own crust. */
     private static void rim(ServerLevel level, List<BlockPos> pool, int waterY, BlockState crust) {
         Set<Long> inside = new HashSet<>();
@@ -252,15 +333,33 @@ public final class HotSpringShape {
             for (Direction d : Direction.Plane.HORIZONTAL) {
                 int x = p.getX() + d.getStepX(), z = p.getZ() + d.getStepZ();
                 if (inside.contains(key(x, z))) continue;
-                for (int dy = 0; dy <= 1; dy++) {
+
+                // The wall. Both the water line and the block under it have to be solid, or the
+                // pool leaks: a single course at the water line still lets it pour out underneath
+                // wherever the ground outside falls away.
+                //
+                // Vegetation used to slip through here. The test at the water line asked only
+                // "not air, and no fluid in it" - and a grass tuft is neither, so it was left
+                // standing in contact with the water and the pool drained through it the moment
+                // anything updated the block. That is the most likely cause of a spring that
+                // quietly empties itself, and it would be immediate with Flowing Fluids.
+                for (int dy = -1; dy <= 0; dy++) {
                     BlockPos edge = new BlockPos(x, waterY + dy, z);
                     BlockState s = level.getBlockState(edge);
                     if (EruptionHandler.isPlayerPlaced(s)) continue;
-                    if (dy == 0 && !s.isAir() && s.getFluidState().isEmpty()) continue;
-                    if (dy == 1 && !s.isAir() && !TerrainProbe.isVegetation(s)) continue;
-                    if (dy == 1 && level.random.nextInt(3) != 0) continue;   // a broken lip, not a wall
+                    boolean holdsWater = !s.isAir() && s.getFluidState().isEmpty()
+                            && !TerrainProbe.isVegetation(s);
+                    if (holdsWater) continue;
                     level.setBlock(edge, crust, 2);
                 }
+
+                // And a broken lip above it, for looks rather than containment.
+                BlockPos lip = new BlockPos(x, waterY + 1, z);
+                BlockState s = level.getBlockState(lip);
+                if (EruptionHandler.isPlayerPlaced(s)) continue;
+                if (!s.isAir() && !TerrainProbe.isVegetation(s)) continue;
+                if (level.random.nextInt(3) != 0) continue;
+                level.setBlock(lip, crust, 2);
             }
         }
     }
@@ -298,7 +397,27 @@ public final class HotSpringShape {
      * only noticed it was in trouble when the block directly over its bed was covered - fill in any
      * other part of the pool, even most of it, and nothing happened at all.</p>
      */
-    public static boolean isBlocked(ServerLevel level, int x, int z, int stage, int datumY) {
+    /** What state a spring's pool is in. */
+    public enum Health {
+        /** Wet and whole. */
+        FINE,
+        /** Something has been dropped in it, but the outlet is clear. The spring flushes it. */
+        FOULED,
+        /** Buried past the point where the outlet can clear itself. The water goes elsewhere. */
+        BLOCKED
+    }
+
+    /**
+     * How much of this pool is still water.
+     *
+     * <h2>Two thresholds, not one</h2>
+     * One threshold gave a spring only two states, and set the bar so high that dropping a patch of
+     * dirt into a pool did nothing observable at all - which is what testing reported. A real spring
+     * flushes a small obstruction and is stopped by a large one, so there are two: a fouled pool is
+     * cleaned out and rebuilt at the age it had reached, and a buried one makes the water look for
+     * another way out.
+     */
+    public static Health health(ServerLevel level, int x, int z, int stage, int datumY) {
         int waterY = datumY - 1;
         int radius = radiusFor(stage);
         int wet = 0, dry = 0;
@@ -306,12 +425,17 @@ public final class HotSpringShape {
             for (int dz = -radius; dz <= radius; dz++) {
                 if (dx * dx + dz * dz > radius * radius) continue;
                 BlockPos p = new BlockPos(x + dx, waterY, z + dz);
-                if (!level.getBlockState(p).getFluidState().isEmpty()) wet++;
-                else if (!level.getBlockState(p).isAir()) dry++;
+                BlockState s = level.getBlockState(p);
+                if (!s.getFluidState().isEmpty()) wet++;
+                else if (!s.isAir()) dry++;
             }
         }
-        if (wet + dry == 0) return true;
-        return wet < (wet + dry) * 0.4;
+        int total = wet + dry;
+        if (total == 0) return Health.BLOCKED;
+        double wetShare = (double) wet / total;
+        if (wetShare >= 0.9) return Health.FINE;
+        if (wetShare >= 0.5) return Health.FOULED;
+        return Health.BLOCKED;
     }
 
     private static int groundNear(ServerLevel level, int x, int z) {

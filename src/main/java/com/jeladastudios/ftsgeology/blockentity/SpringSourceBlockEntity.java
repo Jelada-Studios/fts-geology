@@ -137,11 +137,26 @@ public class SpringSourceBlockEntity extends BlockEntity {
      * @return true if a spring was built here
      */
     public boolean growToMaturity(ServerLevel level) {
+        return growTo(level, FINAL_STAGE);
+    }
+
+    /**
+     * Runs the spring up to a given age at once.
+     *
+     * <p>The stages are run in sequence rather than jumping straight to the target, because that is
+     * what a growing spring does and the two must not be different code paths. Building only the
+     * final stage on untouched ground is what hid the bug where a sequence could not widen the pool
+     * at all - it looked perfect from a command and was broken everywhere else.</p>
+     */
+    public boolean growTo(ServerLevel level, int target) {
         if (outletY == Integer.MIN_VALUE) return false;
-        for (int s = 1; s <= FINAL_STAGE; s++) {
-            if (!applyStage(level, s)) return s > 1;
+        int reached = 0;
+        for (int s = 1; s <= Math.max(1, Math.min(FINAL_STAGE, target)); s++) {
+            if (!applyStage(level, s)) break;
+            reached = s;
         }
-        stage = FINAL_STAGE;
+        if (reached == 0) return false;
+        stage = reached;
         stageSince = level.getGameTime();
         setChanged();
         return true;
@@ -169,6 +184,18 @@ public class SpringSourceBlockEntity extends BlockEntity {
         if (!GeyserConfig.SPRING_RENEWAL_ENABLED.get()) return;
         if ((server.getGameTime() + pos.hashCode()) % CHECK_INTERVAL != 0) return;
         if (be.dormant) return;
+
+        // A pool somebody has thrown a few blocks into is cleaned out and rebuilt at the age it had
+        // reached. Only a pool that is mostly buried counts as a blocked outlet.
+        if (be.datumY != Integer.MIN_VALUE && be.stage > 0) {
+            HotSpringShape.Health h = HotSpringShape.health(
+                    server, be.outletX, be.outletZ, be.stage, be.datumY);
+            if (h == HotSpringShape.Health.FOULED) {
+                be.applyStage(server, be.stage);
+                GeysersMod.LOGGER.debug("Spring at {},{} flushed its pool", be.outletX, be.outletZ);
+                return;
+            }
+        }
 
         if (!be.ventOpen(server)) {
             // The pool is gone - a quake, a landslide, a player filling it in. Nothing tries to
@@ -220,7 +247,8 @@ public class SpringSourceBlockEntity extends BlockEntity {
         }
         // Asked of the whole basin. Testing one column meant filling in any part of a pool except
         // the block over the bed did nothing at all, which is exactly what testing reported.
-        return !HotSpringShape.isBlocked(level, outletX, outletZ, Math.max(1, stage), datumY);
+        return HotSpringShape.health(level, outletX, outletZ, Math.max(1, stage), datumY)
+                != HotSpringShape.Health.BLOCKED;
     }
 
     // === Climbing ===========================================================
