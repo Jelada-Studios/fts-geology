@@ -46,18 +46,28 @@ public class HotSpringBlockEntity extends BlockEntity {
 
         // Does this spring still have its water?
         //
-        // Terraced springs have come out dry over several rounds of testing and every fix so far has
-        // been correct but incomplete. The check at generation time now reports nothing at all -
-        // a whole session with not one warning - which says the water IS placed and IS still there
-        // when carveTerrace returns. So it is being taken afterwards, by something else, and the
-        // only way to catch that is to look later. This bed sits directly under its own pool, so
-        // "no fluid above me" is exactly the symptom, and it prints the coordinate to go and look at.
-        if (time % 200L == 0L && !be.reportedDry
-                && server.getBlockState(pos.above()).getFluidState().isEmpty()) {
-            be.reportedDry = true;
-            com.jeladastudios.ftsgeology.GeysersMod.LOGGER.warn(
-                    "hot spring at {} has no water above it (block above is {})",
-                    pos, server.getBlockState(pos.above()).getBlock());
+        // This started as a diagnostic: terraced springs kept coming out dry and the check at
+        // generation time never fired once, so the loss had to be happening later and the only way
+        // to catch it was to look later. The bed sits directly under its own pool, so "no fluid
+        // above me" is exactly the symptom.
+        //
+        // It is now also the trigger for renewal. That is deliberately the only trigger: it catches
+        // a quake burying the pool, a landslide, a lava flow capping it, or any future cause,
+        // without any of them having to know the renewal code exists.
+        if (time % 200L == 0L) {
+            boolean dry = server.getBlockState(pos.above()).getFluidState().isEmpty();
+            if (dry && !be.reportedDry) {
+                be.reportedDry = true;
+                com.jeladastudios.ftsgeology.GeysersMod.LOGGER.warn(
+                        "hot spring at {} has no water above it (block above is {})",
+                        pos, server.getBlockState(pos.above()).getBlock());
+                com.jeladastudios.ftsgeology.hydrology.SpringRenewal.request(server, pos);
+            } else if (!dry && be.reportedDry) {
+                // Wet again. Arm the check so a second burial is caught too - a spring that has
+                // recovered once is if anything more likely to be buried again, since whatever
+                // shook the ground down onto it tends to happen more than once in the same place.
+                be.reportedDry = false;
+            }
         }
 
         // Steam over the whole pool, not just the one column above the vent.

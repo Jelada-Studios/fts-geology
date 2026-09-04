@@ -152,6 +152,9 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_TEMPERATE; // blocks below the land
     public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_ARID;
     public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_HUMID;
+    public static final ForgeConfigSpec.BooleanValue SPRING_RENEWAL_ENABLED;
+    public static final ForgeConfigSpec.IntValue SPRING_RENEWAL_DELAY_TICKS;
+    public static final ForgeConfigSpec.IntValue SPRING_RENEWAL_SEARCH;    // how far an outlet may move
 
     // --- Instruments ---------------------------------------------------------
     public static final ForgeConfigSpec.IntValue SEISMOGRAPH_RANGE;   // blocks a station can hear
@@ -739,6 +742,28 @@ public final class GeyserConfig {
                 .comment("Depth to water in hot, wet biomes - jungle, swamp, mangrove.",
                         "More rain goes in than drains away again, so the water is at your ankles.")
                 .defineInRange("waterTableDepthHumid", 3, 0, 64);
+        SPRING_RENEWAL_ENABLED = b
+                .comment("Let a buried hot spring come back.",
+                        "An earthquake reaches about 24 blocks down; the heat feeding a spring is",
+                        "deeper than that, so a quake does not destroy a spring, it blocks the",
+                        "outlet - and an outlet still being pushed from below does not stay",
+                        "blocked. The 1959 Hebgen Lake quake changed dozens of Yellowstone geysers",
+                        "and switched none of them off.",
+                        "A column with anything player-built in it is never touched, whatever this",
+                        "is set to.")
+                .define("springRenewalEnabled", true);
+        SPRING_RENEWAL_DELAY_TICKS = b
+                .comment("Ticks between a spring losing its water and the vent re-opening.",
+                        "This is a recovery, not an undo, so it should not be instant: the delay is",
+                        "what makes it read as the ground settling rather than as damage failing to",
+                        "stick. 1200 ticks is one minute. Set it low if you are testing.")
+                .defineInRange("springRenewalDelayTicks", 1200, 20, 1728000);
+        SPRING_RENEWAL_SEARCH = b
+                .comment("How far, in blocks, a sealed spring may look for a new outlet.",
+                        "When the old vent is buried too deep to clear, the water comes up wherever",
+                        "the water table next reaches the surface within this distance. Set to 0 to",
+                        "make springs only ever re-open in the exact hole they were in.")
+                .defineInRange("springRenewalSearch", 16, 0, 64);
         b.pop();
 
         SPEC = b.build();

@@ -190,6 +190,10 @@ public final class RetrogenHandler {
         com.jeladastudios.ftsgeology.volcano.VolcanoJob.drain(event.getServer(),
                 TickBudget.slice(0.3));
 
+        // Springs asking for their water back. A tiny share on purpose: it is a handful of block
+        // writes per site and it is never urgent, so it goes behind everything else.
+        com.jeladastudios.ftsgeology.hydrology.SpringRenewal.drain(TickBudget.slice(0.05));
+
         // A volcano under construction slows chunk geology down rather than stopping it. Blocking
         // outright looked tidier but would let the chunk queue grow without bound while exploring a
         // hotspot, where volcanoes are common enough to arrive faster than they finish.
