@@ -100,6 +100,16 @@ public class SpringSourceBlockEntity extends BlockEntity {
     /** Set when the outlet came out at the waterline, where no pool can be held. */
     private boolean dormant;
 
+    /**
+     * The original ground level at the outlet, measured once and then kept.
+     *
+     * <p>Every pool this line ever builds is sited from this, not from a reading of the ground as
+     * it is now. Re-measuring is what made a covered spring rebuild lower each time until it had
+     * sunk into a pit: after stage 4 the land within its own basin IS its own excavated floor, and
+     * a stage 1 rebuild samples exactly there.</p>
+     */
+    private int datumY = Integer.MIN_VALUE;
+
     /** Wall rock the conduit came up through; decides what the water precipitates. */
     private int carbonate;
     private int volcanic;
@@ -204,9 +214,13 @@ public class SpringSourceBlockEntity extends BlockEntity {
     /** Is there still water at the vent? Two lookups, and the common case. */
     private boolean ventOpen(ServerLevel level) {
         if (outletY == Integer.MIN_VALUE) return false;
-        BlockPos v = new BlockPos(outletX, outletY, outletZ);
-        if (level.getBlockState(v).getFluidState().isEmpty()) return false;
-        return true;   // water at the vent is the test; the bed can sit anywhere in the basin
+        if (datumY == Integer.MIN_VALUE) {
+            return !level.getBlockState(new BlockPos(outletX, outletY, outletZ))
+                    .getFluidState().isEmpty();
+        }
+        // Asked of the whole basin. Testing one column meant filling in any part of a pool except
+        // the block over the bed did nothing at all, which is exactly what testing reported.
+        return !HotSpringShape.isBlocked(level, outletX, outletZ, Math.max(1, stage), datumY);
     }
 
     // === Climbing ===========================================================
@@ -340,10 +354,14 @@ public class SpringSourceBlockEntity extends BlockEntity {
      * arguments it gets.</p>
      */
     private boolean applyStage(ServerLevel level, int toStage) {
-        List<BlockPos> pool = HotSpringShape.build(level, outletX, outletZ, toStage);
+        if (datumY == Integer.MIN_VALUE) {
+            datumY = HotSpringShape.datumFor(level, outletX, outletZ);
+            if (datumY == Integer.MIN_VALUE) return false;
+        }
+        List<BlockPos> pool = HotSpringShape.build(level, outletX, outletZ, toStage, datumY);
         if (pool.isEmpty()) return false;
-        // The vent follows the water line the shape chose, so ventOpen() looks in the right place.
         outletY = pool.get(0).getY();
+        setChanged();
         return true;
     }
 
@@ -384,6 +402,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
                 pos, outletX, outletZ, best.getX(), best.getZ());
         outletX = best.getX();
         outletZ = best.getZ();
+        datumY = Integer.MIN_VALUE;   // a new outlet has its own ground level
         outletY = best.getY();
         mouthY = Integer.MIN_VALUE;
         stage = 0;
@@ -407,6 +426,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
         tag.putLong("StageSince", stageSince);
         tag.putInt("Stalled", stalled);
         tag.putBoolean("Dormant", dormant);
+        tag.putInt("DatumY", datumY);
         tag.putInt("Carbonate", carbonate);
         tag.putInt("Volcanic", volcanic);
     }
@@ -423,6 +443,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
         stageSince = tag.getLong("StageSince");
         stalled = tag.getInt("Stalled");
         dormant = tag.getBoolean("Dormant");
+        datumY = tag.contains("DatumY") ? tag.getInt("DatumY") : Integer.MIN_VALUE;
         carbonate = tag.getInt("Carbonate");
         volcanic = tag.getInt("Volcanic");
     }

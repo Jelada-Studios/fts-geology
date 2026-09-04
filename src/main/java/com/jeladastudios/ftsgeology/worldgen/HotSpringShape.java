@@ -47,6 +47,18 @@ public final class HotSpringShape {
     /** How far past the pool the untouched reference ring is read. */
     private static final int REFERENCE_GAP = 2;
 
+    /** How far above the water line the pool clears its overburden. */
+    private static final int OVERBURDEN_CUT = 3;
+
+    /** One warm bed per this many cells of pool floor. */
+    private static final int CELLS_PER_BED = 12;
+
+    /** Reads the original ground level here, for a spring that does not have one yet. */
+    public static int datumFor(ServerLevel level, int x, int z) {
+        int line = waterLine(level, x, z, radiusFor(1));
+        return line == Integer.MIN_VALUE ? Integer.MIN_VALUE : line + 1;
+    }
+
     public static int radiusFor(int stage) {
         return RADIUS[Math.max(1, Math.min(MAX_STAGE, stage)) - 1];
     }
@@ -58,10 +70,30 @@ public final class HotSpringShape {
      * @return the pool cells, or an empty list if this spot will not hold a spring
      */
     public static List<BlockPos> build(ServerLevel level, int x, int z, int stage) {
+        return build(level, x, z, stage, Integer.MIN_VALUE);
+    }
+
+    /**
+     * @param datumY the original ground level here, from before this spring existed. Pass
+     *               {@link Integer#MIN_VALUE} to read it off the surrounding land, which is right
+     *               the first time and wrong every time after.
+     *
+     * <h2>Why the datum has to be remembered</h2>
+     * Reading the water line off a ring outside the pool is stable while a spring is <i>growing</i>,
+     * because a bigger stage samples further out than a smaller one dug. It is not stable when a
+     * spring is rebuilt from stage 1 after being covered: the stage 1 ring, at radius 4 to 6, lies
+     * <b>inside</b> the basin stage 4 cut at radius 10, so it measures the old excavated floor and
+     * sites the new pool lower. Every cover-and-recover cycle then steps down again, which is the
+     * spring sinking into the ground that testing found.
+     *
+     * <p>So the level is measured once, when the water first reaches daylight, and kept. After that
+     * it is a fact about the place rather than a reading of what the spring has done to it.</p>
+     */
+    public static List<BlockPos> build(ServerLevel level, int x, int z, int stage, int datumY) {
         stage = Math.max(1, Math.min(MAX_STAGE, stage));
         int radius = radiusFor(stage);
 
-        int waterY = waterLine(level, x, z, radius);
+        int waterY = datumY != Integer.MIN_VALUE ? datumY - 1 : waterLine(level, x, z, radius);
         if (waterY == Integer.MIN_VALUE) return List.of();
         // A basin at or under the waterline drains into the sea the moment anything updates it.
         if (waterY <= level.getSeaLevel() + 1) return List.of();
@@ -74,16 +106,20 @@ public final class HotSpringShape {
         BlockState crust = ModBlocks.SINTER.get().defaultBlockState();
         for (BlockPos cell : pool) {
             int cx = cell.getX(), cz = cell.getZ();
-            // Open the cell to the sky. Only loose cover and the spring's own crust come out;
-            // native rock above the water line is what bounds the pool, not something to dig.
-            for (int y = waterY + 1; y <= waterY + 3; y++) {
+            // Open the cell to the sky, and mean it.
+            //
+            // This used to take out only loose cover and the spring's own crust, while the flood
+            // fill admitted cells whose ground stood up to two blocks ABOVE the water line. So a
+            // grass block sat on top of a pool cell and stayed there: water underneath, lid on top,
+            // which is the "springs come out covered in grass" report. Anything natural over the
+            // water comes out now. It is a cut, but a bounded one, and the thing that stops it
+            // ratcheting is the remembered datum rather than a refusal to dig.
+            for (int y = waterY + 1; y <= waterY + OVERBURDEN_CUT; y++) {
                 BlockPos p = new BlockPos(cx, y, cz);
                 BlockState s = level.getBlockState(p);
                 if (s.isAir()) continue;
                 if (EruptionHandler.isPlayerPlaced(s)) continue;
-                if (TerrainProbe.isVegetation(s) || isCrust(s)) {
-                    level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
-                }
+                level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
             }
             // Floor up to the water line where the ground has fallen away below it.
             int g = TerrainProbe.groundY(level, cx, cz);
@@ -96,19 +132,17 @@ public final class HotSpringShape {
             level.setBlock(cell, Blocks.WATER.defaultBlockState(), 2);
         }
 
-        // The warm bed, and the heat under it, at the middle of whatever shape formed.
-        BlockPos bed = bedFor(pool, x, z, waterY);
-        level.setBlock(bed, ModBlocks.HOT_SPRING.get().defaultBlockState(), 2);
-        level.setBlock(bed.below(2), Blocks.MAGMA_BLOCK.defaultBlockState(), 2);
-        MagmaSealing.seal(level, bed.below(2), false);
+        // Warm beds through the floor, not one in the middle.
+        //
+        // A single bed heated a 21-block pool from one point, so the edges read cold and the steam
+        // all came from the centre. It also made "is this spring blocked?" a question about one
+        // column, which is why covering any other part of a pool did nothing at all.
+        placeBeds(level, pool, x, z, waterY);
 
         rim(level, pool, waterY, crust);
 
-        // The colours arrive last. A microbial mat needs a large, warm, settled pool; a spring that
-        // opened a few days ago has not got one yet.
-        if (stage >= MAX_STAGE) {
-            RetrogenHandler.paintRings(level, pool, x, z, waterY);
-        }
+        // Colours by age - see paintThermalRings. Stage 1 gets only its own bare deposit.
+        RetrogenHandler.paintRings(level, pool, x, z, waterY, stage);
         return pool;
     }
 
@@ -231,13 +265,53 @@ public final class HotSpringShape {
         }
     }
 
-    /** The bed goes in the middle if the middle is wet, otherwise in a cell that is. */
-    private static BlockPos bedFor(List<BlockPos> pool, int x, int z, int waterY) {
-        for (BlockPos p : pool) {
-            if (p.getX() == x && p.getZ() == z) return new BlockPos(x, waterY - 1, z);
+    /** One warm bed per {@link #CELLS_PER_BED} of pool floor, and always one at the vent. */
+    private static void placeBeds(ServerLevel level, List<BlockPos> pool, int x, int z, int waterY) {
+        BlockState bed = ModBlocks.HOT_SPRING.get().defaultBlockState();
+
+        BlockPos vent = new BlockPos(x, waterY - 1, z);
+        boolean ventInPool = pool.stream().anyMatch(p -> p.getX() == x && p.getZ() == z);
+        if (ventInPool) seatBed(level, vent, bed);
+
+        int wanted = Math.max(1, pool.size() / CELLS_PER_BED);
+        int placed = ventInPool ? 1 : 0;
+        for (int i = 0; i < pool.size() && placed < wanted; i++) {
+            // Spread over the list rather than clustered, so the heat is spread over the floor.
+            BlockPos cell = pool.get((i * 7 + 3) % pool.size());
+            if (cell.getX() == x && cell.getZ() == z) continue;
+            seatBed(level, new BlockPos(cell.getX(), waterY - 1, cell.getZ()), bed);
+            placed++;
         }
-        BlockPos mid = pool.get(pool.size() / 2);
-        return new BlockPos(mid.getX(), waterY - 1, mid.getZ());
+    }
+
+    private static void seatBed(ServerLevel level, BlockPos at, BlockState bed) {
+        if (EruptionHandler.isPlayerPlaced(level.getBlockState(at))) return;
+        level.setBlock(at, bed, 2);
+        level.setBlock(at.below(2), Blocks.MAGMA_BLOCK.defaultBlockState(), 2);
+        MagmaSealing.seal(level, at.below(2), false);
+    }
+
+    /**
+     * Has this spring lost its pool?
+     *
+     * <p>Asked of the whole basin rather than of one column. The single-column test meant a spring
+     * only noticed it was in trouble when the block directly over its bed was covered - fill in any
+     * other part of the pool, even most of it, and nothing happened at all.</p>
+     */
+    public static boolean isBlocked(ServerLevel level, int x, int z, int stage, int datumY) {
+        int waterY = datumY - 1;
+        int radius = radiusFor(stage);
+        int wet = 0, dry = 0;
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                if (dx * dx + dz * dz > radius * radius) continue;
+                BlockPos p = new BlockPos(x + dx, waterY, z + dz);
+                if (!level.getBlockState(p).getFluidState().isEmpty()) wet++;
+                else if (!level.getBlockState(p).isAir()) dry++;
+            }
+        }
+        if (wet + dry == 0) return true;
+        return wet < (wet + dry) * 0.4;
     }
 
     private static int groundNear(ServerLevel level, int x, int z) {

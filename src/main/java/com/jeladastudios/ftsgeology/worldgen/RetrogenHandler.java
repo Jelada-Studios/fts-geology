@@ -621,16 +621,53 @@ public final class RetrogenHandler {
         BlockState existing = level.getBlockState(src);
         if (existing.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(existing)) return null;
 
-        level.setBlock(src, ModBlocks.SPRING_SOURCE.get().defaultBlockState(), 2);
+        buildReservoir(level, src, ModBlocks.SPRING_SOURCE.get().defaultBlockState(), 2, 3);
         if (level.getBlockEntity(src) instanceof SpringSourceBlockEntity be) {
             be.setTargetRadius(radius);
         }
         return src;
     }
 
+    /**
+     * The reservoir under a geothermal feature: rock floor, magma heat bed, a walled body of water,
+     * and a natural rock cap over it.
+     *
+     * <h2>Why a spring has one at all</h2>
+     * A hot spring and a geyser are the same machine. Both are water sitting on hot rock with a way
+     * up; the only difference is that a geyser's conduit is constricted enough for pressure to build
+     * before it lets go, and a spring's is not - so a spring simply seeps, steadily, forever. Giving
+     * a spring only a marker block was the thing that made every version of it feel invented: the
+     * pool had nothing feeding it, so it had to be conjured at the surface instead of arriving from
+     * below.
+     *
+     * <p>There is deliberately no pre-carved shaft. The cap is natural rock, and the conduit is bored
+     * upward a few blocks at a time by {@link com.jeladastudios.ftsgeology.eruption.VentPathfinder} -
+     * which is also what lets a blocked spring go looking for a different way out.</p>
+     */
+    static void buildReservoir(ServerLevel level, BlockPos core, BlockState coreBlock,
+                               int rad, int chamberH) {
+        int waterDepth = Math.max(1, chamberH - 1);
+
+        // Containment floor, then a SOLID magma bed. Fluid lava would mix with the chamber water
+        // into cobblestone, or drain away into a cave, and take the heat with it.
+        fillLayer(level, core.below(2), rad + 1, Blocks.DEEPSLATE);
+        fillLayer(level, core.below(1), rad, Blocks.MAGMA_BLOCK);
+        MagmaSealing.sealSlab(level, core.below(1), rad);
+
+        // Core level: a rock ring keeping the heat off the water, with the core in the middle.
+        fillLayer(level, core, rad, Blocks.DEEPSLATE);
+        level.setBlock(core, coreBlock, 2);
+
+        // The water itself, walled so it cannot leak into a cave alongside.
+        for (int dy = 1; dy <= chamberH; dy++) {
+            fillLayer(level, core.above(dy), rad, dy <= waterDepth ? Blocks.WATER : Blocks.AIR);
+            ringWall(level, core.above(dy), rad + 1);
+        }
+    }
+
     /** Lays the microbial colour bands around a finished pool. Called by the spring line. */
-    public static void paintRings(ServerLevel level, List<BlockPos> pool, int cx, int cz, int waterY) {
-        paintThermalRings(level, pool, cx, cz, waterY);
+    public static void paintRings(ServerLevel level, List<BlockPos> pool, int cx, int cz, int waterY, int stage) {
+        paintThermalRings(level, pool, cx, cz, waterY, stage);
     }
 
     /**
@@ -771,7 +808,7 @@ public final class RetrogenHandler {
             }
         }
 
-        paintThermalRings(level, pool, cx, cz, waterY);
+        paintThermalRings(level, pool, cx, cz, waterY, HotSpringShape.MAX_STAGE);
 
         // Seal the magma bed on every face that could otherwise be exposed on a slope.
         for (BlockPos w : pool) {
@@ -895,7 +932,7 @@ public final class RetrogenHandler {
      * on the apron instead of climbing a bank.</p>
      */
     private static void paintThermalRings(ServerLevel level, List<BlockPos> pool,
-                                          int cx, int cz, int waterY) {
+                                          int cx, int cz, int waterY, int stage) {
         if (pool.isEmpty()) return;
 
         // Band order runs OUTWARD from the water, and it is the order Grand Prismatic actually
@@ -907,12 +944,19 @@ public final class RetrogenHandler {
         // the brown one, and it blends into bare earth on its own - the transition needs no help
         // once the order is right. The green fringe is kept narrow because in a real spring it is
         // not really a mat at all: it is blue water seen shallow over the yellow one.
+        // How many of those bands exist depends on how old the spring is.
+        //
+        // A mat is a living thing. It needs a pool that has been warm, wet and the same shape for
+        // long enough to be colonised, and the outer bands need the widest, coolest, most settled
+        // fringe of all - so on a spring that opened a few days ago there is nothing but its own
+        // bare deposit. The colours arriving one at a time is what makes the stages read as ages
+        // rather than as the same spring at different sizes.
         int[] band = {
                 1 + level.random.nextInt(2),   // the sinter shelf
-                1 + level.random.nextInt(2),   // green, the shallow fringe at the waterline
-                2 + level.random.nextInt(3),   // yellow
-                2 + level.random.nextInt(3),   // orange
-                2 + level.random.nextInt(4),   // brown, coolest and driest
+                stage >= 2 ? 1 + level.random.nextInt(2) : 0,   // green, the shallow fringe
+                stage >= 3 ? 2 + level.random.nextInt(3) : 0,   // yellow
+                stage >= 4 ? 2 + level.random.nextInt(3) : 0,   // orange
+                stage >= 4 ? 2 + level.random.nextInt(4) : 0,   // brown, coolest and driest
         };
         int bandReach = 0;
         for (int b : band) bandReach += b;
@@ -923,7 +967,7 @@ public final class RetrogenHandler {
         // sulfate and arsenic in the runoff kill the soil and the heat finishes the roots - but it
         // has to LOOK killed rather than look unfinished. So it is a pale crusted skin that thins
         // outward into whatever was there, and the trees standing in it are dead.
-        int halo = 5 + level.random.nextInt(6);
+        int halo = stage >= 4 ? 5 + level.random.nextInt(6) : 0;
         int reach = bandReach + halo;
         double phase = level.random.nextDouble() * Math.PI * 2;
 
