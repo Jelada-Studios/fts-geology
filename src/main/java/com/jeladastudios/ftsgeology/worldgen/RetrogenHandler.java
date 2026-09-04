@@ -707,7 +707,7 @@ public final class RetrogenHandler {
         }
 
         // Take the canopy off the whole terrace - basin and colour bands - before any of it is cut.
-        clearSpringCanopy(level, cx, cz, radius + 18);
+        clearCanopy(level, cx, cz, radius + 18);
 
         for (BlockPos w : pool) {
             // Clear anything standing over the basin, then cut it: water, calcite floor, magma bed.
@@ -837,7 +837,7 @@ public final class RetrogenHandler {
      * decision comes from a smooth field rather than a per-column roll, because a tree covers a
      * dozen columns and rolling per column would leave half a canopy standing.</p>
      */
-    private static void clearSpringCanopy(ServerLevel level, int cx, int cz, int radius) {
+    public static void clearCanopy(ServerLevel level, int cx, int cz, int radius) {
         double solid = radius * 0.5;
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {

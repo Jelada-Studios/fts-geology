@@ -6,7 +6,7 @@ import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.eruption.VentPathfinder;
 import com.jeladastudios.ftsgeology.registry.ModBlockEntities;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
-import com.jeladastudios.ftsgeology.worldgen.MagmaSealing;
+import com.jeladastudios.ftsgeology.worldgen.HotSpringShape;
 import com.jeladastudios.ftsgeology.worldgen.RetrogenHandler;
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
 import net.minecraft.core.BlockPos;
@@ -67,19 +67,13 @@ public class SpringSourceBlockEntity extends BlockEntity {
     private static final int CEILING_ALLOWANCE = 3;
 
     /** The last stage. 0 is a bare vent; 3 is a finished spring with its colour bands. */
-    public static final int FINAL_STAGE = 3;
+    public static final int FINAL_STAGE = HotSpringShape.MAX_STAGE;
 
     /** Ticks in a Minecraft day. */
     private static final long DAY = 24000L;
 
-    /** How deep a hollow the spring will floor with its own deposit rather than refuse. */
-    private static final int FILL_LIMIT = 10;
 
-    /** A pool smaller than this reads as a puddle, so the water rises to look for room. */
-    private static final int MIN_POOL = 12;
 
-    /** How far the water may rise above its stage height while looking for room. */
-    private static final int MAX_SEARCH_RISE = 3;
 
     // --- state -------------------------------------------------------------
 
@@ -174,7 +168,13 @@ public class SpringSourceBlockEntity extends BlockEntity {
                 be.stageSince = server.getGameTime();
                 be.setChanged();
             }
-            if (be.stalled >= STALL_LIMIT && server.getGameTime() % 1200L != 0L) return;
+            // Capped for good: the water goes looking for another way out rather than pushing at a
+            // lid forever. This is what a blocked spring does - the pressure does not go away, it
+            // finds the next weakness, usually a few metres to one side.
+            if (be.stalled >= STALL_LIMIT) {
+                if (server.getGameTime() % 1200L != 0L) return;
+                if (be.stepAside(server, pos)) return;
+            }
             be.climb(server, pos);
             return;
         }
@@ -186,7 +186,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
             be.stage++;
             be.stageSince = server.getGameTime();
             GeysersMod.LOGGER.info("Spring at {} reached stage {}/{} ({} blocks across)",
-                    be.vent(), be.stage, FINAL_STAGE, radiusFor(be.stage, be.targetRadius) * 2 + 1);
+                    be.vent(), be.stage, FINAL_STAGE, HotSpringShape.radiusFor(be.stage) * 2 + 1);
             be.setChanged();
         }
     }
@@ -194,8 +194,8 @@ public class SpringSourceBlockEntity extends BlockEntity {
     /** How long the current stage lasts, in ticks. */
     private long stageLength() {
         double days = switch (stage) {
-            case 0 -> GeyserConfig.SPRING_STAGE_ONE_DAYS.get();
-            case 1 -> GeyserConfig.SPRING_STAGE_TWO_DAYS.get();
+            case 0, 1 -> GeyserConfig.SPRING_STAGE_ONE_DAYS.get();
+            case 2 -> GeyserConfig.SPRING_STAGE_TWO_DAYS.get();
             default -> GeyserConfig.SPRING_STAGE_THREE_DAYS.get();
         };
         return Math.max(20L, (long) (days * DAY));
@@ -206,7 +206,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
         if (outletY == Integer.MIN_VALUE) return false;
         BlockPos v = new BlockPos(outletX, outletY, outletZ);
         if (level.getBlockState(v).getFluidState().isEmpty()) return false;
-        return level.getBlockState(v.below()).is(ModBlocks.HOT_SPRING.get());
+        return true;   // water at the vent is the test; the bed can sit anywhere in the basin
     }
 
     // === Climbing ===========================================================
@@ -254,7 +254,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
                 BlockPos p = new BlockPos(pos.getX(), y, pos.getZ()).relative(d);
                 BlockState s = level.getBlockState(p);
                 if (s.isAir() || !s.getFluidState().isEmpty()) continue;
-                if (s.is(Blocks.BEDROCK) || isOwnDeposit(s)) continue;
+                if (s.is(Blocks.BEDROCK) || s.is(Blocks.CALCITE) || s.is(ModBlocks.SINTER.get())) continue;
                 if (EruptionHandler.isPlayerPlaced(s)) continue;
                 noteRock(s);
                 if (level.random.nextInt(3) == 0) continue;      // patchy, not a tiled pipe
@@ -311,15 +311,17 @@ public class SpringSourceBlockEntity extends BlockEntity {
             }
         }
 
-        level.setBlock(vent.below(), ModBlocks.HOT_SPRING.get().defaultBlockState(), 2);
-        level.setBlock(vent, Blocks.WATER.defaultBlockState(), 2);
-        level.setBlock(vent.below(3), Blocks.MAGMA_BLOCK.defaultBlockState(), 2);
-        MagmaSealing.seal(level, vent.below(3), false);
-
         setVent(vent);
-        stage = 0;
-        stageSince = level.getGameTime();
         stalled = 0;
+        // Water reaching daylight IS a spring, immediately - a small one. The stages after this are
+        // it getting older, not it appearing.
+        if (!applyStage(level, 1)) {
+            stalled++;
+            setChanged();
+            return;
+        }
+        stage = 1;
+        stageSince = level.getGameTime();
         GeysersMod.LOGGER.info("Spring line at {} broke surface at Y {}, carrying {}",
                 pos, ground, deposit().getBlock().getName().getString());
         setChanged();
@@ -327,164 +329,68 @@ public class SpringSourceBlockEntity extends BlockEntity {
 
     // === Growth =============================================================
 
-    /** How wide the pool is at a given stage. */
-    private static int radiusFor(int stage, int target) {
-        return switch (stage) {
-            case 0 -> 0;
-            case 1 -> Math.max(2, target / 3);
-            case 2 -> Math.max(3, target * 2 / 3);
-            default -> target;
-        };
-    }
-
     /**
-     * Grows the spring to one stage: a wider basin, one block higher, with its old rim broken out.
+     * Builds the spring at a stage. All the shaping lives in {@link HotSpringShape}.
      *
-     * @return true if a pool was laid
+     * <p>This class used to shape the pool itself, and that is where every bad spring came from: a
+     * version that re-cut on a timer walked downhill, one that grew cell by cell came out full of
+     * holes, and one that raised the water a block per stage ended up standing on a calcite
+     * pedestal above the treetops. Shape is now a pure function of place and stage, testable on its
+     * own through {@code /geology place hotspring}, and the line's only job is to decide which
+     * arguments it gets.</p>
      */
     private boolean applyStage(ServerLevel level, int toStage) {
-        int r = radiusFor(toStage, targetRadius);
-        BlockState deposit = deposit();
-
-        // Each stage stands a block higher than the last. This is the mound growing - a spring
-        // building its own hill out of its own precipitate, which is what Pamukkale is.
-        //
-        // And if there is no room at that height, the water rises until it finds some. A spring does
-        // not dig itself a basin; it ponds, and the pond climbs until it spreads or spills. Without
-        // this a spring on ground a quake had just broken had nowhere to go and stayed a single wet
-        // block for good.
-        int base = outletY + (toStage - 1);
-        List<BlockPos> pool = List.of();
-        int waterY = base;
-        for (int rise = 0; rise <= MAX_SEARCH_RISE; rise++) {
-            waterY = base + rise;
-            pool = floodPool(level, waterY, r);
-            if (pool.size() >= MIN_POOL) break;
-        }
-        if (pool.size() < 3) return false;
-
-        for (BlockPos cell : pool) {
-            int x = cell.getX(), z = cell.getZ();
-            // Clear the column up to the waterline, but only of our own material and loose cover.
-            // Native rock is never removed: that is the rule that makes the ground under a spring
-            // unable to fall, and it is what the downhill-walking pool used to violate.
-            for (int y = waterY; y <= waterY + 2; y++) {
-                BlockPos p = new BlockPos(x, y, z);
-                BlockState s = level.getBlockState(p);
-                if (s.isAir() || !s.getFluidState().isEmpty()) continue;
-                if (isOwnDeposit(s) || TerrainProbe.isVegetation(s)) {
-                    level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
-                }
-            }
-            // Floor: build up to the waterline wherever the ground sits below it.
-            int g = TerrainProbe.groundY(level, x, z);
-            int from = g == Integer.MIN_VALUE ? waterY - 1 : Math.min(waterY - 1, g);
-            for (int y = from; y <= waterY - 1; y++) {
-                BlockPos p = new BlockPos(x, y, z);
-                if (EruptionHandler.isPlayerPlaced(level.getBlockState(p))) continue;
-                level.setBlock(p, deposit, 2);
-            }
-            level.setBlock(cell, Blocks.WATER.defaultBlockState(), 2);
-        }
-
-        // The bed goes back under the vent, and the heat under that.
-        BlockPos bed = new BlockPos(outletX, waterY - 1, outletZ);
-        level.setBlock(bed, ModBlocks.HOT_SPRING.get().defaultBlockState(), 2);
-        level.setBlock(bed.below(2), Blocks.MAGMA_BLOCK.defaultBlockState(), 2);
-        MagmaSealing.seal(level, bed.below(2), false);
-        outletY = waterY;
-
-        buildRim(level, pool, waterY, deposit);
-
-        // The colours only arrive at the end. A microbial mat needs a large, warm, stable pool; on a
-        // spring that opened a day ago there is nothing for it to live on yet.
-        if (toStage >= FINAL_STAGE) {
-            RetrogenHandler.paintRings(level, pool, outletX, outletZ, waterY);
-        }
+        List<BlockPos> pool = HotSpringShape.build(level, outletX, outletZ, toStage);
+        if (pool.isEmpty()) return false;
+        // The vent follows the water line the shape chose, so ventOpen() looks in the right place.
+        outletY = pool.get(0).getY();
         return true;
     }
 
     /**
-     * The pool as one connected region, worked out before a block is placed.
+     * The outlet is capped and cannot be cleared: the water goes looking for another way out.
      *
-     * <p>A flood fill from the vent, stopped by native ground standing above the waterline and by
-     * the stage radius. Our own deposit is <b>passable</b>: that is how a spring breaks out past the
-     * rim it built at an earlier stage instead of being sealed inside it forever.</p>
+     * <p>This is the behaviour a blocked spring actually has. Pressure does not disappear because a
+     * vent silts up; it finds the next weakness, which is usually a few metres away rather than
+     * directly above. The old pool is left as a dead travertine terrace - crust standing, water
+     * gone, colours faded, because the mats do not outlive the spring that fed them.</p>
      *
-     * <p>Doing it as a region rather than cell by cell is what stops the pool coming out full of
-     * holes. The previous version tested each cell alone and dropped the failures permanently, which
-     * on a spring that had been filled in left a scatter of water holes in a calcite field.</p>
+     * @return true if a new outlet was chosen
      */
-    private List<BlockPos> floodPool(ServerLevel level, int waterY, int r) {
-        List<BlockPos> out = new ArrayList<>();
-        Set<Long> seen = new HashSet<>();
-        Deque<int[]> queue = new ArrayDeque<>();
-        queue.add(new int[]{outletX, outletZ});
-        seen.add(key(outletX, outletZ));
+    private boolean stepAside(ServerLevel level, BlockPos pos) {
+        BlockPos best = null;
+        int bestGround = Integer.MAX_VALUE;
+        for (int attempt = 0; attempt < 24; attempt++) {
+            double ang = level.random.nextDouble() * Math.PI * 2;
+            int r = 2 + level.random.nextInt(5);
+            int x = outletX + (int) Math.round(Math.cos(ang) * r);
+            int z = outletZ + (int) Math.round(Math.sin(ang) * r);
+            if (!level.isLoaded(new BlockPos(x, level.getSeaLevel(), z))) continue;
 
-        while (!queue.isEmpty() && out.size() < 4096) {
-            int[] c = queue.poll();
-            int x = c[0], z = c[1];
-            int dx = x - outletX, dz = z - outletZ;
-            if (dx * dx + dz * dz > r * r) continue;
-
-            if (!passable(level, x, z, waterY)) continue;
-            out.add(new BlockPos(x, waterY, z));
-
-            for (Direction d : Direction.Plane.HORIZONTAL) {
-                int nx = x + d.getStepX(), nz = z + d.getStepZ();
-                if (seen.add(key(nx, nz))) queue.add(new int[]{nx, nz});
+            int g = TerrainProbe.groundY(level, x, z);
+            if (g == Integer.MIN_VALUE || g <= level.getSeaLevel() + 2) continue;
+            if (EruptionHandler.isPlayerPlaced(level.getBlockState(new BlockPos(x, g, z)))) continue;
+            if (TerrainProbe.hasFluidAbove(level, x, z)) continue;
+            // Water takes the lowest way out it can find.
+            if (g < bestGround) {
+                bestGround = g;
+                best = new BlockPos(x, g, z);
             }
         }
-        return out;
-    }
+        if (best == null) return false;
 
-    /** May the pool occupy this column? Native rock above the waterline is a wall; ours is not. */
-    private boolean passable(ServerLevel level, int x, int z, int waterY) {
-        for (int y = waterY; y <= waterY + 1; y++) {
-            BlockState s = level.getBlockState(new BlockPos(x, y, z));
-            if (s.isAir() || !s.getFluidState().isEmpty()) continue;
-            if (TerrainProbe.isVegetation(s) || isOwnDeposit(s)) continue;
-            return false;                                    // native ground, or a build
-        }
-        // And it must not be a void the pool would pour into. The limit is what the spring is
-        // willing to floor with its own deposit, so it is generous: measured on ground broken by a
-        // quake, a limit of 6 admitted 22 cells where 10 admits 80. Refusing a hollow the spring
-        // was about to fill in anyway is what left it with no pool at all on rubble.
-        int g = TerrainProbe.groundY(level, x, z);
-        return g != Integer.MIN_VALUE && waterY - g <= FILL_LIMIT;
-    }
-
-    /** One course of deposit around the pool, so the water is held by the spring's own crust. */
-    private void buildRim(ServerLevel level, List<BlockPos> pool, int waterY, BlockState deposit) {
-        Set<Long> inside = new HashSet<>();
-        for (BlockPos p : pool) inside.add(key(p.getX(), p.getZ()));
-
-        for (BlockPos p : pool) {
-            for (Direction d : Direction.Plane.HORIZONTAL) {
-                int x = p.getX() + d.getStepX(), z = p.getZ() + d.getStepZ();
-                if (inside.contains(key(x, z))) continue;
-                BlockPos edge = new BlockPos(x, waterY, z);
-                BlockState s = level.getBlockState(edge);
-                if (EruptionHandler.isPlayerPlaced(s)) continue;
-                if (!s.isAir() && s.getFluidState().isEmpty()) continue;   // already solid
-                level.setBlock(edge, deposit, 2);
-            }
-        }
-    }
-
-    /** Material this spring laid down itself, and may therefore take up again. */
-    private static boolean isOwnDeposit(BlockState s) {
-        return s.is(Blocks.CALCITE)
-                || s.is(ModBlocks.SINTER.get())
-                || s.is(ModBlocks.MICROBIAL_MAT_GREEN.get())
-                || s.is(ModBlocks.MICROBIAL_MAT_YELLOW.get())
-                || s.is(ModBlocks.MICROBIAL_MAT_ORANGE.get())
-                || s.is(ModBlocks.MICROBIAL_MAT_BROWN.get());
-    }
-
-    private static long key(int x, int z) {
-        return (((long) x) << 32) ^ (z & 0xFFFFFFFFL);
+        HotSpringShape.abandon(level, outletX, outletZ, Math.max(1, stage));
+        GeysersMod.LOGGER.info("Spring line at {} moved its outlet from {},{} to {},{}",
+                pos, outletX, outletZ, best.getX(), best.getZ());
+        outletX = best.getX();
+        outletZ = best.getZ();
+        outletY = best.getY();
+        mouthY = Integer.MIN_VALUE;
+        stage = 0;
+        stageSince = level.getGameTime();
+        stalled = 0;
+        setChanged();
+        return true;
     }
 
     // === Persistence ========================================================

@@ -770,21 +770,23 @@ public final class GeyserConfig {
                         "player-built in it is never bored through, whatever this is set to.")
                 .define("springRenewalEnabled", true);
         SPRING_STAGE_ONE_DAYS = b
-                .comment("In-game days before a new spring grows from a vent into a small pool.",
-                        "A hot spring does not appear finished. It opens as one wet block, and then",
-                        "builds itself a basin out of what its own water is carrying. These three",
-                        "keys are how long each step takes.",
-                        "Only affects springs that are GROWING - after an earthquake, or where a",
-                        "quake has opened a new one. Springs made with the world are already old and",
-                        "start finished. Set these low to watch the whole sequence while testing.")
+                .comment("In-game days a stage 1 spring takes to reach stage 2.",
+                        "A hot spring has four ages, 5, 9, 15 and 21 blocks across. Stage 1 appears",
+                        "the moment the water reaches daylight; these three keys are how long the",
+                        "steps after it take.",
+                        "Only affects springs that are GROWING - one recovering after an earthquake,",
+                        "or one a quake has newly opened. Springs made with the world start at",
+                        "stage 4, so a new world has old springs in it rather than day-old puddles.",
+                        "Set these very low to watch the whole sequence while testing, or use",
+                        "/geology place hotspring <1-4> to stand all four side by side.")
                 .defineInRange("springStageOneDays", 1.0D, 0.01D, 400.0D);
         SPRING_STAGE_TWO_DAYS = b
-                .comment("Days from the small pool to a wide one.",
+                .comment("Days from stage 2 to stage 3, where the pool reaches 15 blocks across.",
                         "At this step the spring breaks out past the rim it built earlier and",
                         "spreads to whatever shape the ground allows.")
                 .defineInRange("springStageTwoDays", 5.0D, 0.01D, 400.0D);
         SPRING_STAGE_THREE_DAYS = b
-                .comment("Days from a wide pool to a finished one with its colour bands.",
+                .comment("Days from stage 3 to a finished spring with its colour bands.",
                         "The microbial mats come last for a reason: they need a big, warm, stable",
                         "pool to live in, and a spring that opened a few days ago has not got one.")
                 .defineInRange("springStageThreeDays", 12.0D, 0.01D, 400.0D);

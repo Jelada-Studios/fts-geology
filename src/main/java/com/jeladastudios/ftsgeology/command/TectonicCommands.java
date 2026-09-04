@@ -25,6 +25,7 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerLevel;
 import com.jeladastudios.ftsgeology.volcano.VolcanoBuilder;
 import com.jeladastudios.ftsgeology.volcano.VolcanoType;
+import com.jeladastudios.ftsgeology.worldgen.HotSpringShape;
 import com.jeladastudios.ftsgeology.worldgen.RetrogenHandler;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -107,7 +108,15 @@ public final class TectonicCommands {
                                 .then(Commands.argument("feature", StringArgumentType.word())
                                         .suggests((c, b) -> SharedSuggestionProvider.suggest(FEATURES, b))
                                         .executes(ctx -> place(ctx,
-                                                StringArgumentType.getString(ctx, "feature"))))));
+                                                StringArgumentType.getString(ctx, "feature"), 0))
+                                        // A hot spring takes an age. Being able to stand four of
+                                        // them side by side is what makes the shape testable on its
+                                        // own, apart from the water line that normally decides it.
+                                        .then(Commands.argument("stage",
+                                                        IntegerArgumentType.integer(1, HotSpringShape.MAX_STAGE))
+                                                .executes(ctx -> place(ctx,
+                                                        StringArgumentType.getString(ctx, "feature"),
+                                                        IntegerArgumentType.getInteger(ctx, "stage")))))));
     }
 
     private static final String[] SETTINGS = {"subduction", "rift", "collision", "transform", "hotspot"};
@@ -639,13 +648,18 @@ public final class TectonicCommands {
     // === /geology place =====================================================
 
     /** Force-places a feature here, bypassing the suitability gate, to test the structure alone. */
-    private static int place(CommandContext<CommandSourceStack> ctx, String what) {
+    private static int place(CommandContext<CommandSourceStack> ctx, String what, int stage) {
         CommandSourceStack source = ctx.getSource();
         ServerLevel level = source.getLevel();
         BlockPos at = BlockPos.containing(source.getPosition());
         boolean ok;
         switch (what) {
-            case "hotspring" -> ok = RetrogenHandler.placeHotSpringAt(level, at.getX(), at.getZ());
+            // With a stage, the shape is built directly and nothing else is involved - no water
+            // line, no timers. That is the point: it makes what a spring LOOKS like testable apart
+            // from when and where one appears, which is where every bad spring has come from.
+            case "hotspring" -> ok = stage > 0
+                    ? !HotSpringShape.build(level, at.getX(), at.getZ(), stage).isEmpty()
+                    : RetrogenHandler.placeHotSpringAt(level, at.getX(), at.getZ());
             case "volcano", "shield", "strato", "fissure", "caldera" -> {
                 // Ground, not canopy - see TerrainProbe.
                 int y = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, at.getX(), at.getZ());
