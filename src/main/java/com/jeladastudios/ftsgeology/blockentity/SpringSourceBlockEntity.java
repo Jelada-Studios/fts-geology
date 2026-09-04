@@ -91,8 +91,24 @@ public class SpringSourceBlockEntity extends BlockEntity {
     /** Top of the conduit so far. Climbs from the source towards daylight. */
     private int mouthY = Integer.MIN_VALUE;
 
-    /** How wide this spring gets when it is finished. */
-    private int targetRadius = 6;
+    /**
+     * The oldest this spring is allowed to get, and therefore how wide it ends up.
+     *
+     * <h2>What this replaced</h2>
+     * There was a {@code targetRadius} here that was written, saved to NBT, loaded back - and never
+     * read by anything. Pool size comes from {@link HotSpringShape#radiusFor} alone. That mattered
+     * because {@code RetrogenHandler.placeHotSpringAt} sized the gap between the pools of a terrace
+     * chain from the radius it passed to that dead setter: a stride of 6 to 20 blocks between pools
+     * that all grew to stage 4, which is 21 blocks across. Every pair in every chain overlapped, and
+     * since each pool sits a block lower than the one above it and each build clears the three
+     * blocks over its own cells, neighbouring springs deleted each other's water for ever. That is
+     * the water appearing and vanishing on a loop with the spring itself never changing.
+     *
+     * <p>A cap the growth loop actually reads is what that field should always have been. Springs in
+     * a chain stop at stage 2, so the terraces stay small, close together and stepped, which is what
+     * a travertine terrace looks like; a spring alone on the flat still grows to stage 4.</p>
+     */
+    private int maxStage = FINAL_STAGE;
 
     /** 0 = a bare vent, up to {@link #FINAL_STAGE}. */
     private int stage;
@@ -142,10 +158,15 @@ public class SpringSourceBlockEntity extends BlockEntity {
 
     // === Public API =========================================================
 
-    /** Called by the generator so a fresh line knows how big a spring it feeds. */
-    public void setTargetRadius(int r) {
-        this.targetRadius = Math.max(3, r);
+    /** Called by the generator so a fresh line knows how old a spring it is allowed to grow. */
+    public void setMaxStage(int s) {
+        this.maxStage = Math.max(1, Math.min(FINAL_STAGE, s));
         setChanged();
+    }
+
+    /** The oldest this spring may get. */
+    public int maxStage() {
+        return maxStage;
     }
 
     /**
@@ -173,8 +194,15 @@ public class SpringSourceBlockEntity extends BlockEntity {
     public boolean growTo(ServerLevel level, int target) {
         if (outletY == Integer.MIN_VALUE) return false;
         int reached = 0;
-        for (int s = 1; s <= Math.max(1, Math.min(FINAL_STAGE, target)); s++) {
-            if (!applyStage(level, s)) break;
+        for (int s = 1; s <= Math.max(1, Math.min(maxStage, target)); s++) {
+            // Clears the canopy at every step, and this is the path world generation takes.
+            //
+            // It passed false, and openVent - the only caller that passed true - is never reached
+            // from generation at all: openSpring seats the source and calls straight into here. So
+            // a naturally generated spring cleared no trees whatsoever, at any stage, and the tree
+            // standing over a pool in testing was simply never cut. The canopy is taken at each
+            // step rather than once at the end because each stage is wider than the last.
+            if (!applyStage(level, s, true)) break;
             reached = s;
         }
         if (reached == 0) return false;
@@ -206,6 +234,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
         if (!GeyserConfig.SPRING_RENEWAL_ENABLED.get()) return;
         if ((server.getGameTime() + pos.hashCode()) % CHECK_INTERVAL != 0) return;
         if (be.dormant) return;
+        if (be.adoptOldSave(server)) return;
 
         // A pool somebody has thrown a few blocks into is cleaned out and rebuilt at the age it had
         // reached. Only a pool that is mostly buried counts as a blocked outlet.
@@ -260,10 +289,15 @@ public class SpringSourceBlockEntity extends BlockEntity {
             return;
         }
 
-        if (be.stage >= FINAL_STAGE) return;                 // finished; nothing left to do
+        // Its own cap, not the global one: a spring in a terrace chain is spaced for a stage 2 pool
+        // and grows into its neighbour if it is allowed past that.
+        if (be.stage >= be.maxStage) return;                 // finished; nothing left to do
         if (server.getGameTime() - be.stageSince < be.stageLength()) return;
 
-        if (be.applyStage(server, be.stage + 1)) {
+        // A wider stage needs a wider clearing, so growth takes the canopy; the same-stage flush
+        // above does not. Growth happens three times in a spring's life rather than every check,
+        // which is what keeps this from becoming the ring of dead trunks again.
+        if (be.applyStage(server, be.stage + 1, true)) {
             be.stage++;
             be.stageSince = server.getGameTime();
             GeysersMod.LOGGER.info("Spring at {} reached stage {}/{} ({} blocks across)",
@@ -282,16 +316,69 @@ public class SpringSourceBlockEntity extends BlockEntity {
         return Math.max(20L, (long) (days * DAY));
     }
 
-    /** Is there still water at the vent? Two lookups, and the common case. */
+    /**
+     * Is there still water at the vent?
+     *
+     * <p>Asked of the whole basin. Testing one column meant filling in any part of a pool except the
+     * block over the bed did nothing at all, which is exactly what testing reported.</p>
+     *
+     * <h2>The fallback has to look wider than one block</h2>
+     * Before a pool has been recorded there is nothing to measure, so this falls back to the vent
+     * column. One block is far too brittle a thing to hang {@link #stepAside} on: freeze it, or set
+     * a single block on it, and a spring whose basin is otherwise perfect abandons the lot, kills
+     * its mats and drills somewhere else. So the fallback sweeps the stage's own radius and asks
+     * whether there is any water left in the basin at all.
+     */
     private boolean ventOpen(ServerLevel level) {
         if (outletY == Integer.MIN_VALUE) return false;
-        if (datumY == Integer.MIN_VALUE || poolCells.length == 0) {
-            return !level.getBlockState(new BlockPos(outletX, outletY, outletZ))
-                    .getFluidState().isEmpty();
-        }
-        // Asked of the whole basin. Testing one column meant filling in any part of a pool except
-        // the block over the bed did nothing at all, which is exactly what testing reported.
+        if (datumY == Integer.MIN_VALUE || poolCells.length == 0) return anyWaterInBasin(level);
         return poolHealth(level) != HotSpringShape.Health.BLOCKED;
+    }
+
+    /** Is there any water at all in this spring's basin? The coarse fallback test. */
+    private boolean anyWaterInBasin(ServerLevel level) {
+        int waterY = datumY != Integer.MIN_VALUE ? datumY - 1 : outletY;
+        int radius = HotSpringShape.radiusFor(Math.max(1, stage));
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                if (dx * dx + dz * dz > radius * radius) continue;
+                BlockPos p = new BlockPos(outletX + dx, waterY, outletZ + dz);
+                if (!level.getBlockState(p).getFluidState().isEmpty()) return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Brings a spring saved by an older version up to date, once.
+     *
+     * <h2>Why this is needed at all</h2>
+     * The pool cell list is what {@link #poolHealth} measures against, and a world saved before it
+     * existed has no {@code PoolCells} tag - so the list loads empty and {@code poolHealth} answers
+     * BLOCKED for ever. That has three consequences, none of them recoverable on their own: the
+     * spring can never read FINE, so its rebuild counter never clears; it can never read FOULED, so
+     * dropping dirt in an old pool does nothing at all; and a spring already at its final stage
+     * returns from {@link #serverTick} before anything would repopulate the list. It stays broken
+     * for the life of the world.
+     *
+     * <p>So it is rebuilt once at the age it had. The trees are left alone - this ground was cleared
+     * when the spring first arrived, possibly years of play ago.</p>
+     *
+     * @return true if this tick was spent on the migration
+     */
+    private boolean adoptOldSave(ServerLevel level) {
+        if (poolCells.length > 0) return false;
+        if (!surfaced || stage <= 0 || datumY == Integer.MIN_VALUE) return false;
+        if (!applyStage(level, stage)) {
+            // Nothing can be built here any more - the ground has changed out from under it. Let
+            // the ordinary blocked-outlet path deal with it rather than retrying every check.
+            surfaced = false;
+            setChanged();
+            return false;
+        }
+        GeysersMod.LOGGER.debug("Spring at {},{} adopted an older save ({} cells)",
+                outletX, outletZ, poolCells.length);
+        return true;
     }
 
     /** The state of the pool this spring last built. */
@@ -562,7 +649,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
         tag.putInt("OutletY", outletY);
         tag.putInt("OutletZ", outletZ);
         tag.putInt("MouthY", mouthY);
-        tag.putInt("TargetRadius", targetRadius);
+        tag.putInt("MaxStage", maxStage);
         tag.putInt("Stage", stage);
         tag.putLong("StageSince", stageSince);
         tag.putInt("Stalled", stalled);
@@ -583,7 +670,9 @@ public class SpringSourceBlockEntity extends BlockEntity {
         outletZ = tag.getInt("OutletZ");
         outletY = tag.contains("OutletY") ? tag.getInt("OutletY") : Integer.MIN_VALUE;
         mouthY = tag.contains("MouthY") ? tag.getInt("MouthY") : Integer.MIN_VALUE;
-        targetRadius = Math.max(3, tag.getInt("TargetRadius"));
+        maxStage = tag.contains("MaxStage")
+                ? Math.max(1, Math.min(FINAL_STAGE, tag.getInt("MaxStage")))
+                : FINAL_STAGE;   // older saves grew without a cap
         stage = tag.getInt("Stage");
         stageSince = tag.getLong("StageSince");
         stalled = tag.getInt("Stalled");
@@ -594,9 +683,15 @@ public class SpringSourceBlockEntity extends BlockEntity {
         poolCells = tag.getLongArray("PoolCells");
         // Springs saved before the pool was recorded have surfaced if they have an outlet: without
         // this they would go back to climbing and re-open a vent that is already open.
+        //
+        // The stage is deliberately NOT part of this test. A spring caught mid-way through the old
+        // two-second loop was saved with stage 0 - the loop set it on every failed check - so
+        // requiring stage > 0 would load exactly those springs as unsurfaced and drop them straight
+        // back into the demotion this was written to stop. An assigned outlet means the conduit
+        // reached daylight, whatever the stage says.
         surfaced = tag.contains("Surfaced")
                 ? tag.getBoolean("Surfaced")
-                : outletY != Integer.MIN_VALUE && stage > 0;
+                : outletY != Integer.MIN_VALUE;
         rebuilds = tag.getInt("Rebuilds");
         lastRebuild = tag.contains("LastRebuild") ? tag.getLong("LastRebuild") : Long.MIN_VALUE;
     }

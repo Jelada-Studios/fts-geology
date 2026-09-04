@@ -528,24 +528,32 @@ public final class RetrogenHandler {
         int placed = 0;
         int px = x, pz = z;
         int ground = centre, waterY = centre - 1;       // recessed: water sits BELOW the rim
-        // Every water cell cut so far. Each pool hands it to the next so a lower terrace cannot
-        // clear, or tile sinter over, the water of the one above it.
-        java.util.Set<BlockPos> taken = new java.util.HashSet<>();
         BlockPos firstBed = null;
+
+        // How old a pool in this system is allowed to get, and therefore how wide.
+        //
+        // A chain caps at stage 2 and a lone pool on the flat does not. This is the whole fix for
+        // the terraces that deleted each other's water: the spacing below is derived from the SAME
+        // number, so a chain cannot grow into itself no matter what the ground does. The previous
+        // code spaced pools from a local `radius` of 2 to 7 that was handed to a setter nothing
+        // read, while every pool grew to stage 4 at radius 10 - so the gap was 6 to 20 blocks
+        // between pools 21 blocks across, and every consecutive pair overlapped.
+        int chainStage = terraced ? Math.min(2, stage) : stage;
+        int matureR = HotSpringShape.radiusFor(chainStage);
+
         for (int i = 0; i < terraces; i++) {
-            int radius = terraced
-                    ? Math.max(2, 5 - relief / 3) + level.random.nextInt(3)
-                    : 5 + level.random.nextInt(3);
             // Every pool is built by a mineral water line, at generation exactly as after a quake -
             // the line is seated, its vent opened, and then run straight to maturity. There is no
             // second pool builder any more, so the two paths cannot drift apart, and what a new
             // world contains is what a recovered spring grows back into.
-            if (openSpring(level, px, pz, radius, stage)) placed++;
-            // Step downhill for the next pool in the chain. A full diameter plus a gap: the old
-            // stride was one radius, so consecutive pools sat on top of each other. The bearing is
-            // nudged and the stride varied at every step so the chain reads as a stream of pools
-            // following a slope rather than a row of them on a ruler.
-            int stride = radius * 2 + 2 + level.random.nextInt(4);
+            if (openSpring(level, px, pz, chainStage, stage)) placed++;
+            // Step downhill for the next pool in the chain, clear of the pool this one will grow
+            // into. The bearing is nudged and the stride varied at every step so the chain reads as
+            // a stream of pools following a slope rather than a row of them on a ruler.
+            //
+            // The wobbled edge reaches 1.34 times the nominal radius, so the gap allows for it:
+            // two pools that just cleared on paper still met in the bulges.
+            int stride = (int) Math.ceil(matureR * 1.34) * 2 + 2 + level.random.nextInt(4);
             bearing += (level.random.nextDouble() - 0.5) * 0.9;
             px += (int) Math.round(Math.cos(bearing) * stride);
             pz += (int) Math.round(Math.sin(bearing) * stride);
@@ -592,12 +600,12 @@ public final class RetrogenHandler {
      * earthquake the same line grows the same spring back over a few in-game days. One builder, so
      * a repaired spring and a generated one cannot look different.</p>
      */
-    private static boolean openSpring(ServerLevel level, int x, int z, int radius, int stage) {
+    private static boolean openSpring(ServerLevel level, int x, int z, int maxStage, int stage) {
         int ground = TerrainProbe.groundY(level, x, z);
         if (ground == Integer.MIN_VALUE) return false;
         if (ground <= level.getSeaLevel() + 2) return false;
 
-        BlockPos source = place(level, new BlockPos(x, ground, z), ground, radius);
+        BlockPos source = place(level, new BlockPos(x, ground, z), ground, maxStage);
         if (source == null) return false;
         if (!(level.getBlockEntity(source) instanceof SpringSourceBlockEntity be)) return false;
 
@@ -668,7 +676,7 @@ public final class RetrogenHandler {
      * @param at     the surface point the line belongs to
      * @param groundY surface height there, which fixes how deep the line is seated
      */
-    private static BlockPos place(ServerLevel level, BlockPos at, int groundY, int radius) {
+    private static BlockPos place(ServerLevel level, BlockPos at, int groundY, int maxStage) {
         // Pulled up rather than refused where the world floor is close: a shallow site still gets a
         // spring, just one whose deep end is nearer. It is only abandoned if it cannot be seated
         // deeper than a quake can dig.
@@ -680,7 +688,7 @@ public final class RetrogenHandler {
 
         buildReservoir(level, src, ModBlocks.SPRING_SOURCE.get().defaultBlockState(), 2, 3);
         if (level.getBlockEntity(src) instanceof SpringSourceBlockEntity be) {
-            be.setTargetRadius(radius);
+            be.setMaxStage(maxStage);
         }
         return src;
     }
@@ -727,193 +735,6 @@ public final class RetrogenHandler {
         paintThermalRings(level, pool, cx, cz, waterY, stage);
     }
 
-    /**
-     * Cuts one travertine pool into the ground, at world generation.
-     *
-     * <p>The pool is <b>recessed</b>: its water sits a block below the surrounding ground, so it is
-     * physically incapable of spilling out - the containment comes from the shape of the land rather
-     * than from a wall built around it afterwards. The calcite floor hides a magma bed, and that bed
-     * is wrapped on every exposed face so it can never show through a slope.</p>
-     *
-     * <h2>Generation only</h2>
-     * A spring that has already been placed does <b>not</b> rebuild itself with this. It was tried,
-     * and the strictness that is right here - refuse an awkward site, there are thousands of other
-     * chunks - is exactly wrong for a spring that has already earned its place. Worse, cutting a
-     * pool lowers the ground, so a source that re-cut on a timer walked its own pool one block
-     * downhill every two seconds. {@code SpringSourceBlockEntity} builds by deposition instead, and
-     * never removes anything.
-     *
-     * @return where the warm bed went, or null if this spot will not hold a pool
-     */
-    private static BlockPos carveTerrace(ServerLevel level, int cx, int cz, int waterY, int radius,
-                                        java.util.Set<BlockPos> taken) {
-        double phaseA = level.random.nextDouble() * Math.PI * 2;
-        double phaseB = level.random.nextDouble() * Math.PI * 2;
-
-        // Never cut at or below the waterline.
-        //
-        // A basin dug below sea level beside the sea is a drain. Everything here is written with
-        // flag 2, so nothing moves at generation - but the moment any block update reaches it the
-        // ocean empties into the hole, which is the "a spring next to water destroys the water
-        // around it" report. The sea was not being deleted; it was running into the pit the spring
-        // had just dug for it.
-        if (waterY <= level.getSeaLevel() + 1) return null;
-
-        int reach = radius + 2;
-
-        // Standing water anywhere in the footprint OR one block outside it refuses the whole
-        // terrace. One block out matters because the rim is written there, and the rim used to
-        // overwrite water with sinter - so a spring on a shoreline chewed into the sea before it
-        // had even finished being built.
-        for (int dx = -reach - 1; dx <= reach + 1; dx++) {
-            for (int dz = -reach - 1; dz <= reach + 1; dz++) {
-                if (TerrainProbe.hasFluidAbove(level, cx + dx, cz + dz)) return null;
-            }
-        }
-
-        List<BlockPos> pool = new ArrayList<>();
-        int footprint = 0;
-        for (int dx = -reach; dx <= reach; dx++) {
-            for (int dz = -reach; dz <= reach; dz++) {
-                double dist = Math.sqrt(dx * dx + dz * dz);
-                double ang = Math.atan2(dz, dx);
-                double rr = radius * (1.0 + 0.32 * Math.sin(2 * ang + phaseA)
-                        + 0.18 * Math.sin(3 * ang + phaseB));
-                if (dist > rr) continue;
-                int gx = cx + dx, gz = cz + dz;
-                int g = TerrainProbe.groundY(level, gx, gz);
-                if (g == Integer.MIN_VALUE) continue;
-                footprint++;
-                if (EruptionHandler.isPlayerPlaced(level.getBlockState(new BlockPos(gx, g, gz)))) continue;
-                // Cut down to the basin, or build its floor up - but only over a few blocks. The
-                // old rule accepted a cell ONLY if its ground already happened to sit within two
-                // blocks of the water level, so on any uneven ground most of the footprint was
-                // rejected and what you got was a couple of water blocks in the middle of a large
-                // sinter field. The basin is levelled now instead of being hunted for.
-                if (g < waterY - 3 || g > waterY + 4) continue;
-                pool.add(new BlockPos(gx, waterY, gz));
-            }
-        }
-        // A pool has to be most of its own footprint. Anything less is a puddle in a colour field,
-        // and with finite-water mods installed it would drain to nothing and read as empty.
-        if (pool.size() < 6 || pool.size() < footprint * 0.6) {
-            return null;
-        }
-
-        // Take the canopy off the whole terrace - basin and colour bands - before any of it is cut.
-        clearCanopy(level, cx, cz, radius + 18);
-
-        for (BlockPos w : pool) {
-            // Clear anything standing over the basin, then cut it: water, calcite floor, magma bed.
-            TerrainProbe.clearVegetation(level, w.getX(), waterY, w.getZ(), 3);
-            // Open the cell to its OWN ground, not to a fixed two blocks.
-            //
-            // The cell filter accepts ground up to three blocks above the water
-            // (|g - (waterY+1)| <= 2), so on lumpy terrain a fixed two-block clear still left some
-            // cells of the same pool roofed over by the original surface - water underneath, lid on
-            // top. That is the dryness that survived the last round, and why it was "some of them"
-            // rather than all: it needs bumpy ground, which is exactly where it was reported.
-            // Clamped at 4: the cell filter only admits ground up to waterY+3, so anything larger
-            // means the terrain moved under us between building the pool and cutting it. Bounded so
-            // a surprise can never turn into a shaft driven up through the hillside.
-            int cellGround = TerrainProbe.groundY(level, w.getX(), w.getZ());
-            int open = cellGround == Integer.MIN_VALUE
-                    ? 2 : Mth.clamp(cellGround - waterY, 2, 5);
-            for (int up = 1; up <= open; up++) {
-                BlockPos a = w.above(up);
-                // Never clear a cell an upstream pool is using as its water. Terraces step down one
-                // block at a time and their reaches overlap, so this loop used to empty the pool
-                // above it - which is why terraced springs came out dry.
-                if (taken.contains(a)) continue;
-                BlockState as = level.getBlockState(a);
-                if (!as.isAir() && !EruptionHandler.isPlayerPlaced(as)) {
-                    level.setBlock(a, Blocks.AIR.defaultBlockState(), 2);
-                }
-            }
-            // Build the floor UP where the ground fell away below the basin. Without this a cell
-            // whose ground sat two or three blocks low got a single calcite block with a void under
-            // it, and the water above had nothing to rest on - so the pool came out part full.
-            int floorFrom = cellGround == Integer.MIN_VALUE
-                    ? waterY - 1 : Math.min(waterY - 1, cellGround);
-            for (int y = floorFrom; y <= waterY - 1; y++) {
-                level.setBlock(new BlockPos(w.getX(), y, w.getZ()),
-                        Blocks.CALCITE.defaultBlockState(), 2);
-            }
-            level.setBlock(w, Blocks.WATER.defaultBlockState(), 2);
-            level.setBlock(w.below(2), Blocks.MAGMA_BLOCK.defaultBlockState(), 2);
-            MagmaSealing.seal(level, w.below(2), false);   // never visible from a slope or cave
-        }
-
-        // Rim: the terrace lip, one block proud of the water so nothing can run out, and the
-        // sinter shelf that a spring actually armours itself with.
-        for (BlockPos w : pool) {
-            for (Direction d : Direction.Plane.HORIZONTAL) {
-                BlockPos edge = w.relative(d);
-                if (pool.contains(edge)) continue;
-                for (int up = 0; up <= 1; up++) {
-                    BlockPos p = edge.above(up);
-                    // The rim writes sinter unconditionally at up == 0, which would tile straight
-                    // over the water of the pool one terrace up.
-                    if (taken.contains(p)) continue;
-                    BlockState s = level.getBlockState(p);
-                    if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) continue;
-                    if (up == 0 || s.isAir() || !s.getFluidState().isEmpty()
-                            || TerrainProbe.isVegetation(s)) {
-                        level.setBlock(p, ModBlocks.SINTER.get().defaultBlockState(), 2);
-                    }
-                }
-            }
-        }
-
-        paintThermalRings(level, pool, cx, cz, waterY, HotSpringShape.MAX_STAGE);
-
-        // Seal the magma bed on every face that could otherwise be exposed on a slope.
-        for (BlockPos w : pool) {
-            BlockPos magma = w.below(2);
-            for (Direction d : Direction.values()) {
-                if (d == Direction.UP) continue;
-                BlockPos p = magma.relative(d);
-                if (pool.contains(p.above(2))) continue;
-                BlockState s = level.getBlockState(p);
-                if (s.is(Blocks.BEDROCK) || s.is(Blocks.MAGMA_BLOCK)) continue;
-                if (EruptionHandler.isPlayerPlaced(s)) continue;
-                if (s.isAir() || !s.getFluidState().isEmpty()) {
-                    level.setBlock(p, Blocks.CALCITE.defaultBlockState(), 2);
-                }
-            }
-        }
-
-        // A bed under EVERY terrace, not just the first.
-        //
-        // It used to be gated on `core`, so in a chain of four pools only the top one was warm -
-        // the rest were cold water in a sinter basin, with no steam and no regeneration, which is
-        // not a spring system, it is one spring and three puddles.
-        BlockPos bed = pool.contains(new BlockPos(cx, waterY, cz))
-                ? new BlockPos(cx, waterY - 1, cz)
-                : pool.get(pool.size() / 2).below();
-        level.setBlock(bed, ModBlocks.HOT_SPRING.get().defaultBlockState(), 2);
-        taken.addAll(pool);
-
-        // Count the water back.
-        //
-        // Terraced springs have come out dry three rounds in a row, and each round I found a real
-        // cause, fixed it, measured the fix, and it was still not the whole story. So rather than
-        // guess a fourth time: the pool knows how many cells it filled, and if any of them are not
-        // water by the time the method returns, something in here took them and the log will say
-        // how many and where. Cheap - one block read per pool cell, once, at generation.
-        int wet = 0;
-        for (BlockPos w : pool) {
-            if (!level.getBlockState(w).getFluidState().isEmpty()) wet++;
-        }
-        if (wet < pool.size()) {
-            GeysersMod.LOGGER.warn(
-                    "hot spring lost water: {} of {} cells dry at {},{},{} (biome {})",
-                    pool.size() - wet, pool.size(), cx, waterY, cz,
-                    level.getBiome(new BlockPos(cx, waterY, cz)).unwrapKey()
-                            .map(k -> k.location().toString()).orElse("?"));
-        }
-        return bed;
-    }
 
 
     /**
