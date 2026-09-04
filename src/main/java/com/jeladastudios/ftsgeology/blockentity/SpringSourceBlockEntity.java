@@ -111,7 +111,11 @@ public class SpringSourceBlockEntity extends BlockEntity {
             be.stalled = 0;
             return;                                   // the common case, and it costs two lookups
         }
-        if (be.stalled >= STALL_LIMIT) return;        // capped by a build, or genuinely stuck
+        // Stalling drops the source to one attempt a minute rather than stopping it for good. What
+        // blocks a spring is usually temporary - rubble that has not finished settling, a player
+        // structure that gets moved - and a source that has given up permanently is indistinguishable
+        // from one that never worked.
+        if (be.stalled >= STALL_LIMIT && server.getGameTime() % 1200L != 0L) return;
         be.climb(server, pos);
     }
 
@@ -193,16 +197,39 @@ public class SpringSourceBlockEntity extends BlockEntity {
     /** The conduit has reached daylight: cut a pool at the top of it. */
     private void surface(ServerLevel level, BlockPos pos, int ground) {
         int waterY = ground - 1;
-        BlockPos bed = RetrogenHandler.carvePoolAt(level, pos.getX(), pos.getZ(), waterY, poolRadius);
-        if (bed != null) {
-            setOutlet(bed);
-            GeysersMod.LOGGER.info("Spring source at {} surfaced at Y {} after climbing {} blocks",
-                    pos, waterY, waterY - pos.getY());
-        } else {
-            // The ground up here will not hold a pool - a cliff edge, or standing water. Let the
-            // conduit steam quietly rather than forcing a basin somewhere it would drain away.
-            stalled++;
+        BlockPos oldBed = outletY == Integer.MIN_VALUE
+                ? null : new BlockPos(outletX, outletY, outletZ);
+
+        // Try the full pool first, then progressively smaller ones. A source that has reached
+        // daylight has earned an outlet; refusing it one because the site is awkward is how a
+        // spring ends up permanently dead on ground a quake has just broken.
+        BlockPos bed = null;
+        for (int r = poolRadius; r >= 2 && bed == null; r -= 2) {
+            bed = RetrogenHandler.carvePoolAt(level, pos.getX(), pos.getZ(), waterY, r);
         }
+        if (bed == null) {
+            // Say so. This used to fail silently and then give up for good after STALL_LIMIT
+            // attempts, which is indistinguishable in game from the feature not existing.
+            stalled++;
+            if (stalled == STALL_LIMIT) {
+                GeysersMod.LOGGER.warn(
+                        "Spring source at {} reached Y {} but cannot cut a pool there; giving up",
+                        pos, ground);
+            }
+            setChanged();
+            return;
+        }
+
+        setOutlet(bed);
+        // The outlet can land in a different column from the one it left. Retire the old bed so it
+        // is not left sitting dry under the rubble, reporting itself broken forever.
+        if (oldBed != null && !oldBed.equals(bed)
+                && level.getBlockState(oldBed).is(ModBlocks.HOT_SPRING.get())
+                && level.getBlockState(oldBed.above()).getFluidState().isEmpty()) {
+            level.setBlock(oldBed, Blocks.CALCITE.defaultBlockState(), 2);
+        }
+        GeysersMod.LOGGER.info("Spring source at {} opened a pool at Y {} ({} blocks above it)",
+                pos, waterY, waterY - pos.getY());
         setChanged();
     }
 

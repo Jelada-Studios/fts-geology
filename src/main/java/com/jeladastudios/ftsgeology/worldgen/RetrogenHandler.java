@@ -519,9 +519,6 @@ public final class RetrogenHandler {
         // Every water cell cut so far. Each pool hands it to the next so a lower terrace cannot
         // clear, or tile sinter over, the water of the one above it.
         java.util.Set<BlockPos> taken = new java.util.HashSet<>();
-        // The main pool, remembered so the deep source can be seated under it.
-        BlockPos firstBed = null;
-        int firstRadius = 4;
         for (int i = 0; i < terraces; i++) {
             int radius = terraced
                     ? Math.max(2, 5 - relief / 3) + level.random.nextInt(3)
@@ -529,10 +526,10 @@ public final class RetrogenHandler {
             BlockPos bed = carveTerrace(level, px, pz, waterY, radius, taken);
             if (bed != null) {
                 placed++;
-                if (firstBed == null) {
-                    firstBed = bed;
-                    firstRadius = radius;
-                }
+                // Every pool gets its own deep end, not just the head of the chain. A terrace is a
+                // stack of separate outlets fed by the same water, and a pool with no source under
+                // it is one that can be destroyed for good - which is half of a terraced spring.
+                seatSourceUnder(level, bed, radius);
             }
             // Step downhill for the next pool in the chain. A full diameter plus a gap: the old
             // stride was one radius, so consecutive pools sat on top of each other.
@@ -558,7 +555,6 @@ public final class RetrogenHandler {
             if (waterY <= lo - 6) break;
         }
         if (placed == 0) return false;
-        seatSourceUnder(level, firstBed, firstRadius);
         GeysersMod.LOGGER.debug("Hot spring ({} pools) at {}, {}, {}", placed, x, centre, z);
         return true;
     }
@@ -635,7 +631,7 @@ public final class RetrogenHandler {
      * @return the bed position, or null if this spot will not hold a pool
      */
     public static BlockPos carvePoolAt(ServerLevel level, int x, int z, int waterY, int radius) {
-        return carveTerrace(level, x, z, waterY, radius, new java.util.HashSet<>());
+        return carveTerrace(level, x, z, waterY, radius, new java.util.HashSet<>(), true);
     }
 
     /**
@@ -649,6 +645,32 @@ public final class RetrogenHandler {
      */
     private static BlockPos carveTerrace(ServerLevel level, int cx, int cz, int waterY, int radius,
                                         java.util.Set<BlockPos> taken) {
+        return carveTerrace(level, cx, cz, waterY, radius, taken, false);
+    }
+
+    /**
+     * @param repair relaxes the site tests for a spring that already exists and is rebuilding its
+     *               own outlet, rather than one being chosen a home at world generation.
+     *
+     * <h2>Why the two need different rules</h2>
+     * At generation a strict test is right: there are thousands of other chunks, so refusing an
+     * awkward site costs nothing. For a source rebuilding its pool it costs the spring, and the two
+     * tests that matter both fire exactly when a spring most needs rebuilding.
+     *
+     * <p>The fluid test refuses the whole terrace if there is standing water anywhere in the
+     * footprint - which, after a pool is partly filled in, is the spring's own remaining water. That
+     * is why burying a pool halfway left it dead while burying it completely repaired fine, a result
+     * that made no sense from the outside and is exactly backwards. In repair mode only water
+     * <i>below</i> the intended waterline refuses, because that is the case the test was written
+     * for: a basin cut into a slope above the sea drains into it.</p>
+     *
+     * <p>The other is the requirement that a pool fill most of its own footprint. Ground an
+     * earthquake has just broken fails it almost by definition. A real spring does not go looking
+     * for level ground, it makes some - the travertine it deposits is how the basin gets built - so
+     * in repair mode the basin is levelled over a wider range and a smaller one is accepted.</p>
+     */
+    private static BlockPos carveTerrace(ServerLevel level, int cx, int cz, int waterY, int radius,
+                                        java.util.Set<BlockPos> taken, boolean repair) {
         double phaseA = level.random.nextDouble() * Math.PI * 2;
         double phaseB = level.random.nextDouble() * Math.PI * 2;
 
@@ -669,7 +691,18 @@ public final class RetrogenHandler {
         // had even finished being built.
         for (int dx = -reach - 1; dx <= reach + 1; dx++) {
             for (int dz = -reach - 1; dz <= reach + 1; dz++) {
-                if (TerrainProbe.hasFluidAbove(level, cx + dx, cz + dz)) return null;
+                if (!repair) {
+                    if (TerrainProbe.hasFluidAbove(level, cx + dx, cz + dz)) return null;
+                    continue;
+                }
+                // Repairing: only water the basin could drain INTO is a problem. The spring's own
+                // surviving pool sits at the waterline and must not veto its own repair.
+                int g = TerrainProbe.groundY(level, cx + dx, cz + dz);
+                if (g == Integer.MIN_VALUE || g + 1 >= waterY - 1) continue;
+                if (!level.getBlockState(new BlockPos(cx + dx, g + 1, cz + dz))
+                        .getFluidState().isEmpty()) {
+                    return null;
+                }
             }
         }
 
@@ -692,13 +725,18 @@ public final class RetrogenHandler {
                 // blocks of the water level, so on any uneven ground most of the footprint was
                 // rejected and what you got was a couple of water blocks in the middle of a large
                 // sinter field. The basin is levelled now instead of being hunted for.
-                if (g < waterY - 3 || g > waterY + 4) continue;
+                // Repairing levels a wider band, because the ground it is levelling has usually just
+                // been broken by whatever destroyed the pool.
+                int below = repair ? 7 : 3, above = repair ? 7 : 4;
+                if (g < waterY - below || g > waterY + above) continue;
                 pool.add(new BlockPos(gx, waterY, gz));
             }
         }
         // A pool has to be most of its own footprint. Anything less is a puddle in a colour field,
         // and with finite-water mods installed it would drain to nothing and read as empty.
-        if (pool.size() < 6 || pool.size() < footprint * 0.6) return null;
+        if (repair ? pool.size() < 4 : (pool.size() < 6 || pool.size() < footprint * 0.6)) {
+            return null;
+        }
 
         // Take the canopy off the whole terrace - basin and colour bands - before any of it is cut.
         clearSpringCanopy(level, cx, cz, radius + 18);
@@ -718,7 +756,7 @@ public final class RetrogenHandler {
             // a surprise can never turn into a shaft driven up through the hillside.
             int cellGround = TerrainProbe.groundY(level, w.getX(), w.getZ());
             int open = cellGround == Integer.MIN_VALUE
-                    ? 2 : Mth.clamp(cellGround - waterY, 2, 5);
+                    ? 2 : Mth.clamp(cellGround - waterY, 2, repair ? 8 : 5);
             for (int up = 1; up <= open; up++) {
                 BlockPos a = w.above(up);
                 // Never clear a cell an upstream pool is using as its water. Terraces step down one
