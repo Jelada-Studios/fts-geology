@@ -63,37 +63,52 @@ public final class SpringSeeding {
         // A small quake rearranges very little. The scaling keeps M4 events almost never doing this
         // while a great one usually does something.
         double chance = GeyserConfig.QUAKE_SPRING_CHANCE.get() * Math.max(0.0, magnitude - 3.0);
-        if (rng.nextDouble() > chance) return;
+        if (rng.nextDouble() > chance) {
+            GeysersMod.LOGGER.info("quake spring: no roll (M{}, {}% chance)",
+                    String.format(java.util.Locale.ROOT, "%.1f", magnitude),
+                    Math.round(chance * 100));
+            return;
+        }
+
+        // Counted so a quake that opens nothing can say WHY. Without this the feature is untestable:
+        // "it rolled and the ground was wrong" and "it is broken" look identical from in game, and
+        // a session usually contains only one or two quakes to judge by.
+        int unloaded = 0, cold = 0, dry = 0, badGround = 0, occupied = 0, refused = 0;
 
         int reach = Math.max(64, ruptureLength / 2);
         for (int i = 0; i < CANDIDATES; i++) {
             int x = epicentre.getX() + rng.nextInt(reach * 2 + 1) - reach;
             int z = epicentre.getZ() + rng.nextInt(reach * 2 + 1) - reach;
-            if (!level.isLoaded(new BlockPos(x, level.getSeaLevel(), z))) continue;
+            if (!level.isLoaded(new BlockPos(x, level.getSeaLevel(), z))) { unloaded++; continue; }
 
             // 1. Is there heat under here at all?
             GeothermalSuitability.Suitability s = GeothermalSuitability.at(level, x, z);
-            if (s.hotSpring() < HEAT_FLOOR) continue;
+            if (s.hotSpring() < HEAT_FLOOR) { cold++; continue; }
 
             // 2. Does the water actually reach the surface here? This is the condition that could
             //    not be asked before the water table existed, and it is the one that decides
             //    whether a spring is geology or decoration.
-            if (!WaterTable.isSpringLine(level, x, z)) continue;
+            if (!WaterTable.isSpringLine(level, x, z)) { dry++; continue; }
 
             // 3. Is the ground fit to hold a pool, and is the site free?
             int ground = TerrainProbe.groundY(level, x, z);
-            if (ground == Integer.MIN_VALUE || ground <= level.getSeaLevel() + 2) continue;
-            if (TerrainProbe.hasFluidAbove(level, x, z)) continue;
-            if (springNear(level, x, z)) continue;
+            if (ground == Integer.MIN_VALUE || ground <= level.getSeaLevel() + 2) { badGround++; continue; }
+            if (TerrainProbe.hasFluidAbove(level, x, z)) { badGround++; continue; }
+            if (springNear(level, x, z)) { occupied++; continue; }
 
             BlockPos source = RetrogenHandler.seedSourceAt(level, x, z, ground);
-            if (source == null) continue;
+            if (source == null) { refused++; continue; }
             GeysersMod.LOGGER.info(
                     "Earthquake opened a new spring source at {} (heat {}, {} blocks from the epicentre)",
                     source, String.format(java.util.Locale.ROOT, "%.2f", s.hotSpring()),
                     (int) Math.sqrt(epicentre.distSqr(source)));
             return;                                  // one per quake, deliberately
         }
+        GeysersMod.LOGGER.info(
+                "quake spring: rolled but found nowhere in {} tries "
+                        + "({} unloaded, {} not hot enough, {} no spring line, {} bad ground, "
+                        + "{} too close to one, {} refused)",
+                CANDIDATES, unloaded, cold, dry, badGround, occupied, refused);
     }
 
     /**
