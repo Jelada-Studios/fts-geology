@@ -548,7 +548,7 @@ public final class RetrogenHandler {
         // code spaced pools from a local `radius` of 2 to 7 that was handed to a setter nothing
         // read, while every pool grew to stage 4 at radius 10 - so the gap was 6 to 20 blocks
         // between pools 21 blocks across, and every consecutive pair overlapped.
-        int chainStage = terraced ? Math.min(2, stage) : stage;
+        int chainStage = terraced ? Math.min(3, stage) : stage;
         int matureR = HotSpringShape.radiusFor(chainStage);
 
         for (int i = 0; i < terraces; i++) {

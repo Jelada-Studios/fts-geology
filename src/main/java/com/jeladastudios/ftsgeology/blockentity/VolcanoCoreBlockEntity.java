@@ -1,6 +1,8 @@
 package com.jeladastudios.ftsgeology.blockentity;
 
+import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
+import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.registry.ModBlockEntities;
 import com.jeladastudios.ftsgeology.volcano.VolcanoEruption;
 import net.minecraft.core.BlockPos;
@@ -10,6 +12,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -53,6 +56,47 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
 
     public void setCraterRadius(int r) { this.craterR = Math.max(1, r); setChanged(); }
 
+    /** Sequence number of the last quake this volcano has already recharged for. */
+    private long rechargedFor = Long.MIN_VALUE;
+
+    /**
+     * Puts the magma back after an earthquake has taken it, once per quake.
+     *
+     * <h2>Why a volcano could die permanently</h2>
+     * The dormant branch begins {@code if (!hasLava(server, pos)) return;}, and {@link #hasLava}
+     * looks at the six cells touching the core. A quake that shears that magma out, or cools it
+     * against water it has just let in, makes that test false - and no code in the mod ever put lava
+     * back. The countdown to the next eruption stopped being decremented, and the mountain sat there
+     * for the rest of the world's life with a cold crater. Testing found exactly that.
+     *
+     * <p>The cells to restore are already recorded: {@code moltenCells} is the set the builder said
+     * must stay lava between eruptions. Until now only {@code coolScatteredLava} read it, and only to
+     * decide what <i>not</i> to cool - nothing read it to put anything back.</p>
+     */
+    private void refillAfterQuake(ServerLevel level, BlockPos pos) {
+        long quake = com.jeladastudios.ftsgeology.quake.QuakeQuiet.released(
+                level, pos.getX(), pos.getZ());
+        if (quake == 0L || quake <= rechargedFor) return;
+        rechargedFor = quake;
+        setChanged();
+        if (hasLava(level, pos)) return;                  // the quake left the magma alone
+
+        int restored = 0;
+        for (long c : moltenCells) {
+            BlockPos p = BlockPos.of(c);
+            BlockState s = level.getBlockState(p);
+            // Only into rock the quake left behind, never into anything built or into open sky.
+            if (!s.getFluidState().isEmpty()) continue;
+            if (s.isAir()) continue;
+            if (EruptionHandler.isPlayerPlaced(s)) continue;
+            level.setBlock(p, Blocks.LAVA.defaultBlockState(), 2);
+            restored++;
+        }
+        if (restored > 0) {
+            GeysersMod.LOGGER.info("Volcano at {} recharged after a quake: {} cells", pos, restored);
+        }
+    }
+
     public void setSurfaceVents(List<BlockPos> vents) {
         long[] arr = new long[vents.size()];
         for (int i = 0; i < arr.length; i++) arr[i] = vents.get(i).asLong();
@@ -91,11 +135,15 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
 
         switch (be.phase) {
             case DORMANT -> {
-                if (!hasLava(server, pos)) return; // dead until it has lava again
                 // Does not wake up into ground a quake is still moving. An eruption already under
                 // way is left to finish - it is the starting of new work that produces the ruin,
                 // not the finishing of old.
                 if (com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(server, pos)) return;
+                // A quake that took the magma away used to kill the volcano outright: hasLava went
+                // false, this branch returned on every tick from then on, and nothing anywhere put
+                // lava back. That is the crater that cools after an earthquake and never refills.
+                be.refillAfterQuake(server, pos);
+                if (!hasLava(server, pos)) return; // dead until it has lava again
                 be.idleSmoke(server, summit, 0.4f, true); // lazy smoke off the crater + a vent or two
                 if ((be.timer -= 20) <= 0) {
                     be.phase = Phase.RUMBLING;
@@ -216,6 +264,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         tag.putInt("CraterR", craterR);
         if (surfaceVents.length > 0) tag.putLongArray("SurfaceVents", surfaceVents);
         if (moltenCells.length > 0) tag.putLongArray("MoltenCells", moltenCells);
+        tag.putLong("RechargedFor", rechargedFor);
     }
 
     @Override
@@ -228,5 +277,6 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         craterR = tag.contains("CraterR") ? tag.getInt("CraterR") : 3;
         surfaceVents = tag.contains("SurfaceVents") ? tag.getLongArray("SurfaceVents") : new long[0];
         moltenCells = tag.contains("MoltenCells") ? tag.getLongArray("MoltenCells") : new long[0];
+        rechargedFor = tag.contains("RechargedFor") ? tag.getLong("RechargedFor") : Long.MIN_VALUE;
     }
 }

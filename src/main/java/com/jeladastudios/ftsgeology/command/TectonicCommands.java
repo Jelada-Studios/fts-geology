@@ -692,9 +692,15 @@ public final class TectonicCommands {
             default -> ok = false;
         }
         final boolean done = ok;
-        source.sendSuccess(() -> Component.translatable("command.fts_geology.s_s_here", done
-                ? "Placed " + what + " here (suitability gate bypassed). Large volcanoes build over a few seconds."
-                : "Could not place ", what), false);
+        // Two keys, one placeholder each.
+        //
+        // There was one key, "%s%s here.", and the success branch handed the first placeholder a
+        // whole finished sentence and the second the feature name - so it printed "Placed hotspring
+        // here (suitability gate bypassed). Large volcanoes build over a few seconds.hotspring
+        // here." The failure branch happened to read correctly, which is why it went unnoticed.
+        source.sendSuccess(() -> Component.translatable(
+                done ? "command.fts_geology.placed_here" : "command.fts_geology.cannot_place_here",
+                what), false);
         return done ? 1 : 0;
     }
 }

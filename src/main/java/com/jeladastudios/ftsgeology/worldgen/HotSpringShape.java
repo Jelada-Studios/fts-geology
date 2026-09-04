@@ -1,5 +1,6 @@
 package com.jeladastudios.ftsgeology.worldgen;
 
+import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import net.minecraft.core.BlockPos;
@@ -68,8 +69,36 @@ public final class HotSpringShape {
         return line == Integer.MIN_VALUE ? Integer.MIN_VALUE : line + 1;
     }
 
+    /**
+     * The water line the untouched ground around a spring of this stage would give.
+     *
+     * <p>Exposed so a spring recovering from an earthquake can ask whether the ground it sat on has
+     * actually moved, without adopting the answer. The ring this reads is outside anything the pool
+     * can reach, so it reports what the quake did rather than what the spring did.</p>
+     */
+    public static int waterLineAt(ServerLevel level, int x, int z, int stage) {
+        return waterLine(level, x, z, radiusFor(stage));
+    }
+
     public static int radiusFor(int stage) {
         return RADIUS[Math.max(1, Math.min(MAX_STAGE, stage)) - 1];
+    }
+
+    /**
+     * Says why a spring could not be built here.
+     *
+     * <p>Because "the command said stage 4 and I got a stage 3 spring" cost a whole round of
+     * guessing, and two separate reviews of the code produced two different wrong answers. An empty
+     * return from {@link #build} used to be silent, so the only way to tell which of three guards
+     * had fired was to reason about it. Now it says.</p>
+     */
+    private static void refuse(int x, int z, int stage, String why, int datumY, int waterY,
+                               int cells) {
+        GeysersMod.LOGGER.debug(
+                "Spring shape refused at {},{} stage {}: {} (datum {}, water {}, {} cells)",
+                x, z, stage, why,
+                datumY == Integer.MIN_VALUE ? "none" : datumY,
+                waterY == Integer.MIN_VALUE ? "none" : waterY, cells);
     }
 
     /**
@@ -116,14 +145,23 @@ public final class HotSpringShape {
         int radius = radiusFor(stage);
 
         int waterY = datumY != Integer.MIN_VALUE ? datumY - 1 : waterLine(level, x, z, radius);
-        if (waterY == Integer.MIN_VALUE) return List.of();
+        if (waterY == Integer.MIN_VALUE) {
+            refuse(x, z, stage, "no reading of the ground", datumY, waterY, 0);
+            return List.of();
+        }
         // A basin at or under the waterline drains into the sea the moment anything updates it.
-        if (waterY <= level.getSeaLevel() + 1) return List.of();
+        if (waterY <= level.getSeaLevel() + 1) {
+            refuse(x, z, stage, "at or under the waterline", datumY, waterY, 0);
+            return List.of();
+        }
 
         if (clearTrees) RetrogenHandler.clearCanopy(level, x, z, radius + 12);
 
         List<BlockPos> pool = fillHoles(poolCells(level, x, z, radius, waterY), waterY);
-        if (pool.size() < 4) return List.of();
+        if (pool.size() < 4) {
+            refuse(x, z, stage, "nowhere to put a pool", datumY, waterY, pool.size());
+            return List.of();
+        }
 
         BlockState crust = ModBlocks.SINTER.get().defaultBlockState();
         for (BlockPos cell : pool) {
@@ -519,11 +557,11 @@ public final class HotSpringShape {
         return (((long) x) << 32) ^ (z & 0xFFFFFFFFL);
     }
 
-    private static int unpackX(long k) {
+    public static int unpackX(long k) {
         return (int) (k >> 32);
     }
 
-    private static int unpackZ(long k) {
+    public static int unpackZ(long k) {
         return (int) k;
     }
 }

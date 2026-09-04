@@ -16,19 +16,23 @@ import java.util.List;
  * that, every geothermal feature in the corridor was trying to repair itself: springs rebuilding
  * pools into ground that was about to move again, volcanoes re-laying cones that were still being
  * cut apart. The result was not a spring that survived a quake, it was a spring that thrashed for
- * two minutes and left wreckage - which is exactly what testing found afterwards, a field of ruins
- * with nothing rebuilt in it.
+ * two minutes and left wreckage.
  *
  * <p>Standing still is also the honest answer geologically. The deep plumbing is what survives an
- * earthquake; the surface expression does not, and does not try to. Hebgen Lake in 1959 rearranged
- * the vents across Yellowstone over hours and days, not while the ground was still shaking.</p>
+ * earthquake; the surface expression does not. Hebgen Lake in 1959 rearranged the vents across
+ * Yellowstone over hours and days, not while the ground was still shaking.</p>
  *
- * <h2>The release is the delicate part</h2>
- * A zone is <b>not</b> released when the rupture finishes. {@link Weathering} is still bringing down
- * everything the quake left hanging, and a pool rebuilt before that has finished is immediately
- * fouled by the debris landing in it - which would leave this whole mechanism looking like it had
- * done nothing. So a zone stays shut until the settling queue for it is empty, and then for a grace
- * period after that.
+ * <h2>A zone is released, not deleted - and it is stamped with a number, not a time</h2>
+ * The first version deleted a zone when its grace period ran out, and that made the window in which
+ * a spring could react <b>exactly zero ticks wide</b>: while the zone existed {@link #isQuiet}
+ * refused to let the spring run at all, and the moment it was deleted {@link #released} had nothing
+ * left to report. Measured over two M9.5 quakes in one session: zero springs re-sited.
+ *
+ * <p>So a finished zone stays in the list as <i>released</i>, and carries a sequence number. A
+ * feature records the number of the last quake it has already answered for. That matters because
+ * a rupture is a thousand blocks long and its corridor is a couple of hundred wide, so most of the
+ * springs it wrecks are in <b>unloaded chunks</b> when it finishes - with a deadline they would
+ * simply miss their turn, and with a number they pick it up whenever the player next goes there.</p>
  */
 public final class QuakeQuiet {
 
@@ -46,22 +50,42 @@ public final class QuakeQuiet {
     /** Margin around the rupture, so features just outside the edits are covered too. */
     private static final int MARGIN = 48;
 
-    /** Still open, i.e. the quake has not finished applying. */
-    private static final long RUNNING = Long.MAX_VALUE;
+    /** How long a released zone is remembered, so features in unloaded chunks still get their turn. */
+    private static final long MEMORY_TICKS = 72_000L;   // an hour of game time
+
+    /** Hard ceiling on remembered zones, so a very long-lived world cannot grow this without bound. */
+    private static final int MAX_ZONES = 64;
+
+    private enum Phase {
+        /** The rupture is still being applied. */
+        RUPTURING,
+        /** Applied, but the debris is still coming down. */
+        SETTLING,
+        /** Debris landed; running out the grace period before anything is allowed to build. */
+        GRACE,
+        /** Quiet over. Features in here may act, once, and stamp this zone's sequence number. */
+        RELEASED
+    }
 
     private static final class Zone {
+        final long sequence;
         final ResourceKey<Level> dimension;
         final int x;
         final int z;
+        final int radius;
         final long radiusSq;
-        long until;
+        Phase phase = Phase.RUPTURING;
+        /** Game time the grace period ends, and then the time the zone was released. */
+        long graceEnds;
+        long releasedAt;
 
-        Zone(ResourceKey<Level> dimension, int x, int z, int radius) {
+        Zone(long sequence, ResourceKey<Level> dimension, int x, int z, int radius) {
+            this.sequence = sequence;
             this.dimension = dimension;
             this.x = x;
             this.z = z;
+            this.radius = radius;
             this.radiusSq = (long) radius * radius;
-            this.until = RUNNING;
         }
 
         boolean covers(ResourceKey<Level> dim, int px, int pz) {
@@ -72,50 +96,69 @@ public final class QuakeQuiet {
     }
 
     private static final List<Zone> ZONES = new ArrayList<>();
+    private static long nextSequence = 1L;
 
-    /** Opens a zone as a quake begins. Held open until {@link #settling} releases it. */
+    /** Opens a zone as a quake begins. Held until the ground and its debris are both still. */
     public static synchronized void open(ServerLevel level, BlockPos epicentre, double ruptureLength) {
         int radius = (int) Math.round(ruptureLength / 2.0) + MARGIN;
-        ZONES.add(new Zone(level.dimension(), epicentre.getX(), epicentre.getZ(), radius));
+        ZONES.add(new Zone(nextSequence++, level.dimension(),
+                epicentre.getX(), epicentre.getZ(), radius));
     }
 
-    /**
-     * The rupture has finished applying. The zone now waits on the debris.
-     *
-     * <p>Called with the settling still queued, so this sets no deadline yet - {@link #tick} does
-     * that once the queue for this level is empty.</p>
-     */
+    /** The rupture has finished applying. The zone now waits on the debris. */
     public static synchronized void settling(ServerLevel level, BlockPos epicentre) {
         for (Zone z : ZONES) {
-            if (z.until == RUNNING && z.covers(level.dimension(), epicentre.getX(), epicentre.getZ())) {
-                z.until = RUNNING - 1;      // finished rupturing, still settling
+            if (z.phase == Phase.RUPTURING
+                    && z.covers(level.dimension(), epicentre.getX(), epicentre.getZ())) {
+                z.phase = Phase.SETTLING;
                 return;
             }
         }
     }
 
     /**
-     * Retires zones whose debris has landed and whose grace period has run out.
+     * Releases zones whose own debris has landed, and forgets very old ones.
      *
-     * @param settled whether the settling queue for this level is empty
+     * <p>Each zone asks about <b>its own ground</b>. The first version asked
+     * {@code Weathering.settled()}, which is one queue for the whole server, so a quake anywhere -
+     * even in another dimension - held every other zone open, and parked columns waiting on an
+     * unloaded chunk were not counted at all.</p>
      */
-    public static synchronized void tick(ServerLevel level, boolean settled) {
+    public static synchronized void tick(ServerLevel level) {
         long now = level.getGameTime();
         for (Zone z : ZONES) {
-            if (z.until == RUNNING - 1 && settled) z.until = now + GRACE_TICKS;
+            if (!z.dimension.equals(level.dimension())) continue;   // this level's clock only
+            switch (z.phase) {
+                case SETTLING -> {
+                    if (Weathering.pendingNear(level, z.x, z.z, z.radius)) continue;
+                    z.phase = Phase.GRACE;
+                    z.graceEnds = now + GRACE_TICKS;
+                }
+                case GRACE -> {
+                    if (now < z.graceEnds) continue;
+                    z.phase = Phase.RELEASED;
+                    z.releasedAt = now;
+                }
+                default -> { }
+            }
         }
-        ZONES.removeIf(z -> z.until < RUNNING - 1 && now >= z.until);
+        // Forget the oldest once they are well past release, and cap the list either way.
+        ZONES.removeIf(z -> z.phase == Phase.RELEASED
+                && z.dimension.equals(level.dimension())
+                && now - z.releasedAt > MEMORY_TICKS);
+        while (ZONES.size() > MAX_ZONES) ZONES.remove(0);
     }
 
     /**
      * Is this column inside ground that is still moving or still settling?
      *
-     * <p>Cheap: a distance check over a list that is empty almost all the time and holds a couple of
-     * entries at worst.</p>
+     * <p>A released zone answers <b>false</b> - that is the whole point of keeping it. It stays in
+     * the list so {@link #released} can still report it, not to go on silencing anything.</p>
      */
     public static synchronized boolean isQuiet(ServerLevel level, int x, int z) {
         if (ZONES.isEmpty()) return false;
         for (Zone zone : ZONES) {
+            if (zone.phase == Phase.RELEASED) continue;
             if (zone.covers(level.dimension(), x, z)) return true;
         }
         return false;
@@ -126,18 +169,26 @@ public final class QuakeQuiet {
     }
 
     /**
-     * When the zone covering this column releases, or {@link Long#MIN_VALUE} if none does.
+     * The sequence number of the newest <b>released</b> quake over this column, or 0 if none.
      *
-     * <p>Used as a one-shot stamp: a feature records the release it has already reacted to, so it
-     * re-sites itself once per quake rather than on a timer. That distinction is the whole safety
-     * margin on re-measuring a spring's datum.</p>
+     * <p>Running and settling zones are deliberately invisible here. Reporting them was a real bug:
+     * the old version returned the maximum {@code until} over every covering zone, and a running
+     * zone's was {@link Long#MAX_VALUE}, so a second quake arriving over the same ground made a
+     * spring stamp itself with a number nothing could ever exceed - and it never re-sited again,
+     * for that quake or any later one.</p>
+     *
+     * <p>Compare against the feature's own stamp: greater means there is a quake here it has not
+     * answered for yet. Because it is a count rather than a clock, a spring in a chunk that stays
+     * unloaded for hours still gets its turn when the chunk comes back.</p>
      */
-    public static synchronized long releaseAt(ServerLevel level, int x, int z) {
-        long latest = Long.MIN_VALUE;
+    public static synchronized long released(ServerLevel level, int x, int z) {
+        long newest = 0L;
         for (Zone zone : ZONES) {
-            if (zone.covers(level.dimension(), x, z)) latest = Math.max(latest, zone.until);
+            if (zone.phase != Phase.RELEASED) continue;
+            if (!zone.covers(level.dimension(), x, z)) continue;
+            newest = Math.max(newest, zone.sequence);
         }
-        return latest;
+        return newest;
     }
 
     /** Drops every zone. For {@code /geology quake cancel}, and for world unload. */

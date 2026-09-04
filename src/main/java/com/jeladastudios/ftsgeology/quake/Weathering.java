@@ -139,10 +139,36 @@ public final class Weathering {
         int pass;
         int moved;
 
+        /**
+         * Bounding box of the columns, worked out once.
+         *
+         * <p>{@link #pendingNear} is asked every tick, once per open quiet zone, and a corridor job
+         * carries a hundred thousand columns - walking them would be a six-figure loop per tick for
+         * a question that only needs "anywhere near here?". The box is generous rather than exact,
+         * which for this question is the right way to be wrong: it can hold a zone shut a moment
+         * longer than needed, never release one early.</p>
+         */
+        final int minX, maxX, minZ, maxZ;
+
         Job(ResourceKey<Level> dimension, long[] columns, Long2IntMap excavated) {
             this.dimension = dimension;
             this.columns = columns;
             this.excavated = excavated;
+            int lx = Integer.MAX_VALUE, hx = Integer.MIN_VALUE;
+            int lz = Integer.MAX_VALUE, hz = Integer.MIN_VALUE;
+            for (long c : columns) {
+                int x = (int) (c >> 32), z = (int) c;
+                if (x < lx) lx = x;
+                if (x > hx) hx = x;
+                if (z < lz) lz = z;
+                if (z > hz) hz = z;
+            }
+            this.minX = lx; this.maxX = hx; this.minZ = lz; this.maxZ = hz;
+        }
+
+        boolean overlaps(int x, int z, int radius) {
+            return x + radius >= minX && x - radius <= maxX
+                    && z + radius >= minZ && z - radius <= maxZ;
         }
     }
 
@@ -249,14 +275,46 @@ public final class Weathering {
 
     /** Relaxes a slice of the corridor. Bounded by both a column count and a wall-clock deadline. */
     /**
-     * Has everything the last quake shook loose finished coming down?
+     * Is there settling still outstanding over this patch of ground?
      *
-     * <p>Asked by {@link QuakeQuiet} before it lets springs and volcanoes rebuild. Rebuilding into
-     * ground that is still shedding talus produces a pool that is fouled the moment it is finished.
-     * </p>
+     * <p>Asked by {@link QuakeQuiet} before it lets springs and volcanoes rebuild there. Rebuilding
+     * into ground that is still shedding talus produces a pool that is fouled the moment it is
+     * finished.</p>
+     *
+     * <h2>Why this is a question about a place</h2>
+     * It used to be {@code settled()}, meaning "is the whole server's queue empty", and that was
+     * wrong in both directions at once. A second quake anywhere - another continent, another
+     * dimension - put work in the same queue and held every other zone open indefinitely. And
+     * columns waiting on an unloaded chunk sit in {@link #PARKED} rather than the queue, so an empty
+     * queue did not mean the ground was finished either; a zone could be released over a corridor
+     * with a mile of unsettled talus still parked in it.
+     *
+     * <p>Both go away once the question is asked about a specific area, which is the only form the
+     * caller ever actually wanted.</p>
      */
-    public static synchronized boolean settled() {
-        return QUEUE.isEmpty();
+    public static synchronized boolean pendingNear(ServerLevel level, int x, int z, int radius) {
+        for (Job job : QUEUE) {
+            if (!job.dimension.equals(level.dimension())) continue;
+            if (job.overlaps(x, z, radius)) return true;
+        }
+        // Parked columns are keyed by chunk, so the chunk's centre is close enough to test.
+        String prefix = level.dimension().location() + "@";
+        for (java.util.Map.Entry<String, Long2IntOpenHashMap> e : PARKED.entrySet()) {
+            if (!e.getKey().startsWith(prefix)) continue;
+            if (e.getValue().isEmpty()) continue;
+            String[] cs = e.getKey().substring(prefix.length()).split(",");
+            if (cs.length != 2) continue;
+            try {
+                long cx = (Long.parseLong(cs[0]) << 4) + 8;
+                long cz = (Long.parseLong(cs[1]) << 4) + 8;
+                long dx = cx - x, dz = cz - z;
+                // A chunk is 16 wide, so allow for it straddling the edge of the area.
+                if (dx * dx + dz * dz <= (long) (radius + 16) * (radius + 16)) return true;
+            } catch (NumberFormatException ignored) {
+                // A malformed key cannot be located, so it cannot hold a zone open.
+            }
+        }
+        return false;
     }
 
     public static void drain(MinecraftServer server, long budgetNanos) {

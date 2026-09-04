@@ -264,11 +264,11 @@ public final class Earthquake {
         Weathering.drain(event.getServer(),
                 com.jeladastudios.ftsgeology.util.TickBudget.slice(0.3));
 
-        // Release quiet zones whose debris has finished coming down. Done after the drain above, so
-        // a zone can be released on the same tick the last of its talus lands.
-        boolean settled = Weathering.settled();
+        // Release quiet zones whose OWN debris has finished coming down. Done after the drain above,
+        // so a zone can be released on the same tick the last of its talus lands. Each zone asks
+        // about its own ground - see Weathering.pendingNear.
         for (ServerLevel l : event.getServer().getAllLevels()) {
-            QuakeQuiet.tick(l, settled);
+            QuakeQuiet.tick(l);
         }
 
         if (ACTIVE.isEmpty()) return;

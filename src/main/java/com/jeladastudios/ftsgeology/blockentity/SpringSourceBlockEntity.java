@@ -14,6 +14,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -79,6 +80,14 @@ public class SpringSourceBlockEntity extends BlockEntity {
     /** Rebuilds in a row before the spring stops trying and says why, once. */
     private static final int REBUILD_LIMIT = 8;
 
+    /**
+     * The most a single earthquake may move a spring's reference level, in blocks.
+     *
+     * <p>Generous enough that a serious quake visibly lowers a pool, tight enough that no run of
+     * quakes can walk a spring into the ground the way repeated re-measuring did before.</p>
+     */
+    private static final int MAX_DATUM_SHIFT = 3;
+
 
 
 
@@ -106,7 +115,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
      * the water appearing and vanishing on a loop with the spring itself never changing.
      *
      * <p>A cap the growth loop actually reads is what that field should always have been. Springs in
-     * a chain stop at stage 2, so the terraces stay small, close together and stepped, which is what
+     * a chain stop at stage 3, so the terraces stay close together and stepped, which is what
      * a travertine terrace looks like; a spring alone on the flat still grows to stage 4.</p>
      */
     private int maxStage = FINAL_STAGE;
@@ -243,12 +252,18 @@ public class SpringSourceBlockEntity extends BlockEntity {
         if (!(level instanceof ServerLevel server)) return;
         if (!GeyserConfig.SPRING_RENEWAL_ENABLED.get()) return;
         if ((server.getGameTime() + pos.hashCode()) % CHECK_INTERVAL != 0) return;
-        if (be.dormant) return;
         // The ground here is still moving, or still shedding what the quake shook loose. Rebuilding
         // into it produces the field of wreckage testing found after a quake: a spring that spent
         // the whole event repairing a pool that was about to be torn up again.
-        if (QuakeQuiet.isQuiet(server, be.outletX, be.outletZ)) return;
+        if (QuakeQuiet.isQuiet(server, be.siteX(), be.siteZ())) return;
+
+        // Before the dormancy check, deliberately. An earthquake is the one thing that can make a
+        // spring which had given up worth trying again: the ground it could not hold a pool on is
+        // not the ground that is there now. Dormancy was set in two places and cleared in none, so
+        // without this a single bad patch put a spring to sleep for the life of the world.
         if (be.resiteAfterQuake(server)) return;
+
+        if (be.dormant) return;
         if (be.adoptOldSave(server)) return;
 
         // A pool somebody has thrown a few blocks into is cleaned out and rebuilt at the age it had
@@ -279,12 +294,18 @@ public class SpringSourceBlockEntity extends BlockEntity {
             // What a blocked spring actually does is find the next weakness a few metres to one
             // side. So it stalls towards that instead.
             if (be.surfaced) {
-                if (be.rebuildBarred(server)) return;
+                // Counted BEFORE the rebuild barrier, not after.
+                //
+                // It was after, and that quietly killed the escape route this branch exists for:
+                // rebuildBarred goes true once the spring has given up, so stalled stopped rising
+                // the moment it mattered, never reached STALL_LIMIT, and stepAside - a silted vent
+                // finding a new way out, the whole physical idea - has never once run.
                 be.stalled++;
                 be.setChanged();
                 if (be.stalled >= STALL_LIMIT && server.getGameTime() % 1200L == 0L) {
-                    be.stepAside(server, pos);
+                    if (be.stepAside(server, pos)) return;
                 }
+                if (be.rebuildBarred(server)) return;
                 return;
             }
 
@@ -316,7 +337,9 @@ public class SpringSourceBlockEntity extends BlockEntity {
             be.stage++;
             be.stageSince = server.getGameTime();
             GeysersMod.LOGGER.info("Spring at {} reached stage {}/{} ({} blocks across)",
-                    be.vent(), be.stage, FINAL_STAGE, HotSpringShape.radiusFor(be.stage) * 2 + 1);
+                    // Its own ceiling, not the global one. A chained spring caps at stage 2 and
+                    // reporting "2/4" read as unfinished when it was in fact done.
+                    be.vent(), be.stage, be.maxStage, HotSpringShape.radiusFor(be.stage) * 2 + 1);
             be.setChanged();
         }
     }
@@ -392,39 +415,84 @@ public class SpringSourceBlockEntity extends BlockEntity {
      * @return true if this tick was spent re-siting
      */
     private boolean resiteAfterQuake(ServerLevel level) {
-        long release = QuakeQuiet.releaseAt(level, outletX, outletZ);
-        if (release == Long.MIN_VALUE) return false;       // no quake has been through here
-        if (release <= resitedFor) return false;           // already dealt with this one
-        resitedFor = release;
+        long quake = QuakeQuiet.released(level, siteX(), siteZ());
+        if (quake == 0L) return false;                     // no finished quake over this ground
+        if (quake <= resitedFor) return false;             // already answered for this one
+        resitedFor = quake;
+        setChanged();
 
-        if (!surfaced || stage <= 0) {
-            setChanged();
-            return false;                                   // never had a pool; let it climb
-        }
+        if (!surfaced || stage <= 0) return false;         // never had a pool; let it climb
+        if (datumY == Integer.MIN_VALUE) return false;
 
-        int fresh = HotSpringShape.datumFor(level, outletX, outletZ);
-        if (fresh == Integer.MIN_VALUE) {
-            setChanged();
-            return false;
-        }
-        if (fresh == datumY) {
-            setChanged();
-            return false;                                   // the ground here did not actually move
-        }
-
-        int moved = fresh - datumY;
-        datumY = fresh;
+        // Anything left of the old pool goes before the new one is built, so a rebuilt spring does
+        // not stand in a ring of the water its predecessor spilled.
+        drainPool(level);
+        // The ground moved, so a spring that had given up is worth another try.
+        dormant = false;
         rebuilds = 0;
         lastRebuild = Long.MIN_VALUE;
+
+        int oldWater = datumY - 1;
+        int ring = HotSpringShape.waterLineAt(level, siteX(), siteZ(), stage);
+
+        // Has the ground the pool sat on actually moved? Testing the RING, not the basin.
+        //
+        // The basin is the spring's own excavation, so measuring against that is the downhill
+        // ratchet this project has had three times over. The ring is outside anything the pool can
+        // reach (see HotSpringShape.waterLine), so it is the one honest witness to what the quake
+        // did to this place.
+        if (ring != Integer.MIN_VALUE && Math.abs(ring - oldWater) <= 1) {
+            // It did not. Keep the datum and rebuild exactly where the spring already was - which
+            // is what testing asked for: a spring whose ground is intact has no business sinking.
+            if (!applyStage(level, stage)) {
+                surfaced = false;
+                setChanged();
+                return false;
+            }
+            GeysersMod.LOGGER.info("Spring at {},{} rebuilt after a quake, same level",
+                    siteX(), siteZ());
+            setChanged();
+            return true;
+        }
+
+        if (ring == Integer.MIN_VALUE) return false;       // cannot read the ground; leave it alone
+
+        // It did move. Follow it - but only so far.
+        //
+        // The cap is the whole safety margin. A quake dropping the ground two or three blocks is a
+        // real thing that should be visible; a spring walking 49 blocks into the earth over a run of
+        // rebuilds is the ratchet. Limiting the shift per quake makes the first possible and the
+        // second arithmetically impossible, however many quakes pass over it.
+        int wanted = ring + 1;
+        int capped = Mth.clamp(wanted, datumY - MAX_DATUM_SHIFT, datumY + MAX_DATUM_SHIFT);
+        int moved = capped - datumY;
+        datumY = capped;
         if (!applyStage(level, stage)) {
             surfaced = false;                               // no pool fits here now; go looking
             setChanged();
             return false;
         }
         GeysersMod.LOGGER.info("Spring at {},{} re-sited after a quake: ground moved {} blocks",
-                outletX, outletZ, moved);
+                siteX(), siteZ(), moved);
         setChanged();
         return true;
+    }
+
+    /** Takes the water out of the pool this spring last built, and nothing else. */
+    private void drainPool(ServerLevel level) {
+        if (poolCells.length == 0 || datumY == Integer.MIN_VALUE) return;
+        int waterY = datumY - 1;
+        int cleared = 0;
+        for (long c : poolCells) {
+            BlockPos p = new BlockPos(HotSpringShape.unpackX(c), waterY, HotSpringShape.unpackZ(c));
+            if (level.getBlockState(p).getFluidState().isEmpty()) continue;
+            level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+            cleared++;
+        }
+        if (cleared > 0) {
+            GeysersMod.LOGGER.debug("Spring at {},{} drained {} cells before rebuilding",
+                    siteX(), siteZ(), cleared);
+        }
     }
 
     /**
@@ -457,6 +525,29 @@ public class SpringSourceBlockEntity extends BlockEntity {
         GeysersMod.LOGGER.debug("Spring at {},{} adopted an older save ({} cells)",
                 outletX, outletZ, poolCells.length);
         return true;
+    }
+
+    /**
+     * The column this spring belongs to, for asking questions about the ground.
+     *
+     * <h2>Why this is not just the outlet</h2>
+     * {@code outletX}/{@code outletZ} are only filled in by {@code setVent}, which runs inside
+     * {@link #openVent} - <b>after</b> the water reaches daylight. A source planted by an earthquake
+     * goes {@code SpringSeeding.afterQuake -> seedSourceAt -> place} and never touches setVent, so
+     * until it surfaces those fields are both <b>0</b>.
+     *
+     * <p>That made every quiet-zone question about a source still boring upward a question about
+     * the world origin, usually thousands of blocks from the quake. The sources that most needed
+     * protecting - freshly seeded ones, inside the rupture, mid-climb - were the exact ones the
+     * quiet zone could not see. Falling back to the block entity's own column fixes it, and the two
+     * agree once a spring has surfaced because the vent is bored straight up from here.</p>
+     */
+    private int siteX() {
+        return outletY == Integer.MIN_VALUE ? worldPosition.getX() : outletX;
+    }
+
+    private int siteZ() {
+        return outletY == Integer.MIN_VALUE ? worldPosition.getZ() : outletZ;
     }
 
     /** The state of the pool this spring last built. */
@@ -681,8 +772,10 @@ public class SpringSourceBlockEntity extends BlockEntity {
         for (int attempt = 0; attempt < 24; attempt++) {
             double ang = level.random.nextDouble() * Math.PI * 2;
             int r = 2 + level.random.nextInt(5);
-            int x = outletX + (int) Math.round(Math.cos(ang) * r);
-            int z = outletZ + (int) Math.round(Math.sin(ang) * r);
+            // Around this spring's own column - see siteX(). An unsurfaced source has no outlet
+            // recorded, and searching from (0, 0) found nothing but unloaded chunks.
+            int x = siteX() + (int) Math.round(Math.cos(ang) * r);
+            int z = siteZ() + (int) Math.round(Math.sin(ang) * r);
             if (!level.isLoaded(new BlockPos(x, level.getSeaLevel(), z))) continue;
 
             int g = TerrainProbe.groundY(level, x, z);
@@ -714,6 +807,10 @@ public class SpringSourceBlockEntity extends BlockEntity {
         poolCells = new long[0];
         rebuilds = 0;
         lastRebuild = Long.MIN_VALUE;
+        // A spring that has found somewhere else to come out is not a spring that has given up.
+        // Without this the dormancy set on the way in would survive the move and the new outlet
+        // would never be built - dormant was set in two places and cleared in none.
+        dormant = false;
         setChanged();
         return true;
     }
