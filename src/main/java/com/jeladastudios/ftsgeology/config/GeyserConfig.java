@@ -146,6 +146,13 @@ public final class GeyserConfig {
     // --- Integration with other mods ----------------------------------------
     public static final ForgeConfigSpec.BooleanValue SUGGEST_OPTIONAL_MODS;   // default ON
 
+    // --- Hydrology (groundwater) ---------------------------------------------
+    public static final ForgeConfigSpec.BooleanValue WATER_TABLE_ENABLED;
+    public static final ForgeConfigSpec.DoubleValue WATER_TABLE_SUBDUAL;      // relief it copies, 0..1
+    public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_TEMPERATE; // blocks below the land
+    public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_ARID;
+    public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_HUMID;
+
     // --- Instruments ---------------------------------------------------------
     public static final ForgeConfigSpec.IntValue SEISMOGRAPH_RANGE;   // blocks a station can hear
     static {
@@ -695,6 +702,43 @@ public final class GeyserConfig {
                         "100 km at the default horizontal scale, comfortably wider than anywhere a",
                         "player is likely to have built a second station.")
                 .defineInRange("seismographRange", 4000, 64, 100000);
+        b.pop();
+
+        b.push("hydrology");
+        WATER_TABLE_ENABLED = b
+                .comment("Model a groundwater table under the world.",
+                        "Nothing here places or edits a block on its own. It answers one question -",
+                        "how deep is the water under this column - and the features that need an",
+                        "answer (springs, wells, recovery after a quake) read it. Turned off, those",
+                        "fall back to their older placement rules.")
+                .define("waterTableEnabled", true);
+        WATER_TABLE_SUBDUAL = b
+                .comment("How much of the land's relief the water table climbs, from 0 to 1.",
+                        "Groundwater is a SUBDUED replica of the topography: it rises from the",
+                        "valley it drains into towards the high ground that recharges it, but",
+                        "nothing like as steeply as the land does. At 0 the table is flat at the",
+                        "valley floor and no water ever reaches the surface elsewhere. At 1 it",
+                        "copies the land and springs break out all over the slopes. Measured on",
+                        "upland terrain, the default puts spring lines on about 1% of land columns",
+                        "- valley floors and breaks of slope, which is where they belong.")
+                .defineInRange("waterTableSubdual", 0.50D, 0.0D, 1.0D);
+        WATER_TABLE_DEPTH_TEMPERATE = b
+                .comment("Blocks of dry ground above the water table in ordinary rainy country.",
+                        "This is how deep a well has to be dug in a plains or forest biome.")
+                .defineInRange("waterTableDepthTemperate", 8, 0, 64);
+        WATER_TABLE_DEPTH_ARID = b
+                .comment("Depth to water in hot biomes that get no rain at all.",
+                        "Nothing recharges a desert aquifer from above, so the table sits far down",
+                        "and desert wells are deep. Note that this effectively rules out desert",
+                        "springs, which is correct: a real oasis is not fed by local rainfall but",
+                        "by a regional aquifer recharged in mountains hundreds of kilometres away.",
+                        "That is a geological exception, not a climate one, so it does not belong",
+                        "in this number.")
+                .defineInRange("waterTableDepthArid", 24, 0, 128);
+        WATER_TABLE_DEPTH_HUMID = b
+                .comment("Depth to water in hot, wet biomes - jungle, swamp, mangrove.",
+                        "More rain goes in than drains away again, so the water is at your ankles.")
+                .defineInRange("waterTableDepthHumid", 3, 0, 64);
         b.pop();
 
         SPEC = b.build();

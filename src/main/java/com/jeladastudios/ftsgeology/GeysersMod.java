@@ -79,6 +79,7 @@ public class GeysersMod {
     public void onServerStopped(net.minecraftforge.event.server.ServerStoppedEvent event) {
         com.jeladastudios.ftsgeology.tectonics.TectonicMap.clearCache();
         com.jeladastudios.ftsgeology.tectonics.HotspotMap.clearCache();
+        com.jeladastudios.ftsgeology.hydrology.WaterTable.clearCache();
         com.jeladastudios.ftsgeology.volcano.VolcanoJob.clear();
         com.jeladastudios.ftsgeology.quake.Weathering.clear();
         com.jeladastudios.ftsgeology.quake.PendingEdits.clear();

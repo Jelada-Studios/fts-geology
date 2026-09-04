@@ -379,6 +379,22 @@ public final class TectonicCommands {
         source.sendSuccess(() -> Component.translatable("command.fts_geology.expected_here_s",
                         Component.translatable(expectedKey(s.faultType())))
                 .withStyle(ChatFormatting.DARK_AQUA), false);
+
+        // Groundwater. Printed here rather than in its own command because the question it answers
+        // - why is there a spring on this ledge and not that one - is a question about the section.
+        var w = com.jeladastudios.ftsgeology.hydrology.WaterTable.sample(level, at.getX(), at.getZ());
+        if (w.isSpringLine(level.getSeaLevel())) {
+            source.sendSuccess(() -> Component.translatable(
+                    "command.fts_geology.column.spring_line", w.tableY(), w.artesianHead())
+                    .withStyle(ChatFormatting.AQUA), false);
+        } else {
+            source.sendSuccess(() -> Component.translatable(
+                    "command.fts_geology.column.water_table", w.tableY(), w.depthToWater())
+                    .withStyle(ChatFormatting.AQUA), false);
+        }
+        source.sendSuccess(() -> Component.translatable(
+                "command.fts_geology.column.water_detail", w.base(), w.regional(), w.unsaturated())
+                .withStyle(ChatFormatting.DARK_GRAY), false);
         if (s.stress() < 0.25 && s.faultType() != FaultType.INTERIOR) {
             source.sendSuccess(() -> Component.translatable("command.fts_geology.stress_is_below_0_25_so_this_column_is_o")
                     .withStyle(ChatFormatting.YELLOW), false);
