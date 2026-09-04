@@ -6,6 +6,7 @@ import com.jeladastudios.ftsgeology.block.GeyserCoreBlock;
 import com.jeladastudios.ftsgeology.block.GeyserIgniterBlock;
 import com.jeladastudios.ftsgeology.block.HotSpringBlock;
 import com.jeladastudios.ftsgeology.block.SeismographBlock;
+import com.jeladastudios.ftsgeology.block.SpringSourceBlock;
 import com.jeladastudios.ftsgeology.block.VolcanoCoreBlock;
 import com.jeladastudios.ftsgeology.block.VolcanoIgniterBlock;
 import net.minecraft.world.level.block.Block;
@@ -47,6 +48,16 @@ public final class ModBlocks {
             () -> new HotSpringBlock(BlockBehaviour.Properties.copy(Blocks.CALCITE)
                     .lightLevel(s -> 4)
                     .strength(1.2F)));
+
+    /**
+     * The deep, unreachable end of a hot spring - see SpringSourceBlock. Unbreakable and
+     * blast-proof like the geyser core, because a quake that could carve it away would leave the
+     * spring with nothing to recover from, which is the whole thing this block exists to prevent.
+     */
+    public static final RegistryObject<Block> SPRING_SOURCE = BLOCKS.register("spring_source",
+            () -> new SpringSourceBlock(BlockBehaviour.Properties.copy(Blocks.DEEPSLATE)
+                    .strength(-1.0F, 3600000.0F)
+                    .noLootTable()));
 
     /** Technical block driving a volcano's eruption cycle. */
     public static final RegistryObject<Block> VOLCANO_CORE = BLOCKS.register("volcano_core",

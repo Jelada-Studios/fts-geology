@@ -307,6 +307,10 @@ public final class Earthquake {
                 GeysersMod.LOGGER.info("quake finished: {} blocks over {} ticks", run.applied, run.ticks);
                 // The shaking stops, but the ground it left is raw. Let it relax.
                 Weathering.enqueue(level, run.plan.edits());
+                // And the plumbing under it has been rearranged, which is how a quake opens a
+                // spring that was not there before.
+                com.jeladastudios.ftsgeology.hydrology.SpringSeeding.afterQuake(
+                        level, run.plan.epicentre(), run.plan.ruptureLength(), run.plan.magnitude());
             }
             return done;
         });

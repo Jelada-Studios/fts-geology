@@ -1,0 +1,232 @@
+package com.jeladastudios.ftsgeology.blockentity;
+
+import com.jeladastudios.ftsgeology.GeysersMod;
+import com.jeladastudios.ftsgeology.config.GeyserConfig;
+import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
+import com.jeladastudios.ftsgeology.eruption.VentPathfinder;
+import com.jeladastudios.ftsgeology.registry.ModBlockEntities;
+import com.jeladastudios.ftsgeology.registry.ModBlocks;
+import com.jeladastudios.ftsgeology.worldgen.RetrogenHandler;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
+
+/**
+ * Works a buried hot spring back up to daylight.
+ *
+ * <h2>What it is doing</h2>
+ * Heated water under pressure does not give up when its outlet is blocked; it works through the
+ * blockage, and while it does it drops the minerals it is carrying. That is what a travertine mound
+ * IS - Pamukkale is a spring that has been building its own hill out of its own deposit for
+ * thousands of years. So this bores a conduit upward a few blocks at a time and lines it with
+ * sinter as it climbs, and when it reaches the surface it cuts a pool there.
+ *
+ * <h2>Why it reuses the geyser's pathfinder</h2>
+ * {@link VentPathfinder} already does exactly this job for geysers: climb gradually, prefer an
+ * opening that already exists over breaking fresh rock, wall off a cave it breaks into, stop at a
+ * ceiling. It also refuses to touch anything player-built unless it is given pressure to force
+ * with - and a spring is given none, so a build over a spring stops it dead. That safety is
+ * inherited rather than re-implemented.
+ *
+ * <h2>Why the outlet is allowed to move</h2>
+ * The conduit climbs from the source, not from where the pool used to be, so if a quake has moved
+ * the ground the water surfaces wherever the new ground lets it. That is the behaviour the 1959
+ * Hebgen Lake earthquake produced at Yellowstone: outlets shifted, deposits were left behind at the
+ * old ones, and the systems themselves carried on.
+ */
+public class SpringSourceBlockEntity extends BlockEntity {
+
+    /** How often the source looks up, in ticks. Slow: this is geology, not machinery. */
+    private static final int CHECK_INTERVAL = 40;
+
+    /** Give up on a climb that has made no progress this many attempts in a row. */
+    private static final int STALL_LIMIT = 20;
+
+    /** Highest the conduit may ever climb above the ground it was built under. */
+    private static final int CEILING_ALLOWANCE = 3;
+
+    /** Where the pool this source last built has its warm bed, or MIN_VALUE when it has none. */
+    private int outletX;
+    private int outletZ;
+    private int outletY = Integer.MIN_VALUE;
+
+    /** Top of the conduit so far. Starts at the source and climbs. */
+    private int mouthY = Integer.MIN_VALUE;
+
+    /** Radius of the pool to cut when the conduit surfaces. */
+    private int poolRadius = 4;
+
+    /** Consecutive attempts that gained no height. */
+    private int stalled;
+
+    public SpringSourceBlockEntity(BlockPos pos, BlockState state) {
+        super(ModBlockEntities.SPRING_SOURCE.get(), pos, state);
+    }
+
+    /** Called by the generator so a fresh source knows how big a pool it feeds. */
+    public void setPoolRadius(int r) {
+        this.poolRadius = Math.max(2, r);
+        setChanged();
+    }
+
+    /** Called when the generator has already cut the pool, so the source starts up satisfied. */
+    public void setOutlet(BlockPos bed) {
+        this.outletX = bed.getX();
+        this.outletY = bed.getY();
+        this.outletZ = bed.getZ();
+        this.mouthY = bed.getY();
+        setChanged();
+    }
+
+    /** Wakes a source that has been told its pool is gone, so it re-checks on the next tick. */
+    public void nudge() {
+        this.stalled = 0;
+        setChanged();
+    }
+
+    /**
+     * Marks this source as having no outlet yet, so it starts climbing from scratch. Used when a
+     * quake opens a source somewhere that has never had a spring.
+     */
+    public void clearOutlet() {
+        this.outletY = Integer.MIN_VALUE;
+        this.mouthY = Integer.MIN_VALUE;
+        this.stalled = 0;
+        setChanged();
+    }
+
+    public static void serverTick(Level level, BlockPos pos, BlockState state,
+                                  SpringSourceBlockEntity be) {
+        if (!(level instanceof ServerLevel server)) return;
+        if (!GeyserConfig.SPRING_RENEWAL_ENABLED.get()) return;
+        if ((server.getGameTime() + pos.hashCode()) % CHECK_INTERVAL != 0) return;
+
+        if (be.outletAlive(server)) {
+            be.stalled = 0;
+            return;                                   // the common case, and it costs two lookups
+        }
+        if (be.stalled >= STALL_LIMIT) return;        // capped by a build, or genuinely stuck
+        be.climb(server, pos);
+    }
+
+    /**
+     * Two block lookups: is the pool this source built still a pool?
+     *
+     * <p>The bed's own coordinates are remembered rather than assumed to be straight overhead. On
+     * broken ground the pool cutter puts the bed wherever the basin actually formed, which need not
+     * be the centre column - and a source looking in the wrong column finds no bed, concludes its
+     * pool has been destroyed, and cuts a fresh one every couple of seconds for the life of the
+     * world.</p>
+     */
+    private boolean outletAlive(ServerLevel level) {
+        if (outletY == Integer.MIN_VALUE) return false;
+        BlockPos bed = new BlockPos(outletX, outletY, outletZ);
+        if (!level.getBlockState(bed).is(ModBlocks.HOT_SPRING.get())) return false;
+        return !level.getBlockState(bed.above()).getFluidState().isEmpty();
+    }
+
+    /**
+     * One step of the climb: bore a little further, line what was bored, and cut the pool if the
+     * conduit has reached the surface.
+     */
+    private void climb(ServerLevel level, BlockPos pos) {
+        int ground = level.getHeight(Heightmap.Types.WORLD_SURFACE, pos.getX(), pos.getZ());
+        int ceiling = ground + CEILING_ALLOWANCE;
+        if (mouthY == Integer.MIN_VALUE) mouthY = pos.getY() + 1;
+
+        // The ground can move down as well as up - a quake that drops the surface leaves the old
+        // mouth stranded above the new ceiling. Bring it back into range first, or the trace has
+        // nowhere to climb to, reports no progress, and the source counts itself stalled while
+        // standing at an outlet that is already open.
+        mouthY = Math.min(mouthY, ceiling);
+        int before = mouthY;
+
+        // No pressure: the pathfinder will clear natural rubble and refuse anything built, which is
+        // exactly the promise a spring should keep. See VentPathfinder.trace.
+        BlockPos mouth = VentPathfinder.trace(level, pos, mouthY, ceiling, 0.0, true);
+        mouthY = mouth.getY();
+
+        if (mouthY > before) {
+            stalled = 0;
+            lineWithSinter(level, pos, before, mouthY);
+            setChanged();
+        }
+
+        // Surfaced? The conduit is open to the sky once it is at or above the ground. Checked
+        // whether or not it climbed this time, because arriving and making no further progress is
+        // success, not a stall.
+        if (mouthY >= ground) {
+            surface(level, pos, ground);
+            return;
+        }
+        if (mouthY <= before) stalled++;
+    }
+
+    /**
+     * Skins the newly bored section with sinter.
+     *
+     * <p>This is the visible half of the mechanism and the reason a re-opened spring does not look
+     * like a drilled hole: the fill the water came through is left as travertine, so what you find
+     * afterwards is a pale chimney with the spring running up the middle of it.</p>
+     */
+    private void lineWithSinter(ServerLevel level, BlockPos pos, int fromY, int toY) {
+        BlockState sinter = ModBlocks.SINTER.get().defaultBlockState();
+        for (int y = fromY; y <= toY; y++) {
+            for (Direction d : Direction.Plane.HORIZONTAL) {
+                BlockPos p = new BlockPos(pos.getX(), y, pos.getZ()).relative(d);
+                BlockState s = level.getBlockState(p);
+                if (s.isAir() || !s.getFluidState().isEmpty()) continue;
+                if (s.is(Blocks.BEDROCK) || s.is(ModBlocks.SINTER.get())) continue;
+                if (EruptionHandler.isPlayerPlaced(s)) continue;
+                if (level.random.nextInt(3) == 0) continue;     // patchy, not a tiled pipe
+                level.setBlock(p, sinter, 2);
+            }
+        }
+    }
+
+    /** The conduit has reached daylight: cut a pool at the top of it. */
+    private void surface(ServerLevel level, BlockPos pos, int ground) {
+        int waterY = ground - 1;
+        BlockPos bed = RetrogenHandler.carvePoolAt(level, pos.getX(), pos.getZ(), waterY, poolRadius);
+        if (bed != null) {
+            setOutlet(bed);
+            GeysersMod.LOGGER.info("Spring source at {} surfaced at Y {} after climbing {} blocks",
+                    pos, waterY, waterY - pos.getY());
+        } else {
+            // The ground up here will not hold a pool - a cliff edge, or standing water. Let the
+            // conduit steam quietly rather than forcing a basin somewhere it would drain away.
+            stalled++;
+        }
+        setChanged();
+    }
+
+    @Override
+    protected void saveAdditional(CompoundTag tag) {
+        super.saveAdditional(tag);
+        tag.putInt("OutletX", outletX);
+        tag.putInt("OutletY", outletY);
+        tag.putInt("OutletZ", outletZ);
+        tag.putInt("MouthY", mouthY);
+        tag.putInt("PoolRadius", poolRadius);
+        tag.putInt("Stalled", stalled);
+    }
+
+    @Override
+    public void load(CompoundTag tag) {
+        super.load(tag);
+        outletY = tag.contains("OutletY") ? tag.getInt("OutletY") : Integer.MIN_VALUE;
+        // Sources written before the bed's column was recorded fall back to straight overhead,
+        // which is where it is on level ground and therefore right for nearly all of them.
+        outletX = tag.contains("OutletX") ? tag.getInt("OutletX") : worldPosition.getX();
+        outletZ = tag.contains("OutletZ") ? tag.getInt("OutletZ") : worldPosition.getZ();
+        mouthY = tag.contains("MouthY") ? tag.getInt("MouthY") : Integer.MIN_VALUE;
+        poolRadius = Math.max(2, tag.getInt("PoolRadius"));
+        stalled = tag.getInt("Stalled");
+    }
+}

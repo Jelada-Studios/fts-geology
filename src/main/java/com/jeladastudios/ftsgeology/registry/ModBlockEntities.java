@@ -4,6 +4,7 @@ import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.blockentity.GeyserChamberBlockEntity;
 import com.jeladastudios.ftsgeology.blockentity.GeyserCoreBlockEntity;
 import com.jeladastudios.ftsgeology.blockentity.GeyserIgniterBlockEntity;
+import com.jeladastudios.ftsgeology.blockentity.SpringSourceBlockEntity;
 import com.jeladastudios.ftsgeology.blockentity.HotSpringBlockEntity;
 import com.jeladastudios.ftsgeology.blockentity.SeismographBlockEntity;
 import com.jeladastudios.ftsgeology.blockentity.VolcanoCoreBlockEntity;
@@ -36,6 +37,11 @@ public final class ModBlockEntities {
     public static final RegistryObject<BlockEntityType<HotSpringBlockEntity>> HOT_SPRING =
             BLOCK_ENTITIES.register("hot_spring", () -> BlockEntityType.Builder
                     .of(HotSpringBlockEntity::new, ModBlocks.HOT_SPRING.get())
+                    .build(null));
+
+    public static final RegistryObject<BlockEntityType<SpringSourceBlockEntity>> SPRING_SOURCE =
+            BLOCK_ENTITIES.register("spring_source", () -> BlockEntityType.Builder
+                    .of(SpringSourceBlockEntity::new, ModBlocks.SPRING_SOURCE.get())
                     .build(null));
 
     public static final RegistryObject<BlockEntityType<VolcanoCoreBlockEntity>> VOLCANO_CORE =

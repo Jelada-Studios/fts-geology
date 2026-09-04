@@ -2,6 +2,7 @@ package com.jeladastudios.ftsgeology.worldgen;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.blockentity.GeyserCoreBlockEntity;
+import com.jeladastudios.ftsgeology.blockentity.SpringSourceBlockEntity;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.util.TickBudget;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
@@ -518,11 +519,21 @@ public final class RetrogenHandler {
         // Every water cell cut so far. Each pool hands it to the next so a lower terrace cannot
         // clear, or tile sinter over, the water of the one above it.
         java.util.Set<BlockPos> taken = new java.util.HashSet<>();
+        // The main pool, remembered so the deep source can be seated under it.
+        BlockPos firstBed = null;
+        int firstRadius = 4;
         for (int i = 0; i < terraces; i++) {
             int radius = terraced
                     ? Math.max(2, 5 - relief / 3) + level.random.nextInt(3)
                     : 5 + level.random.nextInt(3);
-            if (carveTerrace(level, px, pz, waterY, radius, taken)) placed++;
+            BlockPos bed = carveTerrace(level, px, pz, waterY, radius, taken);
+            if (bed != null) {
+                placed++;
+                if (firstBed == null) {
+                    firstBed = bed;
+                    firstRadius = radius;
+                }
+            }
             // Step downhill for the next pool in the chain. A full diameter plus a gap: the old
             // stride was one radius, so consecutive pools sat on top of each other.
             int stride = radius * 2 + 2 + level.random.nextInt(2);
@@ -547,8 +558,84 @@ public final class RetrogenHandler {
             if (waterY <= lo - 6) break;
         }
         if (placed == 0) return false;
+        seatSourceUnder(level, firstBed, firstRadius);
         GeysersMod.LOGGER.debug("Hot spring ({} pools) at {}, {}, {}", placed, x, centre, z);
         return true;
+    }
+
+    /** How far under the pool the source sits. Must clear the quake's reach, which is 24. */
+    private static final int SOURCE_DEPTH = 28;
+
+    /**
+     * Puts the deep end of a spring in, well below anything that can disturb it.
+     *
+     * <p>Without this a hot spring is only its pool, and a pool is surface furniture: an earthquake
+     * large enough to move the ground takes the entire spring away and leaves nothing to recover
+     * from - which is exactly what testing found. The source sits deeper than the quake code ever
+     * reaches, so what a quake can do is block the outlet, which is also all a real one does.</p>
+     *
+     * <p>Also how springs generated before sources existed catch up: a world is not regenerated
+     * when the mod updates, so those get one the first time anything disturbs them.</p>
+     *
+     * @return where the source went, or null if this column cannot take one
+     */
+    public static BlockPos seatSourceUnder(ServerLevel level, BlockPos bed, int radius) {
+        if (bed == null) return null;
+        return place(level, bed, bed.getY() + 1, radius);
+    }
+
+    /**
+     * Seats a source where there is no spring yet, so it can open one for itself.
+     *
+     * <p>Used when an earthquake has changed the plumbing somewhere that now qualifies. Unlike the
+     * other two entry points there is no pool to inherit, so the source starts with no outlet and
+     * bores its way up to make one - which is also why the mound it builds on the way is the only
+     * warning the surface gets.</p>
+     */
+    public static BlockPos seedSourceAt(ServerLevel level, int x, int z, int groundY) {
+        BlockPos at = place(level, new BlockPos(x, groundY - 2, z), groundY - 1,
+                4 + level.random.nextInt(3));
+        if (at != null && level.getBlockEntity(at) instanceof SpringSourceBlockEntity be) {
+            be.clearOutlet();     // nothing above yet: start climbing on the next tick
+        }
+        return at;
+    }
+
+    /**
+     * @param bed    the pool's warm bed, which the source remembers so it can tell later whether
+     *               its own pool is still there. Not necessarily straight above the source: on
+     *               broken ground the cutter puts the bed wherever the basin actually formed.
+     * @param waterY the pool's water level, which fixes how deep the source is seated
+     */
+    private static BlockPos place(ServerLevel level, BlockPos bed, int waterY, int radius) {
+        int y = waterY - SOURCE_DEPTH;
+        if (y <= level.getMinBuildHeight() + 4) return null;      // too shallow a world here
+        BlockPos at = new BlockPos(bed.getX(), y, bed.getZ());
+        BlockState existing = level.getBlockState(at);
+        if (existing.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(existing)) return null;
+
+        level.setBlock(at, ModBlocks.SPRING_SOURCE.get().defaultBlockState(), 2);
+        if (level.getBlockEntity(at) instanceof SpringSourceBlockEntity be) {
+            be.setPoolRadius(radius);
+            be.setOutlet(bed);
+        }
+        return at;
+    }
+
+    /**
+     * Cuts a single spring pool at a given spot. Public so the deep source can rebuild its own
+     * outlet with exactly the geometry the generator would have used, rather than a second,
+     * subtly different pool cutter drifting out of step with this one.
+     *
+     * <p>Returns <b>where the warm bed actually went</b>, which is not always the middle: on broken
+     * ground the centre column can fall outside the basin, and the bed then goes to a cell that is
+     * inside it. A source that assumed the middle would never find its own pool again, decide it
+     * had been destroyed, and cut another one every couple of seconds forever.</p>
+     *
+     * @return the bed position, or null if this spot will not hold a pool
+     */
+    public static BlockPos carvePoolAt(ServerLevel level, int x, int z, int waterY, int radius) {
+        return carveTerrace(level, x, z, waterY, radius, new java.util.HashSet<>());
     }
 
     /**
@@ -560,7 +647,7 @@ public final class RetrogenHandler {
      * is wrapped on every exposed face so it can never show through a slope.</p>
      *
      */
-    private static boolean carveTerrace(ServerLevel level, int cx, int cz, int waterY, int radius,
+    private static BlockPos carveTerrace(ServerLevel level, int cx, int cz, int waterY, int radius,
                                         java.util.Set<BlockPos> taken) {
         double phaseA = level.random.nextDouble() * Math.PI * 2;
         double phaseB = level.random.nextDouble() * Math.PI * 2;
@@ -572,7 +659,7 @@ public final class RetrogenHandler {
         // ocean empties into the hole, which is the "a spring next to water destroys the water
         // around it" report. The sea was not being deleted; it was running into the pit the spring
         // had just dug for it.
-        if (waterY <= level.getSeaLevel() + 1) return false;
+        if (waterY <= level.getSeaLevel() + 1) return null;
 
         int reach = radius + 2;
 
@@ -582,7 +669,7 @@ public final class RetrogenHandler {
         // had even finished being built.
         for (int dx = -reach - 1; dx <= reach + 1; dx++) {
             for (int dz = -reach - 1; dz <= reach + 1; dz++) {
-                if (TerrainProbe.hasFluidAbove(level, cx + dx, cz + dz)) return false;
+                if (TerrainProbe.hasFluidAbove(level, cx + dx, cz + dz)) return null;
             }
         }
 
@@ -611,7 +698,7 @@ public final class RetrogenHandler {
         }
         // A pool has to be most of its own footprint. Anything less is a puddle in a colour field,
         // and with finite-water mods installed it would drain to nothing and read as empty.
-        if (pool.size() < 6 || pool.size() < footprint * 0.6) return false;
+        if (pool.size() < 6 || pool.size() < footprint * 0.6) return null;
 
         // Take the canopy off the whole terrace - basin and colour bands - before any of it is cut.
         clearSpringCanopy(level, cx, cz, radius + 18);
@@ -725,7 +812,7 @@ public final class RetrogenHandler {
                     level.getBiome(new BlockPos(cx, waterY, cz)).unwrapKey()
                             .map(k -> k.location().toString()).orElse("?"));
         }
-        return true;
+        return bed;
     }
 
 

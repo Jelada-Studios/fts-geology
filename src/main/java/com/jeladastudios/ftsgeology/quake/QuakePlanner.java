@@ -2,6 +2,7 @@ package com.jeladastudios.ftsgeology.quake;
 
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
+import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.tectonics.DepthScale;
 import com.jeladastudios.ftsgeology.tectonics.FaultType;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
@@ -979,9 +980,33 @@ public final class QuakePlanner {
         return s != null && !s.isAir() ? s : (surface != null ? surface : Blocks.STONE.defaultBlockState());
     }
 
+    /**
+     * The mod's own working parts: cores, chambers, igniters and the deep end of a hot spring.
+     *
+     * <h2>Why these are protected outright</h2>
+     * They are machinery rather than landscape, and half of a machine is worse than none - an
+     * orphaned chamber with no core, or a spring source with its conduit cut away, is a broken
+     * world rather than a damaged one. The existing code said as much in a comment and relied on
+     * these blocks failing the natural-terrain test to get it, which held only while
+     * {@code quakeMayBreakBuilds} was off: with that switched on, {@code mayBreakBuilds} let a quake
+     * carve a working geyser in half after all.
+     *
+     * <p>Depth alone is not a substitute. A spring source is seated below anything a quake reaches,
+     * but a quake can lower the ground, and the one after it measures from the new surface.</p>
+     */
+    private static boolean machinery(BlockState s) {
+        return s.is(ModBlocks.GEYSER_CORE.get())
+                || s.is(ModBlocks.GEYSER_CHAMBER.get())
+                || s.is(ModBlocks.GEYSER_IGNITER.get())
+                || s.is(ModBlocks.VOLCANO_CORE.get())
+                || s.is(ModBlocks.VOLCANO_IGNITER.get())
+                || s.is(ModBlocks.SPRING_SOURCE.get());
+    }
+
     /** May the quake remove this block? Never bedrock; never a build unless explicitly allowed. */
     private static boolean carvable(BlockState s, boolean mayBreakBuilds) {
         if (s == null || s.is(Blocks.BEDROCK)) return false;
+        if (machinery(s)) return false;
         return mayBreakBuilds || !EruptionHandler.isPlayerPlaced(s);
     }
 
@@ -990,6 +1015,7 @@ public final class QuakePlanner {
         if (s == null || s.isAir() || s.is(Blocks.BEDROCK)) return false;
         if (!s.getFluidState().isEmpty()) return false;
         if (TerrainProbe.isVegetation(s)) return false;   // nothing to carry; it is just ground cover
+        if (machinery(s)) return false;
         return mayBreakBuilds || !EruptionHandler.isPlayerPlaced(s);
     }
 }

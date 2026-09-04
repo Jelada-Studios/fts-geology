@@ -154,8 +154,17 @@ public final class WaterTable {
             double subdual = GeyserConfig.WATER_TABLE_SUBDUAL.get();
             int head = (int) Math.round(base + (regional - base) * subdual) - unsaturated;
 
-            // A connected aquifer still cannot drain below the ocean it discharges into.
-            head = Math.max(head, sea);
+            // A coastal aquifer cannot sit below the ocean it discharges into - but only a coastal
+            // one. Clamping every column to sea level was the second version of the same mistake
+            // the datum had: measured on ordinary lowland, it decided the water table for 93.8% of
+            // desert columns, which pinned tableY at 63 and made the reported depth simply "how far
+            // above the sea am I". That is why a desert and a temperate hill read identically in
+            // testing - the dry-zone setting could not show through at all.
+            //
+            // Inland the table is allowed below the valley floor. That is not an error state: it is
+            // what a dry valley is, and a desert should have them.
+            if (base < sea) head = Math.max(head, sea);
+            head = Math.max(head, level.getMinBuildHeight() + 1);
 
             // Water cannot stand above the land. Where it wants to, it comes out instead - which is
             // what isSpringLine() reads off the uncapped head.

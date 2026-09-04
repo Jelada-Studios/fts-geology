@@ -154,7 +154,8 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_HUMID;
     public static final ForgeConfigSpec.BooleanValue SPRING_RENEWAL_ENABLED;
     public static final ForgeConfigSpec.IntValue SPRING_RENEWAL_DELAY_TICKS;
-    public static final ForgeConfigSpec.IntValue SPRING_RENEWAL_SEARCH;    // how far an outlet may move
+    public static final ForgeConfigSpec.BooleanValue QUAKES_OPEN_NEW_SPRINGS;
+    public static final ForgeConfigSpec.DoubleValue QUAKE_SPRING_CHANCE;   // per magnitude over 3
 
     // --- Instruments ---------------------------------------------------------
     public static final ForgeConfigSpec.IntValue SEISMOGRAPH_RANGE;   // blocks a station can hear
@@ -743,27 +744,40 @@ public final class GeyserConfig {
                         "More rain goes in than drains away again, so the water is at your ankles.")
                 .defineInRange("waterTableDepthHumid", 3, 0, 64);
         SPRING_RENEWAL_ENABLED = b
-                .comment("Let a buried hot spring come back.",
-                        "An earthquake reaches about 24 blocks down; the heat feeding a spring is",
-                        "deeper than that, so a quake does not destroy a spring, it blocks the",
-                        "outlet - and an outlet still being pushed from below does not stay",
-                        "blocked. The 1959 Hebgen Lake quake changed dozens of Yellowstone geysers",
-                        "and switched none of them off.",
-                        "A column with anything player-built in it is never touched, whatever this",
-                        "is set to.")
+                .comment("Let a buried hot spring work its way back to the surface.",
+                        "Every spring has a source seated far below the depth an earthquake reaches",
+                        "(24 blocks). A quake therefore cannot destroy a spring, only block its",
+                        "outlet, and an outlet still being pushed from below does not stay blocked:",
+                        "the source bores a conduit back up, lining it with sinter as it climbs, and",
+                        "cuts a fresh pool wherever it gets out. That is how the 1959 Hebgen Lake",
+                        "quake left Yellowstone - outlets moved, deposits left behind at the old",
+                        "ones, and not one system switched off.",
+                        "Turning this off freezes every source where it is. A column with anything",
+                        "player-built in it is never bored through, whatever this is set to.")
                 .define("springRenewalEnabled", true);
         SPRING_RENEWAL_DELAY_TICKS = b
-                .comment("Ticks between a spring losing its water and the vent re-opening.",
-                        "This is a recovery, not an undo, so it should not be instant: the delay is",
-                        "what makes it read as the ground settling rather than as damage failing to",
-                        "stick. 1200 ticks is one minute. Set it low if you are testing.")
+                .comment("Ticks before a spring with no source of its own is given one.",
+                        "Only affects springs generated before sources existed - they get one the",
+                        "first time anything disturbs them, and look after themselves from then on.",
+                        "Springs that already have a source do not wait: the source watches its own",
+                        "pool and starts climbing as soon as it goes. 1200 ticks is one minute.")
                 .defineInRange("springRenewalDelayTicks", 1200, 20, 1728000);
-        SPRING_RENEWAL_SEARCH = b
-                .comment("How far, in blocks, a sealed spring may look for a new outlet.",
-                        "When the old vent is buried too deep to clear, the water comes up wherever",
-                        "the water table next reaches the surface within this distance. Set to 0 to",
-                        "make springs only ever re-open in the exact hole they were in.")
-                .defineInRange("springRenewalSearch", 16, 0, 64);
+        QUAKES_OPEN_NEW_SPRINGS = b
+                .comment("Let an earthquake open a hot spring where there was not one.",
+                        "Shaking the crust changes how easily water moves through it: some cracks",
+                        "close, others open, and water that had no way to the surface finds one.",
+                        "The 1959 Hebgen Lake quake did this at Yellowstone within days.",
+                        "Three things still have to line up - heat below, groundwater reaching the",
+                        "surface, and no spring already there - so most ruptures produce nothing,",
+                        "and at most one new spring is opened per quake.")
+                .define("quakesOpenNewSprings", true);
+        QUAKE_SPRING_CHANCE = b
+                .comment("Chance of a new spring per point of magnitude above 3.",
+                        "At the default an M4 quake has roughly a 6% chance and an M8 about 30%,",
+                        "before the geological conditions above are even checked. Raise it if you",
+                        "want a world that visibly rearranges itself; set quakesOpenNewSprings to",
+                        "false to switch the whole thing off.")
+                .defineInRange("quakeSpringChance", 0.06D, 0.0D, 1.0D);
         b.pop();
 
         SPEC = b.build();

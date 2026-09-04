@@ -383,18 +383,36 @@ public final class TectonicCommands {
         // Groundwater. Printed here rather than in its own command because the question it answers
         // - why is there a spring on this ledge and not that one - is a question about the section.
         var w = com.jeladastudios.ftsgeology.hydrology.WaterTable.sample(level, at.getX(), at.getZ());
-        if (w.isSpringLine(level.getSeaLevel())) {
+
+        // Depth is measured to the ground that is actually here, not to the one the generator would
+        // have made. The model has to use the generator height - that is what lets it answer for
+        // columns nowhere near a loaded chunk - but the two part company wherever the mod has since
+        // built something, and a volcano is 40 blocks of exactly that. Reporting the generator
+        // figure to a player standing on a summit tells them the water is a few blocks down when it
+        // is under the whole cone.
+        final int ground = top;
+        int depth = Math.max(0, ground - w.tableY());
+        if (w.head() >= ground && ground > level.getSeaLevel()) {
             source.sendSuccess(() -> Component.translatable(
-                    "command.fts_geology.column.spring_line", w.tableY(), w.artesianHead())
+                    "command.fts_geology.column.spring_line", w.tableY(), w.head() - ground)
                     .withStyle(ChatFormatting.AQUA), false);
         } else {
+            final int d = depth;
             source.sendSuccess(() -> Component.translatable(
-                    "command.fts_geology.column.water_table", w.tableY(), w.depthToWater())
+                    "command.fts_geology.column.water_table", w.tableY(), d)
                     .withStyle(ChatFormatting.AQUA), false);
         }
         source.sendSuccess(() -> Component.translatable(
                 "command.fts_geology.column.water_detail", w.base(), w.regional(), w.unsaturated())
                 .withStyle(ChatFormatting.DARK_GRAY), false);
+        // Say so when the ground here is not the ground the generator made, so a reading taken on a
+        // volcano or in a quake scar can be understood rather than reported as a wrong number.
+        if (Math.abs(ground - w.localSurface()) >= 3) {
+            source.sendSuccess(() -> Component.translatable(
+                    "command.fts_geology.column.ground_moved",
+                    ground - w.localSurface(), w.localSurface())
+                    .withStyle(ChatFormatting.DARK_GRAY), false);
+        }
         if (s.stress() < 0.25 && s.faultType() != FaultType.INTERIOR) {
             source.sendSuccess(() -> Component.translatable("command.fts_geology.stress_is_below_0_25_so_this_column_is_o")
                     .withStyle(ChatFormatting.YELLOW), false);
