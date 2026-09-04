@@ -55,6 +55,9 @@ public final class EmergentGeyserHandler {
 
     /** Scans a bounded box around a point for one ignitable setup; ignites the first found. */
     private static void scanAround(ServerLevel level, BlockPos centre) {
+        // A rupture shears water and lava past each other constantly while it is being applied, so
+        // scanning mid-quake reads those transients as a geyser waiting to happen and lights them.
+        if (com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(level, centre)) return;
         int r = GeyserConfig.EMERGENT_SCAN_RADIUS.get();
         int lavaDepth = GeyserConfig.EMERGENT_LAVA_DEPTH.get();
         int minWater = GeyserConfig.EMERGENT_MIN_WATER.get();

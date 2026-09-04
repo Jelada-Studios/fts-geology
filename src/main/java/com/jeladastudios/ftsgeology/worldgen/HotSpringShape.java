@@ -47,6 +47,15 @@ public final class HotSpringShape {
     /** How far past the pool the untouched reference ring is read. */
     private static final int REFERENCE_GAP = 2;
 
+    /**
+     * The furthest {@link #poolCells} can wobble, as a multiple of the nominal radius.
+     *
+     * <p>The edge is {@code radius * (1 + 0.22 sin(2a) + 0.12 sin(3a))}, so it peaks at 1.34 when
+     * both terms crest together. Anything that has to stay clear of the pool measures from here
+     * rather than assuming the radius.</p>
+     */
+    private static final double MAX_WOBBLE = 1.34;
+
     /** How far above the water line the pool clears its overburden. */
     private static final int OVERBURDEN_CUT = 3;
 
@@ -196,9 +205,26 @@ public final class HotSpringShape {
      * walked itself 49 blocks downhill. The reference ring lies beyond the stage radius, so it is
      * still the land the spring arrived in however many times this runs.</p>
      */
+    /**
+     * The ground this spring's water line is read from: a ring outside anything it can reach.
+     *
+     * <h2>Why the ring is placed by the wobble and not by a constant</h2>
+     * It used to sit at {@code radius + 2}. But {@link #poolCells} floods to a wobbled edge that
+     * reaches {@code 1.34 * radius}, and {@link #build} floors an admitted cell down to
+     * {@code waterY - 1} even where the ground stood two blocks above it. At stage 4 that put the
+     * pool's own edge 1.4 blocks inside its own reference ring, so every rebuild lowered part of the
+     * ground the next datum would be measured from. Measured: a stage 4 spring sank 2 blocks over 20
+     * rebuilds and 6 over 200, entirely under its own weight. Stages 1 and 2 were clear, stage 3
+     * overlapped by 0.4.
+     *
+     * <p>This is the same downhill ratchet that buried springs before, in its last hiding place, and
+     * it is only reachable by something that re-measures a datum - which is exactly what recovering
+     * from an earthquake has to do. So the gap is derived from the reach rather than guessed: the
+     * ring starts past the furthest the pool can ever wobble, at every stage, permanently.</p>
+     */
     private static int waterLine(ServerLevel level, int x, int z, int radius) {
         List<Integer> heights = new ArrayList<>();
-        int inner = radius + REFERENCE_GAP, outer = inner + 2;
+        int inner = (int) Math.ceil(radius * MAX_WOBBLE) + REFERENCE_GAP, outer = inner + 2;
         for (int dx = -outer; dx <= outer; dx++) {
             for (int dz = -outer; dz <= outer; dz++) {
                 int d2 = dx * dx + dz * dz;

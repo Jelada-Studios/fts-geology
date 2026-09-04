@@ -583,8 +583,13 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         int startY = ventTopY != UNKNOWN_MOUTH_Y
                 ? ventTopY
                 : pos.getY() + GeyserConfig.CHAMBER_TARGET_HEIGHT.get();
-        BlockPos mouth = VentPathfinder.trace(level, pos, startY, ceilingY, pressure, active);
-        if (active && (ventTopY == UNKNOWN_MOUTH_Y || mouth.getY() > ventTopY)) {
+        // Boring is suspended while the ground overhead is still being rearranged: the vent would be
+        // cut through rock that is about to move, and the frontier it recorded would then point into
+        // the middle of nowhere. The column it has already bored is left exactly as it is.
+        boolean bore = active
+                && !com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(level, pos);
+        BlockPos mouth = VentPathfinder.trace(level, pos, startY, ceilingY, pressure, bore);
+        if (bore && (ventTopY == UNKNOWN_MOUTH_Y || mouth.getY() > ventTopY)) {
             ventTopY = mouth.getY(); // advance the frontier so next second resumes here
         }
         this.currentMouth = mouth;

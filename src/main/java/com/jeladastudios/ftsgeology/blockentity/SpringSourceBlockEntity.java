@@ -4,6 +4,7 @@ import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.eruption.VentPathfinder;
+import com.jeladastudios.ftsgeology.quake.QuakeQuiet;
 import com.jeladastudios.ftsgeology.registry.ModBlockEntities;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.worldgen.HotSpringShape;
@@ -139,6 +140,15 @@ public class SpringSourceBlockEntity extends BlockEntity {
     private long lastRebuild = Long.MIN_VALUE;
 
     /**
+     * Release time of the last quake zone this spring has already re-sited for.
+     *
+     * <p>The one-shot stamp that stops {@link #resiteAfterQuake} from re-measuring the datum more
+     * than once per earthquake. Without it that method would run on every check and become the
+     * downhill ratchet it is carefully written not to be.</p>
+     */
+    private long resitedFor = Long.MIN_VALUE;
+
+    /**
      * The original ground level at the outlet, measured once and then kept.
      *
      * <p>Every pool this line ever builds is sited from this, not from a reading of the ground as
@@ -234,6 +244,11 @@ public class SpringSourceBlockEntity extends BlockEntity {
         if (!GeyserConfig.SPRING_RENEWAL_ENABLED.get()) return;
         if ((server.getGameTime() + pos.hashCode()) % CHECK_INTERVAL != 0) return;
         if (be.dormant) return;
+        // The ground here is still moving, or still shedding what the quake shook loose. Rebuilding
+        // into it produces the field of wreckage testing found after a quake: a spring that spent
+        // the whole event repairing a pool that was about to be torn up again.
+        if (QuakeQuiet.isQuiet(server, be.outletX, be.outletZ)) return;
+        if (be.resiteAfterQuake(server)) return;
         if (be.adoptOldSave(server)) return;
 
         // A pool somebody has thrown a few blocks into is cleaned out and rebuilt at the age it had
@@ -347,6 +362,69 @@ public class SpringSourceBlockEntity extends BlockEntity {
             }
         }
         return false;
+    }
+
+    /**
+     * Re-sites the spring on the ground a quake left, once per quake.
+     *
+     * <h2>This deliberately re-measures the datum, which is the dangerous thing to do</h2>
+     * {@link #datumY} is normally measured once and kept forever, and that rule exists because
+     * re-measuring is precisely what buried springs three separate times: a rebuild samples the
+     * basin the spring itself dug, sites the next pool lower, and the spring walks into the ground.
+     * The measured drift at its worst was 49 blocks.
+     *
+     * <p>A quake is the one case where the datum is genuinely stale rather than self-inflicted. The
+     * land really did move, the old figure describes ground that no longer exists, and keeping it
+     * would leave the pool hanging in the air or buried - which is the wreckage testing reported.
+     * The deep line is untouched under all of it, so there is something to rebuild from.</p>
+     *
+     * <h2>The three guards that keep it from ratcheting</h2>
+     * <ol>
+     *   <li>Only when a quake zone actually covered this column - not on a timer, not on a failed
+     *       health check, not because a player filled the pool in.</li>
+     *   <li>Once per zone. The release time is stamped on the block entity, so a second tick after
+     *       the same quake does nothing.</li>
+     *   <li>Only after the zone has released, which means the debris has already landed.</li>
+     * </ol>
+     * Together those make the number of re-measurements equal to the number of earthquakes over this
+     * spring, rather than a function of how long the chunk stays loaded.
+     *
+     * @return true if this tick was spent re-siting
+     */
+    private boolean resiteAfterQuake(ServerLevel level) {
+        long release = QuakeQuiet.releaseAt(level, outletX, outletZ);
+        if (release == Long.MIN_VALUE) return false;       // no quake has been through here
+        if (release <= resitedFor) return false;           // already dealt with this one
+        resitedFor = release;
+
+        if (!surfaced || stage <= 0) {
+            setChanged();
+            return false;                                   // never had a pool; let it climb
+        }
+
+        int fresh = HotSpringShape.datumFor(level, outletX, outletZ);
+        if (fresh == Integer.MIN_VALUE) {
+            setChanged();
+            return false;
+        }
+        if (fresh == datumY) {
+            setChanged();
+            return false;                                   // the ground here did not actually move
+        }
+
+        int moved = fresh - datumY;
+        datumY = fresh;
+        rebuilds = 0;
+        lastRebuild = Long.MIN_VALUE;
+        if (!applyStage(level, stage)) {
+            surfaced = false;                               // no pool fits here now; go looking
+            setChanged();
+            return false;
+        }
+        GeysersMod.LOGGER.info("Spring at {},{} re-sited after a quake: ground moved {} blocks",
+                outletX, outletZ, moved);
+        setChanged();
+        return true;
     }
 
     /**
@@ -661,6 +739,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
         tag.putBoolean("Surfaced", surfaced);
         tag.putInt("Rebuilds", rebuilds);
         tag.putLong("LastRebuild", lastRebuild);
+        tag.putLong("ResitedFor", resitedFor);
     }
 
     @Override
@@ -694,5 +773,6 @@ public class SpringSourceBlockEntity extends BlockEntity {
                 : outletY != Integer.MIN_VALUE;
         rebuilds = tag.getInt("Rebuilds");
         lastRebuild = tag.contains("LastRebuild") ? tag.getLong("LastRebuild") : Long.MIN_VALUE;
+        resitedFor = tag.contains("ResitedFor") ? tag.getLong("ResitedFor") : Long.MIN_VALUE;
     }
 }

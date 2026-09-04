@@ -222,6 +222,9 @@ public final class Earthquake {
                 }, Util.backgroundExecutor())
                 .thenAcceptAsync(plan -> {
                     ACTIVE.add(new Running(dim, plan, startAt));
+                    // Everything geothermal in the corridor stands down until the ground has
+                    // stopped moving AND the debris has landed. See QuakeQuiet.
+                    QuakeQuiet.open(level, plan.epicentre(), plan.ruptureLength());
                     GeysersMod.LOGGER.info("quake apply starting: {} edits queued", plan.edits().size());
                 }, level.getServer())
                 .exceptionally(t -> {
@@ -236,6 +239,7 @@ public final class Earthquake {
         ACTIVE.clear();
         PendingEdits.clear();
         Weathering.clear();
+        QuakeQuiet.clear();     // nothing left to settle, so nothing left to wait for
         return n;
     }
 
@@ -259,6 +263,13 @@ public final class Earthquake {
         // Ground the last quake tore up goes on settling in the background.
         Weathering.drain(event.getServer(),
                 com.jeladastudios.ftsgeology.util.TickBudget.slice(0.3));
+
+        // Release quiet zones whose debris has finished coming down. Done after the drain above, so
+        // a zone can be released on the same tick the last of its talus lands.
+        boolean settled = Weathering.settled();
+        for (ServerLevel l : event.getServer().getAllLevels()) {
+            QuakeQuiet.tick(l, settled);
+        }
 
         if (ACTIVE.isEmpty()) return;
         int budget = GeyserConfig.QUAKE_BLOCKS_PER_TICK.get();
@@ -307,8 +318,13 @@ public final class Earthquake {
                 GeysersMod.LOGGER.info("quake finished: {} blocks over {} ticks", run.applied, run.ticks);
                 // The shaking stops, but the ground it left is raw. Let it relax.
                 Weathering.enqueue(level, run.plan.edits());
+                // The corridor stays shut until that settling is done - the rupture ending is not
+                // the same thing as the ground being still.
+                QuakeQuiet.settling(level, run.plan.epicentre());
                 // And the plumbing under it has been rearranged, which is how a quake opens a
-                // spring that was not there before.
+                // spring that was not there before. Seeded now, but the source it plants will not
+                // start climbing until the zone releases, so it does not bore up through a slope
+                // that is still coming down.
                 com.jeladastudios.ftsgeology.hydrology.SpringSeeding.afterQuake(
                         level, run.plan.epicentre(), run.plan.ruptureLength(), run.plan.magnitude());
             }

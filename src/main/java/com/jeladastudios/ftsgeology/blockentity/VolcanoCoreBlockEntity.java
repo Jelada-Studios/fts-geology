@@ -92,6 +92,10 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         switch (be.phase) {
             case DORMANT -> {
                 if (!hasLava(server, pos)) return; // dead until it has lava again
+                // Does not wake up into ground a quake is still moving. An eruption already under
+                // way is left to finish - it is the starting of new work that produces the ruin,
+                // not the finishing of old.
+                if (com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(server, pos)) return;
                 be.idleSmoke(server, summit, 0.4f, true); // lazy smoke off the crater + a vent or two
                 if ((be.timer -= 20) <= 0) {
                     be.phase = Phase.RUMBLING;

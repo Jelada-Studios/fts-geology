@@ -248,6 +248,17 @@ public final class Weathering {
     }
 
     /** Relaxes a slice of the corridor. Bounded by both a column count and a wall-clock deadline. */
+    /**
+     * Has everything the last quake shook loose finished coming down?
+     *
+     * <p>Asked by {@link QuakeQuiet} before it lets springs and volcanoes rebuild. Rebuilding into
+     * ground that is still shedding talus produces a pool that is fouled the moment it is finished.
+     * </p>
+     */
+    public static synchronized boolean settled() {
+        return QUEUE.isEmpty();
+    }
+
     public static void drain(MinecraftServer server, long budgetNanos) {
         if (QUEUE.isEmpty() || server == null) return;
         long deadline = System.nanoTime() + budgetNanos;

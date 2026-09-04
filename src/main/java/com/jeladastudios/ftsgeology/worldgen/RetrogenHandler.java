@@ -210,6 +210,16 @@ public final class RetrogenHandler {
                 LevelChunk chunk = level.getChunkSource().getChunkNow(q.pos().x, q.pos().z);
                 if (chunk == null) continue;
 
+                // Ground a quake is still working on, or still shedding debris into. Building a
+                // volcano or a spring field into it wastes the feature - this chunk gets exactly
+                // one geology pass ever, and spending it on land that is about to move is spending
+                // it on wreckage. Put it back and take it again when the ground is still.
+                if (com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(
+                        level, q.pos().getMiddleBlockX(), q.pos().getMiddleBlockZ())) {
+                    QUEUE.add(q);
+                    continue;
+                }
+
                 String key = keyOf(level, chunk);
                 try {
                     if (q.deepOnly()) {

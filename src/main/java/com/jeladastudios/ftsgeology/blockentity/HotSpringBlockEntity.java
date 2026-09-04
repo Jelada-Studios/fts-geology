@@ -84,7 +84,11 @@ public class HotSpringBlockEntity extends BlockEntity {
                     e.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 60, 0, true, false));
                 }
             }
-            thawAround(server, pos, r);
+            // Not while the ground is moving: this writes air and water over an 8-block box every
+            // second, which fights the deformation and the blocks settling out of it.
+            if (!com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(server, pos)) {
+                thawAround(server, pos, r);
+            }
         }
     }
 
