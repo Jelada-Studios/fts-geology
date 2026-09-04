@@ -72,6 +72,12 @@ public class SpringSourceBlockEntity extends BlockEntity {
     /** Ticks in a Minecraft day. */
     private static final long DAY = 24000L;
 
+    /** Shortest gap between two rebuilds of the same pool, in ticks. */
+    private static final int REBUILD_COOLDOWN = 600;
+
+    /** Rebuilds in a row before the spring stops trying and says why, once. */
+    private static final int REBUILD_LIMIT = 8;
+
 
 
 
@@ -99,6 +105,22 @@ public class SpringSourceBlockEntity extends BlockEntity {
 
     /** Set when the outlet came out at the waterline, where no pool can be held. */
     private boolean dormant;
+
+    /**
+     * The pool this spring last built, packed by column.
+     *
+     * <p>Kept because it is the only honest denominator for {@link HotSpringShape#health}. Asking
+     * how wet a disc of {@code radiusFor(stage)} is counts the pool's own rim against it, and a
+     * healthy spring then never scores well enough to be left alone.</p>
+     */
+    private long[] poolCells = new long[0];
+
+    /** Set once the conduit has reached daylight. A surfaced spring never re-opens its own vent. */
+    private boolean surfaced;
+
+    /** Rebuilds since the last time the pool was found intact, and when the last one happened. */
+    private int rebuilds;
+    private long lastRebuild = Long.MIN_VALUE;
 
     /**
      * The original ground level at the outlet, measured once and then kept.
@@ -188,18 +210,40 @@ public class SpringSourceBlockEntity extends BlockEntity {
         // A pool somebody has thrown a few blocks into is cleaned out and rebuilt at the age it had
         // reached. Only a pool that is mostly buried counts as a blocked outlet.
         if (be.datumY != Integer.MIN_VALUE && be.stage > 0) {
-            HotSpringShape.Health h = HotSpringShape.health(
-                    server, be.outletX, be.outletZ, be.stage, be.datumY);
-            if (h == HotSpringShape.Health.FOULED) {
+            HotSpringShape.Health h = be.poolHealth(server);
+            if (h == HotSpringShape.Health.FINE) {
+                be.rebuilds = 0;                     // intact: the run of rebuilds is over
+            } else if (h == HotSpringShape.Health.FOULED) {
+                if (be.rebuildBarred(server)) return;
                 be.applyStage(server, be.stage);
+                be.noteRebuild(server);
                 GeysersMod.LOGGER.debug("Spring at {},{} flushed its pool", be.outletX, be.outletZ);
                 return;
             }
         }
 
         if (!be.ventOpen(server)) {
-            // The pool is gone - a quake, a landslide, a player filling it in. Nothing tries to
-            // rescue what was there; the line just starts again from a bare vent.
+            // The pool is gone - a quake, a landslide, a player filling it in.
+            //
+            // A spring that has already reached daylight does NOT go back to climbing. It used to,
+            // and since climb() re-opens the vent unconditionally the moment the conduit stands at
+            // or above the ground - which it does forever, once it has surfaced - every failed
+            // check rebuilt the spring from stage 1. That is the 2-second cycle testing saw, the
+            // 450 "broke surface" lines from six sources, and the stage 1 puddle sitting in the
+            // middle of its own stage 4 basin.
+            //
+            // What a blocked spring actually does is find the next weakness a few metres to one
+            // side. So it stalls towards that instead.
+            if (be.surfaced) {
+                if (be.rebuildBarred(server)) return;
+                be.stalled++;
+                be.setChanged();
+                if (be.stalled >= STALL_LIMIT && server.getGameTime() % 1200L == 0L) {
+                    be.stepAside(server, pos);
+                }
+                return;
+            }
+
             if (be.stage != 0) {
                 be.stage = 0;
                 be.stageSince = server.getGameTime();
@@ -241,21 +285,71 @@ public class SpringSourceBlockEntity extends BlockEntity {
     /** Is there still water at the vent? Two lookups, and the common case. */
     private boolean ventOpen(ServerLevel level) {
         if (outletY == Integer.MIN_VALUE) return false;
-        if (datumY == Integer.MIN_VALUE) {
+        if (datumY == Integer.MIN_VALUE || poolCells.length == 0) {
             return !level.getBlockState(new BlockPos(outletX, outletY, outletZ))
                     .getFluidState().isEmpty();
         }
         // Asked of the whole basin. Testing one column meant filling in any part of a pool except
         // the block over the bed did nothing at all, which is exactly what testing reported.
-        return HotSpringShape.health(level, outletX, outletZ, Math.max(1, stage), datumY)
-                != HotSpringShape.Health.BLOCKED;
+        return poolHealth(level) != HotSpringShape.Health.BLOCKED;
+    }
+
+    /** The state of the pool this spring last built. */
+    private HotSpringShape.Health poolHealth(ServerLevel level) {
+        if (datumY == Integer.MIN_VALUE || poolCells.length == 0) {
+            return HotSpringShape.Health.BLOCKED;
+        }
+        return HotSpringShape.health(level, poolCells, datumY - 1);
+    }
+
+    /**
+     * Is this spring rebuilding too often to be believed?
+     *
+     * <p>Two guards, because the failure they catch is the same one twice. A spring that cannot
+     * hold its pool used to rebuild every {@link #CHECK_INTERVAL} for as long as the chunk stayed
+     * loaded, and each rebuild is a real edit to the world - measured at 177 on one source in a
+     * single session. The cooldown makes that at worst one edit every 30 seconds, and after
+     * {@link #REBUILD_LIMIT} in a row the spring stops and says so once, rather than filling the
+     * log and grinding the site down.</p>
+     */
+    private boolean rebuildBarred(ServerLevel level) {
+        long now = level.getGameTime();
+        if (lastRebuild != Long.MIN_VALUE && now - lastRebuild < REBUILD_COOLDOWN) return true;
+        if (rebuilds >= REBUILD_LIMIT) {
+            if (!dormant) {
+                dormant = true;
+                setChanged();
+                GeysersMod.LOGGER.info(
+                        "Spring at {},{} could not hold its pool after {} rebuilds; dormant",
+                        outletX, outletZ, rebuilds);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private void noteRebuild(ServerLevel level) {
+        lastRebuild = level.getGameTime();
+        rebuilds++;
+        setChanged();
     }
 
     // === Climbing ===========================================================
 
-    /** One step of the climb: bore a little further, and open the vent on arrival. */
+    /**
+     * One step of the climb: bore a little further, and open the vent on arrival.
+     *
+     * <h2>The ground, not the canopy</h2>
+     * The target used to come from a raw {@link Heightmap.Types#WORLD_SURFACE} lookup, which counts
+     * leaves. Under a tree that reads several blocks high, so the conduit kept climbing towards the
+     * canopy and surfaced above the real ground - the 90 to 93 climb in the logs. TerrainProbe's own
+     * javadoc warns about exactly this, and the warning was there before this method was written.
+     */
     private void climb(ServerLevel level, BlockPos pos) {
-        int ground = level.getHeight(Heightmap.Types.WORLD_SURFACE, pos.getX(), pos.getZ());
+        int probed = TerrainProbe.groundY(level, pos.getX(), pos.getZ());
+        int ground = probed != Integer.MIN_VALUE
+                ? probed
+                : level.getHeight(Heightmap.Types.WORLD_SURFACE, pos.getX(), pos.getZ());
         int ceiling = ground + CEILING_ALLOWANCE;
         if (mouthY == Integer.MIN_VALUE) mouthY = pos.getY() + 1;
 
@@ -357,12 +451,17 @@ public class SpringSourceBlockEntity extends BlockEntity {
         stalled = 0;
         // Water reaching daylight IS a spring, immediately - a small one. The stages after this are
         // it getting older, not it appearing.
-        if (!applyStage(level, 1)) {
+        //
+        // This is also the only place the canopy comes off: the trees go because a spring arrived
+        // here, not because it is still here. Rebuilds pass false and leave the wood alone.
+        if (!applyStage(level, 1, true)) {
             stalled++;
             setChanged();
             return;
         }
         stage = 1;
+        surfaced = true;
+        rebuilds = 0;
         stageSince = level.getGameTime();
         GeysersMod.LOGGER.info("Spring line at {} broke surface at Y {}, carrying {}",
                 pos, ground, deposit().getBlock().getName().getString());
@@ -382,13 +481,21 @@ public class SpringSourceBlockEntity extends BlockEntity {
      * arguments it gets.</p>
      */
     private boolean applyStage(ServerLevel level, int toStage) {
+        return applyStage(level, toStage, false);
+    }
+
+    private boolean applyStage(ServerLevel level, int toStage, boolean clearTrees) {
         if (datumY == Integer.MIN_VALUE) {
             datumY = HotSpringShape.datumFor(level, outletX, outletZ);
             if (datumY == Integer.MIN_VALUE) return false;
         }
-        List<BlockPos> pool = HotSpringShape.build(level, outletX, outletZ, toStage, datumY);
+        List<BlockPos> pool =
+                HotSpringShape.build(level, outletX, outletZ, toStage, datumY, clearTrees);
         if (pool.isEmpty()) return false;
         outletY = pool.get(0).getY();
+        // Remembered so health() can ask about the pool that exists rather than the disc it might
+        // have filled. See HotSpringShape.health.
+        poolCells = HotSpringShape.pack(pool);
         setChanged();
         return true;
     }
@@ -436,6 +543,12 @@ public class SpringSourceBlockEntity extends BlockEntity {
         stage = 0;
         stageSince = level.getGameTime();
         stalled = 0;
+        // A new outlet has not surfaced yet, and its pool does not exist. Both have to be cleared
+        // or the spring would keep answering questions about the basin it just walked away from.
+        surfaced = false;
+        poolCells = new long[0];
+        rebuilds = 0;
+        lastRebuild = Long.MIN_VALUE;
         setChanged();
         return true;
     }
@@ -457,6 +570,10 @@ public class SpringSourceBlockEntity extends BlockEntity {
         tag.putInt("DatumY", datumY);
         tag.putInt("Carbonate", carbonate);
         tag.putInt("Volcanic", volcanic);
+        tag.putLongArray("PoolCells", poolCells);
+        tag.putBoolean("Surfaced", surfaced);
+        tag.putInt("Rebuilds", rebuilds);
+        tag.putLong("LastRebuild", lastRebuild);
     }
 
     @Override
@@ -474,5 +591,13 @@ public class SpringSourceBlockEntity extends BlockEntity {
         datumY = tag.contains("DatumY") ? tag.getInt("DatumY") : Integer.MIN_VALUE;
         carbonate = tag.getInt("Carbonate");
         volcanic = tag.getInt("Volcanic");
+        poolCells = tag.getLongArray("PoolCells");
+        // Springs saved before the pool was recorded have surfaced if they have an outlet: without
+        // this they would go back to climbing and re-open a vent that is already open.
+        surfaced = tag.contains("Surfaced")
+                ? tag.getBoolean("Surfaced")
+                : outletY != Integer.MIN_VALUE && stage > 0;
+        rebuilds = tag.getInt("Rebuilds");
+        lastRebuild = tag.contains("LastRebuild") ? tag.getLong("LastRebuild") : Long.MIN_VALUE;
     }
 }

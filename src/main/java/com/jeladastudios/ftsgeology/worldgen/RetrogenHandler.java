@@ -572,8 +572,17 @@ public final class RetrogenHandler {
         return true;
     }
 
-    /** How far under the pool the source sits. Must clear the quake's reach, which is 24. */
-    private static final int SOURCE_DEPTH = 28;
+    /**
+     * How far under the pool the source sits.
+     *
+     * <p>Must clear the quake's reach, which is {@code QuakePlanner.MAX_CAPTURE_DEPTH} = 24. It sits
+     * at twice that rather than just past it, so that the deep end reads as deep when a player digs
+     * for it, and so a quake that drops the surface still cannot get near it.</p>
+     */
+    private static final int SOURCE_DEPTH = 50;
+
+    /** The shallowest the source may sit under the surface and still be out of a quake's reach. */
+    private static final int MIN_SOURCE_DEPTH = 28;
 
     /**
      * Puts in a mineral water line at this spot and runs it up to a finished spring.
@@ -660,8 +669,11 @@ public final class RetrogenHandler {
      * @param groundY surface height there, which fixes how deep the line is seated
      */
     private static BlockPos place(ServerLevel level, BlockPos at, int groundY, int radius) {
-        int y = groundY - SOURCE_DEPTH;
-        if (y <= level.getMinBuildHeight() + 4) return null;      // too shallow a world here
+        // Pulled up rather than refused where the world floor is close: a shallow site still gets a
+        // spring, just one whose deep end is nearer. It is only abandoned if it cannot be seated
+        // deeper than a quake can dig.
+        int y = Math.max(groundY - SOURCE_DEPTH, level.getMinBuildHeight() + 5);
+        if (groundY - y < MIN_SOURCE_DEPTH) return null;           // too shallow a world here
         BlockPos src = new BlockPos(at.getX(), y, at.getZ());
         BlockState existing = level.getBlockState(src);
         if (existing.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(existing)) return null;
