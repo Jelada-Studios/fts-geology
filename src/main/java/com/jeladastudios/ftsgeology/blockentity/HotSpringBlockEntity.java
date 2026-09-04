@@ -30,12 +30,6 @@ import net.minecraft.world.phys.AABB;
  */
 public class HotSpringBlockEntity extends BlockEntity {
 
-    /**
-     * Whether this bed has already reported that its pool is dry, so it says so once and not every
-     * second for the rest of the world's life.
-     */
-    private boolean reportedDry;
-
     public HotSpringBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.HOT_SPRING.get(), pos, state);
     }
@@ -44,31 +38,13 @@ public class HotSpringBlockEntity extends BlockEntity {
         if (!(level instanceof ServerLevel server)) return;
         long time = server.getGameTime();
 
-        // Does this spring still have its water?
+        // The bed does not watch its own pool any more.
         //
-        // This started as a diagnostic: terraced springs kept coming out dry and the check at
-        // generation time never fired once, so the loss had to be happening later and the only way
-        // to catch it was to look later. The bed sits directly under its own pool, so "no fluid
-        // above me" is exactly the symptom.
-        //
-        // It is now also the trigger for renewal. That is deliberately the only trigger: it catches
-        // a quake burying the pool, a landslide, a lava flow capping it, or any future cause,
-        // without any of them having to know the renewal code exists.
-        if (time % 200L == 0L) {
-            boolean dry = server.getBlockState(pos.above()).getFluidState().isEmpty();
-            if (dry && !be.reportedDry) {
-                be.reportedDry = true;
-                com.jeladastudios.ftsgeology.GeysersMod.LOGGER.warn(
-                        "hot spring at {} has no water above it (block above is {})",
-                        pos, server.getBlockState(pos.above()).getBlock());
-                com.jeladastudios.ftsgeology.hydrology.SpringRenewal.request(server, pos);
-            } else if (!dry && be.reportedDry) {
-                // Wet again. Arm the check so a second burial is caught too - a spring that has
-                // recovered once is if anything more likely to be buried again, since whatever
-                // shook the ground down onto it tends to happen more than once in the same place.
-                be.reportedDry = false;
-            }
-        }
+        // It used to, and used to ask for a repair when it went dry. That whole path is gone: the
+        // mineral water line underneath is what knows a spring exists, it checks its own vent every
+        // couple of seconds, and it grows a new pool when there is none. A bed reporting upwards was
+        // an extra way to say the same thing, and it produced its own bugs - a bed buried under a
+        // newer one shouted that it was dry for the life of the world.
 
         // Steam over the whole pool, not just the one column above the vent.
         //

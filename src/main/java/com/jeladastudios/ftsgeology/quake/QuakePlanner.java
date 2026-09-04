@@ -307,7 +307,7 @@ public final class QuakePlanner {
          * One column. The stack is sized per column rather than globally: only the strip that will
          * actually be dug deep - a trench floor, a rift fissure - needs twenty blocks of history.
          */
-        private record Column(int groundY, boolean submerged, BlockState[] stack) {}
+        private record Column(int groundY, boolean submerged, boolean generated, BlockState[] stack) {}
 
         // fastutil (already shipped with Minecraft) so the millions of lookups a large rupture
         // makes do not each allocate a boxed Long.
@@ -339,6 +339,23 @@ public final class QuakePlanner {
         public boolean submergedAt(int x, int z) {
             Column c = columns.get(key(x, z));
             return c != null && c.submerged();
+        }
+
+        /**
+         * True when this column stands inside something the world generated - a village, a temple,
+         * an outpost - rather than something a player built.
+         *
+         * <h2>Why it is recorded here and not asked for later</h2>
+         * The two are indistinguishable by block: a village is planks and cobblestone, so the rule
+         * that protects builds protects villages too, which is why they stood untouched in the
+         * middle of a rupture. Telling them apart needs the structure manager, and that needs world
+         * access - which the planner does not have, because it runs on a worker thread. So the
+         * question is asked once per column while the snapshot is being taken on the server thread,
+         * and the answer travels with the column.
+         */
+        public boolean generatedAt(int x, int z) {
+            Column c = columns.get(key(x, z));
+            return c != null && c.generated();
         }
 
         /** How deep this column was captured; a deformation may not carve past it. */
@@ -391,7 +408,12 @@ public final class QuakePlanner {
                             ? Blocks.BEDROCK.defaultBlockState()
                             : level.getBlockState(m);
                 }
-                snap.columns.put(Snapshot.key(cx, cz), new Snapshot.Column(g, wet, stack));
+                // Asked only where it can matter: a column of plain rock is never in a village, and
+                // the structure lookup is far more expensive than the block reads above it.
+                boolean generated = GeyserConfig.QUAKES_BREAK_STRUCTURES.get()
+                        && EruptionHandler.isPlayerPlaced(stack[0])
+                        && insideGeneratedStructure(level, cx, g, cz);
+                snap.columns.put(Snapshot.key(cx, cz), new Snapshot.Column(g, wet, generated, stack));
             });
         }
         return snap;
@@ -595,7 +617,7 @@ public final class QuakePlanner {
         int top = snap.groundAt(x, z);
         if (delta > 0) {
             BlockState surface = snap.stateAt(x, z, 0);
-            if (!liftable(surface, mayBreakBuilds)) return null;
+            if (!liftable(surface, mayBreakBuilds, snap.generatedAt(x, z))) return null;
             return new ColumnPlan(x, z, top, delta, surface, deeper(snap, x, z, rng));
         }
         int cut = carvableDepth(snap, x, z, -delta, mayBreakBuilds);
@@ -616,7 +638,7 @@ public final class QuakePlanner {
     private static int carvableDepth(Snapshot snap, int x, int z, int want, boolean mayBreakBuilds) {
         int limit = Math.min(want, snap.depthAt(x, z));
         for (int d = 0; d < limit; d++) {
-            if (!carvable(snap.stateAt(x, z, d), mayBreakBuilds)) return d;
+            if (!carvable(snap.stateAt(x, z, d), mayBreakBuilds, snap.generatedAt(x, z))) return d;
         }
         return limit;
     }
@@ -937,8 +959,8 @@ public final class QuakePlanner {
         if (!snap.has(fx, fz)) return null;
 
         BlockState carried = snap.stateAt(fx, fz, 0);
-        if (!liftable(carried, mayBreakBuilds)) return null;
-        if (!liftable(snap.stateAt(x, z, 0), mayBreakBuilds)) return null;
+        if (!liftable(carried, mayBreakBuilds, snap.generatedAt(fx, fz))) return null;
+        if (!liftable(snap.stateAt(x, z, 0), mayBreakBuilds, snap.generatedAt(x, z))) return null;
 
         int from = snap.groundAt(fx, fz);
         // Clamped and tapered, so a cliff crossing the fault offsets rather than collapses.
@@ -981,6 +1003,28 @@ public final class QuakePlanner {
     }
 
     /**
+     * Is this column standing in a structure the world generated?
+     *
+     * <p>Server thread only - see {@link Snapshot#generatedAt}. Any structure counts, not just
+     * villages: a temple, an outpost or a fortress is no more a player's work than a village is,
+     * and a quake that levels the village next door while leaving the pillager tower standing looks
+     * like a bug rather than a decision.</p>
+     */
+    private static boolean insideGeneratedStructure(ServerLevel level, int x, int y, int z) {
+        try {
+            BlockPos pos = new BlockPos(x, y, z);
+            net.minecraft.world.level.StructureManager mgr = level.structureManager();
+            for (net.minecraft.world.level.levelgen.structure.Structure st
+                    : mgr.getAllStructuresAt(pos).keySet()) {
+                if (mgr.getStructureWithPieceAt(pos, st).isValid()) return true;
+            }
+            return false;
+        } catch (Throwable t) {
+            return false;      // an exotic structure source that cannot answer simply protects it
+        }
+    }
+
+    /**
      * The mod's own working parts: cores, chambers, igniters and the deep end of a hot spring.
      *
      * <h2>Why these are protected outright</h2>
@@ -1004,18 +1048,24 @@ public final class QuakePlanner {
     }
 
     /** May the quake remove this block? Never bedrock; never a build unless explicitly allowed. */
-    private static boolean carvable(BlockState s, boolean mayBreakBuilds) {
+    private static boolean carvable(BlockState s, boolean mayBreakBuilds, boolean generated) {
         if (s == null || s.is(Blocks.BEDROCK)) return false;
         if (machinery(s)) return false;
-        return mayBreakBuilds || !EruptionHandler.isPlayerPlaced(s);
+        // "generated" means the column stands in a village or other world-made structure. Those are
+        // scenery the world put there, not somebody's work, so an earthquake moves them like any
+        // other ground - see Snapshot.generatedAt.
+        return mayBreakBuilds || generated || !EruptionHandler.isPlayerPlaced(s);
     }
 
     /** May the quake pick this block up and move or stack it? Same rules, plus it must be solid. */
-    private static boolean liftable(BlockState s, boolean mayBreakBuilds) {
+    private static boolean liftable(BlockState s, boolean mayBreakBuilds, boolean generated) {
         if (s == null || s.isAir() || s.is(Blocks.BEDROCK)) return false;
         if (!s.getFluidState().isEmpty()) return false;
         if (TerrainProbe.isVegetation(s)) return false;   // nothing to carry; it is just ground cover
         if (machinery(s)) return false;
-        return mayBreakBuilds || !EruptionHandler.isPlayerPlaced(s);
+        // "generated" means the column stands in a village or other world-made structure. Those are
+        // scenery the world put there, not somebody's work, so an earthquake moves them like any
+        // other ground - see Snapshot.generatedAt.
+        return mayBreakBuilds || generated || !EruptionHandler.isPlayerPlaced(s);
     }
 }

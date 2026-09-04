@@ -153,7 +153,10 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_ARID;
     public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_HUMID;
     public static final ForgeConfigSpec.BooleanValue SPRING_RENEWAL_ENABLED;
-    public static final ForgeConfigSpec.IntValue SPRING_RENEWAL_DELAY_TICKS;
+    public static final ForgeConfigSpec.BooleanValue QUAKES_BREAK_STRUCTURES;
+    public static final ForgeConfigSpec.DoubleValue SPRING_STAGE_ONE_DAYS;
+    public static final ForgeConfigSpec.DoubleValue SPRING_STAGE_TWO_DAYS;
+    public static final ForgeConfigSpec.DoubleValue SPRING_STAGE_THREE_DAYS;
     public static final ForgeConfigSpec.BooleanValue QUAKES_OPEN_NEW_SPRINGS;
     public static final ForgeConfigSpec.DoubleValue QUAKE_SPRING_CHANCE;   // per magnitude over 3
 
@@ -567,6 +570,17 @@ public final class GeyserConfig {
                         "rest of the mod: only natural terrain is ever deformed, so a base on a fault",
                         "line is safe. Turn on for full realism at your own risk.")
                 .define("quakesBreakBuilds", false);
+        QUAKES_BREAK_STRUCTURES = b
+                .comment("Let earthquakes move villages and other world-generated structures.",
+                        "A village is planks and cobblestone, so the rule that protects what a",
+                        "player built protected villages too - which is why one could stand",
+                        "untouched in the middle of a rupture that had moved everything around it.",
+                        "With this on, anything the world generated (villages, temples, outposts,",
+                        "fortresses) is treated as ground; blocks a player placed are still safe.",
+                        "The honest catch: the test is the structure, not who laid the block. Move",
+                        "into a village and make one of its houses yours and the quake will still",
+                        "take it, because as far as the world is concerned it is still the village.")
+                .define("quakesBreakStructures", true);
         UNSUPPORTED_BLOCKS_FALL = b
                 .comment("After the ground moves, bring down anything the quake left hanging in the",
                         "air. Nothing is destroyed: the stack is set back down on the new ground, so a",
@@ -755,13 +769,25 @@ public final class GeyserConfig {
                         "Turning this off freezes every source where it is. A column with anything",
                         "player-built in it is never bored through, whatever this is set to.")
                 .define("springRenewalEnabled", true);
-        SPRING_RENEWAL_DELAY_TICKS = b
-                .comment("Ticks before a spring with no source of its own is given one.",
-                        "Only affects springs generated before sources existed - they get one the",
-                        "first time anything disturbs them, and look after themselves from then on.",
-                        "Springs that already have a source do not wait: the source watches its own",
-                        "pool and starts climbing as soon as it goes. 1200 ticks is one minute.")
-                .defineInRange("springRenewalDelayTicks", 1200, 20, 1728000);
+        SPRING_STAGE_ONE_DAYS = b
+                .comment("In-game days before a new spring grows from a vent into a small pool.",
+                        "A hot spring does not appear finished. It opens as one wet block, and then",
+                        "builds itself a basin out of what its own water is carrying. These three",
+                        "keys are how long each step takes.",
+                        "Only affects springs that are GROWING - after an earthquake, or where a",
+                        "quake has opened a new one. Springs made with the world are already old and",
+                        "start finished. Set these low to watch the whole sequence while testing.")
+                .defineInRange("springStageOneDays", 1.0D, 0.01D, 400.0D);
+        SPRING_STAGE_TWO_DAYS = b
+                .comment("Days from the small pool to a wide one.",
+                        "At this step the spring breaks out past the rim it built earlier and",
+                        "spreads to whatever shape the ground allows.")
+                .defineInRange("springStageTwoDays", 5.0D, 0.01D, 400.0D);
+        SPRING_STAGE_THREE_DAYS = b
+                .comment("Days from a wide pool to a finished one with its colour bands.",
+                        "The microbial mats come last for a reason: they need a big, warm, stable",
+                        "pool to live in, and a spring that opened a few days ago has not got one.")
+                .defineInRange("springStageThreeDays", 12.0D, 0.01D, 400.0D);
         QUAKES_OPEN_NEW_SPRINGS = b
                 .comment("Let an earthquake open a hot spring where there was not one.",
                         "Shaking the crust changes how easily water moves through it: some cracks",

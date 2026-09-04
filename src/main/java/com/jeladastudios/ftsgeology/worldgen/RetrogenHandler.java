@@ -191,9 +191,6 @@ public final class RetrogenHandler {
         com.jeladastudios.ftsgeology.volcano.VolcanoJob.drain(event.getServer(),
                 TickBudget.slice(0.3));
 
-        // Springs asking for their water back. A tiny share on purpose: it is a handful of block
-        // writes per site and it is never urgent, so it goes behind everything else.
-        com.jeladastudios.ftsgeology.hydrology.SpringRenewal.drain(TickBudget.slice(0.05));
 
         // A volcano under construction slows chunk geology down rather than stopping it. Blocking
         // outright looked tidier but would let the chunk queue grow without bound while exploring a
@@ -534,21 +531,11 @@ public final class RetrogenHandler {
             int radius = terraced
                     ? Math.max(2, 5 - relief / 3) + level.random.nextInt(3)
                     : 5 + level.random.nextInt(3);
-            BlockPos bed = carveTerrace(level, px, pz, waterY, radius, taken);
-            if (bed != null) {
-                placed++;
-                // One source per SYSTEM, under the head of the chain - not one per pool.
-                //
-                // Seating one under every terrace looked more thorough and was the opposite. The
-                // pools of a chain overlap, so each source rebuilt its pool over its neighbour's,
-                // which made that neighbour rebuild, and so on: 53 sources cut 316 pools in a few
-                // minutes, each one a block lower than the last, and the whole field sank into the
-                // ground. The lower terraces are part of the head's system and recover with it.
-                if (firstBed == null) {
-                    firstBed = bed;
-                    seatSourceUnder(level, bed, radius);
-                }
-            }
+            // Every pool is built by a mineral water line, at generation exactly as after a quake -
+            // the line is seated, its vent opened, and then run straight to maturity. There is no
+            // second pool builder any more, so the two paths cannot drift apart, and what a new
+            // world contains is what a recovered spring grows back into.
+            if (openSpring(level, px, pz, radius)) placed++;
             // Step downhill for the next pool in the chain. A full diameter plus a gap: the old
             // stride was one radius, so consecutive pools sat on top of each other. The bearing is
             // nudged and the stride varied at every step so the chain reads as a stream of pools
@@ -584,59 +571,66 @@ public final class RetrogenHandler {
     private static final int SOURCE_DEPTH = 28;
 
     /**
-     * Puts the deep end of a spring in, well below anything that can disturb it.
+     * Puts in a mineral water line at this spot and runs it up to a finished spring.
      *
-     * <p>Without this a hot spring is only its pool, and a pool is surface furniture: an earthquake
-     * large enough to move the ground takes the entire spring away and leaves nothing to recover
-     * from - which is exactly what testing found. The source sits deeper than the quake code ever
-     * reaches, so what a quake can do is block the outlet, which is also all a real one does.</p>
-     *
-     * <p>Also how springs generated before sources existed catch up: a world is not regenerated
-     * when the mod updates, so those get one the first time anything disturbs them.</p>
-     *
-     * @return where the source went, or null if this column cannot take one
+     * <p>This is the only way a hot spring is ever built. At generation it is run to maturity at
+     * once, so a new world has old springs in it rather than a field of day-old puddles; after an
+     * earthquake the same line grows the same spring back over a few in-game days. One builder, so
+     * a repaired spring and a generated one cannot look different.</p>
      */
-    public static BlockPos seatSourceUnder(ServerLevel level, BlockPos bed, int radius) {
-        if (bed == null) return null;
-        return place(level, bed, bed.getY() + 1, radius);
+    private static boolean openSpring(ServerLevel level, int x, int z, int radius) {
+        int ground = TerrainProbe.groundY(level, x, z);
+        if (ground == Integer.MIN_VALUE) return false;
+        if (ground <= level.getSeaLevel() + 2) return false;
+
+        BlockPos source = place(level, new BlockPos(x, ground, z), ground, radius);
+        if (source == null) return false;
+        if (!(level.getBlockEntity(source) instanceof SpringSourceBlockEntity be)) return false;
+
+        // The vent sits on the ground, with the bed under it - the same shape the climb produces.
+        BlockPos vent = new BlockPos(x, ground, z);
+        level.setBlock(vent.below(), ModBlocks.HOT_SPRING.get().defaultBlockState(), 2);
+        level.setBlock(vent, Blocks.WATER.defaultBlockState(), 2);
+        be.setVent(vent);
+        return be.growToMaturity(level);
     }
 
     /**
-     * Seats a source where there is no spring yet, so it can open one for itself.
+     * Seats a mineral water line where there is no spring yet, so it can open one for itself.
      *
-     * <p>Used when an earthquake has changed the plumbing somewhere that now qualifies. Unlike the
-     * other two entry points there is no pool to inherit, so the source starts with no outlet and
-     * bores its way up to make one - which is also why the mound it builds on the way is the only
-     * warning the surface gets.</p>
+     * <p>Used when an earthquake has changed the plumbing somewhere that now qualifies. There is no
+     * vent to inherit, so the line bores its way up and then grows a spring through its stages -
+     * which is why a quake-opened spring announces itself as a small pool that gets bigger over the
+     * following days rather than appearing finished.</p>
      */
     public static BlockPos seedSourceAt(ServerLevel level, int x, int z, int groundY) {
-        BlockPos at = place(level, new BlockPos(x, groundY - 2, z), groundY - 1,
-                4 + level.random.nextInt(3));
-        if (at != null && level.getBlockEntity(at) instanceof SpringSourceBlockEntity be) {
-            be.clearOutlet();     // nothing above yet: start climbing on the next tick
-        }
-        return at;
+        return place(level, new BlockPos(x, groundY, z), groundY,
+                5 + level.random.nextInt(3));
     }
 
     /**
-     * @param bed    the pool's warm bed, which the source remembers so it can tell later whether
-     *               its own pool is still there. Not necessarily straight above the source: on
-     *               broken ground the cutter puts the bed wherever the basin actually formed.
-     * @param waterY the pool's water level, which fixes how deep the source is seated
+     * Puts the deep end of a spring in, well below anything that can disturb it.
+     *
+     * @param at     the surface point the line belongs to
+     * @param groundY surface height there, which fixes how deep the line is seated
      */
-    private static BlockPos place(ServerLevel level, BlockPos bed, int waterY, int radius) {
-        int y = waterY - SOURCE_DEPTH;
+    private static BlockPos place(ServerLevel level, BlockPos at, int groundY, int radius) {
+        int y = groundY - SOURCE_DEPTH;
         if (y <= level.getMinBuildHeight() + 4) return null;      // too shallow a world here
-        BlockPos at = new BlockPos(bed.getX(), y, bed.getZ());
-        BlockState existing = level.getBlockState(at);
+        BlockPos src = new BlockPos(at.getX(), y, at.getZ());
+        BlockState existing = level.getBlockState(src);
         if (existing.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(existing)) return null;
 
-        level.setBlock(at, ModBlocks.SPRING_SOURCE.get().defaultBlockState(), 2);
-        if (level.getBlockEntity(at) instanceof SpringSourceBlockEntity be) {
-            be.setPoolRadius(radius);
-            be.setOutlet(bed);
+        level.setBlock(src, ModBlocks.SPRING_SOURCE.get().defaultBlockState(), 2);
+        if (level.getBlockEntity(src) instanceof SpringSourceBlockEntity be) {
+            be.setTargetRadius(radius);
         }
-        return at;
+        return src;
+    }
+
+    /** Lays the microbial colour bands around a finished pool. Called by the spring line. */
+    public static void paintRings(ServerLevel level, List<BlockPos> pool, int cx, int cz, int waterY) {
+        paintThermalRings(level, pool, cx, cz, waterY);
     }
 
     /**
