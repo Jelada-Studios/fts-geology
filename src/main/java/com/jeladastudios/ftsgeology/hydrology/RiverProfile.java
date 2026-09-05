@@ -27,8 +27,18 @@ public final class RiverProfile {
 
     private RiverProfile() {}
 
-    /** How far out the valley test looks for higher ground on either side. */
-    private static final int VALLEY_REACH = 6;
+    /**
+     * How far out the valley test looks for higher ground on either side.
+     *
+     * <p>Six was far too short. A Terralith or vanilla river runs fifteen to twenty blocks wide, so
+     * standing in the middle of one and looking six blocks each way finds nothing but more river -
+     * both banks read as flat, and the channel test failed for every river that was not a narrow
+     * mountain rill.</p>
+     */
+    private static final int VALLEY_REACH = 16;
+
+    /** Sampling stride across that reach: wider look, fewer lookups. */
+    private static final int VALLEY_STEP = 3;
 
     /** How much higher the banks must stand for this to count as a channel. */
     private static final int BANK_RISE = 2;
@@ -40,9 +50,20 @@ public final class RiverProfile {
      * earthquake has moved the ground and after we have cut into it ourselves. A channel is a column
      * with higher ground on both sides across at least one axis - which is what a valley floor is -
      * and near enough to the water table to actually carry water.</p>
+     *
+     * <h2>Reads loaded blocks, never the generator</h2>
+     * This used to ask {@link #surface}, and that one decision froze a server for thirteen minutes.
+     * {@code getBaseHeight} is not a heightmap lookup on modern Minecraft - it evaluates the whole
+     * 3D noise router, which under Terralith costs a hundred microseconds or so. At twenty-five of
+     * those per call and five thousand calls in the seeding scan, that is well over a hundred
+     * thousand noise evaluations in a single tick.
+     *
+     * <p>And it was never needed: erosion only ever touches loaded chunks, so the blocks are already
+     * in memory. Computing what the generator <i>would</i> have built, for ground that is sitting
+     * right there, was pure waste.</p>
      */
     public static boolean isChannel(ServerLevel level, int x, int z) {
-        int here = surface(level, x, z);
+        int here = ground(level, x, z);
         if (here == Integer.MIN_VALUE) return false;
 
         // Well above the water table is a dry ridge, not a river.
@@ -55,9 +76,9 @@ public final class RiverProfile {
     /** Higher ground both ways along one axis: the cross section of a valley. */
     private static boolean flankedOn(ServerLevel level, int x, int z, int here, int dx, int dz) {
         int leftRise = 0, rightRise = 0;
-        for (int d = 1; d <= VALLEY_REACH; d++) {
-            int l = surface(level, x - dx * d, z - dz * d);
-            int r = surface(level, x + dx * d, z + dz * d);
+        for (int d = VALLEY_STEP; d <= VALLEY_REACH; d += VALLEY_STEP) {
+            int l = ground(level, x - dx * d, z - dz * d);
+            int r = ground(level, x + dx * d, z + dz * d);
             if (l != Integer.MIN_VALUE) leftRise = Math.max(leftRise, l - here);
             if (r != Integer.MIN_VALUE) rightRise = Math.max(rightRise, r - here);
         }
@@ -144,6 +165,15 @@ public final class RiverProfile {
      * makes about terminating rests on reading the real ground here.</p>
      */
     public static int ground(ServerLevel level, int x, int z) {
+        // The chunk test is not politeness, it is the difference between a memory read and a disk
+        // read on the server thread.
+        //
+        // TerrainProbe.groundY goes straight to level.getHeight, which will happily load a chunk
+        // from disk to answer. Every caller here reaches past its own column - the flow test looks
+        // at eight neighbours, the valley test at sixteen blocks either side - so on a chunk edge
+        // this would have pulled the neighbouring region in, synchronously, mid-tick. Dropping
+        // getBaseHeight alone would not have fixed the stalls; it would have moved them.
+        if (!level.hasChunkAt(new BlockPos(x, level.getSeaLevel(), z))) return Integer.MIN_VALUE;
         return TerrainProbe.groundY(level, x, z);
     }
 

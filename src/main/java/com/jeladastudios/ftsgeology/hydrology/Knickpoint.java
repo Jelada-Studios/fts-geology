@@ -67,9 +67,22 @@ public final class Knickpoint {
     /** One migrating step, working its way up a channel. */
     private static final class Retreat {
         final ResourceKey<Level> dimension;
+        /** Corridor columns not yet tested for being a channel with a step in it. */
+        final Deque<long[]> candidates = new ArrayDeque<>();
         final Deque<long[]> front = new ArrayDeque<>();   // columns still to examine, {x, z}
+        /**
+         * Columns that resisted this tick, held back until the next one.
+         *
+         * <p>They used to go straight back onto {@link #front}, and the drain loop pulled them out
+         * again immediately - in the same tick. Granite resists four times in five, so instead of
+         * a hard channel retreating slowly over game time it span on the spot, burning the tick's
+         * column allowance and inflating the progress counter until the whole retreat hit its
+         * ceiling and was thrown away half finished.</p>
+         */
+        final Deque<long[]> deferred = new ArrayDeque<>();
         final Set<Long> seen = new HashSet<>();
         int cut;
+        int seeded;
         int examined;
 
         Retreat(ResourceKey<Level> dimension) {
@@ -90,25 +103,46 @@ public final class Knickpoint {
         int radius = (int) Math.min(160, Math.round(ruptureLength / 4.0) + 32);
         Retreat r = new Retreat(level.dimension());
 
-        // Sample the corridor for channel columns that now sit above their own outflow.
-        int found = 0;
+        // Candidates only. Nothing is tested here.
+        //
+        // This used to walk the whole disc calling isChannel on every fourth column, and that is
+        // what locked the server up: about five thousand points, each asking the terrain generator
+        // for twenty-five column heights, in one tick with no budget. Whether a column is a channel
+        // and whether it has a step are now decided in candidates(), a few hundred at a time inside
+        // the tick budget - so the seeding cannot stall a tick however large the rupture was.
         for (int dx = -radius; dx <= radius; dx += 4) {
             for (int dz = -radius; dz <= radius; dz += 4) {
                 if (dx * dx + dz * dz > radius * radius) continue;
-                int x = epicentre.getX() + dx, z = epicentre.getZ() + dz;
-                if (!level.hasChunkAt(new BlockPos(x, level.getSeaLevel(), z))) continue;
-                if (!RiverProfile.isChannel(level, x, z)) continue;
-                if (stepAt(level, x, z) < STEP_THRESHOLD) continue;
-                if (r.seen.add(key(x, z))) {
-                    r.front.add(new long[]{x, z});
-                    found++;
-                }
+                r.candidates.add(new long[]{epicentre.getX() + dx, epicentre.getZ() + dz});
             }
         }
-        if (found == 0) return;
+        if (r.candidates.isEmpty()) return;
 
         QUEUE.add(r);
-        GeysersMod.LOGGER.info("Knickpoint: {} channel steps queued near {}", found, epicentre);
+        GeysersMod.LOGGER.info("Knickpoint: {} candidate columns near {}",
+                r.candidates.size(), epicentre);
+    }
+
+    /**
+     * Sifts candidate columns for real channel steps, a few per tick.
+     *
+     * @return how many columns were examined
+     */
+    private static int sift(ServerLevel level, Retreat r, int limit) {
+        int done = 0;
+        while (done < limit) {
+            long[] c = r.candidates.poll();
+            if (c == null) return done;
+            done++;
+            int x = (int) c[0], z = (int) c[1];
+            if (!RiverProfile.isChannel(level, x, z)) continue;
+            if (stepAt(level, x, z) < STEP_THRESHOLD) continue;
+            if (r.seen.add(key(x, z))) {
+                r.front.add(new long[]{x, z});
+                r.seeded++;
+            }
+        }
+        return done;
     }
 
     /**
@@ -126,23 +160,32 @@ public final class Knickpoint {
         ServerLevel level = server.getLevel(r.dimension);
         if (level == null) { QUEUE.poll(); return; }
 
-        int done = 0;
+        // Sifting first: candidates become front entries a few hundred at a time.
+        int done = sift(level, r, COLUMNS_PER_TICK / 2);
+
         while (done < COLUMNS_PER_TICK && System.nanoTime() < deadline) {
             long[] c = r.front.poll();
             if (c == null) {
-                GeysersMod.LOGGER.info("Knickpoint finished: {} blocks cut over {} columns",
-                        r.cut, r.examined);
+                if (!r.candidates.isEmpty()) break;      // still sifting; come back next tick
+                if (!r.deferred.isEmpty()) break;        // resisted columns get their turn next tick
+                GeysersMod.LOGGER.info(
+                        "Knickpoint finished: {} blocks cut, {} channel columns, {} visits",
+                        r.cut, r.seeded, r.examined);
                 QUEUE.poll();
                 return;
             }
             done++;
-            r.examined++;
             if (r.examined > MAX_REACH * 8) {          // a hard stop, whatever the terrain does
+                GeysersMod.LOGGER.info("Knickpoint stopped at its ceiling: {} blocks cut", r.cut);
                 QUEUE.poll();
                 return;
             }
             retreatOne(level, (int) c[0], (int) c[1], r);
         }
+
+        // Whatever resisted rejoins the queue only now the tick's loop is over, so a hard rock
+        // slows the retreat down in game time instead of spinning inside one tick.
+        while (!r.deferred.isEmpty()) r.front.add(r.deferred.poll());
     }
 
     /**
@@ -153,10 +196,23 @@ public final class Knickpoint {
      * every visit strictly reduces the difference it is working on.</p>
      */
     private static void retreatOne(ServerLevel level, int x, int z, Retreat r) {
-        if (!level.hasChunkAt(new BlockPos(x, level.getSeaLevel(), z))) return;
+        // Not ready yet is not the same as finished.
+        //
+        // These two used to return without putting the column back, and since `seen` had already
+        // recorded it no upstream neighbour could rediscover it - so a chunk that happened to be
+        // unloaded, or an aftershock passing overhead, silently killed the retreat wave. Held for
+        // the next tick instead.
+        if (!level.hasChunkAt(new BlockPos(x, level.getSeaLevel(), z))) {
+            r.deferred.add(new long[]{x, z});
+            return;
+        }
         // Ground a quake is still working on belongs to the quake. See QuakeQuiet.
-        if (QuakeQuiet.isQuiet(level, x, z)) return;
+        if (QuakeQuiet.isQuiet(level, x, z)) {
+            r.deferred.add(new long[]{x, z});
+            return;
+        }
 
+        r.examined++;
         int step = stepAt(level, x, z);
         if (step < STEP_THRESHOLD) return;               // graded here; the wave stops
 
@@ -167,16 +223,23 @@ public final class Knickpoint {
         BlockState s = level.getBlockState(bed);
         if (RiverProfile.protectedGround(s)) return;
 
+        // Was this bed under water before we touched it? Decide BEFORE cutting.
+        boolean wasSubmerged = !level.getBlockState(bed.above()).getFluidState().isEmpty();
+
         // Hard rock resists: it is visited as often but gives way less of the time, so a gorge in
         // granite retreats slowly and a channel in shale opens quickly.
+        //
+        // Deferred, not re-queued: see Retreat.deferred. Resistance has to cost game time, not tick
+        // budget, and it must not count as progress - inflating the visit counter is what made a
+        // granite channel hit its ceiling and get abandoned half cut.
         if (level.random.nextDouble() > RiverProfile.erodibility(level, x, here, z)) {
-            r.front.add(new long[]{x, z});               // come back to it
+            r.deferred.add(new long[]{x, z});
             return;
         }
 
         level.setBlock(bed, Blocks.AIR.defaultBlockState(), 2);
         r.cut++;
-        water(level, x, here, z);
+        water(level, x, here, z, wasSubmerged);
 
         // Hand the step to the columns that drain INTO this one - upstream is where it goes.
         for (int dx = -1; dx <= 1; dx++) {
@@ -205,7 +268,17 @@ public final class Knickpoint {
      * the water table fills; a bed above it stays dry - which is what a wadi or an arroyo is, and
      * one of the more recognisable things a dry country does to a river.</p>
      */
-    private static void water(ServerLevel level, int x, int cutY, int z) {
+    private static void water(ServerLevel level, int x, int cutY, int z, boolean wasSubmerged) {
+        // A bed that had water on it keeps water on it, whatever the water table says.
+        //
+        // Without this the deepened bed of a river running above its own water table was left as an
+        // air pocket with the river still standing over it - the same hanging water that cost a
+        // whole round on hot springs, written again for rivers. The water table decides whether a
+        // DRY channel starts to fill; it has no business emptying a river that is already there.
+        if (wasSubmerged) {
+            level.setBlock(new BlockPos(x, cutY, z), Blocks.WATER.defaultBlockState(), 2);
+            return;
+        }
         int table = WaterTable.tableY(level, x, z);
         if (cutY > table) return;                        // above the water table: a dry channel
         level.setBlock(new BlockPos(x, cutY, z), Blocks.WATER.defaultBlockState(), 2);
