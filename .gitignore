@@ -34,3 +34,7 @@ docs/*.zip
 
 # Dedicated-server smoke test working directory
 run/
+
+# Store-page copy and screenshots: kept locally, never published to the repo.
+# The repo is mod files only.
+docs/
