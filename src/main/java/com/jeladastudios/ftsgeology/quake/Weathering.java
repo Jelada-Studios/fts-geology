@@ -359,6 +359,9 @@ public final class Weathering {
                 // On the last pass the trunks are already gone, so anything still hanging is
                 // canopy that lost its tree.
                 if (job.pass == PASSES - 1) {
+                    // After reseat, so anything that was going to come down already has and what is
+                    // left standing really is standing on its own.
+                    moved |= topple(level, cx, cz, job.excavated.get(k));
                     moved |= dropOrphanedLeaves(level, cx, cz);
                     moved |= dropUnsupportedWater(level, cx, cz);
                 }
@@ -488,6 +491,111 @@ public final class Weathering {
      *
      * @return true if this column changed
      */
+    /** A column this thin cannot stand this tall in ground a quake has just shaken. */
+    private static final int SLENDER_HEIGHT = 4;
+
+    /** Horizontal neighbours at a given height, above which the stack counts as braced. */
+    private static final int BRACED_NEIGHBOURS = 2;
+
+    /**
+     * Brings down the towers a rupture leaves standing in its own trench.
+     *
+     * <h2>Why {@link #reseat} does not already do this</h2>
+     * That method asks whether the ground fell out from <i>under</i> something. A tower has not lost
+     * its footing - it runs unbroken to the floor - so the gap it measures is zero and it walks away.
+     * The rule was not wrong, it simply had no notion of a column being too thin to stand up, and a
+     * quake that cuts a trench leaves plenty of them: one-block spires of loose cobble standing
+     * several blocks over the new floor, which is what testing photographed.
+     *
+     * <p>Real rock does hold up spires - hoodoos, sea stacks - so this is bounded to ground the
+     * earthquake actually moved. Anything the world generator meant to stand somewhere else is never
+     * looked at. And it <b>lowers</b> rather than deletes: the blocks land on the floor and keep
+     * their state, which is the same promise the rest of this class makes.</p>
+     */
+    private static boolean topple(ServerLevel level, int x, int z, int excavatedTop) {
+        int floor = excavatedTop == Integer.MIN_VALUE
+                ? TerrainProbe.groundY(level, x, z)
+                : solidAtOrBelow(level, x, excavatedTop, z);
+        if (floor == Integer.MIN_VALUE) return false;
+        if (!level.hasChunkAt(new BlockPos(x, floor, z))) return false;
+
+        boolean mayMoveBuilds = GeyserConfig.FALLING_INCLUDES_BUILDS.get();
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+
+        // How high the stack runs, and how much of it stands on its own.
+        int top = floor;
+        int lonely = 0;
+        int ceiling = Math.min(floor + STACK_LIMIT, level.getMaxBuildHeight() - 1);
+        while (top + 1 <= ceiling) {
+            BlockState s = level.getBlockState(m.set(x, top + 1, z));
+            if (s.isAir() || !s.getFluidState().isEmpty()) break;
+            if (s.is(Blocks.BEDROCK)) return false;
+            if (!mayMoveBuilds && !isPlant(s) && EruptionHandler.isPlayerPlaced(s)) return false;
+            top++;
+            if (bracing(level, x, top, z) < BRACED_NEIGHBOURS) lonely++;
+        }
+
+        int height = top - floor;
+        if (height < SLENDER_HEIGHT) return false;
+        // Braced for most of its height: a shoulder of rock, not a spire. Leave it.
+        if (lonely * 2 < height) return false;
+
+        // Down and OUTWARD, from the top, into a mound around the foot.
+        //
+        // Straight down does nothing: a tower lowered onto its own footprint lands exactly where it
+        // already was. A spire that gives way spreads, so each block goes to the lowest of the eight
+        // surrounding columns - and only ever to somewhere strictly lower than it started, which is
+        // what makes the pile finite and the loop terminate.
+        boolean moved = false;
+        int keep = floor + SLENDER_HEIGHT / 2;      // a stump is left, the way a broken spire is
+        for (int y = top; y > keep; y--) {
+            BlockState s = level.getBlockState(m.set(x, y, z));
+            if (s.isAir()) continue;
+            BlockPos rest = lowestNeighbourTop(level, x, y, z);
+            if (rest == null) continue;             // nowhere lower to go; it stays
+            level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2);
+            level.setBlock(rest, s, 2);
+            moved = true;
+        }
+        return moved;
+    }
+
+    /**
+     * Where a block falling off a spire comes to rest: on top of the lowest column around it.
+     *
+     * @return the position to place it, or null if nothing nearby is lower than where it is now
+     */
+    private static BlockPos lowestNeighbourTop(ServerLevel level, int x, int y, int z) {
+        BlockPos best = null;
+        int bestY = y;                              // must land BELOW where it started
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) continue;
+                int nx = x + dx, nz = z + dz;
+                if (!level.hasChunkAt(m.set(nx, y, nz))) continue;
+                int t = TerrainProbe.groundY(level, nx, nz);
+                if (t == Integer.MIN_VALUE) continue;
+                if (t + 1 >= bestY) continue;
+                if (!level.getBlockState(m.set(nx, t + 1, nz)).isAir()) continue;
+                bestY = t + 1;
+                best = new BlockPos(nx, t + 1, nz);
+            }
+        }
+        return best;
+    }
+
+    /** How many of the four horizontal neighbours are solid at this height. */
+    private static int bracing(ServerLevel level, int x, int y, int z) {
+        int n = 0;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            BlockState s = level.getBlockState(m.set(x + d.getStepX(), y, z + d.getStepZ()));
+            if (!s.isAir() && s.getFluidState().isEmpty() && !isPlant(s)) n++;
+        }
+        return n;
+    }
+
     private static boolean dropOrphanedLeaves(ServerLevel level, int x, int z) {
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return false;

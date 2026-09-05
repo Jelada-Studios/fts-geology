@@ -1,10 +1,5 @@
 {
   "variants": {
-    "": [
-      { "model": "fts_geology:block/microbial_mat_green" },
-      { "model": "fts_geology:block/microbial_mat_green_mirrored" },
-      { "model": "fts_geology:block/microbial_mat_green", "y": 180 },
-      { "model": "fts_geology:block/microbial_mat_green_mirrored", "y": 180 }
-    ]
+    "": { "model": "fts_geology:block/microbial_mat_green" }
   }
 }

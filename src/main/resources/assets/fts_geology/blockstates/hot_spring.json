@@ -1,10 +1,5 @@
 {
   "variants": {
-    "": [
-      { "model": "fts_geology:block/hot_spring" },
-      { "model": "fts_geology:block/hot_spring_mirrored" },
-      { "model": "fts_geology:block/hot_spring", "y": 180 },
-      { "model": "fts_geology:block/hot_spring_mirrored", "y": 180 }
-    ]
+    "": { "model": "fts_geology:block/hot_spring" }
   }
 }
