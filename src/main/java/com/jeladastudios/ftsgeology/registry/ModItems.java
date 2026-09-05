@@ -51,6 +51,8 @@ public final class ModItems {
 
     public static final RegistryObject<Item> STEAM_VENT = ITEMS.register("steam_vent",
             () -> new BlockItem(ModBlocks.STEAM_VENT.get(), new Item.Properties()));
+    public static final RegistryObject<Item> VOLCANIC_ASH = ITEMS.register("volcanic_ash",
+            () -> new BlockItem(ModBlocks.VOLCANIC_ASH.get(), new Item.Properties()));
 
     public static final RegistryObject<Item> TRAVERTINE = ITEMS.register("travertine",
             () -> new BlockItem(ModBlocks.TRAVERTINE.get(), new Item.Properties()));

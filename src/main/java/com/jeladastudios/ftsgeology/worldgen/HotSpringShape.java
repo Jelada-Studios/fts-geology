@@ -270,7 +270,16 @@ public final class HotSpringShape {
         java.util.Set<Long> walked = new java.util.HashSet<>();
 
         int width = 2;
-        for (int step = 0; step < 18; step++) {
+        // Forty, not eighteen.
+        //
+        // Eighteen was the whole reason the streak could not be seen. paintThermalRings runs before
+        // this and covers a radius of thirteen to twenty-seven blocks at stage 4 - the five mat
+        // bands are eight to seventeen of that and the sterile halo another five to ten - while the
+        // walk measured out at four steps on the flat and sixteen on a slope. So every cell of it
+        // fell INSIDE the spring's own apron, where the mat guard below refuses to write, and the
+        // few that got past landed pale sinter on pale halo crust. The streak has to outrun the
+        // rings before it is a streak at all.
+        for (int step = 0; step < 40; step++) {
             if (!walked.add(net.minecraft.core.BlockPos.asLong(x, 0, z))) return;   // never twice
             paintRunoff(level, x, z, last, width, step);
 
@@ -282,8 +291,13 @@ public final class HotSpringShape {
             hx = Integer.signum(next[0] - x); hz = Integer.signum(next[2] - z);
             x = next[0]; last = next[1]; z = next[2];
             // Narrows as it goes: the flow spreads, cools and gives out rather than ending on a line.
-            if (step == 5) width = 1;
-            if (step == 12) width = 0;
+            //
+            // Rescaled with the step cap. At 18 steps this went to a single block at 5 and to bare
+            // ground at 12, which over a 40-step run would have left three quarters of the streak a
+            // one-block thread - and the part that matters most is the part beyond the halo, which
+            // is exactly the part that would have been thinnest.
+            if (step == 14) width = 1;
+            if (step == 30) width = 0;
         }
     }
 
@@ -338,13 +352,22 @@ public final class HotSpringShape {
                 BlockPos at = new BlockPos(x + dx, g, z + dz);
                 BlockState s = level.getBlockState(at);
                 if (s.is(Blocks.BEDROCK) || !s.getFluidState().isEmpty()) continue;
-                if (EruptionHandler.isPlayerPlaced(s) || isCrust(s)) continue;
+                if (EruptionHandler.isPlayerPlaced(s)) continue;
+                // The colour bands and the pool's own bed are left exactly as they are: they are the
+                // best-looking thing the mod makes and a streak cut through them would be a scar.
+                //
+                // The guard used to be isCrust, which is those PLUS every block of sinter - and the
+                // halo is thirty percent sinter, so the run was refusing most of the ground it had
+                // to cross. The dry crust out here is fair game; only what is alive is not.
+                if (isMatBlock(s) || s.is(ModBlocks.HOT_SPRING.get()) || s.is(Blocks.CALCITE)) continue;
 
                 TerrainProbe.clearVegetation(level, x + dx, g, z + dz, 2);
-                // Mats only in the first few blocks, where the water is still hot enough for them.
-                BlockState put = step < 4 && dx * dx + dz * dz > 0 && level.random.nextInt(3) == 0
-                        ? ModBlocks.MICROBIAL_MAT_ORANGE.get().defaultBlockState()
-                        : level.random.nextInt(4) == 0
+                // Pale carbonate, deliberately brighter than the halo it is crossing: the halo is
+                // mostly coarse dirt and gravel, so a travertine and sinter ribbon reads as a line
+                // running away downhill rather than as more of the same crust.
+                BlockState put = level.random.nextInt(5) == 0
+                        ? Blocks.CALCITE.defaultBlockState()
+                        : level.random.nextInt(2) == 0
                             ? ModBlocks.TRAVERTINE.get().defaultBlockState()
                             : ModBlocks.SINTER.get().defaultBlockState();
                 level.setBlock(at, put, 2);

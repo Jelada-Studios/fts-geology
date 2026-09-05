@@ -133,6 +133,21 @@ public final class ModBlocks {
                     .mapColor(MapColor.DIRT)
                     .strength(0.8F)));
 
+    /**
+     * Volcanic ash: what comes down out of an eruption column, in layers like snow.
+     *
+     * <p>Soft, dug by hand, and it does not hold a torch up - a fresh fall is unconsolidated dust.
+     * Given time and burial it welds into the tuff the mod already uses for the apron, which is why
+     * the two look related rather than identical.</p>
+     */
+    public static final RegistryObject<Block> VOLCANIC_ASH = BLOCKS.register("volcanic_ash",
+            () -> new com.jeladastudios.ftsgeology.block.VolcanicAshBlock(
+                    BlockBehaviour.Properties.copy(Blocks.SNOW)
+                            .mapColor(MapColor.COLOR_GRAY)
+                            .strength(0.4F)
+                            .sound(net.minecraft.world.level.block.SoundType.SAND)
+                            .noOcclusion()));
+
     /** Steam vent: dark hydrothermal rock with a degassing orifice, mineral staining, and faint glow. */
     public static final RegistryObject<Block> STEAM_VENT = BLOCKS.register("steam_vent",
             () -> new com.jeladastudios.ftsgeology.block.SteamVentBlock(

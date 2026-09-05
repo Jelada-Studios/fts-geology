@@ -181,6 +181,16 @@ public final class VolcanoBuilder {
         double lakeAngle, lakeWidth;
         double phaseA, phaseB, phaseC;
         int bandSeed;
+        /**
+         * The frozen lava flows down the flanks: a bearing and a wander phase each, and how far
+         * they run. See {@link #flowAt}.
+         */
+        int flows;
+        double[] flowAim = new double[0];
+        double[] flowPhase = new double[0];
+        double flowReach;
+        /** Widens the tongues with the mountain, so a shield is not threaded rather than striped. */
+        double flowWidth = 1.0;
         double strikeX = 1, strikeZ = 0;
         int ventCount;
         /** Filled in by the summit step: the lava cell the core sits under. */
@@ -248,6 +258,26 @@ public final class VolcanoBuilder {
         c.phaseB = level.random.nextDouble() * Math.PI * 2;
         c.phaseC = level.random.nextDouble() * Math.PI * 2;
         c.bandSeed = level.random.nextInt(64);
+
+        // Where this mountain's flows went. Two to four of them, spread around the circle with
+        // enough jitter that they are not symmetrical, each running a little past the foot of the
+        // cone so the tongue carries on over the apron instead of stopping at a contour.
+        c.flows = 2 + level.random.nextInt(3) + c.coneBaseR / 35;
+        c.flowAim = new double[c.flows];
+        c.flowPhase = new double[c.flows];
+        double spin = level.random.nextDouble() * Math.PI * 2;
+        for (int i = 0; i < c.flows; i++) {
+            c.flowAim[i] = spin + i * (Math.PI * 2 / c.flows)
+                    + (level.random.nextDouble() - 0.5) * 0.9;
+            c.flowPhase[i] = level.random.nextDouble() * Math.PI * 2;
+        }
+        c.flowReach = Math.max(10, c.coneBaseR) * (1.05 + level.random.nextDouble() * 0.45);
+        // A tongue measured in absolute blocks covers a share of the flank that falls off as 1/r:
+        // measured, a 20-block cone came out 21% flow and a 69-block shield only 6%, so the biggest
+        // mountains - the ones worth looking at - were the ones wearing threads. Scaling the width
+        // with the cone holds the proportion roughly steady, and it is what the real thing does:
+        // Mauna Loa's flows are kilometres across, not the same few metres a cinder cone's are.
+        c.flowWidth = Math.max(1.0, c.coneBaseR / 24.0);
 
         c.calderaFloorY = c.baseY - (3 + level.random.nextInt(5));
         c.domeR = Math.max(3, c.craterR / 3);
@@ -446,8 +476,12 @@ public final class VolcanoBuilder {
             if (ground >= target) continue;
 
             TerrainProbe.clearVegetation(level, gx, ground, gz, 3);
+            // A flow is a skin over the flank, not a seam through it: only the surface course is
+            // crust, and the rock underneath is the ordinary interbedded pile.
+            boolean flow = flowAt(c, ang, dist);
             for (int y = ground + 1; y <= target; y++) {
-                setRock(level, new BlockPos(gx, y, gz), coneRock(level, c, y));
+                setRock(level, new BlockPos(gx, y, gz),
+                        flow && y == target ? flowRock() : coneRock(level, c, y));
             }
         }
     }
@@ -460,6 +494,55 @@ public final class VolcanoBuilder {
      * what makes that legible when you dig in. A shield is nearly all pahoehoe basalt, and a caldera
      * is largely welded tuff - its own ignimbrite.</p>
      */
+    /**
+     * Is this column inside one of the frozen lava flows running down the flanks?
+     *
+     * <h2>Why the mod had a cooling-crust block and nowhere to put it</h2>
+     * {@code COOLING_LAVA_CRUST} has been registered, textured, given a light level and listed as
+     * natural terrain for a long time, and in all that time nothing in world generation ever placed
+     * one: it existed only in the creative menu. Meanwhile a volcano's flanks were a single
+     * undifferentiated skin of basalt, when the most recognisable thing about a real cone is that it
+     * is <b>striped</b> - dark tongues of recent flow standing out against older, weathered rock,
+     * still warm enough to glow at night.
+     *
+     * <h2>A function of bearing and distance, not a second pass over the world</h2>
+     * The obvious way to lay a flow is to walk one downhill from the crater, and it is the wrong way
+     * here: {@code VolcanoJob} builds the mountain a row at a time across many ticks and chunks, so
+     * a walk would need the finished surface before the surface exists. But the cone's own outline
+     * is already a pure function of bearing - {@link #coneRadius} lobes it with two sine terms - so a
+     * flow can be one too, and then it simply drapes over whatever height the cone turns out to have.
+     * No extra pass, no world reads, and it cannot disagree with the shape it is lying on.
+     *
+     * <p>The channel narrows near the vent and broadens into a lobe at the toe, which is the shape
+     * an a'a flow actually leaves: a confined channel while it is moving fast, spreading out and
+     * piling up where it stalls.</p>
+     */
+    private static boolean flowAt(Ctx c, double ang, double dist) {
+        if (c.flows == 0) return false;
+        // The crater is molten, not crusted; its own lava is placed by the summit step.
+        if (dist < c.craterR * 0.9 || dist > c.flowReach) return false;
+
+        double t = dist / c.flowReach;                       // 0 at the vent, 1 at the toe
+        for (int i = 0; i < c.flows; i++) {
+            // The channel snakes as it descends rather than running down a radius like a seam.
+            double centre = c.flowAim[i]
+                    + 0.26 * Math.sin(dist / 9.0 + c.flowPhase[i])
+                    + 0.12 * Math.sin(dist / 4.0 - c.flowPhase[i]);
+            // Wrapped to -PI..PI, so a flow aimed near due west is not cut in half by the seam in
+            // atan2's output.
+            double delta = Math.atan2(Math.sin(ang - centre), Math.cos(ang - centre));
+            double across = Math.abs(delta) * dist;          // blocks measured across the flow
+            if (across <= (1.6 + 3.4 * t * t) * c.flowWidth) return true;
+        }
+        return false;
+    }
+
+    /** The skin of a flow: dark, and still warm enough to show at night. */
+    private static BlockState flowRock() {
+        return com.jeladastudios.ftsgeology.registry.ModBlocks.COOLING_LAVA_CRUST.get()
+                .defaultBlockState();
+    }
+
     private static BlockState coneRock(ServerLevel level, Ctx c, int y) {
         return switch (c.type) {
             case STRATOVOLCANO -> switch (Math.floorMod((y + c.bandSeed) / 3, 4)) {
@@ -618,9 +701,14 @@ public final class VolcanoBuilder {
             if (dist > edge || localInner >= edge) continue;
 
             double t = 1.0 - (dist - localInner) / Math.max(1.0, edge - localInner);
+            // A flow tongue runs past the foot of the cone, so it has to carry on across the apron
+            // or it stops dead on a contour line - which is the same "wall at a fixed radius" fault
+            // this row already had to be taught not to make.
+            boolean flow = flowAt(c, ang, dist);
             // Speckling: certain near the cone, sparse at the rim. This is what dissolves the hard
-            // boundary the player was seeing between basalt and native terrain.
-            if (level.random.nextDouble() > Mth.clamp(t * 1.7, 0.0, 1.0)) continue;
+            // boundary the player was seeing between basalt and native terrain. The flow is exempt:
+            // it is a continuous sheet of rock, and speckling it would perforate the tongue.
+            if (!flow && level.random.nextDouble() > Mth.clamp(t * 1.7, 0.0, 1.0)) continue;
 
             int gx = c.x + dx, gz = c.z + dz;
             int ground = TerrainProbe.groundY(level, gx, gz);
@@ -648,7 +736,9 @@ public final class VolcanoBuilder {
                 // Handing it back at h > 0 would stack a copy of the local ground in the air - a
                 // grass block floating over the apron.
                 setRock(level, new BlockPos(gx, ground + h, gz),
-                        apronRock(level, t, h == 0 ? native0 : null));
+                        flow && h == Math.max(0, thickness)
+                                ? flowRock()
+                                : apronRock(level, t, h == 0 ? native0 : null));
             }
         }
     }

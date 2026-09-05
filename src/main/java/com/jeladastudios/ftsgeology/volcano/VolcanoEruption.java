@@ -130,10 +130,9 @@ public final class VolcanoEruption {
     /**
      * Ash settling out of the column onto the ground downwind.
      *
-     * <p>An ash fall is not a dusting, it is what kills the countryside: the vegetation goes and the
-     * ground turns grey out to whatever distance the wind carried it. So this replaces the surface
-     * block rather than stacking on top of it - the same rule {@link #impact} follows, and the reason
-     * neither of them can leave anything hanging in the air.</p>
+     * <p>What lands is a layer of {@link com.jeladastudios.ftsgeology.block.VolcanicAshBlock}, which
+     * accumulates rather than replacing what it falls on - see {@link #settle} for why that turned
+     * out to be the whole design and not a detail.</p>
      *
      * <p>Off-centre on purpose. A ring of ash around a volcano would be wrong: the column goes where
      * the wind takes it, so the deposit is a lobe on one side, which is also what makes it readable
@@ -172,31 +171,57 @@ public final class VolcanoEruption {
             if (!level.hasChunkAt(new BlockPos(x, level.getSeaLevel(), z))) continue;
             if (com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(level, x, z)) continue;
 
+            // The crater is not a place ash settles - it is where the column is coming OUT of.
+            // Without this the fall quietly fills the lava pool it was launched from.
+            double sx = x - summit.getX(), sz = z - summit.getZ();
+            if (sx * sx + sz * sz < 12 * 12) continue;
+
             int g = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, x, z);
             if (g == Integer.MIN_VALUE) continue;
             if (com.jeladastudios.ftsgeology.worldgen.TerrainProbe.hasFluidAbove(level, x, z)) continue;
 
-            BlockPos at = new BlockPos(x, g, z);
-            BlockState s = level.getBlockState(at);
-            if (s.is(Blocks.BEDROCK) || !s.getFluidState().isEmpty()) continue;
-            if (com.jeladastudios.ftsgeology.eruption.EruptionHandler.isPlayerPlaced(s)) continue;
-            if (isAsh(s)) continue;                       // already ashed; do not churn it
+            BlockPos ground = new BlockPos(x, g, z);
+            BlockState under = level.getBlockState(ground);
+            if (under.is(Blocks.BEDROCK) || !under.getFluidState().isEmpty()) continue;
+            // Not onto a live flow. It would be buried by the next lava anyway, and a grey crust
+            // over molten rock is the one thing here that would read as a bug.
+            if (under.is(Blocks.LAVA) || under.is(Blocks.MAGMA_BLOCK)) continue;
 
-            com.jeladastudios.ftsgeology.worldgen.TerrainProbe.clearVegetation(level, x, g, z, 2);
-            level.setBlock(at, ashBlock(level).defaultBlockState(), 2);
+            settle(level, ground.above());
         }
     }
 
-    /** Welded ash and the coarser fall around it. Nothing new - the apron is made of these too. */
-    private static net.minecraft.world.level.block.Block ashBlock(ServerLevel level) {
-        int r = level.random.nextInt(10);
-        if (r < 6) return Blocks.TUFF;
-        if (r < 8) return Blocks.GRAVEL;
-        return Blocks.COARSE_DIRT;
-    }
+    /**
+     * Adds one layer of ash to a column, up to a full block.
+     *
+     * <h2>It settles ON the ground; it does not become the ground</h2>
+     * This replaced the surface block at first - grass, gravel, whatever was there became tuff or
+     * coarse dirt - and testing found the hole in that immediately: the volcano is inside its own
+     * fall radius, its basalt reads as natural terrain rather than as somebody's build, and so the
+     * mountain was turned into dirt and gravel by its own eruption.
+     *
+     * <p>The fix was not a bigger exclusion zone around the cone. It was that an ash fall does not
+     * replace anything, and everything else follows from saying so: the grass lives, the cone stays
+     * basalt and merely greys over, a second eruption deepens the deposit instead of re-stamping it,
+     * and a player can dig it off.</p>
+     */
+    private static void settle(ServerLevel level, BlockPos at) {
+        BlockState here = level.getBlockState(at);
+        BlockState ash = com.jeladastudios.ftsgeology.registry.ModBlocks.VOLCANIC_ASH.get()
+                .defaultBlockState();
 
-    private static boolean isAsh(BlockState s) {
-        return s.is(Blocks.TUFF) || s.is(Blocks.GRAVEL) || s.is(Blocks.COARSE_DIRT);
+        if (here.is(ash.getBlock())) {
+            int layers = here.getValue(
+                    com.jeladastudios.ftsgeology.block.VolcanicAshBlock.LAYERS);
+            if (layers >= 8) return;                       // as deep as it goes
+            level.setBlock(at, here.setValue(
+                    com.jeladastudios.ftsgeology.block.VolcanicAshBlock.LAYERS, layers + 1), 2);
+            return;
+        }
+        // Ash falls through a tuft of grass and buries it; it does not stack on top of it.
+        if (!here.isAir() && !com.jeladastudios.ftsgeology.worldgen.TerrainProbe.isVegetation(here)) return;
+        if (!ash.canSurvive(level, at)) return;
+        level.setBlock(at, ash, 2);
     }
 
     /**

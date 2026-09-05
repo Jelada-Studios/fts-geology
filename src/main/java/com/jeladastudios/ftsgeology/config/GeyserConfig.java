@@ -338,14 +338,15 @@ public final class GeyserConfig {
         VOLCANIC_ASHFALL = b
                 .comment("Let an eruption lay ash on the ground downwind of the volcano.",
                         "The eruption column is the thing you see from a distance, and what comes",
-                        "down out of it is the thing you walk through afterwards: the vegetation",
-                        "goes and the ground turns grey, in a lobe on the downwind side rather than",
-                        "a ring, so you can read which way the wind was blowing. Each volcano keeps",
-                        "its own prevailing wind for the life of the world.",
-                        "It replaces the surface block rather than piling on top of it, so nothing",
-                        "is ever left hanging and the ground does not creep upward eruption after",
-                        "eruption. Player-placed blocks are left alone either way. Turn it off if",
-                        "you would rather the countryside around a volcano stayed green.")
+                        "down out of it is the thing you walk through afterwards: the ground greys",
+                        "over in a lobe on the downwind side rather than a ring, so you can read",
+                        "which way the wind was blowing. Each volcano keeps its own prevailing wind",
+                        "for the life of the world.",
+                        "The ash settles as a layer on top of whatever is there, like snow, so it",
+                        "destroys nothing: the grass is underneath it, the volcano's own rock stays",
+                        "rock, repeat eruptions deepen the layer up to a full block, and it can be",
+                        "dug off. Turn it off if you would rather the countryside around a volcano",
+                        "stayed green.")
                 .define("volcanicAshfall", true);
         ERUPTIONS_START_FIRES = b
                 .comment("Let a lava flow set the countryside alight. A flow reaching the tree line",

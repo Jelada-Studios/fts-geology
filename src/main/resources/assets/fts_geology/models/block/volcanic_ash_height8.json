@@ -1,0 +1,21 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "fts_geology:block/volcanic_ash",
+    "texture": "fts_geology:block/volcanic_ash"
+  },
+  "elements": [
+    {
+      "from": [ 0, 0, 0 ],
+      "to": [ 16, 8, 16 ],
+      "faces": {
+        "down":  { "texture": "#texture", "cullface": "down" },
+        "up":    { "texture": "#texture" },
+        "north": { "texture": "#texture", "cullface": "north" },
+        "south": { "texture": "#texture", "cullface": "south" },
+        "west":  { "texture": "#texture", "cullface": "west" },
+        "east":  { "texture": "#texture", "cullface": "east" }
+      }
+    }
+  ]
+}
