@@ -80,6 +80,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue VOLCANO_RESERVOIR_RADIUS;  // deep magma-chamber radius
     public static final ForgeConfigSpec.IntValue VOLCANO_CRATER_RADIUS;     // summit crater/lava-pool radius
     public static final ForgeConfigSpec.IntValue VOLCANO_LAVA_BUDGET;       // lava cells per eruption
+    public static final ForgeConfigSpec.BooleanValue VOLCANIC_ASHFALL;      // default ON
 
     // --- Cooldown / recharge cycle -----------------------------------------
     public static final ForgeConfigSpec.IntValue COOLDOWN_TICKS_MIN;  // e.g. 5 min = 6000
@@ -334,6 +335,18 @@ public final class GeyserConfig {
                         "and turns to basalt behind its own front, which is both what happens and",
                         "what actually looks like an eruption.")
                 .defineInRange("volcanoLavaBudget", 24, 0, 400);
+        VOLCANIC_ASHFALL = b
+                .comment("Let an eruption lay ash on the ground downwind of the volcano.",
+                        "The eruption column is the thing you see from a distance, and what comes",
+                        "down out of it is the thing you walk through afterwards: the vegetation",
+                        "goes and the ground turns grey, in a lobe on the downwind side rather than",
+                        "a ring, so you can read which way the wind was blowing. Each volcano keeps",
+                        "its own prevailing wind for the life of the world.",
+                        "It replaces the surface block rather than piling on top of it, so nothing",
+                        "is ever left hanging and the ground does not creep upward eruption after",
+                        "eruption. Player-placed blocks are left alone either way. Turn it off if",
+                        "you would rather the countryside around a volcano stayed green.")
+                .define("volcanicAshfall", true);
         ERUPTIONS_START_FIRES = b
                 .comment("Let a lava flow set the countryside alight. A flow reaching the tree line",
                         "really does start a fire, and the lava budget above already stops the flow",

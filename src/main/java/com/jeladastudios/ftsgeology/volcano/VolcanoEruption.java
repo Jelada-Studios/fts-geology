@@ -54,6 +54,163 @@ public final class VolcanoEruption {
         if (eruptionTicks % 30 == 0) {
             level.playSound(null, summit, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 1.2f, 0.5f);
         }
+
+        // The part you can see from the far side of the valley.
+        ashColumn(level, summit, magnitude, eruptionTicks);
+        ashfall(level, summit, magnitude);
+    }
+
+    // === Ash ================================================================
+
+    /**
+     * The eruption column: ash going up for hundreds of blocks and leaning off downwind.
+     *
+     * <h2>Why nothing above was ever visible from a distance</h2>
+     * Every particle in this class is emitted within a block or two of the vent, and the tallest of
+     * them - the fountain smoke in {@link #tickEruption} - reaches {@code summit + 4}. So a volcano
+     * in full eruption said nothing at all to anybody who was not standing on it, which for the
+     * single largest event in the mod is the wrong way round: in life an eruption column is the
+     * thing you see first and from furthest away, and it is how you know to go and look.
+     *
+     * <h2>The trap: ordinary sendParticles reaches 32 blocks</h2>
+     * {@code ServerLevel.sendParticles(type, x, y, z, ...)} only sends to players within <b>32
+     * blocks</b>. A column visible from three hundred is therefore impossible that way no matter how
+     * many particles are asked for - they are simply never sent, and the fix looks like it failed.
+     * The per-player overload with {@code longDistance = true} raises that to 512, so this walks the
+     * player list itself and sends to each one directly.
+     *
+     * <p>That also makes the cost controllable, because the budget can then depend on how far away
+     * the viewer is: somebody on the far ridge gets the silhouette, somebody on the slope gets the
+     * full thing.</p>
+     */
+    private static void ashColumn(ServerLevel level, BlockPos summit, int magnitude, int eruptionTicks) {
+        if (eruptionTicks % 2 != 0) return;      // twice a tick per player is fog, not a plume
+
+        // How high the column stands, bounded by the world rather than by taste: a big eruption
+        // should genuinely reach the ceiling, because that is what makes it read as enormous.
+        int height = Math.min(30 + magnitude * 20, level.getMaxBuildHeight() - summit.getY() - 2);
+        if (height < 12) return;
+
+        double[] wind = wind(summit);
+        double reach = 512.0;
+
+        for (net.minecraft.server.level.ServerPlayer p : level.players()) {
+            double dx = p.getX() - summit.getX(), dz = p.getZ() - summit.getZ();
+            double dist = Math.sqrt(dx * dx + dz * dz);
+            if (dist > reach) continue;
+
+            // Six segments up the column. Near the vent it is dense and dark; higher up it thins
+            // and spreads into the drifting cloud, which is the shape that reads as an ash plume
+            // rather than as a chimney.
+            int segments = 6;
+            int near = dist < 64 ? 4 : dist < 200 ? 3 : 2;
+            for (int i = 0; i < segments; i++) {
+                double t = (i + 0.5) / segments;
+                double y = summit.getY() + 1.0 + t * height;
+                // Leans downwind, further the higher it goes.
+                double lean = t * t * height * 0.45;
+                double x = summit.getX() + 0.5 + wind[0] * lean;
+                double z = summit.getZ() + 0.5 + wind[1] * lean;
+                // And widens, so the top is a cloud and the bottom is a stalk.
+                double spread = 1.0 + t * height * 0.10;
+
+                level.sendParticles(p, ParticleTypes.LARGE_SMOKE, true,
+                        x, y, z, near, spread, height / (double) segments * 0.4, spread, 0.01);
+                // The pale upper cloud, where the ash is fine enough to catch the light. Only for
+                // people close enough to tell two greys apart: past a couple of hundred blocks it is
+                // a silhouette either way, and this is a third of the packets the column sends.
+                if (t > 0.45 && dist < 256) {
+                    level.sendParticles(p, ParticleTypes.CAMPFIRE_SIGNAL_SMOKE, true,
+                            x, y, z, Math.max(1, near - 1), spread * 1.3, spread * 0.5, spread * 1.3, 0.005);
+                }
+            }
+        }
+    }
+
+    /**
+     * Ash settling out of the column onto the ground downwind.
+     *
+     * <p>An ash fall is not a dusting, it is what kills the countryside: the vegetation goes and the
+     * ground turns grey out to whatever distance the wind carried it. So this replaces the surface
+     * block rather than stacking on top of it - the same rule {@link #impact} follows, and the reason
+     * neither of them can leave anything hanging in the air.</p>
+     *
+     * <p>Off-centre on purpose. A ring of ash around a volcano would be wrong: the column goes where
+     * the wind takes it, so the deposit is a lobe on one side, which is also what makes it readable
+     * on the ground - you can tell which way the wind was blowing when it went off.</p>
+     */
+    private static void ashfall(ServerLevel level, BlockPos summit, int magnitude) {
+        if (!GeyserConfig.VOLCANIC_ASHFALL.get()) return;
+
+        double[] wind = wind(summit);
+        int reach = Math.min(40 + magnitude * 8, 160);
+
+        // Enough columns per call that a minute-long eruption visibly greys the country downwind.
+        //
+        // The first version sampled six a call, which measured out at three percent of the lobe over
+        // a whole eruption - arithmetically an ash fall, and on screen nothing whatever.
+        for (int n = 0; n < 40; n++) {
+            // Distance is square-root biased so the samples spread evenly over the disc rather than
+            // piling up at the middle; the thinning below is what puts the weight near the vent.
+            double d = reach * Math.sqrt(level.random.nextDouble());
+
+            // A direction anywhere on the compass, then weighted by how well it lines up with the
+            // wind. Taking the angle from a fixed cone instead - which is what this did first - put
+            // a hundred percent of the ash in one half and zero in the other, and a lobe with a hard
+            // angular edge reads as a pie slice rather than as weather. Real fall is heaviest
+            // downwind and merely light elsewhere, so every bearing gets some.
+            double a = level.random.nextDouble() * Math.PI * 2;
+            double dirX = Math.cos(a), dirZ = Math.sin(a);
+            double align = dirX * wind[0] + dirZ * wind[1];             // -1 upwind, +1 downwind
+            double lobe = 0.12 + 0.88 * Math.pow((align + 1.0) * 0.5, 2.2);
+
+            int x = summit.getX() + (int) Math.round(dirX * d);
+            int z = summit.getZ() + (int) Math.round(dirZ * d);
+
+            // Thins out with distance as well: solid near the vent, patchy at the edge.
+            if (level.random.nextDouble() > (1.0 - (d / reach) * 0.85) * lobe) continue;
+            if (!level.hasChunkAt(new BlockPos(x, level.getSeaLevel(), z))) continue;
+            if (com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(level, x, z)) continue;
+
+            int g = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, x, z);
+            if (g == Integer.MIN_VALUE) continue;
+            if (com.jeladastudios.ftsgeology.worldgen.TerrainProbe.hasFluidAbove(level, x, z)) continue;
+
+            BlockPos at = new BlockPos(x, g, z);
+            BlockState s = level.getBlockState(at);
+            if (s.is(Blocks.BEDROCK) || !s.getFluidState().isEmpty()) continue;
+            if (com.jeladastudios.ftsgeology.eruption.EruptionHandler.isPlayerPlaced(s)) continue;
+            if (isAsh(s)) continue;                       // already ashed; do not churn it
+
+            com.jeladastudios.ftsgeology.worldgen.TerrainProbe.clearVegetation(level, x, g, z, 2);
+            level.setBlock(at, ashBlock(level).defaultBlockState(), 2);
+        }
+    }
+
+    /** Welded ash and the coarser fall around it. Nothing new - the apron is made of these too. */
+    private static net.minecraft.world.level.block.Block ashBlock(ServerLevel level) {
+        int r = level.random.nextInt(10);
+        if (r < 6) return Blocks.TUFF;
+        if (r < 8) return Blocks.GRAVEL;
+        return Blocks.COARSE_DIRT;
+    }
+
+    private static boolean isAsh(BlockState s) {
+        return s.is(Blocks.TUFF) || s.is(Blocks.GRAVEL) || s.is(Blocks.COARSE_DIRT);
+    }
+
+    /**
+     * This mountain's prevailing wind, as a unit vector.
+     *
+     * <p>Derived from its own position, so it is the same every eruption and after every reload
+     * without storing anything: a volcano that ashes the eastern valley goes on ashing the eastern
+     * valley, and the deposit on the ground stays consistent with the column in the sky.</p>
+     */
+    private static double[] wind(BlockPos summit) {
+        long h = summit.getX() * 0x9E3779B97F4A7C15L ^ summit.getZ() * 0xC2B2AE3D27D4EB4FL;
+        h ^= h >>> 29; h *= 0xBF58476D1CE4E5B9L; h ^= h >>> 32;
+        double a = ((h >>> 11) / (double) (1L << 53)) * Math.PI * 2.0;
+        return new double[]{ Math.cos(a), Math.sin(a) };
     }
 
     /** Once per second while erupting: well lava up the crater so it spills down the mountain. */
