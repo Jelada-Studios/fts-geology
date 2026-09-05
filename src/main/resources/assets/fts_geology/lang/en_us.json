@@ -197,7 +197,7 @@
   "command.fts_geology.expected_here_s": "  Expected here: %s",
   "command.fts_geology.column.expected.collision": "folded calcite / tuff / diorite bands (metamorphic root)",
   "command.fts_geology.column.expected.subduction": "a basalt-blackstone slab deep down, granite/diorite higher",
-  "command.fts_geology.column.expected.rift": "near-vertical basalt dykes, open fractures near the axis",
+  "command.fts_geology.column.expected.rift": "near-vertical basalt dikes, open fractures near the axis",
   "command.fts_geology.column.expected.transform": "a narrow band of cobbled deepslate, gravel and tuff",
   "command.fts_geology.column.expected.interior": "nothing - this is plate interior",
   "command.fts_geology.stress_is_below_0_25_so_this_column_is_o": "  Stress is below 0.25, so this column is outside the active part of the zone.",

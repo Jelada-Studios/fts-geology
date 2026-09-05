@@ -561,7 +561,7 @@ public final class GeyserConfig {
                 .comment("Let boundary rock reach daylight instead of hiding below Y=-30.",
                         "Squeezed into a 28-block window it was easy to tunnel straight past and never",
                         "know the geology was there. Real boundary rock does not stop at a depth: a",
-                        "collision root outcrops in mountainsides, a rift's dyke swarm cuts the whole",
+                        "collision root outcrops in mountainsides, a rift's dike swarm cuts the whole",
                         "crust, a strike-slip damage zone is a scar you can walk along.",
                         "The topsoil is always left alone (see deepStructureSoilDepth), so meadows",
                         "still look like meadows and only the rock beneath them changes - which is",
