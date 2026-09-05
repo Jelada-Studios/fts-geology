@@ -203,7 +203,153 @@ public final class HotSpringShape {
 
         // Colours by age - see paintThermalRings. Stage 1 gets only its own bare deposit.
         RetrogenHandler.paintRings(level, pool, x, z, waterY, stage);
+
+        // And where the pool overflows, the streak it has laid down running away downhill.
+        runoff(level, pool, waterY, stage);
         return pool;
+    }
+
+    /**
+     * The sinter streak running downhill from where the pool spills.
+     *
+     * <h2>Why a pool with no outflow reads as a puddle</h2>
+     * A spring is water <i>arriving</i>, continuously, and it has to go somewhere. Every pool in the
+     * mod simply sat in its own rim with nothing leaving it, so what the landscape showed was a
+     * basin of hot water rather than a spring - and the single most photographed thing about
+     * Mammoth Hot Springs, the white tongue of carbonate spilling away downslope, was missing.
+     *
+     * <p>What it deposits is what it is already made of: the water loses its CO2 as it spreads
+     * thin over the lip, so the carbonate comes out of it fastest exactly along the overflow. The
+     * streak therefore grows out of the rim rather than being drawn onto the ground beside it.</p>
+     *
+     * <h2>The path is not a new piece of maths</h2>
+     * {@link com.jeladastudios.ftsgeology.hydrology.RiverProfile#downstream} already answers "which
+     * way does water leave this column", picking the steepest of the eight neighbours with the
+     * diagonals divided by their length, and returning null at a low point. It was written for the
+     * river erosion, which is switched off by default - but what is switched off is
+     * {@code Knickpoint.afterQuake}, not this, and a helper that finds the way downhill is exactly
+     * as correct either way.
+     *
+     * <p>Only from a mature spring. A young pool has neither the deposit nor the flow to build a
+     * terrace outside itself, which is the same reasoning that brings the colour bands in one at a
+     * time rather than all at stage one.</p>
+     */
+    private static void runoff(ServerLevel level, List<BlockPos> pool, int waterY, int stage) {
+        if (stage < 3 || pool.isEmpty()) return;
+
+        // The spill point is the lowest ground just outside the rim: water leaves a basin at its
+        // lip, and the lip is wherever the land outside it is lowest.
+        // Packed into a set first. Asking a 300-cell List whether it holds each of its own 1200
+        // neighbours is a third of a million comparisons for an answer a hash gives for nothing,
+        // and it would have run every time any spring in the world was built or repaired.
+        java.util.Set<Long> cells = new java.util.HashSet<>();
+        for (BlockPos c : pool) cells.add(net.minecraft.core.BlockPos.asLong(c.getX(), 0, c.getZ()));
+
+        BlockPos lip = null;
+        int lowest = Integer.MAX_VALUE;
+        java.util.Set<Long> tested = new java.util.HashSet<>();
+        for (BlockPos c : pool) {
+            for (net.minecraft.core.Direction d : com.jeladastudios.ftsgeology.hydrology.RiverProfile.sides()) {
+                int nx = c.getX() + d.getStepX(), nz = c.getZ() + d.getStepZ();
+                long key = net.minecraft.core.BlockPos.asLong(nx, 0, nz);
+                if (cells.contains(key) || !tested.add(key)) continue;   // inside, or already looked
+                int g = TerrainProbe.groundY(level, nx, nz);
+                if (g == Integer.MIN_VALUE || g >= lowest) continue;
+                lowest = g;
+                lip = new BlockPos(nx, g, nz);
+            }
+        }
+        if (lip == null || lowest > waterY + 1) return;    // rimmed all round: nothing spills
+
+        int x = lip.getX(), z = lip.getZ();
+        int last = lowest;
+        // The heading it set off on, so it can carry straight on across level ground.
+        int hx = Integer.signum(x - pool.get(0).getX());
+        int hz = Integer.signum(z - pool.get(0).getZ());
+        if (hx == 0 && hz == 0) hx = 1;
+        java.util.Set<Long> walked = new java.util.HashSet<>();
+
+        int width = 2;
+        for (int step = 0; step < 18; step++) {
+            if (!walked.add(net.minecraft.core.BlockPos.asLong(x, 0, z))) return;   // never twice
+            paintRunoff(level, x, z, last, width, step);
+
+            int[] next = flowStep(level, x, z, last, hx, hz);
+            if (next == null) return;                       // the ground rises: the flow stops here
+            if (last - next[1] > 2) return;                 // a cliff, not a slope
+            if (TerrainProbe.hasFluidAbove(level, next[0], next[2])) return;   // reached water
+
+            hx = Integer.signum(next[0] - x); hz = Integer.signum(next[2] - z);
+            x = next[0]; last = next[1]; z = next[2];
+            // Narrows as it goes: the flow spreads, cools and gives out rather than ending on a line.
+            if (step == 5) width = 1;
+            if (step == 12) width = 0;
+        }
+    }
+
+    /**
+     * The next cell the overflow runs to: downhill if there is a downhill, straight on if there is not.
+     *
+     * <h2>Why {@code RiverProfile.downstream} could not be used directly</h2>
+     * It was, first, and the streak came out <b>one block long at every gradient</b>. That helper
+     * insists on a neighbour <i>strictly lower</i> than the current column, which is right for the
+     * erosion it was written for - a retreat that could step sideways would never be guaranteed to
+     * terminate. But Minecraft ground is whole blocks, so a real hillside at a third of a block per
+     * block is a staircase of flats: after one step down, the next two or three columns are exactly
+     * level, {@code downstream} returns null, and the run ends before it has left the rim.
+     *
+     * <p>This is the voxel degeneracy the erosion model was designed around, arriving from the other
+     * side. Water does not stop when the ground goes flat - it spreads and keeps going, which is
+     * precisely how an apron of sinter forms - so the walk carries its heading across level ground
+     * and gives up only when the land ahead actually rises.</p>
+     *
+     * @return {x, groundY, z}, or null if there is nowhere level or lower to go
+     */
+    private static int[] flowStep(ServerLevel level, int x, int z, int here, int hx, int hz) {
+        int[] best = null;
+        double bestScore = -Double.MAX_VALUE;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) continue;
+                int g = TerrainProbe.groundY(level, x + dx, z + dz);
+                if (g == Integer.MIN_VALUE || g > here) continue;      // never uphill
+                double dist = (dx != 0 && dz != 0) ? Math.sqrt(2.0) : 1.0;
+                // Drop dominates; the old heading only decides between equal options, which is what
+                // keeps a run across a flat going straight instead of wandering back on itself.
+                double score = (here - g) / dist * 4.0 + (dx * hx + dz * hz) * 0.5;
+                if (score > bestScore) { bestScore = score; best = new int[]{x + dx, g, z + dz}; }
+            }
+        }
+        return best;
+    }
+
+    /** One rung of the streak, across the flow. */
+    private static void paintRunoff(ServerLevel level, int x, int z, int y, int width, int step) {
+        for (int dx = -width; dx <= width; dx++) {
+            for (int dz = -width; dz <= width; dz++) {
+                if (dx * dx + dz * dz > width * width + width) continue;
+                // Ragged at the sides, solid down the middle.
+                if ((dx != 0 || dz != 0) && level.random.nextInt(3) == 0) continue;
+
+                int g = TerrainProbe.groundY(level, x + dx, z + dz);
+                if (g == Integer.MIN_VALUE || Math.abs(g - y) > 1) continue;
+                if (TerrainProbe.hasFluidAbove(level, x + dx, z + dz)) continue;
+
+                BlockPos at = new BlockPos(x + dx, g, z + dz);
+                BlockState s = level.getBlockState(at);
+                if (s.is(Blocks.BEDROCK) || !s.getFluidState().isEmpty()) continue;
+                if (EruptionHandler.isPlayerPlaced(s) || isCrust(s)) continue;
+
+                TerrainProbe.clearVegetation(level, x + dx, g, z + dz, 2);
+                // Mats only in the first few blocks, where the water is still hot enough for them.
+                BlockState put = step < 4 && dx * dx + dz * dz > 0 && level.random.nextInt(3) == 0
+                        ? ModBlocks.MICROBIAL_MAT_ORANGE.get().defaultBlockState()
+                        : level.random.nextInt(4) == 0
+                            ? ModBlocks.TRAVERTINE.get().defaultBlockState()
+                            : ModBlocks.SINTER.get().defaultBlockState();
+                level.setBlock(at, put, 2);
+            }
+        }
     }
 
     /**
