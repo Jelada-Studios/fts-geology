@@ -40,9 +40,23 @@ public final class VolcanoEruption {
     public static void tickEruption(ServerLevel level, BlockPos summit, int magnitude, int eruptionTicks) {
         double x = summit.getX() + 0.5, z = summit.getZ() + 0.5;
         // Fire fountain: lava + flame + smoke shooting up.
-        level.sendParticles(ParticleTypes.LAVA, x, summit.getY() + 1.0, z, 4, 0.4, 0.2, 0.4, 0.0);
-        level.sendParticles(ParticleTypes.FLAME, x, summit.getY() + 1.5, z, 6, 0.4, 0.6, 0.4, 0.05);
-        level.sendParticles(ParticleTypes.LARGE_SMOKE, x, summit.getY() + 4.0, z, 5, 0.8, 1.2, 0.8, 0.03);
+        level.sendParticles(ParticleTypes.LAVA, x, summit.getY() + 1.0, z, 6, 0.5, 0.3, 0.5, 0.0);
+        level.sendParticles(ParticleTypes.FLAME, x, summit.getY() + 1.5, z, 8, 0.5, 0.7, 0.5, 0.05);
+
+        // The base of the column, and it has to be BLACK.
+        //
+        // This was five smoke particles in a metre-wide puff, which testing called far too light -
+        // and rightly, because the ash column above it had meanwhile been built to reach the world
+        // ceiling. A plume that fans out enormously overhead and comes out of a wisp at the crater
+        // reads as two unrelated effects. So the throat is now dense and dark, and the column takes
+        // over from something already thick rather than from nothing.
+        level.sendParticles(ParticleTypes.LARGE_SMOKE, x, summit.getY() + 2.0, z,
+                18, 1.4, 1.0, 1.4, 0.05);
+        level.sendParticles(ParticleTypes.LARGE_SMOKE, x, summit.getY() + 5.0, z,
+                14, 2.0, 1.8, 2.0, 0.04);
+        // A little of the paler ash mixed through it, so the black is not a flat silhouette.
+        level.sendParticles(ParticleTypes.CAMPFIRE_SIGNAL_SMOKE, x, summit.getY() + 4.0, z,
+                4, 1.2, 1.2, 1.2, 0.02);
 
         int bombs = GeyserConfig.VOLCANO_BOMBS_PER_ERUPTION.get();
         int eruptTicks = Math.max(1, GeyserConfig.VOLCANO_ERUPT_TICKS.get());
@@ -59,7 +73,6 @@ public final class VolcanoEruption {
         ashColumn(level, summit, magnitude, eruptionTicks);
         ashfall(level, summit, magnitude);
         trailBombs(level);
-        plumeLightning(level, summit, magnitude);
         if (eruptionTicks % 4 == 0) ashInTheAir(level, summit, magnitude);
         // The mountain shakes while it is going off, and much less far out than a quake does: an
         // eruption is felt on its own slopes, not across a county.
@@ -321,35 +334,6 @@ public final class VolcanoEruption {
         }
     }
 
-    /**
-     * Lightning inside the ash column.
-     *
-     * <p>A big eruption column really does make its own thunderstorm: ash grains rubbing past each
-     * other charge the cloud, and it discharges - Eyjafjallajokull and Hunga Tonga both put on the
-     * display. It is also the single most dramatic thing that can be added here for almost no code,
-     * because vanilla already has the bolt.</p>
-     *
-     * <p><b>Visual only.</b> {@code setVisualOnly} means no fire, no damage and no converted mobs:
-     * an eruption is already destructive enough on its own terms, and lightning that burned the
-     * forest down would be a second, unasked-for hazard rather than a picture.</p>
-     */
-    private static void plumeLightning(ServerLevel level, BlockPos summit, int magnitude) {
-        if (magnitude < 6) return;                       // only the big columns charge up
-        if (level.random.nextInt(200) != 0) return;
-
-        double[] wind = wind(summit);
-        // Out along the drift, where the cloud actually is rather than over the vent.
-        double d = 8 + level.random.nextDouble() * (10 + magnitude * 2);
-        double bx = summit.getX() + 0.5 + wind[0] * d + (level.random.nextDouble() - 0.5) * 12;
-        double bz = summit.getZ() + 0.5 + wind[1] * d + (level.random.nextDouble() - 0.5) * 12;
-
-        net.minecraft.world.entity.LightningBolt bolt =
-                net.minecraft.world.entity.EntityType.LIGHTNING_BOLT.create(level);
-        if (bolt == null) return;
-        bolt.moveTo(bx, summit.getY() + 2, bz);
-        bolt.setVisualOnly(true);
-        level.addFreshEntity(bolt);
-    }
 
     /**
      * Ash drifting down through the air, as opposed to ash already on the ground.

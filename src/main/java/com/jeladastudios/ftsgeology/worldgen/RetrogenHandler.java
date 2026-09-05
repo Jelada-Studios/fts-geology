@@ -329,6 +329,31 @@ public final class RetrogenHandler {
     }
     // === Generation =========================================================
 
+    /** How much denser hot springs get on properly geothermal ground. */
+    private static final double GEOTHERMAL_SPRING_BOOST = 1.25;
+
+    /**
+     * 0 on ordinary country, rising to 1 on ground that is genuinely geothermal.
+     *
+     * <p>The same three settings the fumarole fields and the basin floor now answer to - a mantle
+     * plume, a spreading ridge, a subduction arc - so the places that look geothermal are the places
+     * that have the springs to go with it, rather than the two things disagreeing.</p>
+     */
+    private static double geothermalGround(ServerLevel level, int x, int z) {
+        double plume = com.jeladastudios.ftsgeology.tectonics.HotspotMap.sample(level, x, z).strength();
+        com.jeladastudios.ftsgeology.tectonics.PlateSample plate =
+                com.jeladastudios.ftsgeology.tectonics.TectonicMap.sampleCached(level, x, z);
+        double boundary = switch (plate.faultType()) {
+            case DIVERGENT, CONVERGENT_SUBDUCTION -> plate.stress();
+            default -> 0.0;
+        };
+        // Doubled before clamping, so the full boost covers the working part of a corridor rather
+        // than only its centre line. Without this the ramp reached its peak on the fault itself and
+        // was already half gone a few dozen blocks out, which averaged to a ninth of what was asked
+        // for - a ramp that only touches its maximum at a single point is not really a boost.
+        return Math.min(1.0, Math.max(plume, boundary) * 2.0);
+    }
+
     private static int generateInChunk(ServerLevel level, LevelChunk chunk) {
         ChunkPos cp = chunk.getPos();
         RandomSource rng = RandomSource.create(
@@ -377,7 +402,15 @@ public final class RetrogenHandler {
         // so features stopped generating altogether.
 
         // Independent surface feature: an occasional hot-spring pool.
-        if (rng.nextDouble() < GeyserConfig.HOT_SPRING_SPAWN_CHANCE.get() * fit.hotSpring()) {
+        //
+        // A quarter denser on genuinely geothermal ground - over a plume, along a spreading ridge,
+        // or in a subduction arc. Those are the places the mod now dresses properly, with a sinter
+        // floor and fumarole fields, and a field of that kind wants springs in it rather than two;
+        // everywhere else keeps the density it had.
+        // Ramped by how geothermal the ground is rather than switched on at a line, so the density
+        // does not step up as you cross an invisible threshold.
+        double springBoost = 1.0 + (GEOTHERMAL_SPRING_BOOST - 1.0) * geothermalGround(level, centreX, centreZ);
+        if (rng.nextDouble() < GeyserConfig.HOT_SPRING_SPAWN_CHANCE.get() * fit.hotSpring() * springBoost) {
             generateHotSpring(level, cp, rng);
         }
         // Volcanoes are rare landmarks and only exist where magma is actually generated.

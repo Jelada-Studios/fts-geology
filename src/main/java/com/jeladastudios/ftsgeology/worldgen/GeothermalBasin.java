@@ -139,8 +139,45 @@ public final class GeothermalBasin {
     private static double basin(ServerLevel level, int x, int z) {
         double p = ThermalBiomes.strength(level, x, z);
         if (p >= 0.8) return p;          // Terralith's Yellowstone and friends, free of charge
-        if (HotspotMap.sample(level, x, z).strength() <= PLUME_THRESHOLD) return 0.0;
-        return HotspotMap.basinStrength(level, x, z);
+
+        double plume = HotspotMap.sample(level, x, z).strength() <= PLUME_THRESHOLD
+                ? 0.0
+                : HotspotMap.basinStrength(level, x, z);
+
+        return Math.max(plume, boundary(level, x, z));
+    }
+
+    /**
+     * Geothermal ground along a plate boundary, as opposed to over a plume.
+     *
+     * <h2>Why a hotspot was not the only place that deserved this</h2>
+     * A plume is the <i>rarest</i> way to get a geothermal field and it was the only one the mod
+     * dressed. Iceland is a spreading ridge; Japan, the Andes and Kamchatka are subduction arcs; and
+     * between them those settings hold most of the geothermal ground on Earth. A rift valley with
+     * volcanoes and hot springs standing on ordinary meadow was the same mistake the basin floor was
+     * written to fix, one setting over.
+     *
+     * <h2>Only the two that melt rock</h2>
+     * {@code GeothermalSuitability} also scores collision and transform boundaries for hot springs,
+     * and correctly - the Himalaya and the North Anatolian fault both have them, because a fault
+     * conducts water whatever else it does. But a sinter flat is not made by warm water alone; it
+     * needs a shallow heat engine driving it, and neither of those settings has one. So they get
+     * springs, as they already did, and no basin floor.
+     *
+     * <h2>Cost</h2>
+     * {@link com.jeladastudios.ftsgeology.tectonics.TectonicMap#sampleCached} is cached per quart
+     * position, the same as the biome lookup above it, and this is called at four chunk corners
+     * rather than per column - so it rides along with sampling that was happening anyway.
+     */
+    private static double boundary(ServerLevel level, int x, int z) {
+        com.jeladastudios.ftsgeology.tectonics.PlateSample plate =
+                com.jeladastudios.ftsgeology.tectonics.TectonicMap.sampleCached(level, x, z);
+        return switch (plate.faultType()) {
+            // Stress already folds in distance to the fault, so the field fades out as the boundary
+            // does rather than ending at a radius.
+            case DIVERGENT, CONVERGENT_SUBDUCTION -> plate.stress();
+            default -> 0.0;
+        };
     }
 
     /** Flat enough to be floor rather than the bank above it. */

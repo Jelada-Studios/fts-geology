@@ -58,17 +58,40 @@ public final class HotspotSigns {
      * you do it is unmistakably a thing rather than scenery noise.</p>
      */
     public static void generate(ServerLevel level, ChunkPos cp, RandomSource rng) {
-        HotspotMap.Hotspot spot = HotspotMap.sample(
-                level, cp.getMinBlockX() + 8, cp.getMinBlockZ() + 8);
-        if (spot.strength() <= THRESHOLD) return;
+        int cx = cp.getMinBlockX() + 8, cz = cp.getMinBlockZ() + 8;
+
+        // A plume is the rarest way to get venting ground and it was the only one this looked for.
+        // Iceland is a spreading ridge and Japan is a subduction arc; between them those two hold
+        // most of the fumarole fields on Earth, and both were bare. So the gate is now "is this
+        // ground geothermal", not "is this ground over a plume" - the bands below are unchanged.
+        double strength = Math.max(
+                HotspotMap.sample(level, cx, cz).strength(),
+                boundaryHeat(level, cx, cz));
+        if (strength <= THRESHOLD) return;
 
         // Squared, so fields cluster towards the middle of a dome and thin out at the rim.
-        double intensity = spot.strength() * spot.strength();
+        double intensity = strength * strength;
         if (rng.nextDouble() > FIELD_CHANCE * intensity * 4.0) return;
 
         int x = cp.getMinBlockX() + rng.nextInt(16);
         int z = cp.getMinBlockZ() + rng.nextInt(16);
         field(level, x, z, intensity, rng);
+    }
+
+    /**
+     * How hard a plate boundary is venting here, on the same scale as plume strength.
+     *
+     * <p>Restricted to the two settings that actually melt rock. A collision or transform boundary
+     * conducts water and gets hot springs - it already does - but a fumarole field wants a shallow
+     * magma body under it, and neither of those has one.</p>
+     */
+    private static double boundaryHeat(ServerLevel level, int x, int z) {
+        com.jeladastudios.ftsgeology.tectonics.PlateSample plate =
+                com.jeladastudios.ftsgeology.tectonics.TectonicMap.sampleCached(level, x, z);
+        return switch (plate.faultType()) {
+            case DIVERGENT, CONVERGENT_SUBDUCTION -> plate.stress();
+            default -> 0.0;
+        };
     }
 
     /** One fumarole field: a fracture trace with its alteration haloes. */
@@ -152,7 +175,7 @@ public final class HotspotSigns {
     }
 
     /** A two or three block chimney of the mineral its own steam has laid down. */
-    static void chimney(ServerLevel level, BlockPos ground, RandomSource rng) {
+    public static void chimney(ServerLevel level, BlockPos ground, RandomSource rng) {
         BlockState base = ModBlocks.STEAM_VENT.get().defaultBlockState()
                 .setValue(SteamVentBlock.PART, SteamVentBlock.Part.BASE);
         BlockState neck = base.setValue(SteamVentBlock.PART, SteamVentBlock.Part.NECK);

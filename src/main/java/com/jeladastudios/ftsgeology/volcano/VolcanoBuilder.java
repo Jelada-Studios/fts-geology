@@ -154,6 +154,7 @@ public final class VolcanoBuilder {
             final int idx = i;
             job.add(lvl -> cutVent(lvl, c, idx));
         }
+        job.add(lvl -> cutFumaroles(lvl, c));
         job.add(lvl -> recordVents(lvl, c));
 
         // 8. The geothermal field around it, then the safety sweep.
@@ -198,6 +199,8 @@ public final class VolcanoBuilder {
         int coreCraterR = 3;
         final List<BlockPos> ventSites = new ArrayList<>();
         final List<BlockPos> vents = new ArrayList<>();
+        /** Steam-vent chimneys on the flanks: quiet most of the time, filthy during an eruption. */
+        final List<BlockPos> fumaroles = new ArrayList<>();
         /**
          * Cells that are MEANT to be lava between eruptions - the crater pool, a caldera's lake
          * crescent, every pond of a fissure swarm.
@@ -1183,10 +1186,61 @@ public final class VolcanoBuilder {
         c.vents.add(outlet);
     }
 
+    /**
+     * Fumarole chimneys scattered over the flanks and the apron.
+     *
+     * <h2>Why a volcano needed them and did not have them</h2>
+     * The mod grew a whole geothermal surface vocabulary - sulfur, crust, mud, steam chimneys - and
+     * spent it entirely on hotspots, while the one place in the world that is unambiguously venting
+     * had none of it. A live cone is not a bare pile of rock; it leaks all over, and the fumaroles
+     * on its flanks are how you can tell it is still alive from a distance.
+     *
+     * <p>They also give the eruption something to do at ground level. The column is overhead and the
+     * lava is at the summit, so a player standing on the mountain saw the least of it; when the
+     * eruption starts these blow hard, right where the player is - see
+     * {@code VolcanoCoreBlockEntity.fumaroleSmoke}.</p>
+     *
+     * <p>The chimney itself is {@link com.jeladastudios.ftsgeology.worldgen.HotspotSigns#chimney},
+     * reused rather than reimplemented: it already builds the three-part tapering stack and already
+     * refuses a spot without headroom.</p>
+     */
+    private static void cutFumaroles(ServerLevel level, Ctx c) {
+        // Rings out from the crater rim to the foot, since a real one vents up and down the cone
+        // rather than in a band. Scaled by size so a big mountain is not decorated as sparsely as a
+        // cinder cone.
+        int wanted = 4 + c.magnitude / 2;
+        int tries = wanted * 4;
+        for (int i = 0; i < tries && c.fumaroles.size() < wanted; i++) {
+            double ang = level.random.nextDouble() * Math.PI * 2;
+            double edge = coneRadius(c, ang);
+            // Clear of the crater, and out as far as the near apron.
+            double d = c.craterR + 3 + level.random.nextDouble() * Math.max(6.0, edge * 1.05);
+            int fx = c.x + (int) Math.round(Math.cos(ang) * d);
+            int fz = c.z + (int) Math.round(Math.sin(ang) * d);
+
+            int g = TerrainProbe.groundY(level, fx, fz);
+            if (g == Integer.MIN_VALUE) continue;
+            BlockPos ground = new BlockPos(fx, g, fz);
+            BlockState on = level.getBlockState(ground);
+            if (on.is(Blocks.BEDROCK) || !on.getFluidState().isEmpty()) continue;
+            if (!level.getBlockState(ground.above()).isAir()) continue;
+            // Never on the mod's own machinery, and never into somebody's build.
+            if (com.jeladastudios.ftsgeology.eruption.EruptionHandler.isPlayerPlaced(on)) continue;
+
+            com.jeladastudios.ftsgeology.worldgen.HotspotSigns.chimney(level, ground, level.random);
+            // Only count it if a chimney actually went in - chimney() bails on headroom of its own.
+            if (level.getBlockState(ground).is(
+                    com.jeladastudios.ftsgeology.registry.ModBlocks.STEAM_VENT.get())) {
+                c.fumaroles.add(ground);
+            }
+        }
+    }
+
     private static void recordVents(ServerLevel level, Ctx c) {
         if (c.vent == null) return;
         if (level.getBlockEntity(c.vent.below()) instanceof VolcanoCoreBlockEntity core) {
             core.setSurfaceVents(c.vents);
+            core.setFumaroles(c.fumaroles);
         }
         // Said out loud, because "it feels like the vents do nothing" is not something you can act
         // on. carveSeatedOutlet returns null silently when a site will not do, so a mountain with

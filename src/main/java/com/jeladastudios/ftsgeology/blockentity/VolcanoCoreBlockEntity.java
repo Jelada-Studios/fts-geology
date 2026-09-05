@@ -41,6 +41,8 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
     private int spilled = 0;
     /** Surface lava outlets across the mountainside: they smoke idle and seep lava mid-eruption. */
     private long[] surfaceVents = new long[0];
+    /** Flank fumarole chimneys, so an eruption can blow filthy smoke out of them. */
+    private long[] fumaroles = new long[0];
     /** Cells that must stay lava between eruptions; see setMoltenCells. */
     private long[] moltenCells = new long[0];
     private int craterR = 3;
@@ -239,6 +241,41 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         setChanged();
     }
 
+    public void setFumaroles(List<BlockPos> vents) {
+        long[] arr = new long[vents.size()];
+        for (int i = 0; i < arr.length; i++) arr[i] = vents.get(i).asLong();
+        this.fumaroles = arr;
+        setChanged();
+    }
+
+    /**
+     * The flank fumaroles blowing hard, while the mountain is erupting.
+     *
+     * <h2>Why the smoke comes from here rather than from the chimney block</h2>
+     * {@code SteamVentBlock} draws its own thread of steam in {@code animateTick}, which is a client
+     * random tick and costs the server nothing - exactly right for the idle state. But the client
+     * has no idea whether the volcano it is standing on is erupting, and telling it would mean a
+     * second packet and a piece of synced state for a puff of smoke.
+     *
+     * <p>The core already knows, and it already has the positions, so during an eruption it simply
+     * sends the heavy smoke itself. The chimney keeps its quiet wisp; this is laid over the top of
+     * it and stops the moment the eruption does, with nothing to reset.</p>
+     */
+    private void fumaroleSmoke(ServerLevel level) {
+        if (fumaroles.length == 0) return;
+        for (long packed : fumaroles) {
+            BlockPos p = BlockPos.of(packed);
+            // The chimney is three blocks of stack, so the smoke leaves from above the cap.
+            double x = p.getX() + 0.5, y = p.getY() + 2.2, z = p.getZ() + 0.5;
+            level.sendParticles(net.minecraft.core.particles.ParticleTypes.LARGE_SMOKE,
+                    x, y, z, 6, 0.35, 0.25, 0.35, 0.06);
+            if (level.random.nextInt(3) == 0) {
+                level.sendParticles(net.minecraft.core.particles.ParticleTypes.CAMPFIRE_SIGNAL_SMOKE,
+                        x, y + 0.6, z, 2, 0.3, 0.3, 0.3, 0.03);
+            }
+        }
+    }
+
     /**
      * The cells that are meant to be lava between eruptions - the summit pool, a caldera's lake, a
      * fissure's ponds.
@@ -264,6 +301,9 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         } else if (be.phase == Phase.ERUPTING) {
             be.eruptionTicks++;
             VolcanoEruption.tickEruption(server, summit, be.magnitude, be.eruptionTicks);
+            // Every few ticks, not every one: this is one packet per chimney and a big cone carries
+            // ten of them.
+            if (be.eruptionTicks % 3 == 0) be.fumaroleSmoke(server);
         }
 
         if (server.getGameTime() % 20L != 0L) return; // the cycle ticks once a second
@@ -401,6 +441,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         tag.putInt("Magnitude", magnitude);
         tag.putInt("CraterR", craterR);
         if (surfaceVents.length > 0) tag.putLongArray("SurfaceVents", surfaceVents);
+        if (fumaroles.length > 0) tag.putLongArray("Fumaroles", fumaroles);
         if (moltenCells.length > 0) tag.putLongArray("MoltenCells", moltenCells);
         tag.putLong("RechargedFor", rechargedFor);
         tag.putLong("RebuiltFor", rebuiltFor);
@@ -418,6 +459,9 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         magnitude = tag.contains("Magnitude") ? tag.getInt("Magnitude") : 12;
         craterR = tag.contains("CraterR") ? tag.getInt("CraterR") : 3;
         surfaceVents = tag.contains("SurfaceVents") ? tag.getLongArray("SurfaceVents") : new long[0];
+        // Absent on any world built before flank fumaroles existed; an empty array simply means
+        // that mountain has none, which is the right answer rather than a crash.
+        fumaroles = tag.contains("Fumaroles") ? tag.getLongArray("Fumaroles") : new long[0];
         moltenCells = tag.contains("MoltenCells") ? tag.getLongArray("MoltenCells") : new long[0];
         rechargedFor = tag.contains("RechargedFor") ? tag.getLong("RechargedFor") : Long.MIN_VALUE;
         rebuiltFor = tag.contains("RebuiltFor") ? tag.getLong("RebuiltFor") : Long.MIN_VALUE;
