@@ -152,7 +152,7 @@ public final class HotspotSigns {
     }
 
     /** A two or three block chimney of the mineral its own steam has laid down. */
-    private static void chimney(ServerLevel level, BlockPos ground, RandomSource rng) {
+    static void chimney(ServerLevel level, BlockPos ground, RandomSource rng) {
         BlockState base = ModBlocks.STEAM_VENT.get().defaultBlockState()
                 .setValue(SteamVentBlock.PART, SteamVentBlock.Part.BASE);
         BlockState neck = base.setValue(SteamVentBlock.PART, SteamVentBlock.Part.NECK);

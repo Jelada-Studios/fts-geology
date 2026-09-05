@@ -197,7 +197,7 @@ public final class OceanicRidge {
      * rounded to whole blocks produces perfect contour lines, and perfect contour lines are the one
      * thing that instantly reads as generated rather than grown.</p>
      */
-    private static double noise(int x, int z, double scale) {
+    static double noise(int x, int z, double scale) {
         double fx = x / scale, fz = z / scale;
         int x0 = Mth.floor(fx), z0 = Mth.floor(fz);
         double ax = fx - x0, az = fz - z0;
@@ -209,7 +209,7 @@ public final class OceanicRidge {
     }
 
     /** One lattice value in [-1, 1]. */
-    private static double lattice(int x, int z) {
+    static double lattice(int x, int z) {
         long h = x * 0x9E3779B97F4A7C15L ^ z * 0xC2B2AE3D27D4EB4FL;
         h ^= h >>> 29;
         h *= 0xBF58476D1CE4E5B9L;

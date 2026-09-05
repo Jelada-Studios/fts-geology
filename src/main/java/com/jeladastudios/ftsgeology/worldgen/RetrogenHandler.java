@@ -360,6 +360,12 @@ public final class RetrogenHandler {
         // thousand blocks and being lucky. Silent everywhere else - one map sample and out.
         HotspotSigns.generate(level, cp, rng);
 
+        // And inside a basin, the ground the springs stand ON. The pools and their colour bands have
+        // been right for a while, but each halo stopped ten blocks out and meadow began, so a geyser
+        // basin read as hot springs dropped onto a field. The sinter flat is the floor of the whole
+        // basin, not a ring around each pool. Silent everywhere else - four map samples and out.
+        GeothermalBasin.generate(level, cp, rng);
+
         // Surface features do read and write across chunk borders, which can pull a neighbour in.
         // That is fine now: this runs from the tick queue, so a forced load simply queues more work
         // for a later tick instead of recursing. Demanding a fully loaded neighbourhood instead was
@@ -970,7 +976,7 @@ public final class RetrogenHandler {
      * through it and the odd patch of the spring's own sinter already reads as exactly that -
      * lighter and drier than the soil around it, without being another flat colour.</p>
      */
-    private static Block haloBlock(ServerLevel level) {
+    static Block haloBlock(ServerLevel level) {
         int r = level.random.nextInt(10);
         if (r < 4) return Blocks.COARSE_DIRT;
         if (r < 7) return Blocks.GRAVEL;
@@ -991,7 +997,7 @@ public final class RetrogenHandler {
      * <p>So this only ever runs on a cell that has just been turned into halo crust, and it uses
      * stripped logs, which are already pale and barkless, with sinter around the base.</p>
      */
-    private static void deadTree(ServerLevel level, BlockPos ground) {
+    static void deadTree(ServerLevel level, BlockPos ground) {
         Block trunk = level.random.nextBoolean() ? Blocks.STRIPPED_SPRUCE_LOG : Blocks.STRIPPED_OAK_LOG;
         int height = 3 + level.random.nextInt(4);
         for (int h = 1; h <= height; h++) {

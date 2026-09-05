@@ -541,7 +541,7 @@ public final class HotSpringShape {
      * standing on something foreign, were refused, and the pool was punched full of holes at exactly
      * the spots the spring heats.</p>
      */
-    private static boolean isCrust(BlockState s) {
+    static boolean isCrust(BlockState s) {
         return s.is(Blocks.CALCITE) || s.is(ModBlocks.SINTER.get())
                 || s.is(ModBlocks.HOT_SPRING.get()) || s.is(Blocks.MAGMA_BLOCK) || isMat(s);
     }
