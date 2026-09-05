@@ -96,7 +96,8 @@ public final class ModBlocks {
      * behind depends on its chemistry. Breakable and collectable, unlike the technical blocks.
      */
     public static final RegistryObject<Block> NATIVE_SULFUR = BLOCKS.register("native_sulfur",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.CALCITE)
+            () -> new com.jeladastudios.ftsgeology.block.NativeSulfurBlock(
+                    BlockBehaviour.Properties.copy(Blocks.CALCITE)
                     .mapColor(MapColor.COLOR_YELLOW)
                     .strength(0.8F)
                     .requiresCorrectToolForDrops()));
@@ -129,7 +130,8 @@ public final class ModBlocks {
 
     /** Mud pot: viscous grey-brown bubbling geothermal mud slurry. */
     public static final RegistryObject<Block> MUD_POT = BLOCKS.register("mud_pot",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.MUD)
+            () -> new com.jeladastudios.ftsgeology.block.MudPotBlock(
+                    BlockBehaviour.Properties.copy(Blocks.MUD)
                     .mapColor(MapColor.DIRT)
                     .strength(0.8F)));
 

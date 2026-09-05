@@ -276,14 +276,34 @@ public final class EruptionHandler {
         // so anything slower than this would visibly flicker.
         refreshRunoff(level, mouth);
 
-        // A tight vertical fountain — narrow column, not a wide cloud.
+        // A jet, not a stack of puffs.
+        //
+        // This used to draw the column by placing a splash particle at every metre of its height and
+        // capping it with a cloud, which is a picture of a geyser rather than a geyser: the height
+        // was drawn rather than achieved, so nothing was ever moving and the whole thing read as
+        // gently steaming. What sells the real one is pressure - water leaving the ground faster
+        // than it can fall back - so the particles are now fired from the mouth with a real upward
+        // velocity and left to run out of it on their way up, spreading into fog as they slow.
         double x = mouth.getX() + 0.5, z = mouth.getZ() + 0.5;
-        int plumeHeight = (int) Math.round((2.0 + 6.0 * decay) * sizeScale);
-        for (int i = 0; i <= plumeHeight; i++) {
-            level.sendParticles(ParticleTypes.SPLASH, x, mouth.getY() + 1.0 + i, z, 1, 0.06, 0.05, 0.06, 0.01);
+        double y = mouth.getY() + 1.0;
+        double power = (0.9 + 1.4 * decay) * sizeScale;
+
+        for (int i = 0; i < 6; i++) {
+            // sendParticles with count 0 is the only way to give a particle a chosen velocity: the
+            // offsets are read as the motion vector instead of as a spread. Hence one call each.
+            level.sendParticles(com.jeladastudios.ftsgeology.registry.ModParticles.GEYSER_MIST.get(),
+                    x + (level.random.nextDouble() - 0.5) * 0.4,
+                    y,
+                    z + (level.random.nextDouble() - 0.5) * 0.4,
+                    0,
+                    (level.random.nextDouble() - 0.5) * 0.06,
+                    power * (0.75 + level.random.nextDouble() * 0.5),
+                    (level.random.nextDouble() - 0.5) * 0.06,
+                    1.0);
         }
-        level.sendParticles(ParticleTypes.CLOUD, x, mouth.getY() + 1.0 + plumeHeight, z, 2, 0.08, 0.08, 0.08, 0.02);
-        level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, x, mouth.getY() + 1.5, z, 3, 0.08, 0.25, 0.08, 0.06);
+        // Boiling at the mouth itself, where the water is still liquid.
+        level.sendParticles(ParticleTypes.SPLASH, x, y, z, 4, 0.25, 0.05, 0.25, 0.02);
+        level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, x, y + 0.5, z, 2, 0.2, 0.2, 0.2, 0.03);
     }
 
     /**
