@@ -64,6 +64,59 @@ public final class VolcanoBuilder {
      *
      * @return true if the site was accepted and the build was queued
      */
+    /**
+     * Raises the mountain again over a core that survived an earthquake.
+     *
+     * <h2>Everything below ground is deliberately left alone</h2>
+     * This is not {@link #build}. It runs the shaping steps only - clear, cone, caldera, apron,
+     * summit, and the safety sweep - and never touches the reservoir, the conduit, the flank vents
+     * or the core. That is not tidiness, it is the thing that makes it safe:
+     * <ul>
+     *   <li>{@code plantCore} writes a fresh block entity, which would come up with its
+     *       "quakes I have answered for" counter empty. The zone stays released for an hour, so the
+     *       new core would immediately rebuild again, and again - an endless loop. Not replanting
+     *       the core removes that by construction rather than by guarding against it.</li>
+     *   <li>The reservoir is sited at {@code baseY - 45}; run a second time it would be cut through
+     *       the middle of the existing edifice.</li>
+     *   <li>A vent that landed a block off would leave two cores ticking in one mountain.</li>
+     * </ul>
+     *
+     * <p>The height is pinned to what this volcano was, rather than re-rolled, because
+     * {@code buildConeRow} only adds where the ground is below target - so a taller roll would pile
+     * onto whatever the quake left standing instead of restoring it.</p>
+     *
+     * @return true if the rebuild was queued
+     */
+    public static boolean rebuildEdifice(ServerLevel level, BlockPos base, int magnitude,
+                                         VolcanoType type, int summitY) {
+        Ctx c = layout(level, base, magnitude, type);
+        if (c == null) return false;
+
+        // Pin the profile to the original mountain instead of the fresh roll layout just made.
+        if (summitY > c.baseY) {
+            c.summitY = summitY;
+            c.coneHeight = summitY - c.baseY;
+            c.coneBaseR = c.coneHeight > 0
+                    ? (int) Math.round(c.craterR + c.coneHeight * type.coneSlope())
+                    : c.craterR;
+            if (type == VolcanoType.FISSURE) c.coneBaseR = 6 + magnitude;
+        }
+
+        VolcanoJob job = new VolcanoJob(level, "rebuild " + type + " @ " + c.x + "," + c.z);
+        forEachRow(job, c.clearReach, dx -> lvl -> clearSiteRow(lvl, c, dx));
+        if (c.coneHeight > 0) {
+            forEachRow(job, c.coneBaseR + 2, dx -> lvl -> buildConeRow(lvl, c, dx));
+        }
+        if (c.type.excavates()) {
+            forEachRow(job, calderaRingReach(c), dx -> lvl -> carveCalderaRow(lvl, c, dx));
+        }
+        forEachRow(job, c.apronReach, dx -> lvl -> buildApronRow(lvl, c, dx));
+        job.add(lvl -> buildSummit(lvl, c));
+        job.add(lvl -> sealExposedLava(lvl, c));
+        job.add(lvl -> verifyContainment(lvl, c));
+        return VolcanoJob.enqueue(job);
+    }
+
     public static boolean build(ServerLevel level, BlockPos base, int magnitude, VolcanoType type) {
         Ctx c = layout(level, base, magnitude, type);
         if (c == null) return false;
@@ -903,6 +956,10 @@ public final class VolcanoBuilder {
             core.setMagnitude(c.magnitude);
             core.setCraterRadius(c.coreCraterR);
             core.setMoltenCells(c.molten);
+            // What the mountain was, so it can be put back after an earthquake flattens it. The
+            // ORIGINAL base, not the summit: a rebuild that measured from the current ground would
+            // stack a new cone on whatever survived and double the mountain's height.
+            core.setShape(c.type, new BlockPos(c.x, c.baseY, c.z), c.summitY);
         }
         setRock(level, c.vent, Blocks.LAVA.defaultBlockState());
     }

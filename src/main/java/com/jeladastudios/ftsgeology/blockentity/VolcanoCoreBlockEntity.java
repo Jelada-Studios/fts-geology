@@ -59,6 +59,73 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
     /** Sequence number of the last quake this volcano has already recharged for. */
     private long rechargedFor = Long.MIN_VALUE;
 
+    /** What this mountain was before anything happened to it, so it can be raised again. */
+    private com.jeladastudios.ftsgeology.volcano.VolcanoType type;
+    private BlockPos originalBase;
+    private int originalSummitY = Integer.MIN_VALUE;
+
+    /** Called by the builder as the core is planted. */
+    public void setShape(com.jeladastudios.ftsgeology.volcano.VolcanoType t, BlockPos base,
+                         int summitY) {
+        this.type = t;
+        this.originalBase = base.immutable();
+        this.originalSummitY = summitY;
+        setChanged();
+    }
+
+    /**
+     * Raises the mountain again after an earthquake flattened it, once per quake.
+     *
+     * <p>Stamped <b>before</b> the job is queued rather than after. A volcano job takes hundreds of
+     * ticks to drain and this method is reached once a second, so stamping afterwards would let
+     * several rebuilds of the same mountain pile into the queue while the first was still running.
+     * </p>
+     */
+    private void rebuildAfterQuake(ServerLevel level, BlockPos pos, long quake) {
+        if (type == null || originalBase == null || originalSummitY == Integer.MIN_VALUE) return;
+        // Is there actually a mountain missing? If the summit is still standing, leave it be.
+        int here = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(
+                level, originalBase.getX(), originalBase.getZ());
+        if (here != Integer.MIN_VALUE && here >= originalSummitY - 2) return;
+
+        rebuiltFor = quake;
+        setChanged();
+        if (com.jeladastudios.ftsgeology.volcano.VolcanoBuilder.rebuildEdifice(
+                level, originalBase, magnitude, type, originalSummitY)) {
+            GeysersMod.LOGGER.info("Volcano at {} rebuilding after a quake ({} -> {})",
+                    pos, here, originalSummitY);
+        }
+    }
+
+    /** Sequence number of the last quake this volcano has already rebuilt for. */
+    private long rebuiltFor = Long.MIN_VALUE;
+
+    /**
+     * The shape this core was built as, from NBT - or a reasonable guess for a world saved before
+     * the shape was recorded.
+     *
+     * <p>The guess reads what the core already stores. A fissure keeps its crater tiny and its ponds
+     * many; a caldera has the widest crater and a lake's worth of molten cells. Anything else is
+     * left null, which simply means that volcano will not raise itself again - a quiet no-op rather
+     * than a wrong mountain.</p>
+     */
+    private static com.jeladastudios.ftsgeology.volcano.VolcanoType readType(CompoundTag tag) {
+        if (tag.contains("Type")) {
+            try {
+                return com.jeladastudios.ftsgeology.volcano.VolcanoType
+                        .valueOf(tag.getString("Type"));
+            } catch (IllegalArgumentException ignored) {
+                // A type name from a future or renamed build. Fall through to the guess.
+            }
+        }
+        int crater = tag.getInt("CraterR");
+        int vents = tag.contains("SurfaceVents") ? tag.getLongArray("SurfaceVents").length : 0;
+        int molten = tag.contains("MoltenCells") ? tag.getLongArray("MoltenCells").length : 0;
+        if (crater <= 2 && vents > 20) return com.jeladastudios.ftsgeology.volcano.VolcanoType.FISSURE;
+        if (crater >= 10 && molten > 30) return com.jeladastudios.ftsgeology.volcano.VolcanoType.CALDERA;
+        return null;
+    }
+
     /**
      * Puts the magma back after an earthquake has taken it, once per quake.
      *
@@ -210,6 +277,9 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                 // A quake that took the magma away used to kill the volcano outright: hasLava went
                 // false, this branch returned on every tick from then on, and nothing anywhere put
                 // lava back. That is the crater that cools after an earthquake and never refills.
+                long quake = com.jeladastudios.ftsgeology.quake.QuakeQuiet.released(
+                        server, pos.getX(), pos.getZ());
+                if (quake > be.rebuiltFor) be.rebuildAfterQuake(server, pos, quake);
                 be.refillAfterQuake(server, pos);
                 if (!hasLava(server, pos)) return; // dead until it has lava again
                 be.idleSmoke(server, summit, 0.4f, true); // lazy smoke off the crater + a vent or two
@@ -333,6 +403,10 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         if (surfaceVents.length > 0) tag.putLongArray("SurfaceVents", surfaceVents);
         if (moltenCells.length > 0) tag.putLongArray("MoltenCells", moltenCells);
         tag.putLong("RechargedFor", rechargedFor);
+        tag.putLong("RebuiltFor", rebuiltFor);
+        if (type != null) tag.putString("Type", type.name());
+        if (originalBase != null) tag.putLong("OriginalBase", originalBase.asLong());
+        tag.putInt("OriginalSummitY", originalSummitY);
     }
 
     @Override
@@ -346,5 +420,10 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         surfaceVents = tag.contains("SurfaceVents") ? tag.getLongArray("SurfaceVents") : new long[0];
         moltenCells = tag.contains("MoltenCells") ? tag.getLongArray("MoltenCells") : new long[0];
         rechargedFor = tag.contains("RechargedFor") ? tag.getLong("RechargedFor") : Long.MIN_VALUE;
+        rebuiltFor = tag.contains("RebuiltFor") ? tag.getLong("RebuiltFor") : Long.MIN_VALUE;
+        type = readType(tag);
+        originalBase = tag.contains("OriginalBase") ? BlockPos.of(tag.getLong("OriginalBase")) : null;
+        originalSummitY = tag.contains("OriginalSummitY")
+                ? tag.getInt("OriginalSummitY") : Integer.MIN_VALUE;
     }
 }
