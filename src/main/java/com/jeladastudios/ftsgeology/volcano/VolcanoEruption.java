@@ -58,6 +58,9 @@ public final class VolcanoEruption {
         // The part you can see from the far side of the valley.
         ashColumn(level, summit, magnitude, eruptionTicks);
         ashfall(level, summit, magnitude);
+        trailBombs(level);
+        plumeLightning(level, summit, magnitude);
+        if (eruptionTicks % 4 == 0) ashInTheAir(level, summit, magnitude);
     }
 
     // === Ash ================================================================
@@ -278,9 +281,96 @@ public final class VolcanoEruption {
                 dir.z * horiz + (level.random.nextDouble() - 0.5) * 0.2));
         bomb.setHurtsEntities(3.0f, 12);
         bomb.hurtMarked = true;
+        IN_FLIGHT.add(bomb);
 
         // Impact: a single scorched block at the landing spot.
         impact(level, target, summit.getY());
+    }
+
+    /**
+     * Bombs still in the air, so a trail can be drawn behind them.
+     *
+     * <p>{@link FallingBlockEntity} ticks itself and tells nobody, so there is no hook on the entity
+     * to hang this from; holding the handful in flight and drawing from the eruption's own tick is
+     * both simpler than an entity mixin and self-limiting, since the list only ever contains the
+     * bombs one volcano has thrown in the last few seconds.</p>
+     */
+    private static final java.util.List<FallingBlockEntity> IN_FLIGHT = new java.util.ArrayList<>();
+
+    /**
+     * Smoke and fire off the back of a bomb on its way over.
+     *
+     * <p>Without it a bomb is a block of basalt gliding through the air, which reads as a glitch
+     * rather than as something thrown out of a volcano. The trail is what tells you it is hot.</p>
+     */
+    private static void trailBombs(ServerLevel level) {
+        if (IN_FLIGHT.isEmpty()) return;
+        IN_FLIGHT.removeIf(b -> !b.isAlive() || b.isRemoved() || b.level() != level);
+        for (FallingBlockEntity b : IN_FLIGHT) {
+            level.sendParticles(ParticleTypes.LARGE_SMOKE, b.getX(), b.getY() + 0.2, b.getZ(),
+                    2, 0.12, 0.12, 0.12, 0.01);
+            level.sendParticles(ParticleTypes.FLAME, b.getX(), b.getY() + 0.2, b.getZ(),
+                    1, 0.1, 0.1, 0.1, 0.005);
+        }
+    }
+
+    /**
+     * Lightning inside the ash column.
+     *
+     * <p>A big eruption column really does make its own thunderstorm: ash grains rubbing past each
+     * other charge the cloud, and it discharges - Eyjafjallajokull and Hunga Tonga both put on the
+     * display. It is also the single most dramatic thing that can be added here for almost no code,
+     * because vanilla already has the bolt.</p>
+     *
+     * <p><b>Visual only.</b> {@code setVisualOnly} means no fire, no damage and no converted mobs:
+     * an eruption is already destructive enough on its own terms, and lightning that burned the
+     * forest down would be a second, unasked-for hazard rather than a picture.</p>
+     */
+    private static void plumeLightning(ServerLevel level, BlockPos summit, int magnitude) {
+        if (magnitude < 6) return;                       // only the big columns charge up
+        if (level.random.nextInt(200) != 0) return;
+
+        double[] wind = wind(summit);
+        // Out along the drift, where the cloud actually is rather than over the vent.
+        double d = 8 + level.random.nextDouble() * (10 + magnitude * 2);
+        double bx = summit.getX() + 0.5 + wind[0] * d + (level.random.nextDouble() - 0.5) * 12;
+        double bz = summit.getZ() + 0.5 + wind[1] * d + (level.random.nextDouble() - 0.5) * 12;
+
+        net.minecraft.world.entity.LightningBolt bolt =
+                net.minecraft.world.entity.EntityType.LIGHTNING_BOLT.create(level);
+        if (bolt == null) return;
+        bolt.moveTo(bx, summit.getY() + 2, bz);
+        bolt.setVisualOnly(true);
+        level.addFreshEntity(bolt);
+    }
+
+    /**
+     * Ash drifting down through the air, as opposed to ash already on the ground.
+     *
+     * <p>The deposit was there and the fall itself was not, so the ground quietly turned grey around
+     * a player who never saw anything come down. Vanilla has the particle for it already -
+     * {@code ParticleTypes.ASH}, from the basalt deltas - so this needs no sprite of its own.</p>
+     */
+    private static void ashInTheAir(ServerLevel level, BlockPos summit, int magnitude) {
+        if (!GeyserConfig.VOLCANIC_ASHFALL.get()) return;
+
+        double[] wind = wind(summit);
+        int reach = Math.min(40 + magnitude * 8, 160);
+        for (net.minecraft.server.level.ServerPlayer p : level.players()) {
+            double dx = p.getX() - summit.getX(), dz = p.getZ() - summit.getZ();
+            double dist = Math.sqrt(dx * dx + dz * dz);
+            if (dist > reach + 32) continue;
+            // Falling harder downwind, the same lobe the deposit follows, so what is in the air
+            // agrees with what is on the ground.
+            double align = dist < 1 ? 1.0 : (dx / dist) * wind[0] + (dz / dist) * wind[1];
+            int count = (int) Math.round(6 * (0.25 + 0.75 * (align + 1.0) * 0.5));
+
+            level.sendParticles(p, ParticleTypes.ASH, true,
+                    p.getX() + (level.random.nextDouble() - 0.5) * 24,
+                    p.getY() + 6 + level.random.nextDouble() * 8,
+                    p.getZ() + (level.random.nextDouble() - 0.5) * 24,
+                    count, 10.0, 4.0, 10.0, 0.0);
+        }
     }
 
     /**
