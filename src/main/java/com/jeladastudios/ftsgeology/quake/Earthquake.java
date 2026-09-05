@@ -355,6 +355,47 @@ public final class Earthquake {
                     v.y + (p.onGround() ? level.random.nextDouble() * kick * 0.6 : 0.0),
                     v.z + (level.random.nextDouble() - 0.5) * kick);
             p.hurtMarked = true;
+
+            dust(level, p, falloff);
+        }
+    }
+
+    /**
+     * Dust shaken off the ground around a player while the rupture is running.
+     *
+     * <h2>Why an earthquake had nothing on screen</h2>
+     * Everything the quake did to your senses was either felt or heard - the camera kick above, the
+     * siren, the rumble - and the only thing you could <i>see</i> was that the landscape had changed
+     * afterwards. Ground actually being shaken throws dust, and without it the strongest event in the
+     * mod looked like nothing at all until it was over.
+     *
+     * <p>It rides on the loop that was already running: the players in range and their distance
+     * falloff are both computed above, so this adds no search of its own and writes no blocks.</p>
+     */
+    private static void dust(ServerLevel level, ServerPlayer p, double falloff) {
+        // A few times a second rather than every tick. Twenty puffs a second per player reads as fog.
+        if (level.getGameTime() % 3L != 0L) return;
+
+        int puffs = 1 + (int) Math.round(falloff * 4);
+        for (int i = 0; i < puffs; i++) {
+            int x = Mth.floor(p.getX()) + level.random.nextInt(25) - 12;
+            int z = Mth.floor(p.getZ()) + level.random.nextInt(25) - 12;
+            if (!level.hasChunkAt(new BlockPos(x, level.getSeaLevel(), z))) continue;
+
+            int g = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+            BlockPos ground = new BlockPos(x, g - 1, z);
+            net.minecraft.world.level.block.state.BlockState s = level.getBlockState(ground);
+            // Nothing to shake loose off water, and nothing to see off air.
+            if (s.isAir() || !s.getFluidState().isEmpty()) continue;
+
+            // The dust is made of the ground it comes off, so it is yellow over sand, black over
+            // basalt and white over snow. A single grey dust particle would cost exactly the same
+            // and be wrong everywhere except on stone.
+            level.sendParticles(
+                    new net.minecraft.core.particles.BlockParticleOption(
+                            net.minecraft.core.particles.ParticleTypes.BLOCK, s),
+                    x + 0.5, g + 0.1, z + 0.5,
+                    3, 0.4, 0.15, 0.4, 0.02);
         }
     }
 

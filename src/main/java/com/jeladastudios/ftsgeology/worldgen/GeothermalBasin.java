@@ -192,14 +192,14 @@ public final class GeothermalBasin {
             level.setBlock(at, rng.nextInt(7) == 0
                     ? ModBlocks.MUD_POT.get().defaultBlockState()
                     : Blocks.MUD.defaultBlockState(), 2);
-            if (rng.nextInt(220) == 0) HotspotSigns.chimney(level, at, rng);
+            if (rng.nextInt(440) == 0) HotspotSigns.chimney(level, at, rng);
             return true;
         }
 
         if (flat > 0.12) {
             // The sinter flat itself: the pale bare floor the basin is named for.
             level.setBlock(at, flatBlock(rng).defaultBlockState(), 2);
-            if (s > 0.7 && rng.nextInt(400) == 0) HotspotSigns.chimney(level, at, rng);
+            if (s > 0.7 && rng.nextInt(800) == 0) HotspotSigns.chimney(level, at, rng);
             return true;
         }
 

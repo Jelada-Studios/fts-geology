@@ -464,6 +464,19 @@ public final class Weathering {
         for (int i = 0; i < height; i++) {
             level.setBlock(new BlockPos(x, g + 1 + i, z), stack[i], 2);
         }
+        // Dust where it lands, made of what landed. This is the one place in the mod where a block
+        // visibly falls, and it used to happen in complete silence and stillness: the column simply
+        // was somewhere else the next time you looked at it.
+        //
+        // Only for a drop worth seeing, and only sometimes - a rupture reseats hundreds of thousands
+        // of columns, and a puff off every one of them would be a dust storm rather than a landslide.
+        if (drop >= 2 && level.random.nextInt(24) == 0) {
+            level.sendParticles(
+                    new net.minecraft.core.particles.BlockParticleOption(
+                            net.minecraft.core.particles.ParticleTypes.BLOCK, stack[0]),
+                    x + 0.5, g + 1.0, z + 0.5,
+                    4, 0.35, 0.1, 0.35, 0.03);
+        }
         return true;
     }
 
