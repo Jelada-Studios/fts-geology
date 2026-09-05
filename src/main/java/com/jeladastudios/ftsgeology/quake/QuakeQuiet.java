@@ -50,6 +50,23 @@ public final class QuakeQuiet {
     /** Margin around the rupture, so features just outside the edits are covered too. */
     private static final int MARGIN = 48;
 
+    /**
+     * The longest a zone may stay quiet, whatever else is happening, in ticks.
+     *
+     * <h2>Why there has to be a ceiling</h2>
+     * The first version released a zone only when {@code Weathering} reported no settling left over
+     * its ground. Settling for an unloaded chunk is <b>parked</b>, and parked work only resumes when
+     * somebody walks there - so a rupture a thousand blocks long, most of it never revisited, left
+     * work outstanding for ever. The zone never released, {@link #isQuiet} stayed true, and every
+     * spring inside a 548-block radius was frozen: no rebuild, no health check, no climb, nothing.
+     * Testing reported exactly that - a destroyed spring stayed destroyed.
+     *
+     * <p>So the ceiling is not a tuning knob, it is the property that makes this fail safely. A
+     * mistake in the release test now costs a pool rebuilt slightly early, which the spring's own
+     * health check cleans up. Before, it cost the spring permanently.</p>
+     */
+    private static final int MAX_QUIET_TICKS = 1200;      // one minute
+
     /** How long a released zone is remembered, so features in unloaded chunks still get their turn. */
     private static final long MEMORY_TICKS = 72_000L;   // an hour of game time
 
@@ -78,6 +95,8 @@ public final class QuakeQuiet {
         /** Game time the grace period ends, and then the time the zone was released. */
         long graceEnds;
         long releasedAt;
+        /** Game time this zone must release by, no matter what. See MAX_QUIET_TICKS. */
+        long mustReleaseBy = Long.MAX_VALUE;
 
         Zone(long sequence, ResourceKey<Level> dimension, int x, int z, int radius) {
             this.sequence = sequence;
@@ -111,6 +130,10 @@ public final class QuakeQuiet {
             if (z.phase == Phase.RUPTURING
                     && z.covers(level.dimension(), epicentre.getX(), epicentre.getZ())) {
                 z.phase = Phase.SETTLING;
+                // The clock starts the moment the ground stops moving, and it is what actually
+                // releases the zone. Waiting on the settling queue was the design that froze
+                // everything; the queue is now only allowed to hold the zone WITHIN this deadline.
+                z.mustReleaseBy = level.getGameTime() + MAX_QUIET_TICKS;
                 return;
             }
         }
@@ -130,7 +153,11 @@ public final class QuakeQuiet {
             if (!z.dimension.equals(level.dimension())) continue;   // this level's clock only
             switch (z.phase) {
                 case SETTLING -> {
-                    if (Weathering.pendingNear(level, z.x, z.z, z.radius)) continue;
+                    // Settling that is actually queued may delay the zone; parked settling may
+                    // not, because parked work waits on a chunk visit that may never come. Either
+                    // way the deadline wins.
+                    if (now < z.mustReleaseBy
+                            && Weathering.pendingNear(level, z.x, z.z, z.radius)) continue;
                     z.phase = Phase.GRACE;
                     z.graceEnds = now + GRACE_TICKS;
                 }
@@ -142,11 +169,22 @@ public final class QuakeQuiet {
                 default -> { }
             }
         }
-        // Forget the oldest once they are well past release, and cap the list either way.
+        // Forget the oldest once they are well past release.
         ZONES.removeIf(z -> z.phase == Phase.RELEASED
                 && z.dimension.equals(level.dimension())
                 && now - z.releasedAt > MEMORY_TICKS);
-        while (ZONES.size() > MAX_ZONES) ZONES.remove(0);
+        // And cap the list - but only ever by dropping a zone that has already been released.
+        // Removing index 0 unconditionally could evict a zone still rupturing or settling, which
+        // would strand every feature inside it with no release to react to.
+        while (ZONES.size() > MAX_ZONES) {
+            int oldest = -1;
+            for (int i = 0; i < ZONES.size(); i++) {
+                if (ZONES.get(i).phase != Phase.RELEASED) continue;
+                if (oldest < 0 || ZONES.get(i).sequence < ZONES.get(oldest).sequence) oldest = i;
+            }
+            if (oldest < 0) break;      // all still live: keep them all rather than strand one
+            ZONES.remove(oldest);
+        }
     }
 
     /**

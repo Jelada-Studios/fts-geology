@@ -660,8 +660,13 @@ public final class TectonicCommands {
             // reservoir and no conduit under it - so digging beneath one found nothing, and testing
             // the stages this way quietly tested only half the feature. Worse, building a single
             // stage on untouched ground hid a bug that only appears when stages run in sequence.
-            case "hotspring" -> ok = RetrogenHandler.placeHotSpringAt(
-                    level, at.getX(), at.getZ(), stage > 0 ? stage : HotSpringShape.MAX_STAGE);
+            // A named stage builds ONE spring at that stage; no stage builds a whole system, the
+            // way world generation would. Going through the system builder either way meant a
+            // terraced site capped every request at stage 3, so 3 and 4 were indistinguishable.
+            case "hotspring" -> ok = stage > 0
+                    ? RetrogenHandler.placeSingleSpringAt(level, at.getX(), at.getZ(), stage)
+                    : RetrogenHandler.placeHotSpringAt(level, at.getX(), at.getZ(),
+                            HotSpringShape.MAX_STAGE);
             case "volcano", "shield", "strato", "fissure", "caldera" -> {
                 // Ground, not canopy - see TerrainProbe.
                 int y = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, at.getX(), at.getZ());

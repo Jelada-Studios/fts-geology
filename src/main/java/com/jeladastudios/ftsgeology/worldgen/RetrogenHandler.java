@@ -202,6 +202,14 @@ public final class RetrogenHandler {
             // A wall-clock brake as well as a chunk count, so the count above is a permission rather
             // than a promise: whichever runs out first stops the tick.
             long deadline = System.nanoTime() + TickBudget.slice(0.3);
+            // Chunks inside a quiet zone, held aside until the loop is over.
+            //
+            // They used to go straight back into the queue, which made the tick spin: pollNearest
+            // picks the chunk closest to a player, a player standing near a quake is closest to the
+            // quiet chunks, so the very next iteration pulled the same one back out. One chunk could
+            // absorb the entire per-tick budget, every tick, and starve retrogen for the whole
+            // server. Held aside, each is looked at once.
+            List<QueuedChunk> deferred = new ArrayList<>();
             for (int i = 0; i < budget && System.nanoTime() < deadline; i++) {
                 QueuedChunk q = pollNearest(event.getServer());
                 if (q == null) break;
@@ -216,7 +224,7 @@ public final class RetrogenHandler {
                 // it on wreckage. Put it back and take it again when the ground is still.
                 if (com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(
                         level, q.pos().getMiddleBlockX(), q.pos().getMiddleBlockZ())) {
-                    QUEUE.add(q);
+                    deferred.add(q);
                     continue;
                 }
 
@@ -245,6 +253,7 @@ public final class RetrogenHandler {
                     chunk.setUnsaved(true);
                 }
             }
+            QUEUE.addAll(deferred);     // back in the queue, but not before this tick is done
         }
 
         // Say out loud whether the queue is keeping up. Without this there was no way to tell a
@@ -610,6 +619,20 @@ public final class RetrogenHandler {
      * earthquake the same line grows the same spring back over a few in-game days. One builder, so
      * a repaired spring and a generated one cannot look different.</p>
      */
+    /**
+     * Puts one spring here at exactly the stage asked for, with no terrace chain around it.
+     *
+     * <h2>Why the command does not go through {@link #placeHotSpringAt}</h2>
+     * That builds a whole system, and a system caps its pools at stage 3 wherever the ground has
+     * four blocks of relief across seventeen - which is almost anywhere. So
+     * {@code /geology place hotspring 3} and {@code ... 4} produced the same spring, and the command
+     * stopped being able to show the difference between two stages. It is meant to be the tool that
+     * tests the shape function on its own, so it builds exactly one spring at exactly one stage.
+     */
+    public static boolean placeSingleSpringAt(ServerLevel level, int x, int z, int stage) {
+        return openSpring(level, x, z, stage, stage);
+    }
+
     private static boolean openSpring(ServerLevel level, int x, int z, int maxStage, int stage) {
         int ground = TerrainProbe.groundY(level, x, z);
         if (ground == Integer.MIN_VALUE) return false;

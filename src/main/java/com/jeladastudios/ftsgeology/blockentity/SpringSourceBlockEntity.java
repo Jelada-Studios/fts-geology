@@ -227,6 +227,17 @@ public class SpringSourceBlockEntity extends BlockEntity {
         if (reached == 0) return false;
         stage = reached;
         stageSince = level.getGameTime();
+        // Water is standing in daylight here, which is the whole meaning of the flag.
+        //
+        // Only openVent set it, and generation never reaches openVent - a fact written three lines
+        // above this one, in a comment I put there while fixing the canopy, without noticing it
+        // applied to surfaced as well. So every naturally generated spring in every world was
+        // flagged as never having surfaced. The consequence is not cosmetic: when such a pool is
+        // obstructed, serverTick skips the surfaced branch and takes the old path instead -
+        // stage = 0, then climb() bores up through the pool's own floor, then openVent rebuilds it
+        // as a stage 1 puddle. That is the demotion this class was rewritten to stop, still live
+        // for every spring the world made rather than the ones a quake made.
+        surfaced = true;
         setChanged();
         return true;
     }
@@ -300,11 +311,10 @@ public class SpringSourceBlockEntity extends BlockEntity {
                 // rebuildBarred goes true once the spring has given up, so stalled stopped rising
                 // the moment it mattered, never reached STALL_LIMIT, and stepAside - a silted vent
                 // finding a new way out, the whole physical idea - has never once run.
+                // Relocating is off: see stepAsideDisabled. A blocked spring stays put and keeps
+                // trying to clear its own outlet, which is what it did before this branch existed.
                 be.stalled++;
                 be.setChanged();
-                if (be.stalled >= STALL_LIMIT && server.getGameTime() % 1200L == 0L) {
-                    if (be.stepAside(server, pos)) return;
-                }
                 if (be.rebuildBarred(server)) return;
                 return;
             }
@@ -314,13 +324,10 @@ public class SpringSourceBlockEntity extends BlockEntity {
                 be.stageSince = server.getGameTime();
                 be.setChanged();
             }
-            // Capped for good: the water goes looking for another way out rather than pushing at a
-            // lid forever. This is what a blocked spring does - the pressure does not go away, it
-            // finds the next weakness, usually a few metres to one side.
-            if (be.stalled >= STALL_LIMIT) {
-                if (server.getGameTime() % 1200L != 0L) return;
-                if (be.stepAside(server, pos)) return;
-            }
+            // A source that cannot find daylight stops hammering at it. Relocating is off (see
+            // stepAsideDisabled), so this is simply a cap on the work: it keeps its place and its
+            // record, and an earthquake overhead is what gives it another go.
+            if (be.stalled >= STALL_LIMIT) return;
             be.climb(server, pos);
             return;
         }
@@ -418,22 +425,37 @@ public class SpringSourceBlockEntity extends BlockEntity {
         long quake = QuakeQuiet.released(level, siteX(), siteZ());
         if (quake == 0L) return false;                     // no finished quake over this ground
         if (quake <= resitedFor) return false;             // already answered for this one
+
+        if (!surfaced || stage <= 0) {                     // never had a pool; let it climb
+            resitedFor = quake;
+            setChanged();
+            return false;
+        }
+        if (datumY == Integer.MIN_VALUE) {
+            resitedFor = quake;
+            setChanged();
+            return false;
+        }
+
+        // Read the ground BEFORE touching the pool.
+        //
+        // This used to stamp resitedFor, then drain the pool, and only then read the ring - so if
+        // the ring could not be read (an unloaded chunk at radius 16, a cliff) the method returned
+        // with the water deleted, no pool rebuilt, and the quake already marked as answered. The
+        // spring sat in a dry basin for the rest of the world's life. Nothing is stamped and
+        // nothing is removed until there is a pool to put back.
+        int oldWater = datumY - 1;
+        int ring = HotSpringShape.waterLineAt(level, siteX(), siteZ(), stage);
+        if (ring == Integer.MIN_VALUE) return false;       // cannot read the ground; try again later
+
         resitedFor = quake;
-        setChanged();
-
-        if (!surfaced || stage <= 0) return false;         // never had a pool; let it climb
-        if (datumY == Integer.MIN_VALUE) return false;
-
-        // Anything left of the old pool goes before the new one is built, so a rebuilt spring does
-        // not stand in a ring of the water its predecessor spilled.
-        drainPool(level);
         // The ground moved, so a spring that had given up is worth another try.
         dormant = false;
         rebuilds = 0;
         lastRebuild = Long.MIN_VALUE;
-
-        int oldWater = datumY - 1;
-        int ring = HotSpringShape.waterLineAt(level, siteX(), siteZ(), stage);
+        // Anything left of the old pool goes before the new one is built, so a rebuilt spring does
+        // not stand in a ring of the water its predecessor spilled.
+        drainPool(level);
 
         // Has the ground the pool sat on actually moved? Testing the RING, not the basin.
         //
@@ -441,7 +463,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
         // ratchet this project has had three times over. The ring is outside anything the pool can
         // reach (see HotSpringShape.waterLine), so it is the one honest witness to what the quake
         // did to this place.
-        if (ring != Integer.MIN_VALUE && Math.abs(ring - oldWater) <= 1) {
+        if (Math.abs(ring - oldWater) <= 1) {
             // It did not. Keep the datum and rebuild exactly where the spring already was - which
             // is what testing asked for: a spring whose ground is intact has no business sinking.
             if (!applyStage(level, stage)) {
@@ -454,8 +476,6 @@ public class SpringSourceBlockEntity extends BlockEntity {
             setChanged();
             return true;
         }
-
-        if (ring == Integer.MIN_VALUE) return false;       // cannot read the ground; leave it alone
 
         // It did move. Follow it - but only so far.
         //
@@ -766,7 +786,25 @@ public class SpringSourceBlockEntity extends BlockEntity {
      *
      * @return true if a new outlet was chosen
      */
-    private boolean stepAside(ServerLevel level, BlockPos pos) {
+    /**
+     * Disabled: it cannot actually move a spring, and pretending it can is worse than not trying.
+     *
+     * <h2>What is broken about it</h2>
+     * It picks a new outlet a few blocks away and writes it into {@code outletX}/{@code outletZ}.
+     * But the conduit is bored by {@link #climb}, which goes straight up from the block entity's own
+     * column, and {@link #openVent} then writes the vent back as
+     * {@code (pos.getX(), ground, pos.getZ())} - overwriting the position this method chose. The
+     * spring surfaces exactly where it already was, having thrown away its pool and its mats on the
+     * way. So the mechanism that had never once run (the stall counter could not reach its limit)
+     * would not have worked even when it did.
+     *
+     * <p>Fixing it properly means either moving the source block itself or cutting a horizontal
+     * gallery from the core to the new outlet, and that is a piece of work in its own right. Until
+     * then a blocked spring stays where it is and keeps trying to clear itself, which is the
+     * behaviour testing has actually been happy with.</p>
+     */
+    @SuppressWarnings("unused")
+    private boolean stepAsideDisabled(ServerLevel level, BlockPos pos) {
         BlockPos best = null;
         int bestGround = Integer.MAX_VALUE;
         for (int attempt = 0; attempt < 24; attempt++) {

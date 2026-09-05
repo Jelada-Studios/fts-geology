@@ -77,12 +77,37 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         long quake = com.jeladastudios.ftsgeology.quake.QuakeQuiet.released(
                 level, pos.getX(), pos.getZ());
         if (quake == 0L || quake <= rechargedFor) return;
+        if (hasLava(level, pos)) {                        // the quake left the magma alone
+            rechargedFor = quake;
+            setChanged();
+            return;
+        }
+
+        int restored = refill(level, moltenCells);
+
+        // The recorded list is not always enough. It is filled by carveCalderaRow, carveFunnelPit
+        // and carveLavaLake - but carveFissureLine records nothing, so a fissure volcano carries an
+        // empty list and this would restore precisely zero cells and then mark the quake answered.
+        // The throat above the core is the one cell every volcano has, whatever its shape.
+        if (restored == 0) {
+            restored = refill(level, new long[]{pos.above().asLong()});
+        }
+
+        // Stamped on success, not on the attempt.
+        //
+        // Stamping first made a transient failure permanent: nothing restored, quake marked as
+        // handled, and the mountain cold for the rest of the world's life. If this run found
+        // nothing to fill, the next check is welcome to try again.
+        if (restored == 0) return;
         rechargedFor = quake;
         setChanged();
-        if (hasLava(level, pos)) return;                  // the quake left the magma alone
+        GeysersMod.LOGGER.info("Volcano at {} recharged after a quake: {} cells", pos, restored);
+    }
 
+    /** Puts lava back into cells the quake left as solid rock. Returns how many took it. */
+    private int refill(ServerLevel level, long[] cells) {
         int restored = 0;
-        for (long c : moltenCells) {
+        for (long c : cells) {
             BlockPos p = BlockPos.of(c);
             BlockState s = level.getBlockState(p);
             // Only into rock the quake left behind, never into anything built or into open sky.
@@ -92,9 +117,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
             level.setBlock(p, Blocks.LAVA.defaultBlockState(), 2);
             restored++;
         }
-        if (restored > 0) {
-            GeysersMod.LOGGER.info("Volcano at {} recharged after a quake: {} cells", pos, restored);
-        }
+        return restored;
     }
 
     public void setSurfaceVents(List<BlockPos> vents) {

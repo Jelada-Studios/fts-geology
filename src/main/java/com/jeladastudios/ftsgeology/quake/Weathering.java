@@ -291,28 +291,23 @@ public final class Weathering {
      *
      * <p>Both go away once the question is asked about a specific area, which is the only form the
      * caller ever actually wanted.</p>
+     *
+     * <h2>Parked work deliberately does not count</h2>
+     * The first version of this counted {@link #PARKED} as well, on the reasoning that unsettled
+     * ground is unsettled whether or not anyone is looking at it. True, and disastrous: parked work
+     * resumes only when its chunk is loaded, a rupture corridor is mostly chunks nobody revisits, so
+     * something was always outstanding and the zone asking never released. Every geothermal feature
+     * inside it froze permanently.
+     *
+     * <p>The columns that matter are the ones near enough to be loaded, and those are in the queue.
+     * When a player does walk out to a parked stretch, {@link #onChunkLoaded} queues it and it
+     * settles then - around a spring that has long since rebuilt, which is a far better outcome
+     * than the spring never rebuilding at all.</p>
      */
     public static synchronized boolean pendingNear(ServerLevel level, int x, int z, int radius) {
         for (Job job : QUEUE) {
             if (!job.dimension.equals(level.dimension())) continue;
             if (job.overlaps(x, z, radius)) return true;
-        }
-        // Parked columns are keyed by chunk, so the chunk's centre is close enough to test.
-        String prefix = level.dimension().location() + "@";
-        for (java.util.Map.Entry<String, Long2IntOpenHashMap> e : PARKED.entrySet()) {
-            if (!e.getKey().startsWith(prefix)) continue;
-            if (e.getValue().isEmpty()) continue;
-            String[] cs = e.getKey().substring(prefix.length()).split(",");
-            if (cs.length != 2) continue;
-            try {
-                long cx = (Long.parseLong(cs[0]) << 4) + 8;
-                long cz = (Long.parseLong(cs[1]) << 4) + 8;
-                long dx = cx - x, dz = cz - z;
-                // A chunk is 16 wide, so allow for it straddling the edge of the area.
-                if (dx * dx + dz * dz <= (long) (radius + 16) * (radius + 16)) return true;
-            } catch (NumberFormatException ignored) {
-                // A malformed key cannot be located, so it cannot hold a zone open.
-            }
         }
         return false;
     }
