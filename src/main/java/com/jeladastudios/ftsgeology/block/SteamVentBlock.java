@@ -4,6 +4,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -73,6 +75,31 @@ public class SteamVentBlock extends Block {
             case CAP -> CAP_SHAPE;
             default -> BASE_SHAPE;
         };
+    }
+
+    /**
+     * Placing one by hand builds the whole chimney, not just its footing.
+     *
+     * <p>The item is the base part, so placing it gave a plain grey cube and testing quite fairly
+     * said it did not look like a chimney. It is a three-part thing; asking someone to stack the
+     * parts by hand when they cannot even select the other two is not a design, it is an omission.
+     * So it raises its own neck and cap where there is room, and stays a single block where there
+     * is not.</p>
+     */
+    @Override
+    public void setPlacedBy(Level level, BlockPos pos, BlockState state, LivingEntity placer,
+                            ItemStack stack) {
+        if (level.isClientSide) return;
+        if (state.getValue(PART) != Part.BASE) return;
+
+        boolean roomForNeck = level.getBlockState(pos.above()).canBeReplaced();
+        boolean roomForCap = level.getBlockState(pos.above(2)).canBeReplaced();
+        if (roomForNeck && roomForCap) {
+            level.setBlock(pos.above(), state.setValue(PART, Part.NECK), 3);
+            level.setBlock(pos.above(2), state.setValue(PART, Part.CAP), 3);
+        } else if (roomForNeck) {
+            level.setBlock(pos.above(), state.setValue(PART, Part.CAP), 3);
+        }
     }
 
     /**

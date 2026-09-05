@@ -122,7 +122,13 @@ public final class HotspotSigns {
 
         if (band == 0) {
             // On the trace: where the steam actually comes out.
-            if (intensity > 0.45 && rng.nextInt(7) == 0) {
+            //
+            // No intensity gate here any more. It used to need intensity over 0.45, which is the
+            // inner 231 blocks of a 700-block dome - about a ninth of it by area - so every field
+            // outside that was a fumarole field with no fumaroles in it. Testing found the mud and
+            // the crust and no chimneys anywhere, which is exactly that: the bands were painting
+            // and only this one line was refusing.
+            if (rng.nextInt(5) == 0) {
                 chimney(level, at, rng);
                 return;
             }
