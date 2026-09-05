@@ -9,7 +9,7 @@ Code, design and worldgen: Jelada Studios.
 To the people below, for their support: questions that turned into features, reports that turned
 into fixes, and encouragement at the right moment.
 
-- **u/LLoadin** — the first person to ask how to follow the project.
+- **u/LLoadin**
 - **u/Best_Tradition1679**
 - **u/AstronomerSenior4236**
 - **u/ankle_biter50**
