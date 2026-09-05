@@ -186,7 +186,7 @@ public final class GeothermalBasin {
 
         TerrainProbe.clearVegetation(level, x, g, z, 2);
 
-        if (wet > 0.52 && s > 0.45) {
+        if (over(wet, 0.52, 0.20, rng) && s > 0.45) {
             // A mud flat. Mud pots on their own read as one block stamped over and over; in vanilla
             // mud they read as pots in a wet patch, which is the same trick the fumarole fields use.
             level.setBlock(at, rng.nextInt(7) == 0
@@ -196,7 +196,7 @@ public final class GeothermalBasin {
             return true;
         }
 
-        if (flat > 0.12) {
+        if (over(flat, 0.12, 0.22, rng)) {
             // The sinter flat itself: the pale bare floor the basin is named for.
             level.setBlock(at, flatBlock(rng).defaultBlockState(), 2);
             if (s > 0.7 && rng.nextInt(800) == 0) HotspotSigns.chimney(level, at, rng);
@@ -211,6 +211,29 @@ public final class GeothermalBasin {
         // turns into a dead forest instead of an open flat.
         if (rng.nextInt(110) == 0) RetrogenHandler.deadTree(level, at);
         return true;
+    }
+
+    /**
+     * Is this noise value past a threshold - decided with a die inside a band either side of it?
+     *
+     * <h2>Why the boundaries were knife-edged</h2>
+     * The materials were chosen by testing smooth noise against a bare number, and a bare number on
+     * smooth noise draws a smooth curve: the mud flat ended and the sinter flat began along a single
+     * clean line, which testing quite rightly said looked cut rather than grown. Real ground does
+     * not do that. A mud flat gives way to sinter through a stretch where there is some of each,
+     * because both are still being laid down there.
+     *
+     * <p>So over the band the answer is probabilistic and slides from "almost never" to "almost
+     * always". Two materials chosen this way interfinger over the width of the band instead of
+     * meeting on an edge - which is both what the ground does and what was asked for.</p>
+     *
+     * @param band how far either side of the threshold the two materials mix
+     */
+    private static boolean over(double value, double threshold, double band, RandomSource rng) {
+        double p = (value - (threshold - band)) / (2.0 * band);
+        if (p <= 0.0) return false;
+        if (p >= 1.0) return true;
+        return rng.nextDouble() < p;
     }
 
     /** Carbonate and silica, in the proportions a long-lived flat lays them down. */

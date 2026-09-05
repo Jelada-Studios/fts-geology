@@ -147,8 +147,11 @@ public final class VolcanoEruption {
         // Enough columns per call that a minute-long eruption visibly greys the country downwind.
         //
         // The first version sampled six a call, which measured out at three percent of the lobe over
-        // a whole eruption - arithmetically an ash fall, and on screen nothing whatever.
-        for (int n = 0; n < 40; n++) {
+        // a whole eruption - arithmetically an ash fall, and on screen nothing whatever. Forty was
+        // the correction and overshot: testing liked the look and said there was too much of it, so
+        // this is halved again. Coverage does not halve with it, because a good share of the samples
+        // were landing on ground that was already ashed.
+        for (int n = 0; n < 20; n++) {
             // Distance is square-root biased so the samples spread evenly over the disc rather than
             // piling up at the middle; the thinning below is what puts the weight near the vent.
             double d = reach * Math.sqrt(level.random.nextDouble());

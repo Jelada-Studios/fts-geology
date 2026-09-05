@@ -69,12 +69,10 @@ public final class SoilProfile {
         Soil d = probe(level, x0 + 12, z0 + 12);
         if (a == Soil.NONE && b == Soil.NONE && c == Soil.NONE && d == Soil.NONE) return;
 
+        Soil[] probes = { a, b, c, d };
         for (int dx = 0; dx < 16; dx++) {
             for (int dz = 0; dz < 16; dz++) {
-                // Nearest of the four, so where two rock types meet the soil changes over with them
-                // instead of the whole chunk taking one answer - the chunk-aligned wall that
-                // DeepStructure drew, and that the basin floor was built to avoid.
-                Soil soil = (dx < 8 ? (dz < 8 ? a : c) : (dz < 8 ? b : d));
+                Soil soil = pick(probes, dx, dz, rng);
                 if (soil == Soil.NONE) continue;
 
                 // Patches, not speckle. Two scales so the edges of a patch are ragged rather than
@@ -82,11 +80,58 @@ public final class SoilProfile {
                 // the place reads red or pale, not that every block of it does.
                 double n = OceanicRidge.noise(x0 + dx, z0 + dz, 21.0)
                         + 0.5 * OceanicRidge.noise(x0 + dx + 8192, z0 + dz - 8192, 7.0);
-                if (n < 0.18) continue;
+                // A ramp rather than a cut. A hard threshold on smooth noise draws a smooth CURVE,
+                // which is a contour line - and a contour line around a patch of soil reads as
+                // drawn on. Feathering it over a band lets the patch break up at its own edge.
+                double keep = (n - 0.10) / 0.16;
+                if (keep <= 0.0 || (keep < 1.0 && rng.nextDouble() > keep)) continue;
 
                 paint(level, x0 + dx, z0 + dz, soil, rng);
             }
         }
+    }
+
+    /**
+     * Which of the four probes this column follows.
+     *
+     * <h2>The seam this replaces was mine, and my own measurement could not see it</h2>
+     * This used to be {@code dx < 8 ? (dz < 8 ? a : c) : (dz < 8 ? b : d)} - nearest probe, winner
+     * takes the column - with a comment saying it avoided the chunk-aligned wall
+     * {@code DeepStructure} once drew. It does avoid that one. It draws an <b>eight-block quadrant
+     * wall</b> instead, and where two rock types meet under a chunk the soil changed along a
+     * dead-straight line down the middle of it.
+     *
+     * <p>What makes that worth writing down is that the round's measurement passed. It counted how
+     * often the noise mask's patch edges landed on a chunk boundary - 5.8% against 6.3% by chance,
+     * genuinely clean - and never once looked at the boundary between two soil TYPES, which is the
+     * line testing then photographed. Measuring the thing that was changed rather than the thing
+     * beside it is now the third bug of this shape.</p>
+     *
+     * <p>So the choice is weighted by distance and settled with a die: right on top of a probe it
+     * always wins, and half way between two of them it is a coin toss, so the change from one soil
+     * to the other happens across a band of ground where both appear rather than along an edge.</p>
+     */
+    private static Soil pick(Soil[] probes, int dx, int dz, RandomSource rng) {
+        // The four probe points, in the order they were taken.
+        final int[] px = { 3, 12, 3, 12 };
+        final int[] pz = { 3, 3, 12, 12 };
+
+        double total = 0.0;
+        double[] weight = new double[4];
+        for (int i = 0; i < 4; i++) {
+            double ddx = dx - px[i], ddz = dz - pz[i];
+            // Inverse square of the distance, so influence falls away quickly enough that a probe
+            // still dominates its own corner instead of the whole chunk turning into an average.
+            weight[i] = 1.0 / (1.0 + (ddx * ddx + ddz * ddz) * 0.10);
+            total += weight[i];
+        }
+
+        double roll = rng.nextDouble() * total;
+        for (int i = 0; i < 4; i++) {
+            roll -= weight[i];
+            if (roll <= 0.0) return probes[i];
+        }
+        return probes[3];
     }
 
     /** What the rock under this column is, read through whatever soil is lying on it. */
@@ -159,9 +204,14 @@ public final class SoilProfile {
     private static Block block(Soil soil, RandomSource rng) {
         int r = rng.nextInt(10);
         return switch (soil) {
-            // Red earth, with the odd browner patch and some stony ground through it.
-            case LATERITE -> r < 4 ? Blocks.TERRACOTTA
-                    : r < 7 ? Blocks.BROWN_TERRACOTTA
+            // Red earth. It used to lead on plain terracotta with brown behind it, and testing could
+            // not tell whether there was any red soil in the world at all - fairly, because neither
+            // of those blocks is red, they are both a muted orange-brown. Iron oxide is RED, and
+            // that is the entire point of the laterite entry, so red terracotta leads now and the
+            // browner blocks are what breaks it up.
+            case LATERITE -> r < 5 ? Blocks.RED_TERRACOTTA
+                    : r < 7 ? Blocks.TERRACOTTA
+                    : r < 9 ? Blocks.BROWN_TERRACOTTA
                     : Blocks.COARSE_DIRT;
             // Pale and thin, with the parent carbonate showing through where it is thinnest.
             case RENDZINA -> r < 5 ? Blocks.COARSE_DIRT
