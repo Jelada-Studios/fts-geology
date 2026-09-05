@@ -91,7 +91,7 @@ public final class QuakePlanner {
     private static final int MAX_SNAPSHOT_COLUMNS = 400_000;
 
     /** Deepest stack any column ever captures. Also the deepest anything may be carved. */
-    private static final int MAX_CAPTURE_DEPTH = 24;
+    private static final int MAX_CAPTURE_DEPTH = 29;
 
 
     // === Stage 1: follow the fault ==========================================
@@ -738,7 +738,7 @@ public final class QuakePlanner {
     }
 
     private static int maxTrenchDepth(double magnitude) {
-        return Mth.clamp((int) Math.round(magnitudeAmplitude(magnitude, 20.0)), 1, MAX_CAPTURE_DEPTH - 4);
+        return Mth.clamp((int) Math.round(magnitudeAmplitude(magnitude, 25.0)), 1, MAX_CAPTURE_DEPTH - 4);
     }
 
     /**
@@ -832,7 +832,7 @@ public final class QuakePlanner {
             int arcHalf = arcHalfWidth(core);
             if (across > arcHalf) return 0;
             int crest = Math.min(arcCrest(core), arcHalf - 1);
-            int maxLift = Mth.clamp((int) Math.round(slip * magnitudeAmplitude(magnitude, 22.0) * 0.7), 1, 20);
+            int maxLift = Mth.clamp((int) Math.round(slip * magnitudeAmplitude(magnitude, 22.0) * 0.9), 1, 25);
 
             double shape;
             if (across < crest) {
@@ -859,9 +859,17 @@ public final class QuakePlanner {
         if (maxDepth < 1) return 0;
 
         if (d <= reach) {
-            double ramp = smoothstep(Mth.clamp(d / trenchWall(core), 0.0, 1.0));
-            double tail = Math.cos(Math.PI * 0.5 * (d / reach));
-            return -(int) Math.round(maxDepth * ramp * tail * tail);
+            // One continuous curve rather than a wall term times a tail.
+            //
+            // It used to be smoothstep(d / trenchWall) * cos^2(d / reach): two independent factors,
+            // and their product piles most of the descent into the first few blocks off the
+            // boundary. That reads as an edge you fall off rather than a basin you walk down into,
+            // which is what testing meant by asking for the down-going side to be smoother within
+            // itself. A single smootherstep over the whole reach has zero slope at BOTH ends, so
+            // the ground eases away from the boundary and eases back to level at the far side, with
+            // the steepest part in the middle where a real forearc basin has it.
+            double u = Mth.clamp(d / (double) reach, 0.0, 1.0);
+            return -(int) Math.round(maxDepth * (1.0 - smootherstep(u)));
         }
         // The outer rise: a low, broad swell where the bent plate has sprung back up.
         double u = (d - reach) / (reach * (OUTER_RISE_END - 1.0));
@@ -991,6 +999,17 @@ public final class QuakePlanner {
     /** Classic smoothstep: flat at both ends, so a ramp built from it has no corner. */
     private static double smoothstep(double t) {
         return t * t * (3.0 - 2.0 * t);
+    }
+
+    /**
+     * Like {@link #smoothstep} but with zero curvature at both ends as well as zero slope.
+     *
+     * <p>Used for the trench floor. Smoothstep leaves a visible crease where it meets level ground,
+     * because its second derivative jumps; over sixty blocks of subsiding plate that crease reads as
+     * a terrace. This one leaves none.</p>
+     */
+    private static double smootherstep(double t) {
+        return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
     }
 
     // === Helpers ============================================================

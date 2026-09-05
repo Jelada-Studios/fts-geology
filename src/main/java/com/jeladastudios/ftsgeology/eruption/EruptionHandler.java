@@ -631,13 +631,41 @@ public final class EruptionHandler {
         // The five functional blocks are deliberately NOT in here. A geyser core, its chamber and
         // the two igniters are machinery rather than landscape; leaving them protected means a
         // quake cannot cut a working geyser in half and leave an orphaned chamber behind.
+        //
+        // Every RAW geological block the mod places belongs here, and the worked forms deliberately
+        // do not. That line is the whole rule: a rock the world put down is landscape, and a polished
+        // slab or a staircase is somebody's wall.
+        //
+        // The list used to stop at sinter and the mats, and every block added since - the twelve
+        // rocks, the minerals, travertine, the cooling crust, and the basin's own crust, mud pots and
+        // vents - was silently a "player block". So an earthquake would not move any of them: a
+        // hot-spring field ended up standing on towers of its own mud pots and sinter crust while
+        // the ground around it collapsed. Adding a block without adding it here is an easy thing to
+        // miss and nothing complains, which is exactly why this list is written out in full.
         if (s.is(ModBlocks.HOT_SPRING.get())
                 || s.is(ModBlocks.SINTER.get())
+                || s.is(ModBlocks.SINTER_CRUST.get())
+                || s.is(ModBlocks.MUD_POT.get())
+                || s.is(ModBlocks.STEAM_VENT.get())
                 || s.is(ModBlocks.NATIVE_SULFUR.get())
+                || s.is(ModBlocks.COOLING_LAVA_CRUST.get())
                 || s.is(ModBlocks.MICROBIAL_MAT_ORANGE.get())
                 || s.is(ModBlocks.MICROBIAL_MAT_YELLOW.get())
                 || s.is(ModBlocks.MICROBIAL_MAT_BROWN.get())
                 || s.is(ModBlocks.MICROBIAL_MAT_GREEN.get())) {
+            return true;
+        }
+        // The rock family and the ores that go with it: raw stone the world is made of.
+        if (s.is(ModBlocks.TRAVERTINE.get()) || s.is(ModBlocks.RHYOLITE.get())
+                || s.is(ModBlocks.GABBRO.get()) || s.is(ModBlocks.PERIDOTITE.get())
+                || s.is(ModBlocks.SERPENTINITE.get()) || s.is(ModBlocks.SCHIST.get())
+                || s.is(ModBlocks.GNEISS.get()) || s.is(ModBlocks.SLATE.get())
+                || s.is(ModBlocks.MARBLE.get()) || s.is(ModBlocks.QUARTZITE.get())
+                || s.is(ModBlocks.SHALE.get()) || s.is(ModBlocks.CHERT.get())
+                || s.is(ModBlocks.PYRITE.get()) || s.is(ModBlocks.CHALCOPYRITE.get())
+                || s.is(ModBlocks.MALACHITE.get()) || s.is(ModBlocks.AZURITE.get())
+                || s.is(ModBlocks.QUARTZ_VEIN.get()) || s.is(ModBlocks.CINNABAR.get())
+                || s.is(ModBlocks.GALENA.get())) {
             return true;
         }
         if (s.is(BlockTags.BASE_STONE_OVERWORLD)      // stone, granite, diorite, andesite, tuff, deepslate (+modded)

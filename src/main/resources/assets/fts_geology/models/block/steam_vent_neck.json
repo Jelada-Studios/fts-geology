@@ -1,0 +1,26 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "fts_geology:block/steam_vent_neck",
+    "down": "fts_geology:block/steam_vent_neck",
+    "up": "fts_geology:block/steam_vent_neck",
+    "north": "fts_geology:block/steam_vent_neck",
+    "east": "fts_geology:block/steam_vent_neck",
+    "south": "fts_geology:block/steam_vent_neck",
+    "west": "fts_geology:block/steam_vent_neck"
+  },
+  "elements": [
+    {
+      "from": [2, 0, 2],
+      "to": [14, 16, 14],
+      "faces": {
+        "down":  { "uv": [2, 2, 14, 14], "texture": "#down", "cullface": "down" },
+        "up":    { "uv": [2, 2, 14, 14], "texture": "#up" },
+        "north": { "uv": [2, 0, 14, 16], "texture": "#north" },
+        "south": { "uv": [2, 0, 14, 16], "texture": "#south" },
+        "west":  { "uv": [2, 0, 14, 16], "texture": "#west" },
+        "east":  { "uv": [2, 0, 14, 16], "texture": "#east" }
+      }
+    }
+  ]
+}
