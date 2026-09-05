@@ -366,6 +366,10 @@ public final class RetrogenHandler {
         // basin, not a ring around each pool. Silent everywhere else - four map samples and out.
         GeothermalBasin.generate(level, cp, rng);
 
+        // And everywhere the mod has put named rock, the soil that rock weathers into. Four probes
+        // and out over ordinary country - see the class note for why that gate matters.
+        SoilProfile.generate(level, cp, rng);
+
         // Surface features do read and write across chunk borders, which can pull a neighbour in.
         // That is fine now: this runs from the tick queue, so a forced load simply queues more work
         // for a later tick instead of recursing. Demanding a fully loaded neighbourhood instead was
