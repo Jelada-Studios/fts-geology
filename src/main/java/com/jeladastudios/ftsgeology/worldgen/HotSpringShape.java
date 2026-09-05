@@ -546,6 +546,11 @@ public final class HotSpringShape {
                 || s.is(ModBlocks.HOT_SPRING.get()) || s.is(Blocks.MAGMA_BLOCK) || isMat(s);
     }
 
+    /** Exposed so a spring can tell its own water from a lake that reaches the same column. */
+    public static boolean isMatBlock(BlockState s) {
+        return isMat(s);
+    }
+
     private static boolean isMat(BlockState s) {
         return s.is(ModBlocks.MICROBIAL_MAT_GREEN.get())
                 || s.is(ModBlocks.MICROBIAL_MAT_YELLOW.get())

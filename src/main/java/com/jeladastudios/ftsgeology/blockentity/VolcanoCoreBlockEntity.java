@@ -83,6 +83,12 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
             return;
         }
 
+        // Cool whatever the quake flung about before putting the proper lava back. Nothing else
+        // does it: coolScatteredLava only runs from the erupting phases, so a volcano the quake
+        // killed never tidied up after itself and its lava sat there for good.
+        VolcanoEruption.coolScatteredLava(level, pos.above(), craterR, 20 + magnitude,
+                surfaceVents, moltenCells);
+
         int restored = refill(level, moltenCells);
 
         // The recorded list is not always enough. It is filled by carveCalderaRow, carveFunnelPit
@@ -104,20 +110,59 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         GeysersMod.LOGGER.info("Volcano at {} recharged after a quake: {} cells", pos, restored);
     }
 
-    /** Puts lava back into cells the quake left as solid rock. Returns how many took it. */
+    /**
+     * Puts lava back into cells a quake emptied. Returns how many took it.
+     *
+     * <h2>Air is allowed, and that is the whole point</h2>
+     * This refused air, with the comment "never into open sky" - and that single line is why the
+     * fallback never worked. A quake <b>opens</b> the throat, so the cell above the core is air, and
+     * the one place the fallback exists to fill was the one place it skipped. It restored nothing
+     * for ever, silently.
+     *
+     * <p>The worry behind that line was real though, so it is answered properly rather than by
+     * refusing air outright. Lava goes in only where it would stay put:</p>
+     * <ol>
+     *   <li>something solid underneath, or the core itself;</li>
+     *   <li>all four horizontal neighbours solid or already lava - one open side and it pours down
+     *       the mountainside instead of filling;</li>
+     *   <li>at or below local ground, so a summit the quake sheared off does not get lava standing
+     *       on a pinnacle in the open air.</li>
+     * </ol>
+     */
     private int refill(ServerLevel level, long[] cells) {
         int restored = 0;
         for (long c : cells) {
             BlockPos p = BlockPos.of(c);
             BlockState s = level.getBlockState(p);
-            // Only into rock the quake left behind, never into anything built or into open sky.
-            if (!s.getFluidState().isEmpty()) continue;
-            if (s.isAir()) continue;
+            if (!s.getFluidState().isEmpty()) continue;                  // already lava or water
             if (EruptionHandler.isPlayerPlaced(s)) continue;
+            if (s.isAir() && !contained(level, p)) continue;
             level.setBlock(p, Blocks.LAVA.defaultBlockState(), 2);
             restored++;
         }
         return restored;
+    }
+
+    /** Would lava placed here stay where it was put? See {@link #refill}. */
+    private boolean contained(ServerLevel level, BlockPos p) {
+        BlockPos below = p.below();
+        boolean floored = below.equals(worldPosition)
+                || level.getBlockState(below).isFaceSturdy(level, below, Direction.UP)
+                || !level.getBlockState(below).getFluidState().isEmpty();
+        if (!floored) return false;
+
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            BlockPos n = p.relative(d);
+            BlockState ns = level.getBlockState(n);
+            if (!ns.getFluidState().isEmpty()) continue;                 // lava next door is fine
+            if (!ns.isFaceSturdy(level, n, d.getOpposite())) return false;
+        }
+
+        int ground = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(
+                level, p.getX(), p.getZ());
+        int ceiling = Math.max(ground == Integer.MIN_VALUE ? p.getY() : ground,
+                worldPosition.getY() + 1);
+        return p.getY() <= ceiling;
     }
 
     public void setSurfaceVents(List<BlockPos> vents) {

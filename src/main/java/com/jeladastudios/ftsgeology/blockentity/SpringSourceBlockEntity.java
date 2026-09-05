@@ -311,11 +311,22 @@ public class SpringSourceBlockEntity extends BlockEntity {
                 // rebuildBarred goes true once the spring has given up, so stalled stopped rising
                 // the moment it mattered, never reached STALL_LIMIT, and stepAside - a silted vent
                 // finding a new way out, the whole physical idea - has never once run.
-                // Relocating is off: see stepAsideDisabled. A blocked spring stays put and keeps
-                // trying to clear its own outlet, which is what it did before this branch existed.
+                // Relocating is off (see stepAsideDisabled), so clearing its own outlet is the only
+                // thing a blocked spring can do - and it has to actually DO it.
+                //
+                // This branch used to be `stalled++; return;` under a comment claiming it kept
+                // trying to clear the outlet. It did not: there was no rebuild on either path, so a
+                // spring whose pool read BLOCKED sat inert for the rest of the world's life,
+                // counting stalls nobody read. The comment described the intention and the code did
+                // nothing, which is the gap that has cost the most in this feature.
                 be.stalled++;
                 be.setChanged();
                 if (be.rebuildBarred(server)) return;
+                if (be.applyStage(server, be.stage)) {
+                    be.noteRebuild(server);
+                    GeysersMod.LOGGER.debug("Spring at {},{} dug itself out",
+                            be.siteX(), be.siteZ());
+                }
                 return;
             }
 
@@ -448,7 +459,6 @@ public class SpringSourceBlockEntity extends BlockEntity {
         int ring = HotSpringShape.waterLineAt(level, siteX(), siteZ(), stage);
         if (ring == Integer.MIN_VALUE) return false;       // cannot read the ground; try again later
 
-        resitedFor = quake;
         // The ground moved, so a spring that had given up is worth another try.
         dormant = false;
         rebuilds = 0;
@@ -456,6 +466,8 @@ public class SpringSourceBlockEntity extends BlockEntity {
         // Anything left of the old pool goes before the new one is built, so a rebuilt spring does
         // not stand in a ring of the water its predecessor spilled.
         drainPool(level);
+        // NOTE: resitedFor is stamped only where a pool actually goes back in - see the two
+        // applyStage calls below. Stamping here still left a failed rebuild marked as answered.
 
         // Has the ground the pool sat on actually moved? Testing the RING, not the basin.
         //
@@ -467,10 +479,10 @@ public class SpringSourceBlockEntity extends BlockEntity {
             // It did not. Keep the datum and rebuild exactly where the spring already was - which
             // is what testing asked for: a spring whose ground is intact has no business sinking.
             if (!applyStage(level, stage)) {
-                surfaced = false;
                 setChanged();
-                return false;
+                return false;       // unstamped: the next check may find better ground
             }
+            resitedFor = quake;
             GeysersMod.LOGGER.info("Spring at {},{} rebuilt after a quake, same level",
                     siteX(), siteZ());
             setChanged();
@@ -488,31 +500,70 @@ public class SpringSourceBlockEntity extends BlockEntity {
         int moved = capped - datumY;
         datumY = capped;
         if (!applyStage(level, stage)) {
-            surfaced = false;                               // no pool fits here now; go looking
+            datumY = capped - moved;                        // put the datum back; nothing was built
             setChanged();
-            return false;
+            return false;                                   // unstamped, so it can try again
         }
+        resitedFor = quake;
         GeysersMod.LOGGER.info("Spring at {},{} re-sited after a quake: ground moved {} blocks",
                 siteX(), siteZ(), moved);
         setChanged();
         return true;
     }
 
-    /** Takes the water out of the pool this spring last built, and nothing else. */
+    /**
+     * Takes the water out of the pool this spring last built, and nothing else.
+     *
+     * <h2>Why this sweeps a few layers and not a cylinder</h2>
+     * It used to clear only {@code datumY - 1}, one course, so water an earthquake had <b>lifted</b>
+     * sat above that and stayed hanging in the air over the rebuilt spring - which is what testing
+     * photographed. The obvious fix, sweeping a radius over a generous height, is much worse than
+     * the bug: a spring sits in a valley near water, so a cylinder eight deep cuts a shaft through
+     * the bed of any neighbouring river and it pours in for ever, and in a terrace chain - pools
+     * eight to fourteen apart, dropping one to three blocks - the upper spring's sweep deletes the
+     * lower spring's pool.
+     *
+     * <p>So it stays on the columns this spring actually built, and the height comes out of
+     * arithmetic rather than taste: the water sat at {@code datumY - 1}, and
+     * {@link #MAX_DATUM_SHIFT} caps how far a quake may move the datum, so displaced water can only
+     * be within that distance of where it was. Anything outside those bounds belongs to something
+     * else and is left alone.</p>
+     */
     private void drainPool(ServerLevel level) {
         if (poolCells.length == 0 || datumY == Integer.MIN_VALUE) return;
         int waterY = datumY - 1;
+        int lo = waterY - MAX_DATUM_SHIFT;
+        int hi = waterY + MAX_DATUM_SHIFT;
         int cleared = 0;
         for (long c : poolCells) {
-            BlockPos p = new BlockPos(HotSpringShape.unpackX(c), waterY, HotSpringShape.unpackZ(c));
-            if (level.getBlockState(p).getFluidState().isEmpty()) continue;
-            level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
-            cleared++;
+            int cx = HotSpringShape.unpackX(c), cz = HotSpringShape.unpackZ(c);
+            for (int y = lo; y <= hi; y++) {
+                BlockPos p = new BlockPos(cx, y, cz);
+                if (level.getBlockState(p).getFluidState().isEmpty()) continue;
+                if (!ourWater(level, p)) continue;
+                level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                cleared++;
+            }
         }
         if (cleared > 0) {
             GeysersMod.LOGGER.debug("Spring at {},{} drained {} cells before rebuilding",
                     siteX(), siteZ(), cleared);
         }
+    }
+
+    /**
+     * Is this water the spring's own, rather than a lake that happens to reach the same column?
+     *
+     * <p>Decided by what it is standing on. The spring's water sits on what the spring laid down,
+     * or hangs over air the quake left; a lake sits on whatever the world put there. Water resting
+     * on sand, gravel or soil at sea level is somebody else's and is never touched.</p>
+     */
+    private boolean ourWater(ServerLevel level, BlockPos p) {
+        BlockState below = level.getBlockState(p.below());
+        if (below.isAir()) return true;                     // hanging: the quake left it there
+        if (below.is(Blocks.CALCITE) || below.is(ModBlocks.SINTER.get())
+                || below.is(ModBlocks.HOT_SPRING.get())) return true;
+        return HotSpringShape.isMatBlock(below);
     }
 
     /**

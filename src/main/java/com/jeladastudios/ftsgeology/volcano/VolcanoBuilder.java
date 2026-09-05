@@ -838,6 +838,14 @@ public final class VolcanoBuilder {
             // report. Recorded here they are both protected from the sweep and given to the core, so
             // the whole fissure swarm smokes and seeps together the way a real one does.
             c.vents.add(pond);
+            // And recorded as MOLTEN too, which this never did.
+            //
+            // Ctx.molten's own javadoc promises "every pond of a fissure swarm", and this was the
+            // one shape that put nothing in it - so a fissure volcano was born with an empty molten
+            // list, and the post-quake recharge that reads that list restored precisely nothing.
+            // The log said it plainly and nobody had looked: "vents: 35 cut of 6 sites, 0 molten
+            // cells". These ponds ARE the volcano's lava; they belong here.
+            c.molten.add(pond);
         }
         c.coreCraterR = 2;
     }
