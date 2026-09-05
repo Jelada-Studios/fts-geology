@@ -527,15 +527,23 @@ public final class RetrogenHandler {
         // Two blocks of relief is noise on any forest floor, not a slope. Chaining on that put a
         // terrace system on ground that had nowhere to step down to, which is what drove the
         // descent below into the ground.
-        // In a geyser basin the ground gets the benefit of the doubt and gives one broad pool.
+        // A geyser basin gives one broad pool, whatever the ground is doing.
         //
-        // A chain caps its pools at stage 3, and "terraced" only asks for four blocks of relief
-        // across seventeen - which almost anywhere has - so the richest ground in the world was
-        // producing the same modest stepped pools as an ordinary hillside. A hotspot basin is
-        // exactly where the big stage 4 basins belong, so it takes a real slope to break one up.
+        // Two thresholds stacked up to make stage 4 springs essentially nonexistent. "Terraced"
+        // asked for under four blocks of relief across seventeen, which Minecraft terrain hardly
+        // ever has outside flat plains; and the relaxed version of it only applied within about
+        // 40 to 90 blocks of a basin centre, in the 30% of cells that hold a basin at all. So the
+        // richest ground in the world produced the same modest stepped pools as any hillside, and
+        // testing reported seeing no mature springs anywhere - twice.
+        //
+        // Inside a basin there is now no terracing at all. Ground rougher than 12 is refused higher
+        // up regardless, and on a slope the pool trims itself against the rising land, so a broad
+        // pool on uneven ground is self-limiting rather than dangerous. With no chain there is also
+        // no neighbour to overlap.
         double basinHere = com.jeladastudios.ftsgeology.tectonics.HotspotMap
                 .basinStrength(level, x, z);
-        boolean terraced = relief >= (basinHere > 0.35 ? 9 : 4);
+        boolean inBasin = basinHere > 0.2;
+        boolean terraced = !inBasin && relief >= 6;
         int terraces = terraced ? 2 + level.random.nextInt(3) : 1;
 
         // Downhill direction, as an ANGLE rather than a compass point.
@@ -608,7 +616,12 @@ public final class RetrogenHandler {
             if (waterY <= lo - 6) break;
         }
         if (placed == 0) return false;
-        GeysersMod.LOGGER.debug("Hot spring ({} pools) at {}, {}, {}", placed, x, centre, z);
+        // Says which stage this site actually got and why, so "there are no mature springs" can be
+        // counted from a log rather than argued about. It has come up twice now with both of us
+        // guessing at the distribution.
+        GeysersMod.LOGGER.info(
+                "Hot spring at {},{}: {} pool(s), stage {}, relief {}, basin {}",
+                x, z, placed, chainStage, relief, String.format("%.2f", basinHere));
         return true;
     }
 

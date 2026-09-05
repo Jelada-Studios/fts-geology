@@ -2,7 +2,6 @@
   "variants": {
     "part=base": { "model": "fts_geology:block/steam_vent_base" },
     "part=neck": { "model": "fts_geology:block/steam_vent_neck" },
-    "part=cap": { "model": "fts_geology:block/steam_vent_cap" },
-    "": { "model": "fts_geology:block/steam_vent_base" }
+    "part=cap": { "model": "fts_geology:block/steam_vent_cap" }
   }
 }

@@ -126,8 +126,11 @@ public final class HotspotSigns {
                 chimney(level, at, rng);
                 return;
             }
-            set(level, at, rng.nextInt(3) == 0
-                    ? ModBlocks.MUD_POT.get().defaultBlockState()
+            // Mud pots sit in mud. On their own they read as one block stamped over and over;
+            // mixed with the vanilla article they read as a wet patch with pots in it.
+            int roll = rng.nextInt(6);
+            set(level, at, roll == 0 ? ModBlocks.MUD_POT.get().defaultBlockState()
+                    : roll <= 2 ? Blocks.MUD.defaultBlockState()
                     : ModBlocks.SINTER_CRUST.get().defaultBlockState());
         } else if (band == 1) {
             // Beside it: sulfur condensing out of the vapour.
