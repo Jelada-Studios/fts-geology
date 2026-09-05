@@ -453,7 +453,7 @@ public final class GeyserConfig {
         HOTSPOT_SCALE = b
                 .comment("Spacing of the hotspot grid, in blocks. Combined with hotspotDensity this",
                         "sets how far apart plumes end up.")
-                .defineInRange("hotspotScale", 12000.0, 1000.0, 200000.0);
+                .defineInRange("hotspotScale", 8500.0, 1000.0, 200000.0);
         HOTSPOT_DENSITY = b
                 .comment("Fraction of hotspot grid cells that actually contain a plume. Low on purpose:",
                         "hotspots should be rare landmarks, not a second network of boundaries.")

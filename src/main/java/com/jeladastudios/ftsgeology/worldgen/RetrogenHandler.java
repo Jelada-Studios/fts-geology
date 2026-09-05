@@ -355,6 +355,11 @@ public final class RetrogenHandler {
         // Where that boundary is under water, it is a spreading ridge rather than a rift valley.
         OceanicRidge.generate(level, cp, rng);
 
+        // The ground over a mantle plume says so, more loudly the closer you get. This is how a
+        // hotspot is meant to be found: by reading the landscape rather than by walking twenty
+        // thousand blocks and being lucky. Silent everywhere else - one map sample and out.
+        HotspotSigns.generate(level, cp, rng);
+
         // Surface features do read and write across chunk borders, which can pull a neighbour in.
         // That is fine now: this runs from the tick queue, so a forced load simply queues more work
         // for a later tick instead of recursing. Demanding a fully loaded neighbourhood instead was
