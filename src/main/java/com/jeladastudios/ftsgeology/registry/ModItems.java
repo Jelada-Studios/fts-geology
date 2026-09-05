@@ -2,6 +2,7 @@ package com.jeladastudios.ftsgeology.registry;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.item.FaultCompassItem;
+import com.jeladastudios.ftsgeology.item.FieldGuideItem;
 import com.jeladastudios.ftsgeology.item.GeologistsHammerItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
@@ -260,6 +261,10 @@ public final class ModItems {
     /** Strike of the nearest boundary, and what the two plates are doing across it. */
     public static final RegistryObject<Item> FAULT_COMPASS = ITEMS.register("fault_compass",
             () -> new FaultCompassItem(new Item.Properties().stacksTo(1)));
+
+    /** In-game field guide documenting landscape reading, instruments, hydrothermal systems, volcanoes, earthquakes, and commands. */
+    public static final RegistryObject<Item> FIELD_GUIDE = ITEMS.register("field_guide",
+            () -> new FieldGuideItem(new Item.Properties().stacksTo(1)));
 
     private ModItems() {}
 }

@@ -119,6 +119,7 @@ public class GeysersMod {
             event.accept(ModItems.SEISMOGRAPH.get());
             event.accept(ModItems.GEOLOGISTS_HAMMER.get());
             event.accept(ModItems.FAULT_COMPASS.get());
+            event.accept(ModItems.FIELD_GUIDE.get());
         }
         if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
             acceptWorkedRocks(event);
