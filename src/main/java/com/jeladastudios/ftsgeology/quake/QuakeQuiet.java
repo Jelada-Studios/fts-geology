@@ -165,6 +165,11 @@ public final class QuakeQuiet {
                     if (now < z.graceEnds) continue;
                     z.phase = Phase.RELEASED;
                     z.releasedAt = now;
+                    // The ground is finally still, so the rivers in it can start adjusting to the
+                    // level it has stopped at. Called from the one place a zone can become released,
+                    // which makes it exactly once per quake by construction rather than by a stamp.
+                    com.jeladastudios.ftsgeology.hydrology.Knickpoint.afterQuake(
+                            level, new BlockPos(z.x, level.getSeaLevel(), z.z), z.radius * 2.0);
                 }
                 default -> { }
             }

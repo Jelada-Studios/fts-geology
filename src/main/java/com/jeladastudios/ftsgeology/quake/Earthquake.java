@@ -240,6 +240,7 @@ public final class Earthquake {
         PendingEdits.clear();
         Weathering.clear();
         QuakeQuiet.clear();     // nothing left to settle, so nothing left to wait for
+        com.jeladastudios.ftsgeology.hydrology.Knickpoint.clear();
         return n;
     }
 
@@ -270,6 +271,11 @@ public final class Earthquake {
         for (ServerLevel l : event.getServer().getAllLevels()) {
             QuakeQuiet.tick(l);
         }
+
+        // Rivers adjusting to the base level the quake left them. Shares this tick's budget rather
+        // than opening its own, and finishes on its own once the beds are graded again.
+        com.jeladastudios.ftsgeology.hydrology.Knickpoint.drain(event.getServer(),
+                com.jeladastudios.ftsgeology.util.TickBudget.slice(0.2));
 
         if (ACTIVE.isEmpty()) return;
         int budget = GeyserConfig.QUAKE_BLOCKS_PER_TICK.get();
