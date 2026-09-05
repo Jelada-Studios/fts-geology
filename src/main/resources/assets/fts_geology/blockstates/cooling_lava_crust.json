@@ -2,9 +2,9 @@
   "variants": {
     "": [
       { "model": "fts_geology:block/cooling_lava_crust" },
-      { "model": "fts_geology:block/cooling_lava_crust_var2" },
-      { "model": "fts_geology:block/cooling_lava_crust_var3" },
-      { "model": "fts_geology:block/cooling_lava_crust_var4" }
+      { "model": "fts_geology:block/cooling_lava_crust_mirrored" },
+      { "model": "fts_geology:block/cooling_lava_crust", "y": 180 },
+      { "model": "fts_geology:block/cooling_lava_crust_mirrored", "y": 180 }
     ]
   }
 }

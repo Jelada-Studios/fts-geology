@@ -1,6 +1,0 @@
-{
-  "parent": "minecraft:block/cube_all",
-  "textures": {
-    "all": "fts_geology:block/cooling_lava_crust_var2"
-  }
-}
