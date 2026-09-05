@@ -44,6 +44,11 @@ public class GeysersMod {
         // Populate the creative menu once tabs are built (mod bus event).
         modBus.addListener(this::onBuildCreativeTabs);
 
+        // The mod's first packet. Registered in common setup because the channel has to exist on
+        // both sides before anybody joins, and the handler itself is guarded for physical side.
+        modBus.addListener((net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent e) ->
+                e.enqueueWork(com.jeladastudios.ftsgeology.network.ModNetwork::register));
+
         // SERVER, not COMMON.
         //
         // Every setting here decides what the world does - how often a fault ruptures, how deep a

@@ -61,6 +61,13 @@ public final class VolcanoEruption {
         trailBombs(level);
         plumeLightning(level, summit, magnitude);
         if (eruptionTicks % 4 == 0) ashInTheAir(level, summit, magnitude);
+        // The mountain shakes while it is going off, and much less far out than a quake does: an
+        // eruption is felt on its own slopes, not across a county.
+        if (eruptionTicks % 5 == 0) {
+            com.jeladastudios.ftsgeology.network.ModNetwork.shakeNear(level,
+                    summit.getX(), summit.getZ(), 40 + magnitude * 6.0,
+                    0.35f + magnitude / 22.0f, 20);
+        }
     }
 
     // === Ash ================================================================

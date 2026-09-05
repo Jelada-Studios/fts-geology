@@ -356,6 +356,18 @@ public final class Earthquake {
                     v.z + (level.random.nextDouble() - 0.5) * kick);
             p.hurtMarked = true;
 
+            // And the part that actually reads as an earthquake: the view moving.
+            //
+            // Re-sent a few times a second rather than every tick, because the packet carries an
+            // intensity and a run-out and the client fills in the frames between - see ShakePacket.
+            // The duration is deliberately longer than the gap between sends, so a shake fades out
+            // on its own if the quake stops or the player walks out of range instead of ending on a
+            // cliff, and cannot be left switched on by a packet that never arrives.
+            if (level.getGameTime() % 5L == 0L) {
+                float strength = (float) (falloff * (0.6 + run.plan.magnitude() / 3.0));
+                com.jeladastudios.ftsgeology.network.ModNetwork.sendShake(p, strength, 20);
+            }
+
             dust(level, p, falloff);
         }
     }
