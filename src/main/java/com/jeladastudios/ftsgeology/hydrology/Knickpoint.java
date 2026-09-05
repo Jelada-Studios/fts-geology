@@ -1,6 +1,7 @@
 package com.jeladastudios.ftsgeology.hydrology;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
+import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.quake.QuakeQuiet;
 import com.jeladastudios.ftsgeology.util.TickBudget;
 import net.minecraft.core.BlockPos;
@@ -98,6 +99,15 @@ public final class Knickpoint {
      * would be cutting a bed that is about to be rearranged.</p>
      */
     public static void afterQuake(ServerLevel level, BlockPos epicentre, double ruptureLength) {
+        // Off by default. The one gate for the whole feature, and it is deliberately here rather
+        // than at the two call sites: with nothing queued, drain() has nothing to do, so a single
+        // check switches off the seeding scan, the retreat and the tick cost together.
+        //
+        // The code stays because the model is sound - the retreat provably terminates, and that was
+        // measured. What is not yet cheap enough is deciding which columns are channel at all, and
+        // that is a known piece of work rather than an abandoned one: isChannel still asks the water
+        // table, which is nine terrain-generator height queries behind a helper that looks free.
+        if (!GeyserConfig.RIVER_EROSION_ENABLED.get()) return;
         if (QUEUE.size() >= MAX_QUEUED) return;
 
         int radius = (int) Math.min(160, Math.round(ruptureLength / 4.0) + 32);

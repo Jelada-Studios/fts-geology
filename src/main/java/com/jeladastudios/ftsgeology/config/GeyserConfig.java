@@ -159,6 +159,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue SPRING_STAGE_THREE_DAYS;
     public static final ForgeConfigSpec.BooleanValue QUAKES_OPEN_NEW_SPRINGS;
     public static final ForgeConfigSpec.DoubleValue QUAKE_SPRING_CHANCE;   // per magnitude over 3
+    public static final ForgeConfigSpec.BooleanValue RIVER_EROSION_ENABLED;  // default OFF
 
     // --- Instruments ---------------------------------------------------------
     public static final ForgeConfigSpec.IntValue SEISMOGRAPH_RANGE;   // blocks a station can hear
@@ -806,6 +807,19 @@ public final class GeyserConfig {
                         "want a world that visibly rearranges itself; set quakesOpenNewSprings to",
                         "false to switch the whole thing off.")
                 .defineInRange("quakeSpringChance", 0.06D, 0.0D, 1.0D);
+        RIVER_EROSION_ENABLED = b
+                .comment("Let a river cut back down to the level an earthquake has left it at.",
+                        "Off by default, and honestly so. The process is real and the right one to",
+                        "model: dropping the ground under a river opens a step in its bed - a",
+                        "knickpoint - and that step retreats upstream until the profile is graded",
+                        "again, then stops on its own. What it costs is the problem. Finding which",
+                        "columns are channel at all is the expensive half, and over a rupture a",
+                        "thousand blocks long it has run a server minutes behind to produce a",
+                        "riverbed a few blocks deeper - which is a lot of tick budget for something",
+                        "you have to be standing in the water to notice.",
+                        "Turn it on if you want rivers that answer the ground and can spare the",
+                        "time; left off, a quake simply leaves the river where it is.")
+                .define("riverErosionEnabled", false);
         b.pop();
 
         SPEC = b.build();
