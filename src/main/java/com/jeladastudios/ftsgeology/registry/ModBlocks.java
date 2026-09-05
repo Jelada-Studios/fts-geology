@@ -135,11 +135,15 @@ public final class ModBlocks {
 
     /** Steam vent: dark hydrothermal rock with a degassing orifice, mineral staining, and faint glow. */
     public static final RegistryObject<Block> STEAM_VENT = BLOCKS.register("steam_vent",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.BASALT)
-                    .mapColor(MapColor.COLOR_BLACK)
-                    .lightLevel(s -> 3)
-                    .strength(2.0F, 6.0F)
-                    .requiresCorrectToolForDrops()));
+            () -> new com.jeladastudios.ftsgeology.block.SteamVentBlock(
+                    BlockBehaviour.Properties.copy(Blocks.BASALT)
+                            .mapColor(MapColor.COLOR_BLACK)
+                            .lightLevel(s -> 3)
+                            .strength(2.0F, 6.0F)
+                            // A chimney is not a solid cube, so it must not be asked to act like
+                            // one: without this the narrower parts darken everything under them.
+                            .noOcclusion()
+                            .requiresCorrectToolForDrops()));
 
     // --- Geological rock blocks ---------------------------------------------
     //

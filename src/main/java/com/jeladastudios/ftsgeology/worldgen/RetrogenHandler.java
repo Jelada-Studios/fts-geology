@@ -527,7 +527,15 @@ public final class RetrogenHandler {
         // Two blocks of relief is noise on any forest floor, not a slope. Chaining on that put a
         // terrace system on ground that had nowhere to step down to, which is what drove the
         // descent below into the ground.
-        boolean terraced = relief >= 4;
+        // In a geyser basin the ground gets the benefit of the doubt and gives one broad pool.
+        //
+        // A chain caps its pools at stage 3, and "terraced" only asks for four blocks of relief
+        // across seventeen - which almost anywhere has - so the richest ground in the world was
+        // producing the same modest stepped pools as an ordinary hillside. A hotspot basin is
+        // exactly where the big stage 4 basins belong, so it takes a real slope to break one up.
+        double basinHere = com.jeladastudios.ftsgeology.tectonics.HotspotMap
+                .basinStrength(level, x, z);
+        boolean terraced = relief >= (basinHere > 0.35 ? 9 : 4);
         int terraces = terraced ? 2 + level.random.nextInt(3) : 1;
 
         // Downhill direction, as an ANGLE rather than a compass point.

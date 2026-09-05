@@ -490,9 +490,9 @@ public final class GeyserConfig {
                 .defineInRange("hotspotBasinDensity", 0.30, 0.0, 1.0);
         HOTSPOT_FEATURE_BOOST = b
                 .comment("How much denser geysers and hot springs get inside a geyser basin.",
-                        "Multiplies the placement chance, so 3.0 means roughly three times as many",
-                        "vents as an ordinary volcanic setting would give.")
-                .defineInRange("hotspotFeatureBoost", 3.0, 1.0, 20.0);
+                        "Multiplies the placement chance, so 4.5 means roughly four and a half",
+                        "times as many vents as an ordinary volcanic setting would give.")
+                .defineInRange("hotspotFeatureBoost", 4.5, 1.0, 20.0);
         b.pop();
 
         b.push("depth");
