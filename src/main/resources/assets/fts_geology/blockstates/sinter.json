@@ -1,5 +1,10 @@
 {
   "variants": {
-    "": { "model": "fts_geology:block/sinter" }
+    "": [
+      { "model": "fts_geology:block/sinter" },
+      { "model": "fts_geology:block/sinter_mirrored" },
+      { "model": "fts_geology:block/sinter", "y": 180 },
+      { "model": "fts_geology:block/sinter_mirrored", "y": 180 }
+    ]
   }
 }
