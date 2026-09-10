@@ -6,12 +6,17 @@ import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.quake.QuakeQuiet;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.tectonics.HotspotMap;
+import com.jeladastudios.ftsgeology.tectonics.PlateSample;
+import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 import com.jeladastudios.ftsgeology.tectonics.ThermalBiomes;
+import com.jeladastudios.ftsgeology.util.SeedHash;
+import com.jeladastudios.ftsgeology.util.ValueNoise;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -25,7 +30,8 @@ import net.minecraft.world.level.block.state.BlockState;
  *
  * <p>{@link HotspotMap#basinStrength} ends in {@code getBaseHeight}, so it is sampled at the four
  * chunk corners, shared with neighbouring chunks, and interpolated per column. That also gives a
- * ramp at the edge rather than a chunk-aligned wall.</p>
+ * ramp at the edge rather than a chunk-aligned wall. Each column rolls its own dice, so the floor
+ * comes out the same whichever chunk is built first.</p>
  */
 public final class GeothermalBasin {
 
@@ -46,16 +52,21 @@ public final class GeothermalBasin {
      */
     private static final int MAX_STEP = 2;
 
+    private static final long SALT = 0x2C9D71E4A35B08F7L;
+
+    private static final int FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
+
     /** Paints this chunk's share of the basin floor, if it is standing in one. */
-    public static void generate(ServerLevel level, ChunkPos cp, RandomSource rng) {
+    public static void generate(WorldGenLevel level, ChunkPos cp) {
         if (!GeyserConfig.HOTSPOTS_ENABLED.get()) return;
 
+        ServerLevel model = level.getLevel();
         int x0 = cp.getMinBlockX(), z0 = cp.getMinBlockZ();
         // Four corners, not 256 columns and not one centre. See the class note.
-        double s00 = basin(level, x0, z0);
-        double s10 = basin(level, x0 + 16, z0);
-        double s01 = basin(level, x0, z0 + 16);
-        double s11 = basin(level, x0 + 16, z0 + 16);
+        double s00 = basin(model, x0, z0);
+        double s10 = basin(model, x0 + 16, z0);
+        double s01 = basin(model, x0, z0 + 16);
+        double s11 = basin(model, x0 + 16, z0 + 16);
         if (Math.max(Math.max(s00, s10), Math.max(s01, s11)) <= FLOOR_MIN) return;
 
         // The ground of the whole chunk in one pass, so the flatness test below is free rather than
@@ -67,18 +78,21 @@ public final class GeothermalBasin {
             }
         }
 
+        long seed = level.getSeed() ^ SALT;
         int painted = 0;
         for (int dx = 0; dx < 16; dx++) {
             for (int dz = 0; dz < 16; dz++) {
                 double u = dx / 16.0, v = dz / 16.0;
                 double s = Mth.lerp(v, Mth.lerp(u, s00, s10), Mth.lerp(u, s01, s11));
                 if (s <= FLOOR_MIN) continue;
+                int x = x0 + dx, z = z0 + dz;
+                RandomSource rng = RandomSource.create(SeedHash.columnSeed(seed, x, z));
                 // Thins out towards the rim instead of ending on a line, the way the sterile halo
                 // around a single spring already does.
                 double keep = (s - FLOOR_MIN) / (FLOOR_FULL - FLOOR_MIN);
                 if (keep < 1.0 && rng.nextDouble() > keep) continue;
                 if (!isFloor(ground, dx, dz)) continue;
-                if (paint(level, x0 + dx, z0 + dz, ground[dx * 16 + dz], s, rng)) painted++;
+                if (paint(level, x, z, ground[dx * 16 + dz], s, rng)) painted++;
             }
         }
         if (painted > 0) {
@@ -108,8 +122,7 @@ public final class GeothermalBasin {
      * source. Sampled at the chunk corners through the quart-cached tectonic map.
      */
     private static double boundary(ServerLevel level, int x, int z) {
-        com.jeladastudios.ftsgeology.tectonics.PlateSample plate =
-                com.jeladastudios.ftsgeology.tectonics.TectonicMap.sampleCached(level, x, z);
+        PlateSample plate = TectonicMap.sampleCached(level, x, z);
         return switch (plate.faultType()) {
             // Stress already folds in distance to the fault, so the field fades out as the boundary
             // does rather than ending at a radius.
@@ -138,8 +151,9 @@ public final class GeothermalBasin {
      *
      * @return true if anything was written
      */
-    private static boolean paint(ServerLevel level, int x, int z, int g, double s, RandomSource rng) {
-        if (QuakeQuiet.isQuiet(level, x, z)) return false;    // ground still moving
+    private static boolean paint(WorldGenLevel level, int x, int z, int g, double s, RandomSource rng) {
+        // Ground still moving; only a live world has quakes.
+        if (level instanceof ServerLevel live && QuakeQuiet.isQuiet(live, x, z)) return false;
         if (g <= level.getSeaLevel()) return false;
         if (TerrainProbe.hasFluidAbove(level, x, z)) return false;   // a pool or a lake
 
@@ -151,8 +165,8 @@ public final class GeothermalBasin {
         if (HotSpringShape.isCrust(here) || isBasinFloor(here)) return false;
 
         // Patches, not a sprinkle: two slow noise fields give sinter flats, crusted ground and wet hollows.
-        double flat = com.jeladastudios.ftsgeology.util.ValueNoise.noise(x, z, 34.0);
-        double wet = com.jeladastudios.ftsgeology.util.ValueNoise.noise(x + 4096, z - 4096, 19.0);
+        double flat = ValueNoise.noise(x, z, 34.0);
+        double wet = ValueNoise.noise(x + 4096, z - 4096, 19.0);
 
         TerrainProbe.clearVegetation(level, x, g, z, 2);
 
@@ -160,25 +174,25 @@ public final class GeothermalBasin {
             // A mud flat: mud pots among vanilla mud, not one block stamped over and over.
             level.setBlock(at, rng.nextInt(7) == 0
                     ? ModBlocks.MUD_POT.get().defaultBlockState()
-                    : Blocks.MUD.defaultBlockState(), 2);
+                    : Blocks.MUD.defaultBlockState(), FLAGS);
             if (rng.nextInt(440) == 0) HotspotSigns.chimney(level, at, rng);
             return true;
         }
 
         if (over(flat, 0.12, 0.22, rng)) {
             // The sinter flat itself: the pale bare floor the basin is named for.
-            level.setBlock(at, flatBlock(rng).defaultBlockState(), 2);
+            level.setBlock(at, flatBlock(rng).defaultBlockState(), FLAGS);
             if (s > 0.7 && rng.nextInt(800) == 0) HotspotSigns.chimney(level, at, rng);
             return true;
         }
 
         // Between the flats, ground the runoff has poisoned - the same palette the halo round a
         // single spring already uses, so the two meet without a seam.
-        Block b = rng.nextInt(3) == 0 ? ModBlocks.SINTER_CRUST.get() : HotSpringSites.haloBlock(level);
-        level.setBlock(at, b.defaultBlockState(), 2);
+        Block b = rng.nextInt(3) == 0 ? ModBlocks.SINTER_CRUST.get() : HotSpringSites.haloBlock(rng);
+        level.setBlock(at, b.defaultBlockState(), FLAGS);
         // Bobby-socks trees: killed by the silica, left bleached and standing. Rare, or the basin
         // turns into a dead forest instead of an open flat.
-        if (rng.nextInt(110) == 0) HotSpringSites.deadTree(level, at);
+        if (rng.nextInt(110) == 0) HotSpringSites.deadTree(level, at, rng);
         return true;
     }
 

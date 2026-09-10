@@ -33,4 +33,12 @@ public final class ModFeatures {
     public static final RegistryObject<Feature<NoneFeatureConfiguration>> VOLCANO_FIELD =
             FEATURES.register("volcano_field", () -> new com.jeladastudios.ftsgeology.worldgen
                     .VolcanoFieldFeature(NoneFeatureConfiguration.CODEC));
+
+    /**
+     * Geothermal ground and soil colour, painted while a chunk generates. See
+     * {@link com.jeladastudios.ftsgeology.worldgen.GeologySurfaceFeature}.
+     */
+    public static final RegistryObject<Feature<NoneFeatureConfiguration>> GEOLOGY_SURFACE =
+            FEATURES.register("geology_surface", () -> new com.jeladastudios.ftsgeology.worldgen
+                    .GeologySurfaceFeature(NoneFeatureConfiguration.CODEC));
 }

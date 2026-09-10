@@ -555,11 +555,12 @@ public final class GeyserConfig {
                         "Only affects NEWLY generated chunks.")
                 .define("tectonicPlacement", true);
         GEOLOGY_AT_GENERATION = b
-                .comment("Write the deep geology while a chunk is being generated instead of afterwards.",
-                        "A chunk made after the mod was installed then gets its boundary rock and ocean",
-                        "ridges as part of world generation: nothing on the server tick, nothing sent to",
-                        "players, and nothing for mods that hook block changes to react to. Chunks that",
-                        "already existed still get it from the background queue as before.",
+                .comment("Write the geology while a chunk is being generated instead of afterwards.",
+                        "A chunk made after the mod was installed then gets its boundary rock, ocean ridges,",
+                        "ore, fumarole fields, basin floors and soil colour as part of world generation:",
+                        "nothing on the server tick, nothing sent to players, and nothing for mods that hook",
+                        "block changes to react to. Chunks that already existed still get it from the",
+                        "background queue as before. Hot springs, geysers and small volcanoes always do.",
                         "Turn off only if another world generation mod misbehaves with it.")
                 .define("geologyAtGeneration", true);
         DEEP_STRUCTURE_ENABLED = b

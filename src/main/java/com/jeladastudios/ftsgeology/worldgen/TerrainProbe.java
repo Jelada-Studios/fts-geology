@@ -121,7 +121,8 @@ public final class TerrainProbe {
 
     /**
      * Removes plant cover from a column so nothing is left to catch fire or float over a new basin.
-     * Only ever clears {@link #isVegetation} blocks, so builds and trees are untouched.
+     * Only ever clears {@link #isVegetation} blocks, so builds and trees are untouched. Written without
+     * neighbour shape updates, which load edge chunks, so the top of a tall plant or cane is taken too.
      */
     public static void clearVegetation(net.minecraft.world.level.LevelAccessor level, int x, int groundY,
                                        int z, int height) {
@@ -130,7 +131,10 @@ public final class TerrainProbe {
             BlockState s = level.getBlockState(p);
             if (s.isAir()) continue;
             if (!isVegetation(s)) return;   // hit something real: stop, do not tunnel upward
-            level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+            level.setBlock(p, Blocks.AIR.defaultBlockState(),
+                    net.minecraft.world.level.block.Block.UPDATE_CLIENTS
+                            | net.minecraft.world.level.block.Block.UPDATE_KNOWN_SHAPE);
+            if (dy == height && level.getBlockState(p.above()).is(s.getBlock())) height++;
         }
     }
 }

@@ -1,0 +1,6 @@
+{
+  "type": "forge:add_features",
+  "biomes": "#minecraft:is_overworld",
+  "features": "fts_geology:geology_surface",
+  "step": "top_layer_modification"
+}

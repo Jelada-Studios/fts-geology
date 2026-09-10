@@ -59,6 +59,11 @@ public final class RetrogenHandler {
     /** Chunks whose deep geology is already at {@link #DEEP_VERSION}. */
     static final Set<String> DEEP_CURRENT = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
+    /** Chunks whose ground was painted while they generated; see {@link GeologySurfaceFeature}. */
+    static final Set<String> PAINT_CURRENT = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    public static final String PAINT_TAG = "fts_surface_painted";
+
     // === NBT stamp read/write ==============================================
 
     @SubscribeEvent
@@ -70,6 +75,9 @@ public final class RetrogenHandler {
         if (DEEP_CURRENT.contains(key)) {
             event.getData().putInt(DEEP_TAG, DEEP_VERSION);
         }
+        if (PAINT_CURRENT.contains(key)) {
+            event.getData().putBoolean(PAINT_TAG, true);
+        }
     }
 
     @SubscribeEvent
@@ -80,6 +88,9 @@ public final class RetrogenHandler {
         }
         if (event.getData().getInt(DEEP_TAG) >= DEEP_VERSION) {
             DEEP_CURRENT.add(key);
+        }
+        if (event.getData().getBoolean(PAINT_TAG)) {
+            PAINT_CURRENT.add(key);
         }
     }
 
@@ -145,6 +156,11 @@ public final class RetrogenHandler {
     /** How many of those were ore. */
     static final java.util.concurrent.atomic.AtomicLong GENERATED_ORE =
             new java.util.concurrent.atomic.AtomicLong();
+    /** Chunks whose ground was painted at generation. */
+    static final java.util.concurrent.atomic.AtomicInteger PAINTED =
+            new java.util.concurrent.atomic.AtomicInteger();
+    /** Nanoseconds in the whole surface pass since the last report, to set the parts against. */
+    static long surfaceNanos;
 
     /**
      * Generates queued chunks a few at a time. Server tick events do not fire while the spawn area
@@ -218,7 +234,9 @@ public final class RetrogenHandler {
                     // A retrofit gets the deep pass only: nothing that could put a second geyser or
                     // volcano next to one that is already there.
                     if (!q.deepOnly() && !PROCESSED.contains(key)) {
+                        long started = System.nanoTime();
                         blocksSinceReport += generateInChunk(level, chunk);
+                        surfaceNanos += System.nanoTime() - started;
                     }
                     doneSinceReport++;
                 } catch (Exception e) {
@@ -242,10 +260,19 @@ public final class RetrogenHandler {
                 // The longest step is the number that matters with a mod hooking every block change:
                 // it has to stay inside retrogen's slice now that a chunk can stop part way through.
                 GeysersMod.LOGGER.info("retrogen: {} chunks in the last 10s, {} blocks placed, {} still queued, "
-                                + "longest step {} ms; {} chunks got their deep geology at generation ({} blocks, {} of them ore)",
-                        doneSinceReport, blocksSinceReport, QUEUE.size(),
-                        String.format(java.util.Locale.ROOT, "%.2f", longestStepNanos / 1e6), generated,
-                        GENERATED_BLOCKS.getAndSet(0) + GENERATED_ORE.get(), GENERATED_ORE.getAndSet(0));
+                                + "longest step {} ms; {} chunks got their deep geology at generation ({} blocks, {} of them ore), "
+                                + "{} their ground paint",
+                        doneSinceReport, blocksSinceReport, QUEUE.size(), ms(longestStepNanos), generated,
+                        GENERATED_BLOCKS.getAndSet(0) + GENERATED_ORE.get(), GENERATED_ORE.getAndSet(0),
+                        PAINTED.getAndSet(0));
+            }
+            if (surfaceNanos > 0) {
+                long[] p = SurfaceFeatures.PART_NANOS;
+                GeysersMod.LOGGER.info("retrogen surface pass, ms: suitability {}, signs {}, basin {}, soil {}, "
+                                + "springs/geysers/volcanoes {}",
+                        ms(p[0]), ms(p[1]), ms(p[2]), ms(p[3]), ms(surfaceNanos - p[0] - p[1] - p[2] - p[3]));
+                java.util.Arrays.fill(p, 0L);
+                surfaceNanos = 0;
             }
             doneSinceReport = 0;
             blocksSinceReport = 0;
@@ -317,5 +344,15 @@ public final class RetrogenHandler {
         GENERATED.incrementAndGet();
         GENERATED_BLOCKS.addAndGet(blocks);
         GENERATED_ORE.addAndGet(ore);
+    }
+
+    /** Records that a chunk's ground was painted while it generated, so retrogen leaves the painting out. */
+    public static void markPaintCurrent(ResourceKey<Level> dimension, ChunkPos pos) {
+        PAINT_CURRENT.add(dimension.location() + "@" + pos.toLong());
+        PAINTED.incrementAndGet();
+    }
+
+    private static String ms(long nanos) {
+        return String.format(java.util.Locale.ROOT, "%.2f", nanos / 1e6);
     }
 }

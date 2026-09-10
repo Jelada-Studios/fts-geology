@@ -1,12 +1,19 @@
 package com.jeladastudios.ftsgeology.worldgen;
 
 import com.jeladastudios.ftsgeology.block.SteamVentBlock;
+import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.tectonics.HotspotMap;
+import com.jeladastudios.ftsgeology.tectonics.PlateSample;
+import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
+import com.jeladastudios.ftsgeology.util.SeedHash;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -16,6 +23,10 @@ import net.minecraft.world.level.block.state.BlockState;
  *
  * <p>Plumes stay rare, since the default spacing is already denser than Earth's hotspots; this makes
  * them findable by reading the landscape instead.</p>
+ *
+ * <p>A field is seeded from the chunk it starts in. Every chunk it crosses walks it the same way and
+ * paints only its own cells, so a field runs across chunk borders and comes out the same whichever
+ * chunk is built first.</p>
  */
 public final class HotspotSigns {
 
@@ -27,27 +38,44 @@ public final class HotspotSigns {
     /** Chance that a given chunk in the heart of a dome starts a field. */
     private static final double FIELD_CHANCE = 0.055;
 
+    /** How many chunks away a field can start and still reach this one: 15 + 33 + 4 blocks. */
+    private static final int REACH_CHUNKS = 3;
+
+    private static final long FIELD_SALT = 0x5F0E3A1D7C2B9E41L;
+
+    private static final int FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
+
     /**
-     * Puts a fumarole field in this chunk, occasionally, on geothermal ground. A field follows the
-     * crack letting the steam up: it walks a bearing for twenty or thirty blocks and lays bands out
-     * from that line, chimneys and mud on the trace, sulfur beside it, pale crust at the edges.
+     * Paints this chunk's share of every fumarole field that reaches it. A field follows the crack
+     * letting the steam up: it walks a bearing for twenty or thirty blocks and lays bands out from
+     * that line, chimneys and mud on the trace, sulfur beside it, pale crust at the edges.
      */
-    public static void generate(ServerLevel level, ChunkPos cp, RandomSource rng) {
-        int cx = cp.getMinBlockX() + 8, cz = cp.getMinBlockZ() + 8;
+    public static void generate(WorldGenLevel level, ChunkPos cp) {
+        ServerLevel model = level.getLevel();
+        long seed = level.getSeed();
+        for (int ox = -REACH_CHUNKS; ox <= REACH_CHUNKS; ox++) {
+            for (int oz = -REACH_CHUNKS; oz <= REACH_CHUNKS; oz++) {
+                int sx = cp.x + ox, sz = cp.z + oz;
+                long h = SeedHash.hash(seed, sx, sz, FIELD_SALT);
+                double roll = SeedHash.rand01(h);
+                // Rolled before the map is asked, since most chunks start nothing whatever the ground.
+                if (roll > FIELD_CHANCE * 4.0) continue;
 
-        // Any geothermal ground counts: a plume, a spreading ridge or a subduction arc.
-        double strength = Math.max(
-                HotspotMap.sample(level, cx, cz).strength(),
-                boundaryHeat(level, cx, cz));
-        if (strength <= THRESHOLD) return;
+                int cx = (sx << 4) + 8, cz = (sz << 4) + 8;
+                // Any geothermal ground counts: a plume, a spreading ridge or a subduction arc.
+                double strength = Math.max(HotspotMap.sample(model, cx, cz).strength(),
+                        boundaryHeat(model, cx, cz));
+                if (strength <= THRESHOLD) continue;
+                // Squared, so fields cluster towards the middle of a dome and thin out at the rim.
+                double intensity = strength * strength;
+                if (roll > FIELD_CHANCE * intensity * 4.0) continue;
 
-        // Squared, so fields cluster towards the middle of a dome and thin out at the rim.
-        double intensity = strength * strength;
-        if (rng.nextDouble() > FIELD_CHANCE * intensity * 4.0) return;
-
-        int x = cp.getMinBlockX() + rng.nextInt(16);
-        int z = cp.getMinBlockZ() + rng.nextInt(16);
-        field(level, x, z, intensity, rng);
+                RandomSource rng = RandomSource.create(SeedHash.mix(h));
+                int x = (sx << 4) + rng.nextInt(16);
+                int z = (sz << 4) + rng.nextInt(16);
+                field(level, cp, x, z, rng, h);
+            }
+        }
     }
 
     /**
@@ -55,26 +83,24 @@ public final class HotspotSigns {
      * subduction arcs, the settings with shallow magma under them.
      */
     private static double boundaryHeat(ServerLevel level, int x, int z) {
-        com.jeladastudios.ftsgeology.tectonics.PlateSample plate =
-                com.jeladastudios.ftsgeology.tectonics.TectonicMap.sampleCached(level, x, z);
+        PlateSample plate = TectonicMap.sampleCached(level, x, z);
         return switch (plate.faultType()) {
             case DIVERGENT, CONVERGENT_SUBDUCTION -> plate.stress();
             default -> 0.0;
         };
     }
 
-    /** One fumarole field: a fracture trace with its alteration haloes. */
-    private static void field(ServerLevel level, int x, int z, double intensity, RandomSource rng) {
+    /** One fumarole field, a fracture trace with its alteration haloes, painted where it crosses this chunk. */
+    private static void field(WorldGenLevel level, ChunkPos cp, int x, int z, RandomSource rng, long fieldHash) {
         double bearing = rng.nextDouble() * Math.PI * 2;
-        double dx = Math.cos(bearing), dz = Math.sin(bearing);
         int length = 14 + rng.nextInt(20);
         int halfWidth = 2 + rng.nextInt(3);
+        int minX = cp.getMinBlockX(), minZ = cp.getMinBlockZ();
 
         for (int t = 0; t < length; t++) {
             // The trace wanders, the way a crack does.
             bearing += (rng.nextDouble() - 0.5) * 0.22;
-            dx = Math.cos(bearing);
-            dz = Math.sin(bearing);
+            double dx = Math.cos(bearing), dz = Math.sin(bearing);
             int cx = x + (int) Math.round(dx * t);
             int cz = z + (int) Math.round(dz * t);
 
@@ -82,13 +108,16 @@ public final class HotspotSigns {
                 // Perpendicular to the trace.
                 int px = cx + (int) Math.round(-dz * w);
                 int pz = cz + (int) Math.round(dx * w);
+                if (px < minX || px > minX + 15 || pz < minZ || pz > minZ + 15) continue;
                 int band = Math.abs(w);
 
+                // The cell's own dice, so the walk above rolls the same in every chunk it crosses.
+                RandomSource cell = RandomSource.create(SeedHash.columnSeed(fieldHash, px, pz));
                 // Thin out towards the edge of the band so it has no hard border.
                 double keep = 1.0 - (band / (double) (halfWidth + 1));
-                if (rng.nextDouble() > keep) continue;
+                if (cell.nextDouble() > keep) continue;
 
-                paint(level, px, pz, band, intensity, rng);
+                paint(level, px, pz, band, cell);
             }
         }
     }
@@ -98,8 +127,7 @@ public final class HotspotSigns {
      *
      * @param band 0 on the trace itself, rising outward
      */
-    private static void paint(ServerLevel level, int x, int z, int band, double intensity,
-                              RandomSource rng) {
+    private static void paint(WorldGenLevel level, int x, int z, int band, RandomSource rng) {
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return;
         if (g <= level.getSeaLevel()) return;                    // not on the sea floor
@@ -108,7 +136,7 @@ public final class HotspotSigns {
         BlockPos at = new BlockPos(x, g, z);
         BlockState here = level.getBlockState(at);
         if (here.is(Blocks.BEDROCK)) return;
-        if (com.jeladastudios.ftsgeology.eruption.EruptionHandler.isPlayerPlaced(here)) return;
+        if (EruptionHandler.isPlayerPlaced(here)) return;
 
         TerrainProbe.clearVegetation(level, x, g, z, 1);
 
@@ -138,7 +166,7 @@ public final class HotspotSigns {
     }
 
     /** A two or three block chimney of the mineral its own steam has laid down. */
-    public static void chimney(ServerLevel level, BlockPos ground, RandomSource rng) {
+    public static void chimney(LevelAccessor level, BlockPos ground, RandomSource rng) {
         BlockState base = ModBlocks.STEAM_VENT.get().defaultBlockState()
                 .setValue(SteamVentBlock.PART, SteamVentBlock.Part.BASE);
         BlockState neck = base.setValue(SteamVentBlock.PART, SteamVentBlock.Part.NECK);
@@ -160,7 +188,7 @@ public final class HotspotSigns {
         }
     }
 
-    private static void set(ServerLevel level, BlockPos at, BlockState state) {
-        level.setBlock(at, state, 2);
+    private static void set(LevelAccessor level, BlockPos at, BlockState state) {
+        level.setBlock(at, state, FLAGS);
     }
 }

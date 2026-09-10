@@ -3,11 +3,14 @@ package com.jeladastudios.ftsgeology.worldgen;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
+import com.jeladastudios.ftsgeology.util.SeedHash;
+import com.jeladastudios.ftsgeology.util.ValueNoise;
 import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -20,7 +23,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * every hillside into podzol, so the feature stays where the mod has put geology.</p>
  *
  * <p>Bedrock is regional, so it is probed four times per chunk, and the per-column pass runs only
- * when a probe found named rock.</p>
+ * when a probe found named rock. Each column rolls its own dice.</p>
  */
 public final class SoilProfile {
 
@@ -29,10 +32,14 @@ public final class SoilProfile {
     /** How deep under the surface to look for the parent rock before giving up. */
     private static final int PROBE_DEPTH = 12;
 
+    private static final long SALT = 0x7A43E1C95D2F6B08L;
+
+    private static final int FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
+
     private enum Soil { NONE, LATERITE, RENDZINA, PODZOL }
 
     /** Paints this chunk's soil, if the rock under it has anything to say. */
-    public static void generate(ServerLevel level, ChunkPos cp, RandomSource rng) {
+    public static void generate(WorldGenLevel level, ChunkPos cp) {
         if (!GeyserConfig.SOIL_FROM_BEDROCK.get()) return;
 
         int x0 = cp.getMinBlockX(), z0 = cp.getMinBlockZ();
@@ -43,20 +50,22 @@ public final class SoilProfile {
         Soil d = probe(level, x0 + 12, z0 + 12);
         if (a == Soil.NONE && b == Soil.NONE && c == Soil.NONE && d == Soil.NONE) return;
 
+        long seed = level.getSeed() ^ SALT;
         Soil[] probes = { a, b, c, d };
         for (int dx = 0; dx < 16; dx++) {
             for (int dz = 0; dz < 16; dz++) {
+                int x = x0 + dx, z = z0 + dz;
+                RandomSource rng = RandomSource.create(SeedHash.columnSeed(seed, x, z));
                 Soil soil = pick(probes, dx, dz, rng);
                 if (soil == Soil.NONE) continue;
 
                 // Patches on two scales, leaving about half the ground as ordinary soil.
-                double n = com.jeladastudios.ftsgeology.util.ValueNoise.noise(x0 + dx, z0 + dz, 21.0)
-                        + 0.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(x0 + dx + 8192, z0 + dz - 8192, 7.0);
+                double n = ValueNoise.noise(x, z, 21.0) + 0.5 * ValueNoise.noise(x + 8192, z - 8192, 7.0);
                 // A feathered ramp rather than a cut, so a patch breaks up at its edge.
                 double keep = (n - 0.10) / 0.16;
                 if (keep <= 0.0 || (keep < 1.0 && rng.nextDouble() > keep)) continue;
 
-                paint(level, x0 + dx, z0 + dz, soil, rng);
+                paint(level, x, z, soil, rng);
             }
         }
     }
@@ -89,7 +98,7 @@ public final class SoilProfile {
     }
 
     /** What the rock under this column is, read through whatever soil is lying on it. */
-    private static Soil probe(ServerLevel level, int x, int z) {
+    private static Soil probe(LevelReader level, int x, int z) {
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return Soil.NONE;
 
@@ -140,7 +149,7 @@ public final class SoilProfile {
     }
 
     /** One column of soil, if there is soil there to change. */
-    private static void paint(ServerLevel level, int x, int z, Soil soil, RandomSource rng) {
+    private static void paint(WorldGenLevel level, int x, int z, Soil soil, RandomSource rng) {
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return;
         if (TerrainProbe.hasFluidAbove(level, x, z)) return;    // a lake bed is not a soil profile
@@ -152,7 +161,10 @@ public final class SoilProfile {
         if (!here.is(BlockTags.DIRT)) return;
         if (EruptionHandler.isPlayerPlaced(here)) return;
 
-        level.setBlock(at, block(soil, rng).defaultBlockState(), 2);
+        BlockState put = block(soil, rng).defaultBlockState();
+        // Plants cannot stand on terracotta or calcite, and no shape update will knock them off.
+        if (!put.is(BlockTags.DIRT)) TerrainProbe.clearVegetation(level, x, g, z, 2);
+        level.setBlock(at, put, FLAGS);
     }
 
     private static Block block(Soil soil, RandomSource rng) {

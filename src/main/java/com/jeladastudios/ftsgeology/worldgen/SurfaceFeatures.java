@@ -45,6 +45,15 @@ public final class SurfaceFeatures {
         return Math.min(1.0, Math.max(plume, boundary) * 2.0);
     }
 
+    /** Nanoseconds spent on each part of the surface pass since the last report: suitability, signs, basin, soil. */
+    static final long[] PART_NANOS = new long[4];
+
+    private static long lap(int part, long since) {
+        long now = System.nanoTime();
+        PART_NANOS[part] += now - since;
+        return now;
+    }
+
     static int generateInChunk(ServerLevel level, LevelChunk chunk) {
         ChunkPos cp = chunk.getPos();
         RandomSource rng = RandomSource.create(
@@ -55,21 +64,26 @@ public final class SurfaceFeatures {
         int chamberH = GeyserConfig.CHAMBER_TARGET_HEIGHT.get();
 
         // One tectonic sample per chunk decides what belongs here; see GeothermalSuitability.
+        long t = System.nanoTime();
         int centreX = cp.getMinBlockX() + 8, centreZ = cp.getMinBlockZ() + 8;
         GeothermalSuitability.Suitability fit = GeyserConfig.TECTONIC_PLACEMENT.get()
                 ? GeothermalSuitability.at(level, centreX, centreZ)
                 : new GeothermalSuitability.Suitability(1.0, 1.0, 1.0, "Tectonic placement disabled.");
+        t = lap(0, t);
 
-        // Deep geology runs first, from the queue, or was already written at generation.
-
-        // Surface signs over a mantle plume, stronger towards its centre.
-        HotspotSigns.generate(level, cp, rng);
-
-        // The basin floor the springs stand on.
-        GeothermalBasin.generate(level, cp, rng);
-
-        // The soil each named rock weathers into; four probes and out over ordinary country.
-        SoilProfile.generate(level, cp, rng);
+        // Deep geology runs first, from the queue, or was already written at generation. So is the
+        // painting for any chunk generated since GeologySurfaceFeature existed.
+        if (!RetrogenHandler.PAINT_CURRENT.contains(RetrogenHandler.keyOf(level, chunk))) {
+            // Fumarole fields over geothermal ground.
+            HotspotSigns.generate(level, cp);
+            t = lap(1, t);
+            // The basin floor the springs stand on.
+            GeothermalBasin.generate(level, cp);
+            t = lap(2, t);
+            // The soil each named rock weathers into; four probes and out over ordinary country.
+            SoilProfile.generate(level, cp);
+            lap(3, t);
+        }
 
         // Features may read and write across chunk borders; from the tick queue, a forced load only
         // queues more work.

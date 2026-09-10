@@ -315,7 +315,7 @@ public final class HotSpringSites {
                     if (out < 0.0 || out > 1.0) continue;
                     // Thins outward, so the crust breaks up instead of drawing another ring.
                     if (level.random.nextDouble() > 1.0 - out) continue;
-                    b = haloBlock(level);
+                    b = haloBlock(level.random);
                     inHalo = true;
                 }
 
@@ -331,14 +331,14 @@ public final class HotSpringSites {
                 if (!s.getFluidState().isEmpty()) continue;
                 TerrainProbe.clearVegetation(level, x, g, z, 2);
                 level.setBlock(p, b.defaultBlockState(), 2);
-                if (inHalo && level.random.nextInt(30) == 0) deadTree(level, p);
+                if (inHalo && level.random.nextInt(30) == 0) deadTree(level, p, level.random);
             }
         }
     }
 
     /** Halo crust: pale, dry, broken ground made of existing blocks. */
-    static Block haloBlock(ServerLevel level) {
-        int r = level.random.nextInt(10);
+    static Block haloBlock(net.minecraft.util.RandomSource rng) {
+        int r = rng.nextInt(10);
         if (r < 4) return Blocks.COARSE_DIRT;
         if (r < 7) return Blocks.GRAVEL;
         if (r < 9) return ModBlocks.SINTER.get();
@@ -349,17 +349,19 @@ public final class HotSpringSites {
      * A dead, bleached tree in the halo, white at the foot where silica wicked up the wood: Yellowstone's
      * "bobby socks" trees. Only ever placed on fresh halo crust.
      */
-    static void deadTree(ServerLevel level, BlockPos ground) {
-        Block trunk = level.random.nextBoolean() ? Blocks.STRIPPED_SPRUCE_LOG : Blocks.STRIPPED_OAK_LOG;
-        int height = 3 + level.random.nextInt(4);
+    static void deadTree(net.minecraft.world.level.LevelAccessor level, BlockPos ground,
+                         net.minecraft.util.RandomSource rng) {
+        int flags = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
+        Block trunk = rng.nextBoolean() ? Blocks.STRIPPED_SPRUCE_LOG : Blocks.STRIPPED_OAK_LOG;
+        int height = 3 + rng.nextInt(4);
         for (int h = 1; h <= height; h++) {
             BlockPos p = ground.above(h);
             BlockState s = level.getBlockState(p);
             if (!s.isAir() && !TerrainProbe.isVegetation(s)) return;   // something is in the way
-            level.setBlock(p, trunk.defaultBlockState(), 2);
+            level.setBlock(p, trunk.defaultBlockState(), flags);
         }
         // The white foot: silica drawn up out of the ground, which is where the name comes from.
-        level.setBlock(ground, ModBlocks.SINTER.get().defaultBlockState(), 2);
+        level.setBlock(ground, ModBlocks.SINTER.get().defaultBlockState(), flags);
     }
 
     /** Which band a given distance from the water falls in, or null past the last one. */
