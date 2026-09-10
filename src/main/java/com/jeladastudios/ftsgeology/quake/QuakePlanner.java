@@ -23,52 +23,23 @@ import java.util.List;
 import java.util.random.RandomGenerator;
 
 /**
- * Works out what an earthquake does to the ground.
+ * Works out what an earthquake does to the ground, in three stages.
  *
- * <h2>Three stages</h2>
  * <ol>
- *   <li>{@link #traceFault} walks the plate boundary out from the epicentre, re-reading the local
- *       strike as it goes, so the rupture follows the real curve of the fault and stops where the
- *       boundary ends or changes character - at a triple junction, for instance. Pure maths over
- *       the seed; touches no blocks.</li>
- *   <li>{@link #snapshot} then copies only the CORRIDOR along that trace. A realistic M7 rupture is
- *       hundreds of blocks long, and a square box around it would be a million columns.</li>
- *   <li>{@link #plan} turns the snapshot into an immutable edit list on a worker thread, and
- *       {@link Earthquake} applies it on the server thread a slice per tick.</li>
+ *   <li>{@link #traceFault} follows the plate boundary out from the epicentre, re-reading the strike
+ *       as it goes, and stops where the boundary ends or changes kind. Pure maths over the seed.</li>
+ *   <li>{@link #snapshot} copies only the corridor along that trace, on the server thread.</li>
+ *   <li>{@link #plan} turns the snapshot into an edit list on a worker thread; {@link Earthquake}
+ *       applies it a slice per tick.</li>
  * </ol>
  *
- * <h2>The corridor is walked on the block lattice, not parametrically</h2>
- * Both stages used to sweep the corridor by stepping along the fault and then sideways across it,
- * rounding the result to a block. That works perfectly when the fault runs north-south or east-west
- * and <b>silently loses a fifth of the ground</b> when it does not: two rounded parametric axes
- * cannot land on every lattice point. Measured over a 312-block rupture with a 24-block half-width,
- * the columns never visited were
- * <pre>
- *   axis-aligned    0 of 14711    (100.0% covered)
- *   22.5 degrees  526 of 14351     (96.3%)
- *   45 degrees   3094 of 14365     (78.5%)
- *   60 degrees   1926 of 14354     (86.6%)
- * </pre>
- * Untouched columns keep their original height while their neighbours are cut or raised, which is
- * what left rift grabens looking combed through with thin pillars and turned a collision belt's
- * continuous ridges into a scatter of disconnected bumps.
+ * <p>The corridor is enumerated on the integer block lattice ({@link #forEachCorridorColumn}).
+ * Stepping along and across the fault and rounding misses up to a fifth of the columns on a
+ * diagonal fault, and the missed columns stand up as pillars.</p>
  *
- * <p>{@link #forEachCorridorColumn} therefore enumerates the integer columns of each trace segment
- * directly and asks each one where it falls relative to the fault. Coverage is complete by
- * construction, and because a column is visited exactly once it gets a single coherent treatment
- * rather than whichever partial answer happened to claim it first.</p>
- *
- * <h2>Deformation</h2>
- * <ul>
- *   <li><b>Divergent</b> - a graben drops between two shoulder faults with a fissure down its axis.
- *       Thingvellir in Iceland.</li>
- *   <li><b>Subduction</b> - deeply asymmetric: a trench hard against the boundary that shallows out
- *       over sixty-odd blocks, against a broad arc high on the overriding plate.</li>
- *   <li><b>Collision</b> - symmetric crumpling: a wide belt of parallel ridges and valleys, which is
- *       what a fold-and-thrust mountain range actually is.</li>
- *   <li><b>Transform</b> - the landscape itself is carried along the strike, so anything crossing
- *       the fault is cut and offset.</li>
- * </ul>
+ * <p>By boundary: a graben with an axial fissure at a rift, an asymmetric trench and arc at
+ * subduction, one lopsided range with a foreland basin at collision, and ground carried along the
+ * strike at a transform.</p>
  */
 public final class QuakePlanner {
 
@@ -92,7 +63,6 @@ public final class QuakePlanner {
 
     /** Deepest stack any column ever captures. Also the deepest anything may be carved. */
     private static final int MAX_CAPTURE_DEPTH = 29;
-
 
     // === Stage 1: follow the fault ==========================================
 
@@ -151,16 +121,12 @@ public final class QuakePlanner {
         List<TracePoint> backward = walk(level, epicentre, type, seedStrikeX, seedStrikeZ, halfLength, -1, forced);
 
         List<TracePoint> all = new ArrayList<>(backward.size() + forward.size());
-        // The backward half was traced away from the epicentre, so reversing it puts the whole
-        // rupture in order. Its first entry is the epicentre itself, which the forward half also
-        // carries, so it is dropped rather than duplicated into a zero-length segment.
+        // The backward half runs away from the epicentre: reverse it, and drop its first point,
+        // which the forward half also has.
         for (int i = backward.size() - 1; i >= 1; i--) all.add(backward.get(i));
         all.addAll(forward);
 
-        // Re-orient every point's strike so it points at the NEXT point in the list. The two halves
-        // were traced in opposite directions and the corridor is laid out FORWARD from each point,
-        // so a segment still carrying the direction it was traced in would tile the line backwards
-        // and interpolate its slip the wrong way.
+        // Point each strike at the next point: the corridor is laid out forward from each point.
         for (int i = 0; i < all.size() - 1; i++) {
             TracePoint a = all.get(i), b = all.get(i + 1);
             double dx = b.x() - a.x(), dz = b.z() - a.z();
@@ -196,10 +162,8 @@ public final class QuakePlanner {
             x += sx * TRACE_STEP * sign;
             z += sz * TRACE_STEP * sign;
             PlateSample s = TectonicMap.sample(level, (int) Math.round(x), (int) Math.round(z));
-            // A natural rupture stops where the boundary stops being this kind of boundary - that is
-            // what makes it end at a triple junction. A quake whose type was FORCED (the command,
-            // used to demonstrate a style anywhere) must not: standing one block off the fault used
-            // to break the trace on its very first step.
+            // A natural rupture ends where the boundary changes kind. A forced one (the command)
+            // keeps going so a style can be shown anywhere.
             if (!forced && (s.faultType() != type || s.stress() <= 0.02)) break;
             if (forced && s.faultType() != type) continue;   // keep the current strike and carry on
 
@@ -231,25 +195,13 @@ public final class QuakePlanner {
     /**
      * Visits every integer column of one trace segment's corridor exactly once.
      *
-     * <h2>Membership and coordinate are different questions</h2>
-     * <b>Membership</b> is a capsule: a column belongs to this segment's corridor if it is within
-     * {@code band} of the SEGMENT, ends included. Consecutive capsules share the disc at their joint,
-     * so their union covers everything within {@code band} of the polyline - which is what closed the
-     * coverage hole that left grabens combed through with pillars.
+     * <p>Membership is a capsule around the segment, so consecutive segments leave no gaps on a bend.
+     * The coordinate handed on is the perpendicular offset from the fault line, never the capsule
+     * distance: past a segment's end that distance points at the endpoint and turns the rupture into
+     * a bullseye around each trace point.</p>
      *
-     * <p>The <b>coordinate</b> handed to the deformation is a different thing entirely: the
-     * perpendicular offset from the fault line. Reusing the capsule distance for it - which is what
-     * shipped last round - was badly wrong, because past the end of a segment that distance is
-     * measured to the endpoint rather than across the fault. With a 94-block band and an 8-block
-     * segment, <em>95% of each capsule is end cap</em>, so 88.6% of columns were handed a distance
-     * that was not their distance from the fault, wrong by up to the full width of the band. Every
-     * cross-section became a bullseye centred on its trace point instead of a band along the fault:
-     * the segment at the epicentre claimed a 94-block disc and everything further along got an
-     * inflated distance and therefore no deformation at all. That is why a rupture appeared as a
-     * mound at the epicentre rather than something running along the boundary.</p>
-     *
-     * @param bodyOnly first pass: claim only the columns squarely alongside this segment, so each one
-     *                 gets its own segment's slip. The second pass sweeps up the joint discs.
+     * @param bodyOnly first pass: only columns squarely alongside this segment, so each gets its own
+     *                 segment's slip. The second pass fills the joints.
      */
     private static void forEachCorridorColumn(TracePoint tp, TracePoint next, int band,
                                               boolean bodyOnly, ColumnVisitor v) {
@@ -342,16 +294,9 @@ public final class QuakePlanner {
         }
 
         /**
-         * True when this column stands inside something the world generated - a village, a temple,
-         * an outpost - rather than something a player built.
-         *
-         * <h2>Why it is recorded here and not asked for later</h2>
-         * The two are indistinguishable by block: a village is planks and cobblestone, so the rule
-         * that protects builds protects villages too, which is why they stood untouched in the
-         * middle of a rupture. Telling them apart needs the structure manager, and that needs world
-         * access - which the planner does not have, because it runs on a worker thread. So the
-         * question is asked once per column while the snapshot is being taken on the server thread,
-         * and the answer travels with the column.
+         * True when this column stands inside a structure the world generated, such as a village.
+         * Blocks cannot tell a village from a build and the structure manager is not available on
+         * the worker thread, so the answer is recorded while the snapshot is taken.
          */
         public boolean generatedAt(int x, int z) {
             Column c = columns.get(key(x, z));
@@ -419,14 +364,7 @@ public final class QuakePlanner {
         return snap;
     }
 
-    /**
-     * How many blocks of a column's history this style needs at this distance across the fault.
-     *
-     * <p>Capturing to the deepest possible carve everywhere would be the simple thing to do and also
-     * by far the most expensive part of starting a quake. Only the strip that actually gets dug out
-     * needs the full stack; the broad uplifted flanks need three blocks to pick a believable fill
-     * material and nothing more.</p>
-     */
+    /** How many blocks of history a column needs: the full stack only where this style digs deep. */
     private static int captureDepth(FaultType type, double magnitude, double across) {
         int core = ruptureHalfWidth(magnitude);
         int shallow = 4;
@@ -449,21 +387,11 @@ public final class QuakePlanner {
     // === Stage 3: plan the edits ============================================
 
     /**
-     * Turns a trace plus snapshot into an ordered edit list. Pure computation; safe on a worker
-     * thread.
+     * Turns a trace and snapshot into an ordered edit list. Pure computation, safe on a worker thread.
      *
-     * <h2>Why the order matters</h2>
-     * The trace runs end to end, but the segments are visited walking OUTWARD from the epicentre.
-     * That is what actually happens - a rupture nucleates at the hypocentre and tears outward - and
-     * it also means each tick of the apply loop touches one or two chunks instead of scattering
-     * across the whole rupture, which is what used to freeze the client. When the edit cap is
-     * reached the work dropped is always the far ENDS, so a capped quake is a shorter one rather
-     * than one full of holes.
-     *
-     * <h2>One column, one treatment</h2>
-     * Each column is claimed by the first segment that reaches it and is then deformed once, as a
-     * whole. Edits used to be merged block by block across overlapping cross-sections, so a column
-     * could end up half carved by one slice and half stacked by another.
+     * <p>Segments are visited outward from the epicentre, so the apply loop touches a few chunks at a
+     * time and a quake cut short by the edit cap loses its ends rather than gaining holes. Each column
+     * is claimed once and deformed as a whole.</p>
      */
     public static Plan plan(Snapshot snap, List<TracePoint> trace, BlockPos epicentre, FaultType type,
                             double magnitude, double depthMetres, RandomGenerator rng,
@@ -471,9 +399,7 @@ public final class QuakePlanner {
         int cap = GeyserConfig.QUAKE_MAX_EDITS.get();
         int band = deformationHalfWidth(type, magnitude);
 
-        // Phase one: decide what every column does. Nothing is emitted yet, because the ORDER the
-        // edits go out in is what decides whether the fault appears to move all at once or to be
-        // swept along by a wave.
+        // Phase one: decide what every column does. The order edits go out in is decided below.
         List<ColumnPlan> columns = new ArrayList<>();
         LongOpenHashSet claimed = new LongOpenHashSet();
 
@@ -488,11 +414,8 @@ public final class QuakePlanner {
         }
 
         int length = 0;
-        // Two passes over the trace. The first claims only the columns squarely alongside each
-        // segment, so a column is deformed with the slip of the piece of fault it actually sits
-        // against rather than whichever segment happened to reach it first - the segment at the
-        // epicentre otherwise swallows a disc the full width of the corridor. The second pass fills
-        // in the joint discs, which is what keeps coverage complete on a bend.
+        // Two passes: first the columns alongside each segment, so each gets its own slip, then the
+        // joint discs on bends.
         for (int pass = 0; pass < 2; pass++) {
             boolean bodyOnly = pass == 0;
             for (int step = 0; step < trace.size(); step++) {
@@ -546,17 +469,9 @@ public final class QuakePlanner {
     private static final int FRONT_SLICE = 24;
 
     /**
-     * Emits one layer of movement, spread across the whole rupture at once.
-     *
-     * <h2>Why not simply sweep</h2>
-     * Plates do not tear open at one spot and unzip; they pull apart, or drive together, everywhere
-     * along the boundary at the same time. Emitting a layer end to end would still read as a wave
-     * travelling down the fault.
-     *
-     * <p>But writing to the entire rupture inside a single tick is exactly what used to freeze the
-     * client - fifty to a hundred chunk meshes rebuilt every tick. So the layer is cut into
-     * {@link #ACTIVE_FRONTS} fronts spread along the fault and they take turns in short slices: each
-     * tick touches a handful of chunks, while every part of the boundary creeps forward together.</p>
+     * Emits one layer of movement across the whole rupture at once, in {@link #ACTIVE_FRONTS} fronts
+     * taking short turns. The fault moves together along its length, while each tick still rebuilds
+     * only a handful of chunk meshes.
      */
     private static void interleave(List<ColumnPlan> columns, int layer, List<Edit> out, int cap) {
         int n = columns.size();
@@ -622,10 +537,8 @@ public final class QuakePlanner {
         }
         int cut = carvableDepth(snap, x, z, -delta, mayBreakBuilds);
         if (cut < 1) return null;
-        // Sea-floor spreading. Where a rift opens under water the gap does not stay a hole: mantle
-        // rises into it, melts from the drop in pressure alone and freezes as new crust. That is the
-        // entire mechanism of a spreading ridge, and it is why the floor of one is bare young basalt
-        // with the sediment lying only to either side. On land a fissure just stays a fissure.
+        // Under water a rift floor gets fresh crust, which is sea-floor spreading. On land the
+        // fissure stays open.
         BlockState floor = null;
         if (type == FaultType.DIVERGENT && snap.submergedAt(x, z)
                 && Math.abs(across) <= FRESH_CRUST_HALF) {
@@ -646,13 +559,7 @@ public final class QuakePlanner {
     /** How far either side of the axis a submerged rift lays down brand new crust. */
     private static final int FRESH_CRUST_HALF = 2;
 
-    /**
-     * Young ocean floor: the rock that freezes in the gap the moment the plates part.
-     *
-     * <p>Basalt family only, and deliberately no magma block. Magma under water opens a downward
-     * bubble column that drags a swimmer to the bottom, which would turn the most interesting place
-     * in the mod into a drowning trap. The glow belongs on the black smokers, where it is sealed.</p>
-     */
+    /** Young ocean floor. No magma block: under water it makes a bubble column that drags swimmers down. */
     private static BlockState freshCrust(RandomGenerator rng) {
         return switch (rng.nextInt(6)) {
             case 0 -> Blocks.BLACKSTONE.defaultBlockState();
@@ -662,28 +569,14 @@ public final class QuakePlanner {
         };
     }
 
-
     // === Shape parameters, shared with deformationHalfWidth =================
 
-    /**
-     * Half-width of the dropped graben floor at a rift.
-     *
-     * <p>Was capped at 20, which made a rift 40 blocks across while a subduction margin ran past a
-     * hundred and a collision belt seventy - the narrowest thing the model built, when in the
-     * ground a rift valley is one of the widest. The East African Rift is thirty to a hundred
-     * kilometres from shoulder to shoulder.</p>
-     */
+    /** Half-width of a rift's dropped graben floor. A rift valley is one of the widest landforms here. */
     private static int grabenHalfFloor(double magnitude, double slip) {
         return Mth.clamp((int) Math.round(slip * (6 + magnitude * 5.0)), 3, 46);
     }
 
-    /**
-     * How far the flexural shoulder reaches beyond the graben floor.
-     *
-     * <p>Stretching crust does not only drop the middle: unloading it lets the flanks rebound, so a
-     * real rift is a valley between two RAISED shoulders. That is the escarpment you stand on to
-     * look down into the Great Rift Valley, and the model had none of it.</p>
-     */
+    /** How far the flexural shoulder rises beyond the graben floor: a rift is a valley between raised shoulders. */
     private static int riftShoulderReach(int halfFloor) {
         return Math.max(6, (int) Math.round(halfFloor * 0.9));
     }
@@ -692,16 +585,8 @@ public final class QuakePlanner {
     private static final double RIFT_SHOULDER_FRACTION = 0.35;
 
     /**
-     * How far inland the overriding plate is heaved up behind a trench.
-     *
-     * <p>Scaled off the same flexural length as the trench, so the two sides of the margin stay in
-     * proportion as magnitude grows. It is deliberately the <b>wider</b> of the two: the seaward
-     * side ends at {@code trenchReach * OUTER_RISE_END}, and this is about a quarter as far again.
-     * That is the right way round. A subduction margin is lopsided inland - the trench sits a
-     * hundred-odd kilometres offshore and the outer rise dies not far beyond it, while on the other
-     * side the Altiplano is hundreds of kilometres wide and the deformation front runs on past it
-     * into the Sub-Andean belt. It was previously capped at 44 blocks against a seaward reach of
-     * 112, which is not just too narrow but lopsided the wrong way.</p>
+     * How far inland the overriding plate is raised. Scaled off the trench's flexural length and wider
+     * than the seaward side, as a real margin is: the Andean plateau against a narrow outer rise.
      */
     private static int arcHalfWidth(int core) {
         return Mth.clamp((int) Math.round(flexuralLength(core) * 7.8), 12, 145);
@@ -712,11 +597,7 @@ public final class QuakePlanner {
         return Math.max(3, (int) Math.round(flexuralLength(core) * 1.6));
     }
 
-    /**
-     * How high the back-arc plateau stands as a fraction of the arc crest. The high ground behind a
-     * volcanic arc does not fall straight off the back of it; it holds up as a plateau and only then
-     * declines into the foreland.
-     */
+    /** Back-arc plateau height as a fraction of the arc crest. */
     private static final double BACK_ARC_PLATEAU = 0.55;
 
     /** The natural scale of the down-going plate's bend; everything about the trench follows it. */
@@ -741,13 +622,7 @@ public final class QuakePlanner {
         return Mth.clamp((int) Math.round(magnitudeAmplitude(magnitude, 25.0)), 1, MAX_CAPTURE_DEPTH - 4);
     }
 
-    /**
-     * How much of the belt sits on the underthrust side, as a fraction of the whole half-width.
-     *
-     * <p>Below a half, so the range front on that side is steeper and closer in than the plateau
-     * behind the suture - the Himalayan front against the Tibetan plateau. Everything past it is
-     * foreland basin.</p>
-     */
+    /** Share of the collision belt on the underthrust side: a steep range front against a broad plateau. */
     private static final double COLLISION_FRONT_FRACTION = 0.55;
 
     /** Half-width of a collision fold-and-thrust belt. */
@@ -768,14 +643,7 @@ public final class QuakePlanner {
     // Each answers the same question for a single column: how far does this piece of ground move?
     // Positive lifts it, negative digs it out, zero leaves it alone.
 
-    /**
-     * Normal faulting. Stretching crust does not just crack - it drops a whole block of ground
-     * between two faults, which is why a rift is a VALLEY rather than a fissure. At Thingvellir you
-     * can walk along the floor of one with a plate on either side.
-     *
-     * <p>So this is a graben: a subsided floor easing up to the shoulders, with a deep open fissure
-     * down the axis where the crust actually parted.</p>
-     */
+    /** Normal faulting: a graben floor easing up to raised shoulders, with an open fissure on the axis. */
     private static int riftDelta(double across, double slip, double magnitude, RandomGenerator rng) {
         if (slip <= 0.02) return 0;
         int halfFloor = grabenHalfFloor(magnitude, slip);
@@ -786,18 +654,13 @@ public final class QuakePlanner {
         int drop = Mth.clamp((int) Math.round(slip * magnitudeAmplitude(magnitude, 9.0) * 1.4), 1, 8);
 
         if (d > halfFloor) {
-            // The raised shoulder. A half sine: zero where it meets the valley rim and zero again
-            // where it dies out, so it swells up between the two and joins the floor without a
-            // step. Flexural uplift really does crest a little way back from the border fault
-            // rather than right on it, which is what this shape says.
+            // The shoulder: a half sine, zero at the valley rim and at its outer edge.
             double u = (d - halfFloor) / (double) shoulder;
             int lift = (int) Math.round(drop * RIFT_SHOULDER_FRACTION * Math.sin(Math.PI * u));
             return lift;
         }
 
-        // The floor. Smoothstep rather than a straight line, and NOT floored at one block: the old
-        // profile kept a minimum cut of 1 all the way out, so the valley ended in a one-block step
-        // instead of running out into the countryside.
+        // The floor eases out with a smoothstep, so the valley runs into the countryside without a step.
         double t = smoothstep(1.0 - d / (halfFloor + 1.0));
         int cut = (int) Math.round(drop * t);
 
@@ -811,18 +674,9 @@ public final class QuakePlanner {
     }
 
     /**
-     * A subduction margin: the most asymmetric thing plate tectonics builds.
-     *
-     * <p>The down-going side is dragged into a trench that is <b>deepest hard against the
-     * boundary</b> and then shallows out over sixty-odd blocks along a cosine-squared curve, so the
-     * ground climbs back to normal without a single step in it - fifteen or so blocks down close in,
-     * a dozen by twenty blocks out, and on to nothing. The inner wall is eased in over a handful of
-     * blocks with a smoothstep, so even the steepest part of the margin is a slope rather than a
-     * cliff. Far beyond the basin the bent plate springs back into a low <b>outer rise</b>, kept
-     * deliberately subordinate so it reads as a swell rather than competing with the trench.</p>
-     *
-     * <p>The overriding plate carries its high ground inland at the volcanic arc, not at the water's
-     * edge, which is what keeps the boundary itself a smooth inflection instead of a wall.</p>
+     * A subduction margin. The down-going side sinks into a trench, deepest at the boundary and easing
+     * back to level along a smootherstep, with a low outer rise beyond. The overriding side climbs to
+     * a volcanic arc inland and holds a back-arc plateau behind it.
      */
     private static int subductionDelta(double across, double slip, double magnitude) {
         if (slip <= 0.02) return 0;
@@ -836,15 +690,10 @@ public final class QuakePlanner {
 
             double shape;
             if (across < crest) {
-                // Boundary to arc: climbs from nothing, so the margin itself stays an inflection
-                // rather than a wall standing at the water's edge.
+                // Boundary to arc: rises from nothing, so the margin is an inflection, not a wall.
                 shape = 0.5 * (1.0 - Math.cos(Math.PI * across / crest));
             } else {
-                // Arc to foreland. Two terms: a quick drop off the back of the crest, and a broad
-                // plateau under it that only gives way near the far edge. Their sum falls from the
-                // crest to the plateau within the first fifth of the tail and then declines slowly
-                // across the rest of it, which is what makes the uplift a REGION rather than a
-                // ridge - the whole point of the change.
+                // Arc to foreland: a quick drop off the crest onto a plateau that declines slowly.
                 double u = (across - crest) / (double) (arcHalf - crest);
                 double taper = 0.5 * (1.0 + Math.cos(Math.PI * u));   // 1 at the crest, 0 at the edge
                 double offCrest = Math.exp(-u * 6.0);                 // the drop off the back
@@ -859,15 +708,7 @@ public final class QuakePlanner {
         if (maxDepth < 1) return 0;
 
         if (d <= reach) {
-            // One continuous curve rather than a wall term times a tail.
-            //
-            // It used to be smoothstep(d / trenchWall) * cos^2(d / reach): two independent factors,
-            // and their product piles most of the descent into the first few blocks off the
-            // boundary. That reads as an edge you fall off rather than a basin you walk down into,
-            // which is what testing meant by asking for the down-going side to be smoother within
-            // itself. A single smootherstep over the whole reach has zero slope at BOTH ends, so
-            // the ground eases away from the boundary and eases back to level at the far side, with
-            // the steepest part in the middle where a real forearc basin has it.
+            // One smootherstep over the whole reach: level at both ends, steepest in the middle.
             double u = Mth.clamp(d / (double) reach, 0.0, 1.0);
             return -(int) Math.round(maxDepth * (1.0 - smootherstep(u)));
         }
@@ -878,24 +719,9 @@ public final class QuakePlanner {
     }
 
     /**
-     * Continental collision. Two buoyant plates cannot subduct, so the crust simply crumples - and it
-     * crumples into <b>one mountain range</b>, not a corduroy of equal ridges.
-     *
-     * <h2>Why this is one range and not five</h2>
-     * A fold-and-thrust belt really does have parallel ridges, but they are subordinate wrinkles on a
-     * single enormous swell: the Himalaya is one wall with the Siwaliks pleated along its foot, not
-     * five Himalayas standing in a row. The old profile handed the fold train 55% of the amplitude
-     * and let it run clean across the belt, so it produced 2*folds+1 separate summits - five to nine
-     * of them - and on a small rupture, where the wavelength fell to about six blocks, a visible
-     * comb. The fold train is now 8% of the signal: it breaks the silhouette without ever becoming a
-     * mountain of its own.
-     *
-     * <h2>Why it is lopsided</h2>
-     * Collision is one-sided. One plate rides over the other and carries a broad high plateau away
-     * from the suture - Tibet - while the underthrust side gets a steep range front and then a
-     * <b>foreland basin</b>, crust pressed down by the sheer weight of the mountains beside it, which
-     * is the Ganges plain. A symmetric cosine cannot say any of that. This asymmetry is what makes
-     * the landform read as a collision instead of as a generic hill.
+     * Continental collision: one lopsided range. The overriding side carries a broad plateau, the
+     * underthrust side a steep front and then a shallow foreland basin. Fold ridges are 8% texture on
+     * the flank, never mountains of their own.
      */
     private static int collisionDelta(double across, double slip, double magnitude) {
         if (slip <= 0.02) return 0;
@@ -930,13 +756,9 @@ public final class QuakePlanner {
     }
 
     /**
-     * Strike-slip faulting. Neither side rises or falls; one slides along the other, and the moving
-     * side carries the <b>shape of the landscape</b> with it. A stream bed or a ridge crossing the
-     * fault is genuinely cut and offset, which is the one image everybody has of the San Andreas.
-     *
-     * <p>Height changes are clamped and tapered across the band so steep country can never be turned
-     * into a tower or a pit, and the trace itself gets the shallow broken trough - the mole track -
-     * that marks a strike-slip rupture at the surface.</p>
+     * Strike-slip faulting: the moving side carries the landscape along the strike, so ridges and
+     * streams crossing the fault come out offset. Height changes are clamped; the trace gets a
+     * shallow mole track.
      */
     private static ColumnPlan strikeSlipPlan(Snapshot snap, int x, int z, double across,
                                              double sx, double sz, double slip, double magnitude,
@@ -944,8 +766,7 @@ public final class QuakePlanner {
         if (slip <= 0.02) return null;
         int top = snap.groundAt(x, z);
 
-        // The mole track: the shallow, broken trough that marks the trace of a strike-slip rupture
-        // on the surface, with the occasional sag pond where the fault steps.
+        // The mole track, with the odd sag pond where the fault steps.
         if (Math.abs(across) <= 1.2) {
             int trough = Mth.clamp((int) Math.round(slip * magnitude * 0.25), 1, 3);
             if (rng.nextDouble() < 0.06) trough += 2;
@@ -984,10 +805,8 @@ public final class QuakePlanner {
     }
 
     /**
-     * Amplitude for a magnitude, on a curve rather than a straight line. Earthquake energy rises by
-     * about 32x per magnitude step, so a linear response makes every large event feel the same;
-     * squaring the normalised magnitude keeps small quakes modest while letting the rare giants
-     * genuinely reshape the ground.
+     * Amplitude on the square of the normalised magnitude, so small quakes stay modest and the rare
+     * giants reshape the ground.
      *
      * @param peak the amplitude a magnitude 9 reaches, in blocks
      */
@@ -1001,13 +820,7 @@ public final class QuakePlanner {
         return t * t * (3.0 - 2.0 * t);
     }
 
-    /**
-     * Like {@link #smoothstep} but with zero curvature at both ends as well as zero slope.
-     *
-     * <p>Used for the trench floor. Smoothstep leaves a visible crease where it meets level ground,
-     * because its second derivative jumps; over sixty blocks of subsiding plate that crease reads as
-     * a terrace. This one leaves none.</p>
-     */
+    /** Smootherstep: zero slope and curvature at both ends, so a long ramp leaves no crease. */
     private static double smootherstep(double t) {
         return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
     }
@@ -1021,14 +834,7 @@ public final class QuakePlanner {
         return s != null && !s.isAir() ? s : (surface != null ? surface : Blocks.STONE.defaultBlockState());
     }
 
-    /**
-     * Is this column standing in a structure the world generated?
-     *
-     * <p>Server thread only - see {@link Snapshot#generatedAt}. Any structure counts, not just
-     * villages: a temple, an outpost or a fortress is no more a player's work than a village is,
-     * and a quake that levels the village next door while leaving the pillager tower standing looks
-     * like a bug rather than a decision.</p>
-     */
+    /** Is this column in a structure the world generated? Server thread only; see {@link Snapshot#generatedAt}. */
     private static boolean insideGeneratedStructure(ServerLevel level, int x, int y, int z) {
         try {
             BlockPos pos = new BlockPos(x, y, z);
@@ -1044,18 +850,8 @@ public final class QuakePlanner {
     }
 
     /**
-     * The mod's own working parts: cores, chambers, igniters and the deep end of a hot spring.
-     *
-     * <h2>Why these are protected outright</h2>
-     * They are machinery rather than landscape, and half of a machine is worse than none - an
-     * orphaned chamber with no core, or a spring source with its conduit cut away, is a broken
-     * world rather than a damaged one. The existing code said as much in a comment and relied on
-     * these blocks failing the natural-terrain test to get it, which held only while
-     * {@code quakeMayBreakBuilds} was off: with that switched on, {@code mayBreakBuilds} let a quake
-     * carve a working geyser in half after all.
-     *
-     * <p>Depth alone is not a substitute. A spring source is seated below anything a quake reaches,
-     * but a quake can lower the ground, and the one after it measures from the new surface.</p>
+     * The mod's own working parts: cores, chambers, igniters and spring sources. Protected outright,
+     * even when quakes may break builds, because half a geyser is a broken world, not a damaged one.
      */
     static boolean machinery(BlockState s) {
         return s.is(ModBlocks.GEYSER_CORE.get())
@@ -1070,9 +866,7 @@ public final class QuakePlanner {
     private static boolean carvable(BlockState s, boolean mayBreakBuilds, boolean generated) {
         if (s == null || s.is(Blocks.BEDROCK)) return false;
         if (machinery(s)) return false;
-        // "generated" means the column stands in a village or other world-made structure. Those are
-        // scenery the world put there, not somebody's work, so an earthquake moves them like any
-        // other ground - see Snapshot.generatedAt.
+        // A world-made structure moves like any other ground; see Snapshot.generatedAt.
         return mayBreakBuilds || generated || !EruptionHandler.isPlayerPlaced(s);
     }
 
@@ -1082,9 +876,7 @@ public final class QuakePlanner {
         if (!s.getFluidState().isEmpty()) return false;
         if (TerrainProbe.isVegetation(s)) return false;   // nothing to carry; it is just ground cover
         if (machinery(s)) return false;
-        // "generated" means the column stands in a village or other world-made structure. Those are
-        // scenery the world put there, not somebody's work, so an earthquake moves them like any
-        // other ground - see Snapshot.generatedAt.
+        // A world-made structure moves like any other ground; see Snapshot.generatedAt.
         return mayBreakBuilds || generated || !EruptionHandler.isPlayerPlaced(s);
     }
 }

@@ -20,21 +20,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * Keeps a rupture alive across chunks nobody has loaded yet.
- *
- * <h2>Why the rupture is parked rather than its blocks</h2>
- * A realistic rupture runs for hundreds of blocks, far past the render distance. Planning the whole
- * thing and parking the leftover block edits cannot work, because the planner has to READ terrain to
- * decide what to do and terrain in an unloaded chunk cannot be read. So what is stored is the
- * rupture - its type, size and traced path - and it is replanned against real terrain when one of
- * the chunks it crosses finally loads.
- *
- * <h2>Why none of that happens in the chunk-load event</h2>
- * It used to, and that was a serious mistake: {@code ChunkEvent.Load} can fire off the server thread
- * during chunk I/O, and even on the right thread it catches the chunk mid-transition. Writing blocks
- * there risks corrupting the world or locking the game outright. The event now only FLAGS the chunk;
- * the planning and the block writes happen from the tick loop, on the server thread, inside a time
- * budget.
+ * Keeps a rupture alive across chunks nobody has loaded yet. The rupture itself (type, size, path) is
+ * stored rather than its edits, since planning has to read terrain; it is replanned when a chunk it
+ * crosses loads. The load event only flags the chunk; planning and writes run from the tick loop.
  */
 public final class PendingEdits {
 
@@ -67,14 +55,10 @@ public final class PendingEdits {
         int limit = GeyserConfig.QUAKE_PENDING_LIMIT.get();
         if (limit <= 0) return;
 
-        // Must match the corridor the planner will actually use, not the narrow slipped core: the
-        // deformation reaches tens of blocks out for a subduction margin or a collision belt, and a
-        // rupture parked against too few chunks simply stops at the edge of the loaded area.
+        // The planner's full corridor, not the slipped core, or the rupture stops at the loaded edge.
         int band = QuakePlanner.deformationHalfWidth(type, magnitude) + 2;
 
-        // Group the trace by chunk FIRST, so each chunk only remembers the handful of trace points
-        // that actually reach it. Storing the whole trace per chunk meant replaying a long rupture
-        // walked every segment for every chunk that loaded.
+        // Grouped by chunk first, so each chunk keeps only the trace points that reach it.
         Map<Long, List<QuakePlanner.TracePoint>> byChunk = new HashMap<>();
         for (int i = 0; i < trace.size(); i++) {
             QuakePlanner.TracePoint tp = trace.get(i);

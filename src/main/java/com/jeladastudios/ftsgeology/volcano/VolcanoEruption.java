@@ -14,11 +14,7 @@ import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.Vec3;
 
-/**
- * Physical side effects of a volcano: the black-smoke warning, the summit lava fountain, the
- * hurled volcanic bombs, and the growing crater. Stateless helpers — {@code VolcanoCoreBlockEntity}
- * owns the cycle and calls in here.
- */
+/** Physical side effects of a volcano, as stateless helpers; {@code VolcanoCoreBlockEntity} owns the cycle. */
 public final class VolcanoEruption {
 
     private VolcanoEruption() {}
@@ -41,9 +37,7 @@ public final class VolcanoEruption {
         level.sendParticles(ParticleTypes.LAVA, x, summit.getY() + 1.0, z, 6, 0.5, 0.3, 0.5, 0.0);
         level.sendParticles(ParticleTypes.FLAME, x, summit.getY() + 1.5, z, 8, 0.5, 0.7, 0.5, 0.05);
 
-        // The smoke - the black throat, the column over it and the pale cloud it spreads into - is
-        // drawn by the client from the state the core sends every two seconds. It used to be sent
-        // from here as particles, per player, every other tick; see ClientEruptions.
+        // The smoke column is drawn by the client from the state the core sends; see ClientEruptions.
 
         int bombs = GeyserConfig.VOLCANO_BOMBS_PER_ERUPTION.get();
         int eruptTicks = Math.max(1, GeyserConfig.VOLCANO_ERUPT_TICKS.get());
@@ -70,15 +64,9 @@ public final class VolcanoEruption {
     // === Ash ================================================================
 
     /**
-     * Ash settling out of the column onto the ground downwind.
-     *
-     * <p>What lands is a layer of {@link com.jeladastudios.ftsgeology.block.VolcanicAshBlock}, which
-     * accumulates rather than replacing what it falls on - see {@link #settle} for why that turned
-     * out to be the whole design and not a detail.</p>
-     *
-     * <p>Off-centre on purpose. A ring of ash around a volcano would be wrong: the column goes where
-     * the wind takes it, so the deposit is a lobe on one side, which is also what makes it readable
-     * on the ground - you can tell which way the wind was blowing when it went off.</p>
+     * Ash settling out of the column onto the ground downwind, as layers of
+     * {@link com.jeladastudios.ftsgeology.block.VolcanicAshBlock}. A lobe on the wind's side rather
+     * than a ring, so the deposit shows which way the wind blew.
      */
     private static void ashfall(ServerLevel level, BlockPos summit, int magnitude) {
         if (!GeyserConfig.VOLCANIC_ASHFALL.get()) return;
@@ -86,23 +74,13 @@ public final class VolcanoEruption {
         double[] wind = wind(summit);
         int reach = Math.min(40 + magnitude * 8, 160);
 
-        // Enough columns per call that a minute-long eruption visibly greys the country downwind.
-        //
-        // The first version sampled six a call, which measured out at three percent of the lobe over
-        // a whole eruption - arithmetically an ash fall, and on screen nothing whatever. Forty was
-        // the correction and overshot: testing liked the look and said there was too much of it, so
-        // this is halved again. Coverage does not halve with it, because a good share of the samples
-        // were landing on ground that was already ashed.
+        // Enough columns a call that a minute-long eruption visibly greys the ground downwind.
         for (int n = 0; n < 20; n++) {
             // Distance is square-root biased so the samples spread evenly over the disc rather than
             // piling up at the middle; the thinning below is what puts the weight near the vent.
             double d = reach * Math.sqrt(level.random.nextDouble());
 
-            // A direction anywhere on the compass, then weighted by how well it lines up with the
-            // wind. Taking the angle from a fixed cone instead - which is what this did first - put
-            // a hundred percent of the ash in one half and zero in the other, and a lobe with a hard
-            // angular edge reads as a pie slice rather than as weather. Real fall is heaviest
-            // downwind and merely light elsewhere, so every bearing gets some.
+            // Any bearing, weighted by how well it lines up with the wind, so the lobe has no hard edge.
             double a = level.random.nextDouble() * Math.PI * 2;
             double dirX = Math.cos(a), dirZ = Math.sin(a);
             double align = dirX * wind[0] + dirZ * wind[1];             // -1 upwind, +1 downwind
@@ -116,8 +94,7 @@ public final class VolcanoEruption {
             if (!level.hasChunkAt(new BlockPos(x, level.getSeaLevel(), z))) continue;
             if (com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(level, x, z)) continue;
 
-            // The crater is not a place ash settles - it is where the column is coming OUT of.
-            // Without this the fall quietly fills the lava pool it was launched from.
+            // Not into the crater the column comes out of.
             double sx = x - summit.getX(), sz = z - summit.getZ();
             if (sx * sx + sz * sz < 12 * 12) continue;
 
@@ -128,8 +105,7 @@ public final class VolcanoEruption {
             BlockPos ground = new BlockPos(x, g, z);
             BlockState under = level.getBlockState(ground);
             if (under.is(Blocks.BEDROCK) || !under.getFluidState().isEmpty()) continue;
-            // Not onto a live flow. It would be buried by the next lava anyway, and a grey crust
-            // over molten rock is the one thing here that would read as a bug.
+            // Not onto a live flow.
             if (under.is(Blocks.LAVA) || under.is(Blocks.MAGMA_BLOCK)) continue;
 
             settle(level, ground.above());
@@ -137,18 +113,8 @@ public final class VolcanoEruption {
     }
 
     /**
-     * Adds one layer of ash to a column, up to a full block.
-     *
-     * <h2>It settles ON the ground; it does not become the ground</h2>
-     * This replaced the surface block at first - grass, gravel, whatever was there became tuff or
-     * coarse dirt - and testing found the hole in that immediately: the volcano is inside its own
-     * fall radius, its basalt reads as natural terrain rather than as somebody's build, and so the
-     * mountain was turned into dirt and gravel by its own eruption.
-     *
-     * <p>The fix was not a bigger exclusion zone around the cone. It was that an ash fall does not
-     * replace anything, and everything else follows from saying so: the grass lives, the cone stays
-     * basalt and merely greys over, a second eruption deepens the deposit instead of re-stamping it,
-     * and a player can dig it off.</p>
+     * Adds one layer of ash to a column, up to a full block. It settles on the ground rather than
+     * replacing it, so grass lives, the cone stays basalt and repeated eruptions deepen the deposit.
      */
     private static void settle(ServerLevel level, BlockPos at) {
         BlockState here = level.getBlockState(at);
@@ -169,13 +135,7 @@ public final class VolcanoEruption {
         level.setBlock(at, ash, 2);
     }
 
-    /**
-     * This mountain's prevailing wind, as a unit vector.
-     *
-     * <p>Derived from its own position, so it is the same every eruption and after every reload
-     * without storing anything: a volcano that ashes the eastern valley goes on ashing the eastern
-     * valley, and the deposit on the ground stays consistent with the column in the sky.</p>
-     */
+    /** This mountain's prevailing wind as a unit vector, derived from its position so it never changes. */
     public static double[] wind(BlockPos summit) {
         long h = summit.getX() * 0x9E3779B97F4A7C15L ^ summit.getZ() * 0xC2B2AE3D27D4EB4FL;
         h ^= h >>> 29; h *= 0xBF58476D1CE4E5B9L; h ^= h >>> 32;
@@ -185,21 +145,14 @@ public final class VolcanoEruption {
 
     /** Once per second while erupting: well lava up the crater so it spills down the mountain. */
     public static boolean spillLava(ServerLevel level, BlockPos summit) {
-        // Only reports true when it actually put lava out, so the core can hold it to a budget:
-        // an eruption should send a tongue down the flank, not keep pouring until the mountain is
-        // drowned in it.
+        // True only when lava was put out, so the core can hold the flow to a budget.
         if (!level.getBlockState(summit).isAir()) return false;
         level.setBlock(summit, Blocks.LAVA.defaultBlockState(), 3);
         level.scheduleTick(summit, Fluids.LAVA, 5);
         return true;
     }
 
-    /**
-     * Hurls a volcanic bomb: a single lump of basalt arcs out toward a random landing spot around
-     * the volcano and scorches the ground where it hits. Bigger volcanoes throw farther and hit
-     * harder. Deliberately small - one block flying, one block of scorch - so a long session never
-     * buries the mountainside in rubble.
-     */
+    /** Hurls a volcanic bomb: one block of basalt arcs out and scorches one block where it lands. */
     public static void throwBomb(ServerLevel level, BlockPos summit, int magnitude) {
         int reach = 6 + magnitude;                          // how far bombs land
         int tx = summit.getX() + level.random.nextInt(reach * 2 + 1) - reach;
@@ -226,22 +179,10 @@ public final class VolcanoEruption {
         impact(level, target, summit.getY());
     }
 
-    /**
-     * Bombs still in the air, so a trail can be drawn behind them.
-     *
-     * <p>{@link FallingBlockEntity} ticks itself and tells nobody, so there is no hook on the entity
-     * to hang this from; holding the handful in flight and drawing from the eruption's own tick is
-     * both simpler than an entity mixin and self-limiting, since the list only ever contains the
-     * bombs one volcano has thrown in the last few seconds.</p>
-     */
+    /** Bombs in the air, held here to draw their trail, since FallingBlockEntity offers no hook. */
     private static final java.util.List<FallingBlockEntity> IN_FLIGHT = new java.util.ArrayList<>();
 
-    /**
-     * Smoke and fire off the back of a bomb on its way over.
-     *
-     * <p>Without it a bomb is a block of basalt gliding through the air, which reads as a glitch
-     * rather than as something thrown out of a volcano. The trail is what tells you it is hot.</p>
-     */
+    /** Smoke and fire off the back of a bomb, so it reads as thrown rock and not a gliding block. */
     private static void trailBombs(ServerLevel level) {
         if (IN_FLIGHT.isEmpty()) return;
         IN_FLIGHT.removeIf(b -> !b.isAlive() || b.isRemoved() || b.level() != level);
@@ -253,13 +194,9 @@ public final class VolcanoEruption {
         }
     }
 
-
     /**
-     * Scorches exactly ONE block where a bomb lands: the topmost solid cell of that column is
-     * replaced with basalt. Because it uses the landing column own surface height and touches no
-     * neighbours, it can never leave a block hanging in mid-air - the old 3x3 version reused the
-     * centre column Y for all nine cells, which is what littered the slopes with floating rock.
-     * Replacing rather than stacking also means zero net growth.
+     * Scorches one block where a bomb lands: the top solid cell of that column becomes basalt.
+     * Replaces rather than stacks and touches no neighbours, so nothing is left floating.
      */
     private static void impact(ServerLevel level, BlockPos target, int summitY) {
         BlockPos ground = target.below(); // topmost solid block of this column
@@ -281,13 +218,7 @@ public final class VolcanoEruption {
                 p.getX() + 0.5, p.getY() + 1.1, p.getZ() + 0.5, 2, 0.25, 0.15, 0.25, 0.01);
     }
 
-    /**
-     * Seeps lava out of a surface vent during an eruption (spills, then cools to basalt later).
-     *
-     * <p>The outlet is given its own spatter and a low hiss. It used to place the lava and send
-     * nothing at all, so a flank vent quietly filled with lava while every particle in the mod came
-     * out of the summit - the "no steam or soot off the lava veins" report.</p>
-     */
+    /** Seeps lava out of a surface vent during an eruption, with its own spatter and hiss. */
     public static void seepVent(ServerLevel level, BlockPos vent) {
         boolean opened = level.getBlockState(vent).isAir();
         if (opened) {
@@ -302,13 +233,7 @@ public final class VolcanoEruption {
         }
     }
 
-    /**
-     * A puff of steam where a lava cell touches water.
-     *
-     * <p>This is the single most visible thing about a real flow reaching a shoreline or a stream,
-     * and the mod was producing none of it: {@link #coolScatteredLava} already walks every cell the
-     * eruption spilled, so the check rides along on a sweep that was happening anyway.</p>
-     */
+    /** A puff of steam where a lava cell touches water, riding the {@link #coolScatteredLava} sweep. */
     private static void steamIfWet(ServerLevel level, BlockPos p) {
         for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
             if (!level.getBlockState(p.relative(d)).getFluidState()
@@ -321,10 +246,8 @@ public final class VolcanoEruption {
     }
 
     /**
-     * Clears a vent fresh lava once the eruption is over, leaving the outlet OPEN. It used to be
-     * capped with basalt, which both stacked a block on top of every outlet each eruption and
-     * permanently plugged it - {@link #seepVent} only fills air, so a capped outlet never seeped
-     * again. Runoff that spread around the outlet still petrifies via {@link #coolScatteredLava}.
+     * Clears a vent's fresh lava after the eruption and leaves the outlet open, since
+     * {@link #seepVent} only fills air. Runoff around it petrifies in {@link #coolScatteredLava}.
      */
     public static void dryVent(ServerLevel level, BlockPos vent) {
         if (level.getBlockState(vent).getFluidState().is(net.minecraft.tags.FluidTags.LAVA)) {
@@ -333,20 +256,9 @@ public final class VolcanoEruption {
     }
 
     /**
-     * After an eruption, hardens the lava the volcano spilled <em>outside</em> the crater into fresh
-     * basalt/tuff - the runoff on the slopes turns to rock - while the crater lava lake stays molten.
-     *
-     * <p><b>The volcano never grows.</b> Two rules stop a long session from stacking layer on layer
-     * until the mountain swallows its own vent:</p>
-     * <ul>
-     *   <li>nothing may solidify <em>above the original summit</em> ({@code summit.getY()}, which is
-     *       fixed because the core block never moves) - lava up there is simply drained away;</li>
-     *   <li>lava resting on rock the volcano itself already laid down (basalt/tuff/magma) is drained
-     *       too, so flows only petrify where they touch the ORIGINAL terrain. At most one new layer
-     *       can ever form.</li>
-     * </ul>
-     * Lava hanging over air is still left alone, so we never freeze a mid-air stream into a spike.
-     * Bounded scan for performance.
+     * After an eruption, hardens spilled lava outside the crater into basalt or tuff while the crater
+     * lake stays molten. The volcano never grows: lava above the original summit, or resting on rock
+     * the volcano laid down, is drained instead, and lava over air is left alone. Bounded scan.
      */
     public static void coolScatteredLava(ServerLevel level, BlockPos summit, int craterR, int reach,
                                          long[] keepVents, long[] molten) {
@@ -357,26 +269,13 @@ public final class VolcanoEruption {
             int dx = p.getX() - summit.getX();
             int dz = p.getZ() - summit.getZ();
             if (dx * dx + dz * dz <= keep2) continue; // leave the crater lake molten
-            // The volcano's own outlets are meant to stay molten between eruptions.
-            //
-            // They were not excluded before, and because each one is deliberately seated on a basalt
-            // floor the "resting on rock we laid ourselves" rule read them as spilled runoff and
-            // DRAINED them. So every flank vent - and, on a fissure, every pond but the first - went
-            // dark after the very first eruption while the core kept firing its particles out of
-            // them: the "the lava pool has vanished but the eruption still comes from there" report.
+            // The volcano's own outlets stay molten between eruptions.
             if (isKept(keepVents, p)) continue;
-            // Cells the volcano was BUILT with as lava - the summit pool, a caldera's crescent
-            // lake, a fissure's ponds. The radius check above cannot express those shapes: a
-            // caldera's lake reaches 0.85 of the crater radius while its keep radius was a third of
-            // it, so after one eruption most of the lake had been turned to basalt and formCrater
-            // never refilled it. That is the "hardly any lava in the crater" report.
+            // Cells built as lava: summit pool, caldera lake, fissure ponds, shapes a radius cannot express.
             if (isKept(molten, p)) continue;
             FluidState fs = level.getBlockState(p).getFluidState();
-            // Any lava - full source OR a thin flowing "half" block - but only where it RESTS ON
-            // SOLID GROUND, so a mid-air stream is never frozen into a floating spike.
-            // Fire the flow started is put out as it cools, unless eruptionsStartFires says the
-            // burn is allowed to outlive the lava - which is what actually happens when a flow
-            // reaches a forest, and what fire-spread mods are there to carry on with.
+            // Any lava resting on solid ground, so a mid-air stream never becomes a spike. Fire it
+            // started is put out, unless eruptionsStartFires lets the burn outlive the flow.
             if (level.getBlockState(p).is(Blocks.FIRE)) {
                 if (!GeyserConfig.ERUPTIONS_START_FIRES.get()) {
                     level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
@@ -412,16 +311,11 @@ public final class VolcanoEruption {
     }
 
     /**
-     * At eruption end, re-lines the summit crater: the centre stays molten and the rim is cooled
-     * volcanic rock. Everything happens at the summit own Y, so the crater is maintained rather
-     * than raised. Takes the REAL carved crater radius (wider than the raw config value) so the rim
-     * ring lands on the actual rim instead of inside the lava lake, where it used to slowly plug
-     * the crater.
+     * At eruption end, re-lines the summit crater at the summit's own Y: molten inside, cooled rock
+     * on the rim. Uses the real carved crater radius, so the rim lands on the rim.
      */
     public static void formCrater(ServerLevel level, BlockPos summit, int craterR, long[] molten) {
-        // Refill every cell the volcano was built with as lava, wherever it is. The radius loop
-        // below only reaches the summit pool; a caldera's lake and a fissure's ponds sit outside it
-        // and would stay as whatever the eruption left them.
+        // Refill every cell built as lava, including a caldera's lake and a fissure's ponds.
         if (molten != null) {
             for (long key : molten) {
                 BlockPos p = BlockPos.of(key);
@@ -440,14 +334,7 @@ public final class VolcanoEruption {
                 if (s.is(Blocks.BEDROCK)) continue;
                 FluidState fs = s.getFluidState();
                 if (d2 < (r - 1) * (r - 1)) {
-                    // The whole floor inside the rim is refilled, not just the middle cell.
-                    //
-                    // This ran at the END of every eruption and only ever filled d2 <= 1, leaving
-                    // the ring between there and the rim as whatever the eruption happened to
-                    // leave. So the crater kept its full width while the lava in it was a blob in
-                    // the centre - the "the pit gets wider but no new lava appears in the widened
-                    // part, so it just looks empty" report. Only air is filled, so cooled basalt
-                    // the eruption laid down is left where it is.
+                    // The whole floor inside the rim, air only, so basalt the eruption laid down stays.
                     if (fs.isEmpty()) level.setBlock(p, Blocks.LAVA.defaultBlockState(), 3);
                 } else if (d2 >= (r - 1) * (r - 1)) {
                     // rim: cooled volcanic rock, occasionally still smouldering

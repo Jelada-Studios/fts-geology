@@ -15,30 +15,13 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Recognises ground that the world generator has <em>already</em> painted as geothermal, and lets
- * our own geology settle on top of it.
+ * Recognises ground the world generator already painted as geothermal, such as Terralith's
+ * {@code yellowstone} and {@code caldera}, so {@link HotspotMap} can treat it as a live plume and
+ * geysers land where the biome says they should.
  *
- * <h2>The problem this solves</h2>
- * Terralith ships biomes called {@code yellowstone} and {@code caldera}. They look the part - hot
- * colours, sinter-pale ground, the right trees - and they are exactly where a player expects to find
- * geysers. But our plume grid is pure seed maths and knows nothing about them, so the two systems
- * landed in different places: Terralith's Yellowstone had no geysers in it, and our hotspot sat in an
- * ordinary forest.
- *
- * <p>We cannot tell Terralith where to put its biomes - that would mean taking over the world's biome
- * source, with all the mod conflicts that implies. But we can go where it already went. This reads
- * the biome at a column and reports how thermal it is; {@link HotspotMap} then treats strongly
- * thermal ground as a live mantle plume.</p>
- *
- * <h2>Why that is honest geology, not a hack</h2>
- * Yellowstone <b>is</b> a hotspot, and a caldera is what hotspot volcanism leaves behind when the
- * chamber empties and the roof falls in. Treating a biome named after either as evidence of a plume
- * underneath it is reading the landscape the way a geologist would, not inventing a connection.
- *
- * <h2>Why it is safe</h2>
- * Nothing here writes anything, nothing is registered, and matching is by name rather than by mod id,
- * so Terralith, Tectonic, Biomes O' Plenty or anything else works without a dependency. With no such
- * mod installed nothing matches and the plume grid behaves exactly as before.
+ * <p>Yellowstone is a hotspot and a caldera is what one leaves behind, so this reads the landscape
+ * the way a geologist would. It writes nothing and matches by name, not mod id, so no terrain mod is
+ * required; without one nothing matches.</p>
  */
 public final class ThermalBiomes {
 
@@ -55,10 +38,8 @@ public final class ThermalBiomes {
     private static final Match[] MATCHES = {
             new Match("yellowstone", 1.00, true,  "a Yellowstone-type thermal basin"),
             new Match("geyser",      1.00, true,  "a geyser field"),
-            // A caldera is a system that has ALREADY blown its roof off and collapsed. The edifice is
-            // sitting there in the terrain, so building a fresh volcano inside it would be nonsense.
-            // It stays thermally alive though - Yellowstone is a caldera and holds half the geysers
-            // on Earth - so springs and geysers belong here even though a new cone does not.
+            // A caldera has already collapsed, so no new cone belongs in it, but it stays thermally
+            // alive: springs and geysers still do.
             new Match("caldera",     0.95, false, "a collapsed caldera"),
             new Match("crater",      0.90, false, "a volcanic crater"),
             new Match("hot_spring",  0.85, true,  "hot-spring country"),
@@ -118,19 +99,9 @@ public final class ThermalBiomes {
     }
 
     /**
-     * Asks the world biome source what sits here.
-     *
-     * <h2>Read at the surface, not at sea level</h2>
-     * This used to sample at {@code seaLevel}, which is the wrong place: a biome is a 3D field, and
-     * Y=63 under a mountain-top caldera is a different biome entirely - very often a cave biome. That
-     * single line caused both of the odd results seen in testing. Terralith's <b>caldera</b> reported
-     * no thermal ground at all, because the biome read at sea level under it was not the caldera; and
-     * a plume was reported over ordinary desert because the CAVE biome beneath it happened to be
-     * called "thermal caves".
-     *
-     * <p>The height comes from the chunk generator's own base-height function rather than the
-     * heightmap, so this still answers for columns nowhere near a loaded chunk - which matters,
-     * because the map render and the {@code find} search ask about tens of thousands of them.</p>
+     * Asks the world biome source what sits here, at the chunk generator's surface height. Sea level
+     * would read a different biome under a mountain, often a cave biome, and the generator height
+     * answers for columns far from any loaded chunk.
      */
     private static Match classify(ServerLevel level, int blockX, int blockZ) {
         try {

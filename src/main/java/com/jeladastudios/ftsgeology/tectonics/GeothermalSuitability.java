@@ -32,13 +32,9 @@ public final class GeothermalSuitability {
     private GeothermalSuitability() {}
 
     /**
-     * Placement multipliers for one column, applied on top of the configured base spawn chance.
-     * Volcano is 0..1; geyser and hot spring may exceed 1 inside a hotspot geyser basin, where the
-     * ground really is several times more thermally active than anywhere else on the planet.
-     * {@code reasonKey} explains the verdict in plain language for the inspection command. It is a
-     * translation key rather than a finished sentence: this class runs on the server and has no
-     * business deciding what language the player reads, and the text has to be reachable from a
-     * lang file for the mod to be translatable at all.
+     * Placement multipliers for one column, on top of the configured base chance. Volcano is 0..1;
+     * geyser and hot spring may exceed 1 inside a hotspot basin. {@code reasonKey} is a translation
+     * key explaining the verdict.
      */
     public record Suitability(double volcano, double geyser, double hotSpring, String reasonKey) {
 
@@ -100,16 +96,10 @@ public final class GeothermalSuitability {
         // setting is more active wins. This is what puts a Yellowstone in the middle of a plate.
         if (hot.strength() > 0.0) {
             double h = hot.strength();
-            // Inside the dome, geysers cluster into BASINS rather than spreading evenly. Spreading
-            // them evenly over a 700-block plume gave roughly one vent per twenty chunks, which is a
-            // scatter, not Yellowstone. The boost applies only inside a basin, so the field has
-            // crowded hot ground in some places and quiet country in between - as the real one does.
+            // Inside the dome geysers cluster into basins, with quiet country between them.
             double basin = HotspotMap.basinStrength(level, x, z);
             double boost = 1.0 + (GeyserConfig.HOTSPOT_FEATURE_BOOST.get() - 1.0) * basin;
-            // A biome that is already a collapsed caldera keeps its heat but gets no new cone: the
-            // edifice is standing there in the terrain, and building another one inside it would be
-            // nonsense. Yellowstone is exactly this case - a caldera, no active volcano, and half
-            // the geysers on the planet.
+            // A collapsed caldera biome keeps its heat but gets no new cone, like Yellowstone.
             if (ThermalBiomes.allowsVolcano(level, x, z)) volcano = Math.max(volcano, 1.00 * h);
             geyser = Math.max(geyser, h * boost);   // the richest geyser fields on Earth
             hotSpring = Math.max(hotSpring, h * boost);
@@ -124,9 +114,7 @@ public final class GeothermalSuitability {
             reasonKey = "command.fts_geology.suitability.reason.hotspot_trail";
         }
 
-        // Volcano stays a plain 0..1 probability multiplier. Geyser and hot-spring may exceed 1
-        // inside a geyser basin: they multiply the configured base chance, and capping them at 1
-        // would silently throw the whole point of the basin away.
+        // Geyser and hot spring may exceed 1 inside a basin; capping them would throw the basin away.
         double ceiling = Math.max(1.0, GeyserConfig.HOTSPOT_FEATURE_BOOST.get());
         return new Suitability(
                 Mth.clamp(volcano, 0.0, 1.0),

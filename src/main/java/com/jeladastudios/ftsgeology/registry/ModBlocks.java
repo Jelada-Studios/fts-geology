@@ -22,7 +22,7 @@ import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 
-/** All blocks introduced by the mod. Both are technical blocks placed by worldgen/retrogen. */
+/** All blocks introduced by the mod. */
 public final class ModBlocks {
 
     public static final DeferredRegister<Block> BLOCKS =
@@ -54,11 +54,7 @@ public final class ModBlocks {
                     .lightLevel(s -> 4)
                     .strength(1.2F)));
 
-    /**
-     * The deep, unreachable end of a hot spring - see SpringSourceBlock. Unbreakable and
-     * blast-proof like the geyser core, because a quake that could carve it away would leave the
-     * spring with nothing to recover from, which is the whole thing this block exists to prevent.
-     */
+    /** The deep, unreachable end of a hot spring. Unbreakable and blast-proof, so a quake cannot take it. */
     public static final RegistryObject<Block> SPRING_SOURCE = BLOCKS.register("spring_source",
             () -> new SpringSourceBlock(BlockBehaviour.Properties.copy(Blocks.DEEPSLATE)
                     .strength(-1.0F, 3600000.0F)
@@ -76,27 +72,14 @@ public final class ModBlocks {
                     .lightLevel(s -> 9)
                     .strength(2.0F)));
 
-    /**
-     * A seismograph station: a drum of paper, a pen, and a mass too heavy to be moved by the
-     * ground it is standing on.
-     *
-     * <p>The first instrument in the mod that is <em>read</em> rather than watched. It measures two
-     * things off its own trace and works everything else out from them, which means one station can
-     * tell you how far away an earthquake was but never which way - so the interesting thing to do
-     * with it is build three. See {@code SeismographBlockEntity}.</p>
-     */
+    /** A seismograph station: one gives distance but not direction; see {@code SeismographBlockEntity}. */
     public static final RegistryObject<Block> SEISMOGRAPH = BLOCKS.register("seismograph",
             () -> new SeismographBlock(BlockBehaviour.Properties.copy(Blocks.LODESTONE)
                     .mapColor(MapColor.COLOR_LIGHT_GRAY)
                     .strength(2.5F)
                     .noOcclusion()));
 
-    /**
-     * Native sulfur: the yellow crust that grows around volcanic fumaroles and vents as escaping
-     * gases oxidise on contact with air. The acidic counterpart to the calcite/travertine this mod
-     * deposits around alkaline geyser runoff - together they show that what a hot spring leaves
-     * behind depends on its chemistry. Breakable and collectable, unlike the technical blocks.
-     */
+    /** Native sulfur: the yellow crust around fumaroles, the acidic counterpart to calcite and travertine. */
     public static final RegistryObject<Block> NATIVE_SULFUR = BLOCKS.register("native_sulfur",
             () -> new com.jeladastudios.ftsgeology.block.NativeSulfurBlock(
                     BlockBehaviour.Properties.copy(Blocks.CALCITE)
@@ -104,16 +87,7 @@ public final class ModBlocks {
                     .strength(0.8F)
                     .requiresCorrectToolForDrops()));
 
-
-    /**
-     * Sinter: the pale silica shelf a hot spring builds at its own lip.
-     *
-     * <p>Water that has been down through hot rock comes back up carrying dissolved silica, and
-     * drops it the moment it cools at the surface. Over time that armours the pool in a hard white
-     * rim - the terraces at Mammoth and the shelf around every Yellowstone spring are this. It is
-     * the alkaline counterpart to the sulfur that crusts an acidic fumarole, and having both means
-     * the ground around a spring tells you its chemistry.</p>
-     */
+    /** Sinter: the pale silica shelf a hot spring builds at its own lip as its water cools. */
     public static final RegistryObject<Block> SINTER = BLOCKS.register("sinter",
             () -> new Block(BlockBehaviour.Properties.copy(Blocks.CALCITE)
                     .mapColor(MapColor.TERRACOTTA_WHITE)
@@ -137,13 +111,7 @@ public final class ModBlocks {
                     .mapColor(MapColor.DIRT)
                     .strength(0.8F)));
 
-    /**
-     * Volcanic ash: what comes down out of an eruption column, in layers like snow.
-     *
-     * <p>Soft, dug by hand, and it does not hold a torch up - a fresh fall is unconsolidated dust.
-     * Given time and burial it welds into the tuff the mod already uses for the apron, which is why
-     * the two look related rather than identical.</p>
-     */
+    /** Volcanic ash, laid in layers like snow: soft, dug by hand, and holds no torch. */
     public static final RegistryObject<Block> VOLCANIC_ASH = BLOCKS.register("volcanic_ash",
             () -> new com.jeladastudios.ftsgeology.block.VolcanicAshBlock(
                     BlockBehaviour.Properties.copy(Blocks.SNOW)
@@ -165,10 +133,6 @@ public final class ModBlocks {
                             .requiresCorrectToolForDrops()));
 
     // --- Geological rock blocks ---------------------------------------------
-    //
-    // Plain stone-tier blocks for real-world lithologies. Placed by separate
-    // deepgen and tectonics worldgen systems; registered here as decorative and
-    // terrain blocks.
 
     /** Travertine: banded carbonate deposited around hot spring terraces. */
     public static final RegistryObject<Block> TRAVERTINE = BLOCKS.register("travertine",
@@ -418,35 +382,30 @@ public final class ModBlocks {
     public static final RegistryObject<Block> CHERT_WALL = BLOCKS.register("chert_wall",
             () -> new WallBlock(BlockBehaviour.Properties.copy(CHERT.get())));
 
-
     // --- Microbial mats ------------------------------------------------------
     //
-    // The colours ringing a hot spring are alive. Each band is a different community of heat-loving
-    // microorganisms, and each community can only live in its own temperature range - so the rings
-    // are a thermometer you can see from the air. Nearest the boiling centre almost nothing grows
-    // and the water is clear blue; then orange, yellow, brown and finally green as it cools outward.
-    // That is what makes Grand Prismatic look the way it does, and why these four are laid down in
-    // order rather than at random.
+    // Each colour band is a microbial community living in its own temperature range, so the rings
+    // around a pool read as a thermometer.
 
-    /** Hottest mat: the fierce orange ring closest to the boiling centre. */
+    /** Orange microbial mat. */
     public static final RegistryObject<Block> MICROBIAL_MAT_ORANGE = BLOCKS.register("microbial_mat_orange",
             () -> new Block(BlockBehaviour.Properties.copy(Blocks.MUD)
                     .mapColor(MapColor.COLOR_ORANGE)
                     .strength(0.6F)));
 
-    /** A little cooler: the yellow-green band outside the orange. */
+    /** Yellow microbial mat. */
     public static final RegistryObject<Block> MICROBIAL_MAT_YELLOW = BLOCKS.register("microbial_mat_yellow",
             () -> new Block(BlockBehaviour.Properties.copy(Blocks.MUD)
                     .mapColor(MapColor.COLOR_YELLOW)
                     .strength(0.6F)));
 
-    /** Cooler still: the broad brown apron where the runoff has lost most of its heat. */
+    /** Brown microbial mat, at the dry outer edge. */
     public static final RegistryObject<Block> MICROBIAL_MAT_BROWN = BLOCKS.register("microbial_mat_brown",
             () -> new Block(BlockBehaviour.Properties.copy(Blocks.MUD)
                     .mapColor(MapColor.TERRACOTTA_BROWN)
                     .strength(0.6F)));
 
-    /** The outermost, coolest band, where ordinary green algae can finally survive. */
+    /** Green microbial mat, the narrow fringe at the water's edge. */
     public static final RegistryObject<Block> MICROBIAL_MAT_GREEN = BLOCKS.register("microbial_mat_green",
             () -> new Block(BlockBehaviour.Properties.copy(Blocks.MUD)
                     .mapColor(MapColor.COLOR_GREEN)

@@ -6,19 +6,9 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * What kind of rock a block is, and how it got there.
- *
- * <h2>Why classify at all</h2>
- * Minecraft has about thirty stone-like blocks and treats them as textures. Geology treats them as
- * <em>evidence</em>: basalt means lava reached the surface here, sandstone means this was a beach or
- * a desert, deepslate means the rock has been buried deep enough and long enough to recrystallise.
- * A player who can read that off a cliff face is doing the thing the mod is about, and the
- * geologist's hammer is what puts it in their hands.
- *
- * <p>Rock <em>names</em> are deliberately not stored here - the block's own translated name is
- * already correct in every language Minecraft ships, and duplicating it would only mean it going
- * stale. What is stored is the part vanilla has no opinion about: the class, and the one-line
- * origin story that goes with it.</p>
+ * What kind of rock a block is, and how it got there: basalt means lava reached the surface,
+ * sandstone a beach or desert, deepslate deep burial. Names come from the block's own translation;
+ * what is stored here is the class and a one-line origin.
  */
 public final class RockTypes {
 
@@ -161,10 +151,7 @@ public final class RockTypes {
         }
 
         // --- Anything else stony ----------------------------------------------
-        // Plain stone last, so it is the fallback rather than the answer. Vanilla's "stone" is not
-        // a named rock, it is simply the bulk of the crust - and the bulk of the upper continental
-        // crust really is granitic in composition, so putting it with the plutonic rocks is the
-        // honest answer rather than a shrug.
+        // Plain stone last, as the fallback: the upper continental crust is granitic on average.
         if (s.is(BlockTags.BASE_STONE_OVERWORLD) || s.is(Blocks.STONE) || s.is(Blocks.COBBLESTONE)
                 || s.is(Blocks.STONE_BRICKS)) {
             return Rock.PLUTONIC;

@@ -11,22 +11,11 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 
 /**
- * New hot springs opened by an earthquake.
+ * New hot springs opened by an earthquake. Shaking opens fractures and water finds a new way up, as
+ * after the 1959 Hebgen Lake quake at Yellowstone.
  *
- * <h2>Why a quake should be able to make one</h2>
- * Shaking the crust changes its permeability. Fractures open, others close, and water that had no
- * way up finds one - which is why a large earthquake near a geothermal field is followed by springs
- * appearing where there were none. The 1959 Hebgen Lake earthquake did this at Yellowstone within
- * days, and it is the same event that rearranged the outlets of the springs that were already
- * there. Both halves of that behaviour now exist in the mod:
- * {@link com.jeladastudios.ftsgeology.blockentity.SpringSourceBlockEntity} moves an existing
- * outlet, and this opens a new one.
- *
- * <h2>Why it stays rare</h2>
- * Three conditions have to line up, and they are the same three a real spring needs: heat under the
- * ground, water that reaches the surface, and somewhere not already occupied. Most of a rupture
- * corridor fails at least one. The cap of one per quake is a second, blunter guarantee - a world
- * that gets shaken often should not silently fill up with hot springs.
+ * <p>Rare: heat, water reaching the surface and a free site all have to line up, and a quake opens
+ * at most one.</p>
  */
 public final class SpringSeeding {
 
@@ -41,10 +30,8 @@ public final class SpringSeeding {
     /**
      * How strong the geothermal reading has to be, out of 1.
      *
-     * <p>Deliberately stricter than ordinary generation, which has no threshold at all - it rolls
-     * against {@code hotSpringSpawnChance * suitability}, so faint geothermal ground still produces
-     * the occasional spring given enough chunks. A quake gets one roll rather than thousands, so it
-     * is pointed at ground that is unambiguously hot instead.</p>
+     * <p>Stricter than generation, which has no threshold: a quake gets one roll, so it is pointed at
+     * ground that is unambiguously hot.</p>
      */
     private static final double HEAT_FLOOR = 0.55;
 
@@ -70,9 +57,7 @@ public final class SpringSeeding {
             return;
         }
 
-        // Counted so a quake that opens nothing can say WHY. Without this the feature is untestable:
-        // "it rolled and the ground was wrong" and "it is broken" look identical from in game, and
-        // a session usually contains only one or two quakes to judge by.
+        // Counted, so a quake that opens nothing can say why.
         int unloaded = 0, cold = 0, dry = 0, badGround = 0, occupied = 0, refused = 0;
 
         int reach = Math.max(64, ruptureLength / 2);
@@ -85,9 +70,7 @@ public final class SpringSeeding {
             GeothermalSuitability.Suitability s = GeothermalSuitability.at(level, x, z);
             if (s.hotSpring() < HEAT_FLOOR) { cold++; continue; }
 
-            // 2. Does the water actually reach the surface here? This is the condition that could
-            //    not be asked before the water table existed, and it is the one that decides
-            //    whether a spring is geology or decoration.
+            // 2. Does the water reach the surface here?
             if (!WaterTable.isSpringLine(level, x, z)) { dry++; continue; }
 
             // 3. Is the ground fit to hold a pool, and is the site free?
@@ -114,9 +97,7 @@ public final class SpringSeeding {
     /**
      * Is there already a spring near this spot?
      *
-     * <p>Coarse on purpose. A dense scan would mean thousands of ground lookups for a check that
-     * only has to stop a new spring landing on top of an old one; sampling the site on an 8-block
-     * grid catches that and costs 25 lookups.</p>
+     * <p>Coarse on purpose: an 8-block grid, 25 lookups, keeps a new spring off an old one.</p>
      */
     private static boolean springNear(ServerLevel level, int x, int z) {
         for (int dx = -SPACING; dx <= SPACING; dx += 8) {

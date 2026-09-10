@@ -17,23 +17,12 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * What a hot spring looks like, as a function of where it is and how old it is.
+ * What a hot spring looks like, as a pure function of place and stage.
  *
- * <h2>Why this is one function and nothing else</h2>
- * A spring has two independent questions in it: <i>where and when does one appear</i>, and <i>what
- * does one look like</i>. Every serious bug this feature has had came from answering them in the
- * same place - a pool that rebuilt itself on a timer walked downhill, one that grew cell by cell
- * came out full of holes, one that rose a block per stage ended up on a calcite pedestal above the
- * treetops. So the shape is now a pure function of {@code (x, z, stage)} that can be called by hand
- * from {@code /geology place hotspring <stage>}, and the mineral water line underneath only decides
- * which arguments to pass.
- *
- * <h2>The rule that keeps it on the ground</h2>
- * The water line is read from the <b>untouched ground outside the pool</b> - a ring beyond the
- * stage's own radius - and the water sits one block under it. That makes a pool recessed into the
- * land, which is how the springs that looked right were built in the first place, and it means
- * calling this again at a larger stage cannot drift: the reference ring for stage 3 lies outside
- * the pool stage 2 dug, so it is still original ground.
+ * <p>Where and when a spring appears is decided elsewhere; this only builds the shape, so it can be
+ * called by hand from {@code /geology place hotspring <stage>}. The water sits one block under the
+ * untouched ground in a ring outside the pool, so the pool is recessed into the land and building a
+ * larger stage cannot drift downward.</p>
  */
 public final class HotSpringShape {
 
@@ -48,13 +37,7 @@ public final class HotSpringShape {
     /** How far past the pool the untouched reference ring is read. */
     private static final int REFERENCE_GAP = 2;
 
-    /**
-     * The furthest {@link #poolCells} can wobble, as a multiple of the nominal radius.
-     *
-     * <p>The edge is {@code radius * (1 + 0.22 sin(2a) + 0.12 sin(3a))}, so it peaks at 1.34 when
-     * both terms crest together. Anything that has to stay clear of the pool measures from here
-     * rather than assuming the radius.</p>
-     */
+    /** How far the pool's wobbled edge can reach, as a multiple of the radius: 1 + 0.22 + 0.12. */
     private static final double MAX_WOBBLE = 1.34;
 
     /** How far above the water line the pool clears its overburden. */
@@ -70,11 +53,8 @@ public final class HotSpringShape {
     }
 
     /**
-     * The water line the untouched ground around a spring of this stage would give.
-     *
-     * <p>Exposed so a spring recovering from an earthquake can ask whether the ground it sat on has
-     * actually moved, without adopting the answer. The ring this reads is outside anything the pool
-     * can reach, so it reports what the quake did rather than what the spring did.</p>
+     * The water line the untouched ring around a spring of this stage gives. The ring is outside
+     * anything the pool reaches, so it shows what a quake did to the ground, not what the spring did.
      */
     public static int waterLineAt(ServerLevel level, int x, int z, int stage) {
         return waterLine(level, x, z, radiusFor(stage));
@@ -84,14 +64,7 @@ public final class HotSpringShape {
         return RADIUS[Math.max(1, Math.min(MAX_STAGE, stage)) - 1];
     }
 
-    /**
-     * Says why a spring could not be built here.
-     *
-     * <p>Because "the command said stage 4 and I got a stage 3 spring" cost a whole round of
-     * guessing, and two separate reviews of the code produced two different wrong answers. An empty
-     * return from {@link #build} used to be silent, so the only way to tell which of three guards
-     * had fired was to reason about it. Now it says.</p>
-     */
+    /** Logs why a spring could not be built here, at debug level. */
     private static void refuse(int x, int z, int stage, String why, int datumY, int waterY,
                                int cells) {
         GeysersMod.LOGGER.debug(
@@ -116,28 +89,12 @@ public final class HotSpringShape {
     }
 
     /**
-     * @param datumY the original ground level here, from before this spring existed. Pass
-     *               {@link Integer#MIN_VALUE} to read it off the surrounding land, which is right
-     *               the first time and wrong every time after.
-     *
-     * <h2>Why the datum has to be remembered</h2>
-     * Reading the water line off a ring outside the pool is stable while a spring is <i>growing</i>,
-     * because a bigger stage samples further out than a smaller one dug. It is not stable when a
-     * spring is rebuilt from stage 1 after being covered: the stage 1 ring, at radius 4 to 6, lies
-     * <b>inside</b> the basin stage 4 cut at radius 10, so it measures the old excavated floor and
-     * sites the new pool lower. Every cover-and-recover cycle then steps down again, which is the
-     * spring sinking into the ground that testing found.
-     *
-     * <p>So the level is measured once, when the water first reaches daylight, and kept. After that
-     * it is a fact about the place rather than a reading of what the spring has done to it.</p>
-     *
-     * @param clearTrees whether to take the canopy off the site. True the first time a spring
-     *                   appears here; false on every rebuild afterwards. A rebuild used to strip
-     *                   trees too, and since a spring rebuilding itself on a timer was the normal
-     *                   case rather than the exceptional one, the site kept widening into a ring of
-     *                   dead trunks - measured at 177 rebuilds on a single source in one session.
-     *                   The trees are cleared because a spring <i>arrived</i>, not because it is
-     *                   still there.
+     * @param datumY     the original ground level, measured once when the water first reached
+     *                   daylight. {@link Integer#MIN_VALUE} reads it off the surrounding land, which is
+     *                   right only the first time: a rebuild would sample the spring's own basin and
+     *                   site the pool lower each time.
+     * @param clearTrees whether to take the canopy off. True when a spring arrives or grows, false on a
+     *                   same-stage rebuild, so repeated repairs do not widen a ring of dead trees.
      */
     public static List<BlockPos> build(ServerLevel level, int x, int z, int stage, int datumY,
                                        boolean clearTrees) {
@@ -166,14 +123,8 @@ public final class HotSpringShape {
         BlockState crust = ModBlocks.SINTER.get().defaultBlockState();
         for (BlockPos cell : pool) {
             int cx = cell.getX(), cz = cell.getZ();
-            // Open the cell to the sky, and mean it.
-            //
-            // This used to take out only loose cover and the spring's own crust, while the flood
-            // fill admitted cells whose ground stood up to two blocks ABOVE the water line. So a
-            // grass block sat on top of a pool cell and stayed there: water underneath, lid on top,
-            // which is the "springs come out covered in grass" report. Anything natural over the
-            // water comes out now. It is a cut, but a bounded one, and the thing that stops it
-            // ratcheting is the remembered datum rather than a refusal to dig.
+            // Open the cell to the sky: anything natural over the water comes out, so no grass lid is
+            // left on the pool. The remembered datum keeps this from ratcheting down.
             for (int y = waterY + 1; y <= waterY + OVERBURDEN_CUT; y++) {
                 BlockPos p = new BlockPos(cx, y, cz);
                 BlockState s = level.getBlockState(p);
@@ -192,11 +143,7 @@ public final class HotSpringShape {
             level.setBlock(cell, Blocks.WATER.defaultBlockState(), 2);
         }
 
-        // Warm beds through the floor, not one in the middle.
-        //
-        // A single bed heated a 21-block pool from one point, so the edges read cold and the steam
-        // all came from the centre. It also made "is this spring blocked?" a question about one
-        // column, which is why covering any other part of a pool did nothing at all.
+        // Warm beds spread through the floor, not one in the middle, so the whole pool steams.
         placeBeds(level, pool, x, z, waterY);
 
         rim(level, pool, waterY, crust);
@@ -210,30 +157,15 @@ public final class HotSpringShape {
     }
 
     /**
-     * The sinter streak running downhill from where the pool spills.
-     *
-     * <h2>Why a pool with no outflow reads as a puddle</h2>
-     * A spring is water <i>arriving</i>, continuously, and it has to go somewhere. Every pool in the
-     * mod simply sat in its own rim with nothing leaving it, so what the landscape showed was a
-     * basin of hot water rather than a spring - and the single most photographed thing about
-     * Mammoth Hot Springs, the white tongue of carbonate spilling away downslope, was missing.
-     *
-     * <p>What it deposits is what it is already made of: the water loses its CO2 as it spreads
-     * thin over the lip, so the carbonate comes out of it fastest exactly along the overflow. The
-     * streak therefore grows out of the rim rather than being drawn onto the ground beside it.</p>
-     *
-     * <p>Only from a mature spring. A young pool has neither the deposit nor the flow to build a
-     * terrace outside itself, which is the same reasoning that brings the colour bands in one at a
-     * time rather than all at stage one.</p>
+     * The sinter streak running downhill from where a mature pool (stage 3+) spills, as at Mammoth Hot
+     * Springs. Carbonate comes out of the water fastest along the overflow, so the streak grows out of
+     * the rim.
      */
     private static void runoff(ServerLevel level, List<BlockPos> pool, int waterY, int stage) {
         if (stage < 3 || pool.isEmpty()) return;
 
-        // The spill point is the lowest ground just outside the rim: water leaves a basin at its
-        // lip, and the lip is wherever the land outside it is lowest.
-        // Packed into a set first. Asking a 300-cell List whether it holds each of its own 1200
-        // neighbours is a third of a million comparisons for an answer a hash gives for nothing,
-        // and it would have run every time any spring in the world was built or repaired.
+        // The spill point is the lowest ground just outside the rim. Pool cells go in a set first,
+        // since every rim neighbour is tested against them.
         java.util.Set<Long> cells = new java.util.HashSet<>();
         for (BlockPos c : pool) cells.add(net.minecraft.core.BlockPos.asLong(c.getX(), 0, c.getZ()));
 
@@ -266,15 +198,7 @@ public final class HotSpringShape {
         java.util.Set<Long> walked = new java.util.HashSet<>();
 
         int width = 2;
-        // Forty, not eighteen.
-        //
-        // Eighteen was the whole reason the streak could not be seen. paintThermalRings runs before
-        // this and covers a radius of thirteen to twenty-seven blocks at stage 4 - the five mat
-        // bands are eight to seventeen of that and the sterile halo another five to ten - while the
-        // walk measured out at four steps on the flat and sixteen on a slope. So every cell of it
-        // fell INSIDE the spring's own apron, where the mat guard below refuses to write, and the
-        // few that got past landed pale sinter on pale halo crust. The streak has to outrun the
-        // rings before it is a streak at all.
+        // Forty steps: the streak has to outrun the colour bands and halo before it shows at all.
         for (int step = 0; step < 40; step++) {
             if (!walked.add(net.minecraft.core.BlockPos.asLong(x, 0, z))) return;   // never twice
             paintRunoff(level, x, z, last, width, step);
@@ -286,32 +210,16 @@ public final class HotSpringShape {
 
             hx = Integer.signum(next[0] - x); hz = Integer.signum(next[2] - z);
             x = next[0]; last = next[1]; z = next[2];
-            // Narrows as it goes: the flow spreads, cools and gives out rather than ending on a line.
-            //
-            // Rescaled with the step cap. At 18 steps this went to a single block at 5 and to bare
-            // ground at 12, which over a 40-step run would have left three quarters of the streak a
-            // one-block thread - and the part that matters most is the part beyond the halo, which
-            // is exactly the part that would have been thinnest.
+            // Narrows as it goes, at steps scaled to the forty-step run.
             if (step == 14) width = 1;
             if (step == 30) width = 0;
         }
     }
 
     /**
-     * The next cell the overflow runs to: downhill if there is a downhill, straight on if there is not.
-     *
-     * <h2>Why {@code RiverProfile.downstream} could not be used directly</h2>
-     * It was, first, and the streak came out <b>one block long at every gradient</b>. That helper
-     * insists on a neighbour <i>strictly lower</i> than the current column, which is right for the
-     * erosion it was written for - a retreat that could step sideways would never be guaranteed to
-     * terminate. But Minecraft ground is whole blocks, so a real hillside at a third of a block per
-     * block is a staircase of flats: after one step down, the next two or three columns are exactly
-     * level, {@code downstream} returns null, and the run ends before it has left the rim.
-     *
-     * <p>This is the voxel degeneracy the erosion model was designed around, arriving from the other
-     * side. Water does not stop when the ground goes flat - it spreads and keeps going, which is
-     * precisely how an apron of sinter forms - so the walk carries its heading across level ground
-     * and gives up only when the land ahead actually rises.</p>
+     * The next cell the overflow runs to: downhill if there is one, otherwise straight on across level
+     * ground. Minecraft slopes are staircases of flats, so a walk that needs a strictly lower neighbour
+     * stops one block from the rim.
      *
      * @return {x, groundY, z}, or null if there is nowhere level or lower to go
      */
@@ -349,18 +257,11 @@ public final class HotSpringShape {
                 BlockState s = level.getBlockState(at);
                 if (s.is(Blocks.BEDROCK) || !s.getFluidState().isEmpty()) continue;
                 if (EruptionHandler.isPlayerPlaced(s)) continue;
-                // The colour bands and the pool's own bed are left exactly as they are: they are the
-                // best-looking thing the mod makes and a streak cut through them would be a scar.
-                //
-                // The guard used to be isCrust, which is those PLUS every block of sinter - and the
-                // halo is thirty percent sinter, so the run was refusing most of the ground it had
-                // to cross. The dry crust out here is fair game; only what is alive is not.
+                // Leave the colour bands, the bed and the pool's calcite alone; dry crust is fair game.
                 if (isMatBlock(s) || s.is(ModBlocks.HOT_SPRING.get()) || s.is(Blocks.CALCITE)) continue;
 
                 TerrainProbe.clearVegetation(level, x + dx, g, z + dz, 2);
-                // Pale carbonate, deliberately brighter than the halo it is crossing: the halo is
-                // mostly coarse dirt and gravel, so a travertine and sinter ribbon reads as a line
-                // running away downhill rather than as more of the same crust.
+                // Pale carbonate, brighter than the halo it crosses, so it reads as a streak.
                 BlockState put = level.random.nextInt(5) == 0
                         ? Blocks.CALCITE.defaultBlockState()
                         : level.random.nextInt(2) == 0
@@ -401,29 +302,9 @@ public final class HotSpringShape {
     // === Internals ==========================================================
 
     /**
-     * The water line, read from ground the pool has not touched.
-     *
-     * <p>Taking it from inside the pool is what produced the ratchet: a cut pool lowers the ground,
-     * and a water line derived from that ground sits lower again, so a spring rebuilt on a timer
-     * walked itself 49 blocks downhill. The reference ring lies beyond the stage radius, so it is
-     * still the land the spring arrived in however many times this runs.</p>
-     */
-    /**
-     * The ground this spring's water line is read from: a ring outside anything it can reach.
-     *
-     * <h2>Why the ring is placed by the wobble and not by a constant</h2>
-     * It used to sit at {@code radius + 2}. But {@link #poolCells} floods to a wobbled edge that
-     * reaches {@code 1.34 * radius}, and {@link #build} floors an admitted cell down to
-     * {@code waterY - 1} even where the ground stood two blocks above it. At stage 4 that put the
-     * pool's own edge 1.4 blocks inside its own reference ring, so every rebuild lowered part of the
-     * ground the next datum would be measured from. Measured: a stage 4 spring sank 2 blocks over 20
-     * rebuilds and 6 over 200, entirely under its own weight. Stages 1 and 2 were clear, stage 3
-     * overlapped by 0.4.
-     *
-     * <p>This is the same downhill ratchet that buried springs before, in its last hiding place, and
-     * it is only reachable by something that re-measures a datum - which is exactly what recovering
-     * from an earthquake has to do. So the gap is derived from the reach rather than guessed: the
-     * ring starts past the furthest the pool can ever wobble, at every stage, permanently.</p>
+     * The water line: one below the median ground of a ring outside the pool. The ring starts past the
+     * furthest the pool's wobbled edge can reach ({@link #MAX_WOBBLE}), so rebuilding a pool can never
+     * lower the ground its own datum is measured from.
      */
     private static int waterLine(ServerLevel level, int x, int z, int radius) {
         List<Integer> heights = new ArrayList<>();
@@ -442,12 +323,7 @@ public final class HotSpringShape {
         return heights.get(heights.size() / 2) - 1;
     }
 
-    /**
-     * The pool as one connected region at the water line.
-     *
-     * <p>A flood fill, so the result is always a single body of water. Testing each cell on its own
-     * and keeping the winners is what produced a scatter of separate holes in a calcite field.</p>
-     */
+    /** The pool as one connected region at the water line: a flood fill to a wobbled edge. */
     private static List<BlockPos> poolCells(ServerLevel level, int x, int z, int radius, int waterY) {
         double phaseA = level.random.nextDouble() * Math.PI * 2;
         double phaseB = level.random.nextDouble() * Math.PI * 2;
@@ -486,21 +362,8 @@ public final class HotSpringShape {
     }
 
     /**
-     * Standing water the pool must not spread into - a lake, a river, the sea.
-     *
-     * <h2>Why it cannot simply refuse all water</h2>
-     * It used to, and that quietly broke every spring that grows. Stage 1 leaves water on a crust
-     * floor; at stage 2 those cells report standing water, so they were refused, and since they ring
-     * the vent the flood fill could not get past them. Measured over a run of stages, the pool went
-     * <b>13, 5, 5, 5</b> - it shrank at stage 2 and never recovered - where with the guard lifted it
-     * goes 13, 49, 149, 317. Springs placed by command looked right the whole time because a command
-     * builds one stage on untouched ground and never runs a sequence, which is why the screenshots
-     * disagreed with the code.
-     *
-     * <p>The discriminator is what the water is standing on. The spring's own pool sits at its own
-     * water line on the crust it laid; a lake sits on whatever the world put there. With that test
-     * the pool grows normally and still stops dead at a lake pressed against it - measured at 245
-     * cells with the lake untouched.</p>
+     * Standing water the pool must not spread into: a lake, a river, the sea. Told from the spring's own
+     * water by what it stands on, so a growing spring can flood past its previous stage's pool.
      */
     private static boolean foreignWater(ServerLevel level, int x, int z, int waterY) {
         if (!TerrainProbe.hasFluidAbove(level, x, z)) return false;
@@ -512,17 +375,8 @@ public final class HotSpringShape {
     }
 
     /**
-     * Adds the holes the pool has closed around to the pool.
-     *
-     * <p>A flood fill leaves gaps: a knoll a couple of blocks proud, a hollow too deep, a cell that
-     * failed a test. Anything enclosed by the pool is a hole rather than an edge, and leaving it out
-     * had two visible consequences - the overburden pass never cleared it, so it stood in the water
-     * as an island of bare dirt, and {@link #rim} treated it as a piece of shoreline and built a
-     * column of crust on it, which the colour bands then painted. Those are the pillars standing in
-     * the middle of a pool.</p>
-     *
-     * <p>Found by flooding inward from the bounding box: whatever is neither pool nor reachable from
-     * outside it is enclosed.</p>
+     * Adds the cells the pool encloses to the pool, so no island of dirt or pillar of crust is left
+     * standing in the water. Found by flooding inward from the bounding box.
      */
     private static List<BlockPos> fillHoles(List<BlockPos> pool, int waterY) {
         if (pool.isEmpty()) return pool;
@@ -576,15 +430,8 @@ public final class HotSpringShape {
                 int x = p.getX() + d.getStepX(), z = p.getZ() + d.getStepZ();
                 if (inside.contains(key(x, z))) continue;
 
-                // The wall. Both the water line and the block under it have to be solid, or the
-                // pool leaks: a single course at the water line still lets it pour out underneath
-                // wherever the ground outside falls away.
-                //
-                // Vegetation used to slip through here. The test at the water line asked only
-                // "not air, and no fluid in it" - and a grass tuft is neither, so it was left
-                // standing in contact with the water and the pool drained through it the moment
-                // anything updated the block. That is the most likely cause of a spring that
-                // quietly empties itself, and it would be immediate with Flowing Fluids.
+                // The wall: both the water line and the block under it must hold water, or the pool
+                // leaks underneath. Vegetation does not hold water.
                 for (int dy = -1; dy <= 0; dy++) {
                     BlockPos edge = new BlockPos(x, waterY + dy, z);
                     BlockState s = level.getBlockState(edge);
@@ -643,31 +490,9 @@ public final class HotSpringShape {
     }
 
     /**
-     * How much of the pool this spring actually built is still water.
-     *
-     * <h2>Two thresholds, not one</h2>
-     * One threshold gave a spring only two states, and set the bar so high that dropping a patch of
-     * dirt into a pool did nothing observable at all - which is what testing reported. A real spring
-     * flushes a small obstruction and is stopped by a large one, so there are two: a fouled pool is
-     * cleaned out and rebuilt at the age it had reached, and a buried one makes the water look for
-     * another way out.
-     *
-     * <h2>Why it is given the cells and not a radius</h2>
-     * This used to scan the disc of {@link #radiusFor(int)} and score every solid block in it as
-     * dry. But {@link #poolCells} does not fill a disc - it floods to a wobbled edge that runs
-     * between {@code 0.66r} and {@code 1.34r}, and it stops where the land rises. So a large part
-     * of the disc was never pool, and what stands there is the pool's own retaining rim, which was
-     * then counted against it.
-     *
-     * <p>Measured over 400 <b>healthy</b> stage 4 pools, the old test read 86% wet on flat ground,
-     * 67% on a moderate slope and 57% on a steep one - and returned FINE <b>zero times out of
-     * 400</b> on every terrain tested. So a healthy spring read FOULED forever and rebuilt itself
-     * every {@code CHECK_INTERVAL}, and on rough ground read BLOCKED often enough to demote itself
-     * to stage 1 as well. Both loops, the dead-tree ring and the stage 1 puddle sitting in a stage 4
-     * basin, come from this one mismatch.</p>
-     *
-     * <p>The denominator is now the pool that was built, recorded at build time, so a pool nobody
-     * has touched scores exactly 1.0 and the thresholds mean what they say.</p>
+     * How much of the pool this spring actually built is still water: FINE from 90%, FOULED (flushed
+     * and rebuilt) from 50%, otherwise BLOCKED. Measured against the recorded cells rather than a disc,
+     * which would count the pool's own rim as dry.
      *
      * @param cells  the pool cells from the last successful {@link #build}, packed by {@link #key}
      * @param waterY the water line those cells sit at
@@ -697,15 +522,7 @@ public final class HotSpringShape {
         return g == Integer.MIN_VALUE ? level.getSeaLevel() : g;
     }
 
-    /**
-     * Material a spring lays down, which it is therefore allowed to take up again.
-     *
-     * <p>The warm bed belongs on this list and was missing from it. {@link #foreignWater} decides
-     * whether standing water is the spring's own by asking what it stands on, and {@link #placeBeds}
-     * puts a bed under roughly every twelfth pool cell - so on a rebuild those cells reported water
-     * standing on something foreign, were refused, and the pool was punched full of holes at exactly
-     * the spots the spring heats.</p>
-     */
+    /** Material a spring lays down, including its warm beds, which it may therefore take up again. */
     static boolean isCrust(BlockState s) {
         return s.is(Blocks.CALCITE) || s.is(ModBlocks.SINTER.get())
                 || s.is(ModBlocks.HOT_SPRING.get()) || s.is(Blocks.MAGMA_BLOCK) || isMat(s);

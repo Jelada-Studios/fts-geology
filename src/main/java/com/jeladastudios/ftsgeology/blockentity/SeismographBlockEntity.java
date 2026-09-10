@@ -25,25 +25,12 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * A recording station. Turns earthquakes into measurements a player can actually work with.
+ * A recording station. It is told nothing: it reads {@link SeismicNetwork}, works out what its own
+ * drum would have drawn, and keeps that measurement, with distance and magnitude derived from it.
+ * One station cannot give a direction; three fix the epicentre.
  *
- * <h2>What it knows and what it does not</h2>
- * The station is never told where a quake was or how big it was. It is told nothing at all: it
- * reads {@link SeismicNetwork}, works out what its own drum would have drawn, and keeps that. So
- * every line in its log is a <b>measurement</b> - the gap between the two wave arrivals, and how far
- * the needle swung - with the distance and magnitude derived from those two numbers the way a
- * seismologist derives them.
- *
- * <p>It therefore cannot tell you which way the earthquake was, because a single seismograph
- * genuinely cannot. Distance alone puts the epicentre somewhere on a circle. Two stations narrow it
- * to two points, three fix it. Building that network is the instrument's actual gameplay, and it is
- * also exactly how the real thing is done.</p>
- *
- * <h2>Redstone</h2>
- * The station holds a signal for a few seconds after an event, scaled by how hard the ground shook
- * here - measured across the usual range that runs from about 3 for a distant tremor to 15 for
- * something that will take a hillside with it. Enough to build a warning bell, or a door that shuts
- * itself.
+ * <p>After an event it holds a redstone signal scaled by how hard the ground shook here, from about 3
+ * for a distant tremor to 15.</p>
  */
 public class SeismographBlockEntity extends BlockEntity {
 
@@ -69,13 +56,7 @@ public class SeismographBlockEntity extends BlockEntity {
             return SeismicWave.magnitude(amplitudeMm, distanceMetres());
         }
 
-        /**
-         * True when the pen ran off the paper, so the magnitude is only a lower bound.
-         *
-         * <p>Worth saying out loud rather than quietly reporting a wrong number. A station sitting
-         * on top of a large earthquake cannot measure it - that is a real limitation and the reason
-         * a magnitude is agreed between distant stations rather than read off the nearest one.</p>
-         */
+        /** True when the pen ran off the paper, so the magnitude is only a lower bound. */
         public boolean clipped() {
             return amplitudeMm >= SeismicWave.CLIP_MM;
         }
@@ -88,11 +69,7 @@ public class SeismographBlockEntity extends BlockEntity {
     private int shake;
     /** Redstone output while shaking. */
     private int signal;
-    /**
-     * Game time the ground will start moving, while the station is in its warning phase; 0 when it
-     * is not. This is the early-warning window: the quake was detected, the siren is wailing, and
-     * nothing has shaken yet.
-     */
+    /** Game time the ground will start moving, while the station is in its warning phase; 0 otherwise. */
     private long warnUntil;
     /** The arrival's redstone strength, held over from detection until the shaking actually lands. */
     private int pendingSignal;
@@ -119,9 +96,7 @@ public class SeismographBlockEntity extends BlockEntity {
 
         long now = level.getGameTime();
 
-        // Warning phase: the quake is on its way but the ground has not moved. The siren wails and
-        // the redstone is held full until the moment the shaking is due, when it hands off to the
-        // ordinary arrival pulse.
+        // Warning phase: siren wailing and redstone held full until the shaking is due.
         if (be.warnUntil > 0) {
             if (now >= be.warnUntil) {
                 be.warnUntil = 0;
@@ -165,10 +140,7 @@ public class SeismographBlockEntity extends BlockEntity {
         while (readings.size() > LOG_SIZE) readings.remove(readings.size() - 1);
 
         int sig = SeismicWave.signal(amp);
-        // The ground moves warningTicks after the quake was filed. If that is still ahead of us,
-        // this station has caught the alert early and enters its warning phase; if the window has
-        // already passed - warnings disabled, or a station reading back through old events - the
-        // arrival is treated as happening now.
+        // Caught before the ground moves: warning phase. Otherwise the arrival is treated as now.
         long groundMoves = e.gameTime() + GeyserConfig.QUAKE_WARNING_TICKS.get();
         if (groundMoves > level.getGameTime() + 5L) {
             warnUntil = groundMoves;
@@ -186,14 +158,8 @@ public class SeismographBlockEntity extends BlockEntity {
     }
 
     /**
-     * The warning wail: two alternating tones, a couple of blocks around the station, so it reads
-     * as an alarm rather than a note. Loud enough to hear across a room, brief enough not to become
-     * a nuisance over a ten-second window.
-     */
-    /**
-     * The visible half of the alert. The siren itself is a single ten-second clip started once when
-     * the warning begins - retriggering it every few ticks would stack a dozen overlapping copies
-     * of the same wail, which is noise rather than an alarm.
+     * The visible half of the alert. The siren is one ten-second clip started when the warning
+     * begins; retriggering it would stack overlapping copies.
      */
     private void siren(ServerLevel level, BlockPos pos, long now) {
         level.sendParticles(ParticleTypes.NOTE,
@@ -277,9 +243,7 @@ public class SeismographBlockEntity extends BlockEntity {
         pendingSignal = tag.getInt("PendingSignal");
         readings.clear();
         for (Tag t : tag.getList("Readings", Tag.TAG_COMPOUND)) {
-            // Bounded on the way in, not just on the way out. The drum only ever writes LOG_SIZE
-            // lines, so a longer list means the tag was edited or corrupted, and there is no reason
-            // to let it grow the list without limit.
+            // Bounded on the way in too, in case the tag was edited.
             if (readings.size() >= LOG_SIZE) break;
             CompoundTag c = (CompoundTag) t;
             readings.add(new Reading(c.getLong("Id"), c.getDouble("Sp"),

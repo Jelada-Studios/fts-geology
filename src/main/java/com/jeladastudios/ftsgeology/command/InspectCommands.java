@@ -84,9 +84,7 @@ public final class InspectCommands {
 
         source.sendSuccess(() -> Component.translatable("command.fts_geology.plate_map_s_blocks_per_cell", step).withStyle(ChatFormatting.GOLD), false);
 
-        // 625 columns of Voronoi and hotspot maths is far too much to do inside a tick, and none of
-        // it touches the world, so it is computed on a worker thread and only the finished glyph
-        // grid comes back to the server thread to be printed.
+        // 625 columns of pure maths: computed on a worker thread, printed on the server thread.
         final int fstep = step, fhalf = half;
         CompletableFuture
                 .supplyAsync(() -> renderGrid(level, at, fstep, fhalf), Util.backgroundExecutor())
@@ -108,9 +106,7 @@ public final class InspectCommands {
     static List<MutableComponent> renderGrid(ServerLevel level, BlockPos at, int step, int half) {
         List<MutableComponent> rows = new ArrayList<>();
         for (int row = -half; row <= half; row++) {
-            // Literals, not translation keys: these are map symbols, not language. The legend below
-            // the map is translated, but the glyphs themselves have to stay one character wide and
-            // match that legend, so they are not something a translator should be able to change.
+            // Literal glyphs, not translation keys: one character wide and matched to the legend.
             MutableComponent line = Component.literal("");
             for (int col = -half; col <= half; col++) {
                 int wx = at.getX() + col * step;
@@ -174,12 +170,8 @@ public final class InspectCommands {
     }
 
     /**
-     * Renders a decimal for display.
-     *
-     * <p>Minecraft's translation formatter only understands {@code %s}, {@code %d} and positional
-     * {@code %N$s} - a {@code %.2f} left in a lang file throws when the line is drawn. So decimals
-     * are converted here and handed to the component as finished text. {@link Locale#ROOT} keeps
-     * the separator a dot whatever locale the server JVM happened to boot in.</p>
+     * Renders a decimal for display: the translation formatter throws on {@code %.2f}, and
+     * {@link Locale#ROOT} keeps the separator a dot.
      */
     static String dec(double v, int places) {
         return String.format(Locale.ROOT, "%." + places + "f", v);
@@ -248,9 +240,7 @@ public final class InspectCommands {
         if (st.is(ModBlocks.PYRITE.get())) return "command.fts_geology.column.ore.pyrite";
         if (st.is(ModBlocks.CINNABAR.get())) return "command.fts_geology.column.ore.cinnabar";
         if (st.is(ModBlocks.GALENA.get())) return "command.fts_geology.column.ore.galena";
-        // Vanilla ores get no story. The game's own features scatter coal, iron, gold and lapis
-        // everywhere, and a column cannot tell a vein this laid from one vanilla did - so naming a
-        // process for them would mostly be telling a student something untrue.
+        // Vanilla ores get no story: a column cannot tell a vein this laid from one vanilla scattered.
         return null;
     }
 
@@ -268,12 +258,8 @@ public final class InspectCommands {
     // === /geology column ====================================================
 
     /**
-     * Prints the vertical section under the player, bedrock to surface.
-     *
-     * <p>This exists because "I dug down and could not see anything" is not a measurement. The
-     * boundary structure lives in a band that is easy to tunnel past, so testing kept turning into
-     * guesswork about whether it had generated at all. Reading the column out loud settles it in one
-     * command, without digging.</p>
+     * Prints the vertical section under the player, bedrock to surface, so generation can be checked
+     * without digging.
      */
     static int column(CommandContext<CommandSourceStack> ctx) {
         CommandSourceStack source = ctx.getSource();
@@ -293,8 +279,7 @@ public final class InspectCommands {
         String runName = null;
         int runTop = top;
         int shown = 0;
-        // Deposits are gathered in the same walk, which no longer stops once the section is cut off
-        // at 26 lines: a vein below that point is still a vein.
+        // Deposits are gathered in the same walk, including below the 26-line cut-off.
         List<OreRun> ores = new ArrayList<>();
         String oreName = null, oreKey = null;
         int oreTop = 0, oreBottom = 0;
@@ -338,9 +323,8 @@ public final class InspectCommands {
             source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GRAY), false);
         }
 
-        // And the deposits in it, each named for the process that left it there. The Y range is
-        // formatted here rather than in the language file: Minecraft's translations take a plain
-        // %s, and a width like %4d there breaks the whole line.
+        // And the deposits in it, named for the process. The Y range is formatted here, since
+        // translations take a plain %s.
         source.sendSuccess(() -> Component.translatable("command.fts_geology.column.ores_header")
                 .withStyle(ChatFormatting.GOLD), false);
         if (ores.isEmpty()) {
@@ -365,12 +349,8 @@ public final class InspectCommands {
         // - why is there a spring on this ledge and not that one - is a question about the section.
         var w = com.jeladastudios.ftsgeology.hydrology.WaterTable.sample(level, at.getX(), at.getZ());
 
-        // Depth is measured to the ground that is actually here, not to the one the generator would
-        // have made. The model has to use the generator height - that is what lets it answer for
-        // columns nowhere near a loaded chunk - but the two part company wherever the mod has since
-        // built something, and a volcano is 40 blocks of exactly that. Reporting the generator
-        // figure to a player standing on a summit tells them the water is a few blocks down when it
-        // is under the whole cone.
+        // Depth to the ground actually here, not the generator's: they differ wherever the mod built
+        // something, and on a volcano the difference is the whole cone.
         final int ground = top;
         int depth = Math.max(0, ground - w.tableY());
         if (w.head() >= ground && ground > level.getSeaLevel()) {
@@ -404,11 +384,8 @@ public final class InspectCommands {
     // === /geology deepgen ===================================================
 
     /**
-     * Rebuilds the deep boundary geology around the player.
-     *
-     * <p>Deep structure is stamped with a version, so an already-visited chunk regenerates it on its
-     * own as you travel. This is the impatient version: it does the area you are standing in right
-     * now, so you can dig a test tunnel without first having to fly away and come back.</p>
+     * Rebuilds the deep boundary geology around the player now, rather than waiting for visited
+     * chunks to regenerate as you travel.
      *
      * @param chunkRadius 0 for the chunk you are in, up to 8 for a 17x17 chunk block
      */

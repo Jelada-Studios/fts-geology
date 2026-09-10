@@ -41,10 +41,8 @@ import java.util.Arrays;
  * </ul>
  *
  * <h2>Written into one chunk only</h2>
- * The first version let a vein follow its fault wherever it went, twenty blocks into the next chunk
- * if need be. At generation that is a write into a chunk another thread is still building, and on
- * the retrogen path it loads the neighbour on the server thread. Deposits stop at the chunk edge
- * instead; underground, a vein ending at a border reads the same as one ending anywhere else.
+ * Deposits stop at the chunk edge: a write into a neighbour hits a chunk another thread is building,
+ * or loads it on the server thread. Underground, a vein ending at a border reads like any other.
  */
 public final class OreGenesis {
 
@@ -73,10 +71,8 @@ public final class OreGenesis {
             }
         }
 
-        // Away from the belts a geothermal field is a mantle plume, so the plume grid is asked
-        // directly. This used to be GeothermalSuitability, measured as most of the ore pass on the
-        // retrogen path; the grid on its own is arithmetic. Along a boundary the stress gate already
-        // covers every setting whose hot-spring suitability would clear 0.45.
+        // Away from the belts a geothermal field is a plume, so the plume grid is asked directly:
+        // it is arithmetic, where GeothermalSuitability cost most of the ore pass.
         double plume = HotspotMap.plumeStrength(world, cx, cz);
         if (centre.stress() >= 0.35 || plume > 0.45) {
             hydrothermalVeins(d, centre, plume);
@@ -130,11 +126,8 @@ public final class OreGenesis {
     /**
      * Coal and ironstone, as seams in shale, in the quiet country between the active belts.
      *
-     * <p>Every decision here is made per column, in block coordinates: whether a seam is there, and
-     * at what height. The first version made both once per chunk, so a seam stopped dead at a chunk
-     * border and came back a block or two higher or lower in the next one - the chunk-aligned edge
-     * the deep structure spent three rounds getting rid of. Neighbouring columns now differ by at
-     * most one block, border or not.</p>
+     * <p>Presence and height are decided per column, so neighbouring columns differ by at most one
+     * block, border or not.</p>
      */
     private static void sedimentaryBasin(Deposit d, PlateSample s) {
         if (s.stress() > 0.70) return;   // the heart of an active belt is not a basin

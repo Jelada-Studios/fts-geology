@@ -24,22 +24,11 @@ import static com.jeladastudios.ftsgeology.volcano.VolcanoSummit.*;
 /**
  * Carves a whole volcano and its geothermal field.
  *
- * <h2>The edifice is a height field, not a stack of rings</h2>
- * The cone used to be built as horizontal discs starting at the summit column's ground level and
- * filling whatever air they found. On any slope the outer discs therefore hung in space with nothing
- * beneath them, which is why volcanoes appeared with parts floating and met the landscape at a sheer
- * step. Now every column in the footprint works out the height the finished mountain should reach
- * there and fills up from <b>its own</b> ground to meet it. A column can only ever be filled from the
- * ground upward, so a floating block is not merely unlikely - it is impossible to express.
- *
- * <h2>Each type is genuinely a different mountain</h2>
- * Profile exponent, summit treatment, rock recipe and where the flank vents sit all come from
- * {@link VolcanoType}, so a stratocone, a shield, a fissure swarm and a caldera read as four
- * different landforms rather than one mound at four sizes. A caldera in particular now <b>digs</b>:
- * it is a collapse structure, and building it upward as a low wide cone was why it looked like a
- * basalt dinner plate.
- *
- * <p>All of it is emitted as a {@link VolcanoJob} and applied a slice per tick.</p>
+ * <p>The edifice is a height field: every column works out the height the finished mountain reaches
+ * there and fills up from its own ground, so a floating block cannot be expressed. Profile, summit,
+ * rock and vent layout come from {@link VolcanoType}, so the four types are different landforms, and
+ * a caldera digs. Small and medium volcanoes are emitted as a {@link VolcanoJob}, a slice per tick;
+ * large ones are written during world generation.</p>
  */
 public final class VolcanoBuilder {
 
@@ -67,32 +56,10 @@ public final class VolcanoBuilder {
     }
 
     /**
-     * Plans a volcano of an explicit shape and queues it for construction. The setting normally
-     * chooses the shape (see {@link VolcanoType}); this overload exists so the inspection command can
-     * demonstrate each one.
-     *
-     * @return true if the site was accepted and the build was queued
-     */
-    /**
-     * Raises the mountain again over a core that survived an earthquake.
-     *
-     * <h2>Everything below ground is deliberately left alone</h2>
-     * This is not {@link #build}. It runs the shaping steps only - clear, cone, caldera, apron,
-     * summit, and the safety sweep - and never touches the reservoir, the conduit, the flank vents
-     * or the core. That is not tidiness, it is the thing that makes it safe:
-     * <ul>
-     *   <li>{@code plantCore} writes a fresh block entity, which would come up with its
-     *       "quakes I have answered for" counter empty. The zone stays released for an hour, so the
-     *       new core would immediately rebuild again, and again - an endless loop. Not replanting
-     *       the core removes that by construction rather than by guarding against it.</li>
-     *   <li>The reservoir is sited at {@code baseY - 45}; run a second time it would be cut through
-     *       the middle of the existing edifice.</li>
-     *   <li>A vent that landed a block off would leave two cores ticking in one mountain.</li>
-     * </ul>
-     *
-     * <p>The height is pinned to what this volcano was, rather than re-rolled, because
-     * {@code buildConeRow} only adds where the ground is below target - so a taller roll would pile
-     * onto whatever the quake left standing instead of restoring it.</p>
+     * Raises the mountain again over a core that survived an earthquake. Runs the shaping steps only,
+     * never the reservoir, conduit, vents or core: a fresh core would rebuild again in a loop, and a
+     * second reservoir would cut through the edifice. The height is pinned to the original mountain,
+     * since the cone only adds where the ground is below target.
      *
      * @return true if the rebuild was queued
      */
@@ -178,9 +145,7 @@ public final class VolcanoBuilder {
     static void queueEdifice(VolcanoJob job, Ctx c, boolean ramparts) {
         // Strip the canopy off the whole footprint before anything is raised.
         forEachRow(job, c.clearReach, dx -> lvl -> clearSiteRow(lvl, c, dx));
-        // The edifice. Rows run as far out as the lobed foot can reach, not to the nominal radius:
-        // the columns within a row already did, and the rows themselves stopping short cut the lobes
-        // that swing out along the x axis off flat.
+        // The edifice, in rows reaching as far as the lobed foot can swing.
         if (c.coneHeight > 0) {
             forEachRow(job, coneReach(c), dx -> lvl -> buildConeRow(lvl, c, dx));
         }
@@ -276,12 +241,8 @@ public final class VolcanoBuilder {
     }
 
     /**
-     * Leaves a core in the magma chamber for the summit to be finished from.
-     *
-     * <p>The crater, the conduit, the vents and the core need a live world: they read the ground
-     * around them, and the core's block entity has to be filled in. So generation leaves a marker, a
-     * core flagged as unfinished, and once its chunk ticks it queues the rest - see
-     * {@link #finishFieldVolcano}. The chamber's lava goes in over it, so it leaves no trace.</p>
+     * Leaves a core flagged as unfinished in the magma chamber. The crater, conduit, vents and core
+     * need a live world, so once its chunk ticks the marker queues them; see {@link #finishFieldVolcano}.
      */
     static void placeMarker(WorldGenLevel level, Ctx c) {
         net.minecraft.resources.ResourceLocation id =
@@ -345,10 +306,7 @@ public final class VolcanoBuilder {
         }
     }
 
-    /**
-     * Lists a large caldera's lake for its core. The lake was laid while the chunks generated, so
-     * unlike a small caldera's there was no live pass to record it cell by cell as it went in.
-     */
+    /** Lists a large caldera's lake for its core, since generation laid it with no live pass to record it. */
     static void collectCalderaLake(ServerLevel level, Ctx c) {
         int r = (int) Math.ceil(c.lakeOuter) + 1;
         for (int dx = -r; dx <= r; dx++) {

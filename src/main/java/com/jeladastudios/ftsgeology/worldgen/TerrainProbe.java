@@ -9,20 +9,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
- * Reads the shape of the land before anything is placed on it.
- *
- * <h2>Why this exists</h2>
- * Every placement bug the mod has had traces back to one wrong assumption: that
- * {@code Heightmap.WORLD_SURFACE} gives you the ground. It does not - it gives the topmost block
- * that is not air, which on grassy or forested terrain is a flower, a fern or a tree canopy. Build
- * on that and hot springs land a block too high with their magma bed poking out of a cliff, vent
- * lava sits on top of the soil and runs into the forest, and earthquakes refuse to move anything
- * because a tuft of grass looks like somebody built it.
- *
- * <p>{@link #groundY} walks down past all of that to real soil or rock, and the site checks below
- * let a feature ask "is this ground actually flat and dry enough for me?" before it commits. That is
- * what lets lava be seated INTO the terrain rather than dumped on top of it, so it has nowhere to
- * flow rather than being fenced in after the fact.</p>
+ * Reads the shape of the land before anything is placed on it. {@code Heightmap.WORLD_SURFACE} gives
+ * the topmost non-air block, often a flower or a tree canopy; {@link #groundY} walks past that to real
+ * soil or rock, and the site checks tell a feature whether the ground is flat and dry enough.
  */
 public final class TerrainProbe {
 
@@ -35,9 +24,8 @@ public final class TerrainProbe {
      * Ground cover that is part of the landscape rather than part of a build: grass, flowers, crops,
      * mushrooms, vines, snow layers. Safe to clear, and never to be mistaken for player work.
      *
-     * <p>Leaves and logs are deliberately NOT included. They are skipped when looking for the ground
-     * but still count as "might be a build", because a cabin is made of logs and the mod promises
-     * never to break player blocks.</p>
+     * <p>Leaves and logs are not included: skipped when finding ground, but a cabin is made of logs,
+     * so they are never cleared as cover.</p>
      */
     public static boolean isVegetation(BlockState s) {
         if (s.isAir()) return false;
@@ -104,11 +92,8 @@ public final class TerrainProbe {
     /**
      * Looks for ground that a recessed basin can be cut into without leaking.
      *
-     * <p>The test is deliberately strict, because the whole point is that lava or water seated here
-     * has physically nowhere to go: the patch must be at one consistent level (within
-     * {@code tolerance}), free of standing fluid, and clear of the sea. A feature that cannot find
-     * such a site should simply not be placed - one vent that sits properly beats five that set the
-     * forest on fire.</p>
+     * <p>Strict on purpose, so lava or water seated here has nowhere to go: one consistent level
+     * (within {@code tolerance}), no standing fluid, clear of the sea.</p>
      *
      * @param radius    half-width of the patch that has to be level
      * @param tolerance how many blocks of height variation are tolerated across it

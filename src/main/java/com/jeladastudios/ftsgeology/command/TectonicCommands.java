@@ -31,17 +31,8 @@ import static com.jeladastudios.ftsgeology.command.InspectCommands.*;
 import static com.jeladastudios.ftsgeology.command.FindCommands.*;
 
 /**
- * Inspection commands for the tectonic model.
- *
- * <ul>
- *   <li>{@code /geology plate} - full readout for the column you are standing in: which plate, what
- *       crust, which way it drifts, and what the nearest fault is doing.</li>
- *   <li>{@code /geology map [blocksPerCell]} - a chat map of the plates and fault lines around you,
- *       so you can actually see where the boundaries run.</li>
- * </ul>
- *
- * The model computes everything from the world seed and never edits the world, so these are pure
- * read-only queries and safe to run anywhere.
+ * The {@code /geology} command tree. Inspection and search live in {@link InspectCommands} and
+ * {@link FindCommands}; quakes and placement are here.
  */
 @Mod.EventBusSubscriber(modid = GeysersMod.MODID)
 public final class TectonicCommands {
@@ -118,9 +109,7 @@ public final class TectonicCommands {
                                         .then(Commands.literal("medium").executes(ctx -> place(ctx,
                                                 StringArgumentType.getString(ctx, "feature"), 0,
                                                 VolcanoSize.MEDIUM)))
-                                        // A hot spring takes an age. Being able to stand four of
-                                        // them side by side is what makes the shape testable on its
-                                        // own, apart from the water line that normally decides it.
+                                        // A hot spring can be built at one stage, to compare stages side by side.
                                         .then(Commands.argument("stage",
                                                         IntegerArgumentType.integer(1, HotSpringShape.MAX_STAGE))
                                                 .executes(ctx -> place(ctx,
@@ -196,15 +185,8 @@ public final class TectonicCommands {
         BlockPos at = BlockPos.containing(source.getPosition());
         boolean ok;
         switch (what) {
-            // With a stage, one age of spring is built here and now, plumbing and all.
-            //
-            // It used to call the shape builder alone, which meant a command-placed spring had no
-            // reservoir and no conduit under it - so digging beneath one found nothing, and testing
-            // the stages this way quietly tested only half the feature. Worse, building a single
-            // stage on untouched ground hid a bug that only appears when stages run in sequence.
-            // A named stage builds ONE spring at that stage; no stage builds a whole system, the
-            // way world generation would. Going through the system builder either way meant a
-            // terraced site capped every request at stage 3, so 3 and 4 were indistinguishable.
+            // With a stage, one spring at that stage, plumbing and all; with none, a whole system as
+            // world generation would build it.
             case "hotspring" -> ok = stage > 0
                     ? HotSpringSites.placeSingleSpringAt(level, at.getX(), at.getZ(), stage)
                     : HotSpringSites.placeHotSpringAt(level, at.getX(), at.getZ(),
@@ -243,11 +225,6 @@ public final class TectonicCommands {
         final String named = size == VolcanoSize.SMALL
                 ? what : what + " (" + size.name().toLowerCase(Locale.ROOT) + ")";
         // Two keys, one placeholder each.
-        //
-        // There was one key, "%s%s here.", and the success branch handed the first placeholder a
-        // whole finished sentence and the second the feature name - so it printed "Placed hotspring
-        // here (suitability gate bypassed). Large volcanoes build over a few seconds.hotspring
-        // here." The failure branch happened to read correctly, which is why it went unnoticed.
         source.sendSuccess(() -> Component.translatable(
                 done ? "command.fts_geology.placed_here" : "command.fts_geology.cannot_place_here",
                 named), false);

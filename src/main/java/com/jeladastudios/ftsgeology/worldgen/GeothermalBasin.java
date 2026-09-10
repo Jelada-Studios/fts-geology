@@ -17,59 +17,21 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * The ground a geyser basin stands on, rather than the springs standing on grass.
+ * The ground a geyser basin stands on. The sinter flat is the floor of the whole basin, as at Norris
+ * or the Upper Geyser Basin, and the pools sit in it.
  *
- * <h2>What this fixes</h2>
- * The springs themselves have been right for several rounds - the pools, the colour bands, the
- * sterile halo of dead crust and bleached trees around each one. But each of those haloes stops
- * about ten blocks out and ordinary meadow begins, so a geyser basin read as a handful of hot
- * springs dropped onto a field. Which is not what one looks like: at Norris or the Upper Geyser
- * Basin the sinter flat is <b>the floor of the whole basin</b>, pale and bare from one side to the
- * other, and the pools sit in it.
+ * <p>The floor is a function of how deep inside a basin a column is, not a hull around spring
+ * cores, which would need a saved record of every core placed.</p>
  *
- * <h2>Why this is not a hull around the springs</h2>
- * The obvious implementation is to cluster the spring cores in an area and floor the region they
- * enclose. Two things rule it out. The first is mechanical: inside a basin
- * {@code HotSpringSites.placeHotSpringAt} builds exactly one pool rather than a terrace chain, so
- * the springs in a basin are single systems scattered through separate chunks, and clustering them
- * would need a persistent record of every core the generator has ever placed - new saved state, and
- * a new class of bug to go with it.
- *
- * <p>The second is that it would be modelling the wrong thing. The sinter flat is not a deposit
- * ringing each pool; it is what the basin floor is made of, laid down over the whole thing by water
- * that has been coming up through it for a very long time. So the floor is a function of <b>how
- * deep inside a basin a column is</b>, which the mod already knows how to answer, and the springs
- * are simply the places where the water is still reaching daylight.</p>
- *
- * <h2>The cost, counted through the call tree this time</h2>
- * {@link HotspotMap#basinStrength} looks like pure seed arithmetic and is not:
- *
- * <pre>
- * basinStrength -&gt; ThermalBiomes.strength -&gt; lookup -&gt; classify -&gt; getBaseHeight
- * </pre>
- *
- * and {@code getBaseHeight} runs the whole 3D noise router - the same call that froze a server for
- * thirteen minutes when river erosion asked for it once per candidate column. {@code lookup} caches
- * at quart (four block) resolution, which is exactly the kind of reassurance that has already failed
- * once: the erosion seeding scan stepped by four as well, and hit the cache almost never.
- *
- * <p>So basin strength is sampled at the <b>four corners of the chunk</b> - shared with the
- * neighbouring chunks, so amortised to about one new lookup each - and every column in between is
- * interpolated. That also settles, for free, the mistake {@code DeepStructure} made: sampling once
- * at a chunk centre and applying the answer to all 256 columns draws a chunk-aligned wall at every
- * threshold crossing. Interpolating gives a ramp instead.</p>
+ * <p>{@link HotspotMap#basinStrength} ends in {@code getBaseHeight}, so it is sampled at the four
+ * chunk corners, shared with neighbouring chunks, and interpolated per column. That also gives a
+ * ramp at the edge rather than a chunk-aligned wall.</p>
  */
 public final class GeothermalBasin {
 
     private GeothermalBasin() {}
 
-    /**
-     * Below this share of plume strength there is no basin here at all.
-     *
-     * <p>The same number {@link HotspotSigns} uses, and for the same reason: the seed grid that
-     * lays out basins does so everywhere in the world, so without a heat gate this would put a
-     * sinter flat in the middle of a temperate forest with nothing under it.</p>
-     */
+    /** Below this share of plume strength there is no basin; the same gate {@link HotspotSigns} uses. */
     private static final double PLUME_THRESHOLD = 0.12;
 
     /** Where the floor starts appearing at all, as a fraction of basin depth. */
@@ -79,11 +41,8 @@ public final class GeothermalBasin {
     private static final double FLOOR_FULL = 0.60;
 
     /**
-     * The most a column may stand above or below its neighbour and still count as basin floor.
-     *
-     * <p>A basin floor is flat - that is most of what makes it read as one. Without this the paint
-     * would climb the valley sides and turn a hillside white, which looks like a bug rather than
-     * like geology.</p>
+     * The most a column may differ from its neighbour and still count as floor, so the paint does
+     * not climb valley sides.
      */
     private static final int MAX_STEP = 2;
 
@@ -128,13 +87,9 @@ public final class GeothermalBasin {
     }
 
     /**
-     * How deep inside a basin this column sits, 0 outside one.
-     *
-     * <p>This mirrors the first branch of {@link HotspotMap#basinStrength} deliberately rather than
-     * simply calling it: a biome another mod has already painted as thermal ground <i>is</i> the
-     * basin and needs no plume under it, but the mod's own seed grid does, and calling
-     * {@code basinStrength} alone would floor a random cell of ordinary countryside every third
-     * grid square.</p>
+     * How deep inside a basin this column sits, 0 outside one. Mirrors the first branch of
+     * {@link HotspotMap#basinStrength}: a thermal biome is a basin by itself, but the seed grid needs
+     * a plume under it.
      */
     private static double basin(ServerLevel level, int x, int z) {
         double p = ThermalBiomes.strength(level, x, z);
@@ -148,26 +103,9 @@ public final class GeothermalBasin {
     }
 
     /**
-     * Geothermal ground along a plate boundary, as opposed to over a plume.
-     *
-     * <h2>Why a hotspot was not the only place that deserved this</h2>
-     * A plume is the <i>rarest</i> way to get a geothermal field and it was the only one the mod
-     * dressed. Iceland is a spreading ridge; Japan, the Andes and Kamchatka are subduction arcs; and
-     * between them those settings hold most of the geothermal ground on Earth. A rift valley with
-     * volcanoes and hot springs standing on ordinary meadow was the same mistake the basin floor was
-     * written to fix, one setting over.
-     *
-     * <h2>Only the two that melt rock</h2>
-     * {@code GeothermalSuitability} also scores collision and transform boundaries for hot springs,
-     * and correctly - the Himalaya and the North Anatolian fault both have them, because a fault
-     * conducts water whatever else it does. But a sinter flat is not made by warm water alone; it
-     * needs a shallow heat engine driving it, and neither of those settings has one. So they get
-     * springs, as they already did, and no basin floor.
-     *
-     * <h2>Cost</h2>
-     * {@link com.jeladastudios.ftsgeology.tectonics.TectonicMap#sampleCached} is cached per quart
-     * position, the same as the biome lookup above it, and this is called at four chunk corners
-     * rather than per column - so it rides along with sampling that was happening anyway.
+     * Geothermal ground along a spreading ridge or subduction arc, as opposed to over a plume.
+     * Collision and transform boundaries get hot springs but no basin floor, having no shallow heat
+     * source. Sampled at the chunk corners through the quart-cached tectonic map.
      */
     private static double boundary(ServerLevel level, int x, int z) {
         com.jeladastudios.ftsgeology.tectonics.PlateSample plate =
@@ -209,23 +147,17 @@ public final class GeothermalBasin {
         BlockState here = level.getBlockState(at);
         if (here.is(Blocks.BEDROCK)) return false;
         if (EruptionHandler.isPlayerPlaced(here)) return false;
-        // A spring's own work always wins. Its bed, its crust and above all its colour bands are the
-        // thing this is meant to be a background for; repainting them would flatten the one part of
-        // a basin that already looked right.
+        // A spring's own work always wins, its colour bands above all.
         if (HotSpringShape.isCrust(here) || isBasinFloor(here)) return false;
 
-        // Patches, not a sprinkle. Scattering four materials per column at random reads as noise -
-        // which is exactly what testing said about the first version of the fumarole fields. Two
-        // slow noise fields give the floor areas instead: sinter flats, crusted ground between them,
-        // and the odd wet hollow.
+        // Patches, not a sprinkle: two slow noise fields give sinter flats, crusted ground and wet hollows.
         double flat = com.jeladastudios.ftsgeology.util.ValueNoise.noise(x, z, 34.0);
         double wet = com.jeladastudios.ftsgeology.util.ValueNoise.noise(x + 4096, z - 4096, 19.0);
 
         TerrainProbe.clearVegetation(level, x, g, z, 2);
 
         if (over(wet, 0.52, 0.20, rng) && s > 0.45) {
-            // A mud flat. Mud pots on their own read as one block stamped over and over; in vanilla
-            // mud they read as pots in a wet patch, which is the same trick the fumarole fields use.
+            // A mud flat: mud pots among vanilla mud, not one block stamped over and over.
             level.setBlock(at, rng.nextInt(7) == 0
                     ? ModBlocks.MUD_POT.get().defaultBlockState()
                     : Blocks.MUD.defaultBlockState(), 2);
@@ -251,18 +183,8 @@ public final class GeothermalBasin {
     }
 
     /**
-     * Is this noise value past a threshold - decided with a die inside a band either side of it?
-     *
-     * <h2>Why the boundaries were knife-edged</h2>
-     * The materials were chosen by testing smooth noise against a bare number, and a bare number on
-     * smooth noise draws a smooth curve: the mud flat ended and the sinter flat began along a single
-     * clean line, which testing quite rightly said looked cut rather than grown. Real ground does
-     * not do that. A mud flat gives way to sinter through a stretch where there is some of each,
-     * because both are still being laid down there.
-     *
-     * <p>So over the band the answer is probabilistic and slides from "almost never" to "almost
-     * always". Two materials chosen this way interfinger over the width of the band instead of
-     * meeting on an edge - which is both what the ground does and what was asked for.</p>
+     * Is this noise value past a threshold, decided with a die inside a band either side of it? Two
+     * materials chosen this way interfinger across the band instead of meeting on a line.
      *
      * @param band how far either side of the threshold the two materials mix
      */

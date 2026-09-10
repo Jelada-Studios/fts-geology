@@ -22,25 +22,13 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * A tectonic plate model laid over an existing world.
  *
- * <h2>What it is</h2>
- * The surface is divided into plates by a jittered-grid Voronoi diagram seeded from the world seed.
- * Every plate gets a stable id, a crust type ({@link PlateKind}) and a constant drift velocity.
- * Where two plates meet, the relative motion of the pair decides what kind of boundary it is:
- * pulling apart, crunching together, or grinding past each other. {@link #sample} answers all of
- * that for any column in the world.
+ * <p>Plates come from a jittered-grid Voronoi diagram seeded from the world seed, each with a stable
+ * id, a crust type ({@link PlateKind}) and a constant drift. Where two meet, their relative motion
+ * decides the boundary. {@link #sample} answers all of it for any column.</p>
  *
- * <h2>Why it does not fight terrain mods</h2>
- * Nothing here generates or edits a single block, and no worldgen hook is registered, so Terralith,
- * Tectonic and friends keep full control of the landscape. Instead the model is fitted TO their
- * world: a plate is called oceanic or continental by asking the world biome source what sits at the
- * plate centre. Install Tectonic and the plates line up with its oceans and continents; play
- * vanilla and they line up with vanilla ones.
- *
- * <h2>Cost</h2>
- * A sample inspects at most a 5x5 block of candidate plate centres and does no world access beyond
- * cached biome lookups, so it is cheap enough to call per player per tick. Plate crust types are
- * cached per dimension for the lifetime of the server; the geometry itself is pure maths and needs
- * no storage at all, so it is stable across world upgrades and identical on every machine.
+ * <p>It edits no blocks: crust type is read from the biome source at the plate centre, so plates
+ * line up with whatever oceans the terrain generator made. A sample scans at most 5x5 candidate
+ * centres, and crust types are cached per dimension.</p>
  */
 public final class TectonicMap {
 
@@ -133,11 +121,8 @@ public final class TectonicMap {
         PlateKind neighbourKind = plateKind(level, seed, ngx, ngz, scale, jitter);
         FaultType type = classify(faultDistance, faultWidth, convergence, shear, kind, neighbourKind);
 
-        // 4. Stress: how tectonically alive this column is. Shaped rather than linear - a raw
-        //    proximity times motion product averages only about 0.2 across the band, which made
-        //    every feature that keys off stress far too rare. The square root fattens the active
-        //    core of the fault zone, and the motion floor keeps a slow-moving boundary meaningfully
-        //    alive right on the line while still fading out with distance.
+        // 4. Stress: the square root of proximity times motion, with a motion floor, so the active
+        //    core of the fault zone is wide and a slow boundary still lives on the line.
         double proximity = 1.0 - Mth.clamp(faultDistance / faultWidth, 0.0, 1.0);
         proximity = Math.sqrt(proximity);
         double motion = Mth.clamp(Math.max(Math.abs(convergence), shear) / 1.2, 0.0, 1.0);
@@ -147,12 +132,9 @@ public final class TectonicMap {
                 type, faultDistance, convergence, shear, nx, nz, stress);
     }
 
-
     /**
-     * Cached sample on a coarse grid. Plate features are thousands of blocks across, so resolving
-     * them to the nearest four blocks is indistinguishable from exact - and it turns the per-column
-     * scans (deep structure, map rendering) from tens of thousands of Voronoi solves per chunk into
-     * a handful. Use {@link #sample} where exactness matters, such as tracing a rupture.
+     * Cached sample on a four-block grid, indistinguishable from exact for plate features. Use
+     * {@link #sample} where exactness matters, such as tracing a rupture.
      */
     public static PlateSample sampleCached(ServerLevel level, int blockX, int blockZ) {
         long key = ((long) (blockX >> 2) & 0xFFFFFFFFL) | (((long) (blockZ >> 2) & 0xFFFFFFFFL) << 32);
@@ -241,11 +223,8 @@ public final class TectonicMap {
     }
 
     /**
-     * Asks the world biome source what sits around a plate centre, and calls the plate oceanic when
-     * most of those probes land in ocean. This goes through the noise biome source directly, which
-     * answers from generator maths without loading or generating a chunk, so it is safe for distant
-     * plates. If a generator cannot answer, it falls back to a seed-derived split, so an exotic
-     * worldgen mod can never break the model.
+     * Calls a plate oceanic when most probes around its centre land in ocean, asked of the noise
+     * biome source so no chunk loads. Falls back to a seed-derived split if the generator cannot answer.
      */
     private static PlateKind sampleCrust(ServerLevel level, double sx, double sz, double scale, long id) {
         try {

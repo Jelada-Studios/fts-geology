@@ -8,21 +8,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 
 /**
- * The shape a volcano takes.
- *
- * <h2>Why this is decided by tectonics</h2>
- * In the real world you do not get to choose: the setting dictates the volcano. Magma that has
- * squeezed through continental crust above a subduction zone is thick and sticky, so it piles up
- * into the steep, layered cone everybody pictures - Fuji, Ararat, St Helens. Magma rising straight
- * from the mantle at a hotspot is runny, so it spreads out into a vast gentle shield like Mauna Loa,
- * or blows its roof off and leaves a caldera like Yellowstone. At a rift the crust is simply pulled
- * open and lava wells out along the crack, building no cone at all - that is Iceland.
- *
- * <h2>What separates them on the ground</h2>
- * The four used to differ only in how wide the crater was and how tall the cone got, which is why
- * they all read as the same mound at different sizes. Each now has its own <b>summit style</b>, its
- * own <b>flank pattern</b> for where lava outlets sit, and its own <b>rock recipe</b>, so you can
- * tell which setting you are standing in without opening a command.
+ * The shape a volcano takes, decided by its setting: sticky arc magma builds a steep stratocone
+ * (Fuji), runny hotspot magma a shield (Mauna Loa) or a caldera (Yellowstone), and a rift a line of
+ * fissure ponds (Iceland). Each has its own summit style, flank pattern and rock recipe.
  */
 public enum VolcanoType {
     /** Steep layered cone with a narrow funnel crater. Subduction arcs: Fuji, St Helens. */
@@ -111,9 +99,7 @@ public enum VolcanoType {
     /** How many blocks of cone are built above the original ground. Zero means no cone. */
     public int coneHeight(int magnitude, RandomSource rng) {
         return switch (this) {
-            // Taller than the crater is wide, on purpose. At the old 8 + magnitude/2 a modest cone
-            // ended up barely higher than its own crater was deep, so the summit WAS the crater and
-            // the thing read as a ring of rock rather than as a mountain with a notch in the top.
+            // Taller than the crater is wide, so the summit reads as a mountain with a notch in it.
             case STRATOVOLCANO -> 12 + magnitude * 4 / 5 + rng.nextInt(8);
             case SHIELD -> 3 + magnitude / 3 + rng.nextInt(4);
             case FISSURE, CALDERA -> 0;    // neither builds an edifice
@@ -133,10 +119,8 @@ public enum VolcanoType {
     /**
      * Exponent of the flank profile.
      *
-     * <p>Above 1 the flanks are <b>concave</b>: the ground falls away fast just below the summit and
-     * flattens out toward the base, which is the classic stratocone silhouette. Below 1 they are
-     * convex - the long, almost imperceptible swell of a shield. This is the single number that most
-     * separates a Fuji from a Mauna Loa when you look at one from a distance.</p>
+     * <p>Above 1 the flanks are concave, the stratocone silhouette; below 1 convex, the swell of a
+     * shield.</p>
      */
     public double flankExponent() {
         return switch (this) {

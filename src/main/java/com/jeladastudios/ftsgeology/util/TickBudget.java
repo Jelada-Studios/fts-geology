@@ -3,30 +3,12 @@ package com.jeladastudios.ftsgeology.util;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 
 /**
- * One wall-clock budget for everything the mod does on the server thread in a tick.
+ * One wall-clock budget for everything the mod does on the server thread in a tick. Separate
+ * deadlines per system once let the mod take 32 ms of a 20 ms tick; now all draw from one pot, and
+ * when it is gone the rest waits for the next tick.
  *
- * <h2>Why this exists</h2>
- * Every long-running system here was given its own deadline, and each of them measured that
- * deadline from the moment it happened to start. There are five of them across two independent
- * {@code ServerTickEvent} handlers that knew nothing about each other, so in a bad tick the mod
- * could hand itself <b>32 milliseconds</b> of a 20 ms tick: eight for the earthquake, eight for
- * retrogen, eight for a volcano under construction, and four each for parked edits and settling.
- * Profiling a dedicated server showed exactly that - twelve percent of the server thread spent on
- * this mod while a player did nothing but load chunks, and the tick time climbing whenever a quake
- * ran.
- *
- * <p>None of those systems was individually wrong. The bug was that nobody owned the tick. So the
- * budget is opened once per tick here and everything draws from the same pot: when it is gone, the
- * rest of the mod does nothing until the next tick, however much work is queued.</p>
- *
- * <h2>Shares</h2>
- * Forge does not promise which handler runs first, so a plain "take what is left" rule would let
- * background work starve a quake simply by being scheduled earlier. Each caller therefore asks for
- * at most a fixed <em>share</em> of the whole budget: background construction can never take more
- * than a fraction of it, and what it leaves is there for the visible work whichever order they run
- * in.
- *
- * <p>Not thread safe, and does not need to be: every caller is on the server thread.</p>
+ * <p>Handler order is not guaranteed, so each caller asks for at most a fixed share, and background
+ * work cannot starve a quake by running first. Server thread only.</p>
  */
 public final class TickBudget {
 
@@ -64,11 +46,7 @@ public final class TickBudget {
 
     /**
      * Nanoseconds this caller may spend: whatever is left, capped at {@code maxShare} of the tick's
-     * total.
-     *
-     * <p>The cap is what makes the split fair without needing to control handler order. Background
-     * work asks for a small share and therefore cannot empty the pot before a quake gets a look in,
-     * even when it runs first.</p>
+     * total, which keeps the split fair whatever order handlers run in.
      *
      * @param maxShare fraction of the whole tick budget, 0..1
      */

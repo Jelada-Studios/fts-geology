@@ -3,26 +3,12 @@ package com.jeladastudios.ftsgeology.instrument;
 import com.jeladastudios.ftsgeology.tectonics.DepthScale;
 
 /**
- * The seismology a station actually does.
+ * The seismology a station actually does. A seismograph does not know where a quake was: it measures
+ * the gap between the P and S arrivals and how far the needle swung, and works out distance and
+ * magnitude from those. Direction needs more than one station.
  *
- * <h2>Why a station cannot just be told the answer</h2>
- * A seismograph does not know where an earthquake was. It knows two things it measured off its own
- * drum: how long the ground shook before the second kind of wave arrived, and how far the needle
- * swung. Everything else - distance, magnitude - is <em>worked out</em> from those two numbers, and
- * the direction cannot be worked out at all from one station. That is the whole reason seismic
- * networks exist, and it is why this class exists rather than the block simply printing the
- * magnitude the quake was created with.
- *
- * <h2>The two waves</h2>
- * An earthquake radiates a compressional <b>P wave</b> and a slower shear <b>S wave</b> from the
- * same instant at the same place. The P wave always arrives first, and the gap between them grows
- * with distance - about one second per eight kilometres in the upper crust. Measure the gap, and
- * you have the distance to the hypocentre without knowing anything else. This is the first thing
- * anyone is taught about reading a seismogram, and it works here exactly as it does in the field.
- *
- * <p>Speeds are the standard upper-crust values. They are not tuned for gameplay: at the mod's
- * default horizontal scale of 25 metres to the block, the real numbers already land in a readable
- * range - a quake two thousand blocks off gives a gap of about six seconds.</p>
+ * <p>Speeds are standard upper-crust values; at 25 metres to the block a quake two thousand blocks
+ * away gives a gap of about six seconds.</p>
  */
 public final class SeismicWave {
 
@@ -41,15 +27,8 @@ public final class SeismicWave {
     public static final double NOISE_FLOOR_MM = 0.05;
 
     /**
-     * Largest swing the drum can record before the pen runs off the paper.
-     *
-     * <p>Set high on purpose. A real Wood-Anderson drum clips at a few tens of millimetres, and at
-     * the distances a Minecraft world spans - the whole playable area is within about a hundred
-     * kilometres of anywhere - it would clip on almost every event, so the station would under-read
-     * constantly and teach the wrong thing. This one only goes off scale for something enormous
-     * more or less underneath it, which keeps the clip as an interesting edge case rather than the
-     * normal outcome. It is a real effect, and it is exactly why a big quake is measured from
-     * distant stations rather than close ones.</p>
+     * Largest swing the drum records before the pen runs off the paper. Set well above a real
+     * Wood-Anderson drum, which would clip on almost every event at Minecraft distances.
      */
     public static final double CLIP_MM = 100_000.0;
 
@@ -64,12 +43,8 @@ public final class SeismicWave {
     }
 
     /**
-     * Straight-line distance from a station to the hypocentre, in metres.
-     *
-     * <p>Hypocentral, not epicentral: the S-P gap measures the path the waves actually travelled,
-     * and for a deep quake that is mostly downward. A slab event three hundred kilometres under
-     * your feet gives a long gap even though the epicentre is right there, which is a real and
-     * genuinely surprising thing to discover with the instrument in hand.</p>
+     * Straight-line distance to the hypocentre in metres: the S-P gap measures the path, which for a
+     * deep quake runs mostly downward.
      */
     public static double hypocentralMetres(double horizontalBlocks, double depthMetres) {
         double flat = horizontalBlocks * DepthScale.metresPerBlockHorizontal();
@@ -77,19 +52,9 @@ public final class SeismicWave {
     }
 
     /**
-     * The distance correction, {@code -log10(A0)}: how much of a trace is explained by the distance
-     * the waves travelled rather than by the size of the earthquake.
-     *
-     * <p>This is the whole substance of a magnitude scale. Richter's insight was that two stations
-     * at different distances draw wildly different traces for the same event, and that the
-     * difference between them follows a curve you can measure once and then subtract forever after.
-     * The standard Southern California form is used here - anchored so that a trace of one
-     * millimetre at a hundred kilometres is magnitude 3, which is Richter's own definition of the
-     * zero point.</p>
-     *
-     * <p>A straight-line fit in log distance is sometimes quoted instead. It is not used: it is
-     * only calibrated over a few hundred kilometres, and at the range a Minecraft world spans it
-     * drifts badly enough to put the derived magnitude out by half a unit.</p>
+     * The distance correction, {@code -log10(A0)}, in the standard Southern California form: a
+     * one-millimetre trace at a hundred kilometres is magnitude 3. The straight-line log fit is not
+     * used; it drifts by half a unit at these ranges.
      */
     private static double distanceCorrection(double km) {
         double d = Math.max(0.1, km);
@@ -97,12 +62,8 @@ public final class SeismicWave {
     }
 
     /**
-     * How far the needle swings for a quake of this magnitude at this distance, in millimetres.
-     *
-     * <p>Richter's definition run backwards. He defined magnitude as the log of the trace amplitude
-     * corrected for distance, so a station of known distance draws a trace of
-     * {@code A = 10^(M - correction)}. Going in this direction is what lets the block record a
-     * measurement rather than being handed the answer.</p>
+     * How far the needle swings for this magnitude at this distance, in millimetres: Richter's
+     * definition run backwards.
      */
     public static double amplitudeMm(double magnitude, double distanceMetres) {
         return Math.pow(10.0, magnitude - distanceCorrection(distanceMetres / 1000.0));
@@ -120,28 +81,14 @@ public final class SeismicWave {
     }
 
     /**
-     * Trace size the redstone scale starts counting from, in millimetres.
-     *
-     * <p>Not the noise floor. The floor is where an event stops being visible at all, and it sits
-     * far below anything a player will actually see: measured across the range, real readings run
-     * from about ten millimetres to the clip, so anchoring the scale at the floor wasted the bottom
-     * half of it and every quake from a tremor to a disaster came out between 6 and 15. One
-     * millimetre is a trace you can just see on the paper, which is the right place for a signal of
-     * 1 to mean "something happened".</p>
+     * Trace size the redstone scale starts from, in millimetres. Real readings run from about ten
+     * millimetres to the clip, so anchoring at the noise floor wasted half the scale.
      */
     public static final double SIGNAL_FLOOR_MM = 1.0;
 
     /**
-     * Redstone strength for a swing, 1-15, on a log scale.
-     *
-     * <p>Log rather than linear because amplitude spans several orders of magnitude between a
-     * tremor you would not feel and one that flattens a hill - and because that is what a magnitude
-     * scale is for in the first place.</p>
-     *
-     * <p>Keyed to how hard the ground shook <em>here</em>, not to the magnitude the station worked
-     * out. A huge earthquake far away and a small one next door can share a magnitude reading and
-     * mean completely different things to a building, and it is the shaking that a warning system
-     * exists to react to.</p>
+     * Redstone strength for a swing, 1-15, on a log scale. Keyed to how hard the ground shook here,
+     * not to the derived magnitude, since the shaking is what a warning system reacts to.
      */
     public static int signal(double amplitudeMm) {
         if (!detectable(amplitudeMm)) return 0;

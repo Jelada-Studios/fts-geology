@@ -24,40 +24,18 @@ import java.util.Deque;
 import java.util.List;
 
 /**
- * Lets the ground an earthquake tore up settle afterwards.
- *
- * <h2>Why</h2>
- * A rupture leaves raw geometry: single-block spikes standing where their neighbours were carved
- * away, and scarps with edges sharper than rock can actually hold. Real ground does not stay like
- * that for a moment. Gravity takes the overhanging crest off and piles it at the foot as scree, and
- * within days a fresh fault scarp already has a talus apron under it. Skipping that step is what
- * makes a modelled landscape look modelled.
- *
- * <h2>What it does</h2>
- * Three rules, applied a few hundred columns per tick over the couple of minutes after the shaking
- * stops, so the ground visibly relaxes rather than snapping into its final shape:
+ * Lets the ground an earthquake tore up settle afterwards, over a few passes along the corridor.
  *
  * <ul>
- *   <li><b>Spikes fall.</b> A column standing three or more blocks above every one of its four
- *       neighbours has nothing holding it up, so it loses its top block.</li>
- *   <li><b>What stood on it comes down with it.</b> Ground that drops leaves whatever was above it
- *       hanging in mid-air. The stack is set back down on the new ground - trees, soil, and builds
- *       alike, because a floating house is a worse outcome than a settled one and <em>falling is
- *       not breaking</em>: every block survives the drop with its state intact. A tree is the one
- *       exception: one whose ground fell more than three blocks did not subside, it
- *       <em>failed</em>, so it goes with the landslide and the scarp is left bare. That is what an
- *       earthquake photograph actually looks like.</li>
- *   <li><b>Crests shed to their foot.</b> Where a column stands four or more above its lowest
- *       neighbour, the top block is <em>moved</em> onto that neighbour. Material is conserved, which
- *       is what makes it talus rather than erasure: the scarp gets lower and an apron grows under
- *       it.</li>
+ *   <li><b>Spikes fall:</b> a column three or more above all four neighbours loses its top block.</li>
+ *   <li><b>What stood on it comes down:</b> a stack left hanging is set back down on the new ground,
+ *       blocks and states intact. Plants whose ground fell away are cleared, as on a fresh scarp.</li>
+ *   <li><b>Crests shed to their foot:</b> a column four above its lowest neighbour moves its top
+ *       block onto that neighbour, so a scarp grows a talus apron.</li>
  * </ul>
  *
- * <p>It only ever visits columns the quake itself edited. The two rock rules move a block at most
- * one step and never touch a player block, so they cannot run away or flatten anything they did not
- * make. The falling rule only ever moves a stack straight down onto the ground beneath it, so it
- * cannot destroy anything either; {@code unsupportedBlocksFall} turns it off entirely, and
- * {@code fallingIncludesPlayerBlocks} leaves builds hanging while still bringing terrain down.</p>
+ * <p>Only columns the quake edited are visited. {@code unsupportedBlocksFall} turns falling off and
+ * {@code fallingIncludesPlayerBlocks} leaves builds where they are.</p>
  */
 public final class Weathering {
 
@@ -69,49 +47,19 @@ public final class Weathering {
      */
     private static final int PASSES = 5;
 
-    /**
-     * How far above the new ground to look for the underside of whatever is left hanging.
-     *
-     * <p>Has to cover the deepest the ground can drop, which is {@link QuakePlanner#MAX_CAPTURE_DEPTH}
-     * plus room for the weathering passes to lower it further.</p>
-     */
+    /** How far above the new ground to look for the underside of a hanging stack; covers the deepest cut. */
     private static final int GAP_SEARCH = 40;
 
-    /**
-     * How tall a hanging stack may be before it is left alone.
-     *
-     * <p>Separate from {@link #GAP_SEARCH} on purpose. These used to be one number, and a single
-     * 24-block window had to hold the gap AND the whole tree: a large quake drops the ground twenty
-     * blocks, which put the canopy beyond the end of the window, so the trunk was cleared and the
-     * leaves were left floating to decay on vanilla's slow timer. That is the "logs gone, leaves
-     * still up there" report. Terralith's big trees need most of this.</p>
-     */
+    /** Tallest hanging stack brought down. Separate from {@link #GAP_SEARCH} so a big tree fits after a deep drop. */
     private static final int STACK_LIMIT = 48;
 
-    /**
-     * A tree can ride the ground down this far before the slope counts as having failed.
-     *
-     * <p>Zero: undermine a tree at all and it comes down. Three blocks of subsidence really would
-     * carry a tree with it, but the survivors read as trees the quake had missed rather than as
-     * trees that rode it out, and one left standing on a pillar spoils the whole scene.</p>
-     */
+    /** How far a tree may ride the ground down before it counts as a landslide. Zero: undermined trees fall. */
     private static final int RIDE_LIMIT = 0;
 
-    /**
-     * How far from a leaf a log may be before the leaf counts as orphaned. Vanilla's own limit.
-     */
+    /** How far from a log a leaf still counts as attached. Vanilla's own limit. */
     private static final int LEAF_SUPPORT_RANGE = 6;
 
-    /**
-     * How far the corridor is widened before settling, so orphaned canopy is actually visited.
-     *
-     * <p>Wider than {@link #LEAF_SUPPORT_RANGE} on purpose. The support range asks "is this leaf
-     * still attached to a tree", and six blocks is the right answer to that. But the dilation asks a
-     * different question - "which columns might hold a leaf the quake orphaned" - and a large
-     * canopy is wider than six blocks from the trunk column, so its outermost leaves sat in columns
-     * the job never looked at. That is the small clumps left hanging in the air after the big
-     * material had already come down.</p>
-     */
+    /** How far the corridor is widened before settling, so a wide canopy's outer leaves are visited too. */
     private static final int CORRIDOR_DILATION = 12;
 
     /** Columns examined per tick. Low on purpose: this is meant to be watched, not to happen. */
@@ -127,27 +75,13 @@ public final class Weathering {
     private static final class Job {
         final ResourceKey<Level> dimension;
         final long[] columns;
-        /**
-         * Per column, the highest Y the quake actually turned to air, or {@link Integer#MIN_VALUE}.
-         *
-         * <p>This is the anchor {@link #reseat} needs and could not get from the world itself. See
-         * the note there: {@code groundY} cannot tell a floating slab from the ground, but the
-         * quake knows exactly how deep it dug, and nothing below that is any of our business.</p>
-         */
+        /** Per column, the highest Y the quake turned to air: the anchor {@link #reseat} measures ground from. */
         final Long2IntMap excavated;
         int cursor;
         int pass;
         int moved;
 
-        /**
-         * Bounding box of the columns, worked out once.
-         *
-         * <p>{@link #pendingNear} is asked every tick, once per open quiet zone, and a corridor job
-         * carries a hundred thousand columns - walking them would be a six-figure loop per tick for
-         * a question that only needs "anywhere near here?". The box is generous rather than exact,
-         * which for this question is the right way to be wrong: it can hold a zone shut a moment
-         * longer than needed, never release one early.</p>
-         */
+        /** Bounding box, so {@link #pendingNear} does not walk every column each tick. Generous, never early. */
         final int minX, maxX, minZ, maxZ;
 
         Job(ResourceKey<Level> dimension, long[] columns, Long2IntMap excavated) {
@@ -175,17 +109,8 @@ public final class Weathering {
     private static final Deque<Job> QUEUE = new ArrayDeque<>();
 
     /**
-     * Columns whose chunk was not loaded when the settling pass reached them, parked by chunk.
-     *
-     * <p>Without this they were simply dropped. A rupture corridor is tens of thousands of columns
-     * and a player stands in one place, so most of it is unloaded while the passes run - the ground
-     * a player flew out to look at afterwards had never been settled at all, and that is why trees
-     * were still hanging over it. The quake itself already solves this for its own edits, by parking
-     * them in {@link PendingEdits} until the chunk comes back; the settling that follows had no
-     * such thing.</p>
-     *
-     * <p>In memory only, like the quake's own parking: a restart loses whatever had not settled
-     * yet, which costs a little tidiness and no correctness.</p>
+     * Columns whose chunk was unloaded when their pass came, parked by chunk and re-queued when it
+     * loads. In memory only: a restart loses unfinished settling, not correctness.
      */
     private static final java.util.Map<String, Long2IntOpenHashMap> PARKED = new java.util.HashMap<>();
 
@@ -201,23 +126,9 @@ public final class Weathering {
     }
 
     /**
-     * Queues the corridor of a finished quake for weathering. The column list is taken from the
-     * edits that were actually planned, so this touches exactly the ground the quake moved.
-     *
-     * <h2>Why this is done in three passes</h2>
-     * It used to dilate around every single edit, and that is quadratic in the wrong way: a quake
-     * writes several blocks in the same column, so the same ring was walked once per <em>block</em>
-     * rather than once per column. On a large rupture - 1.7 million edits over 290 thousand columns
-     * - that measured at nearly five seconds of server thread at dilation 6, and raising the
-     * dilation to 12 to catch the outermost orphaned leaves would have taken it to fifteen. This
-     * runs the instant a quake finishes, with no budget on it, so that is a hard freeze.
-     *
-     * <p>Two observations fix it. First, collapse the edits to unique columns before dilating at
-     * all. Second - and this is where the real win is - dilating a set is the same as the set plus
-     * the dilation of its <b>boundary</b>: an interior column's ring is already inside the set, so
-     * walking it adds nothing. A long thin corridor has a perimeter measured in thousands of
-     * columns rather than hundreds of thousands, which turns the whole operation from seconds into
-     * tens of milliseconds.</p>
+     * Queues the corridor of a finished quake. The planned edits are collapsed to unique columns and
+     * only the boundary is dilated: dilating every edit took seconds on a large rupture, dilating the
+     * perimeter takes milliseconds.
      */
     public static void enqueue(ServerLevel level, List<QuakePlanner.Edit> edits) {
         if (edits.isEmpty()) return;
@@ -273,36 +184,10 @@ public final class Weathering {
         return n;
     }
 
-    /** Relaxes a slice of the corridor. Bounded by both a column count and a wall-clock deadline. */
     /**
-     * Is there settling still outstanding over this patch of ground?
-     *
-     * <p>Asked by {@link QuakeQuiet} before it lets springs and volcanoes rebuild there. Rebuilding
-     * into ground that is still shedding talus produces a pool that is fouled the moment it is
-     * finished.</p>
-     *
-     * <h2>Why this is a question about a place</h2>
-     * It used to be {@code settled()}, meaning "is the whole server's queue empty", and that was
-     * wrong in both directions at once. A second quake anywhere - another continent, another
-     * dimension - put work in the same queue and held every other zone open indefinitely. And
-     * columns waiting on an unloaded chunk sit in {@link #PARKED} rather than the queue, so an empty
-     * queue did not mean the ground was finished either; a zone could be released over a corridor
-     * with a mile of unsettled talus still parked in it.
-     *
-     * <p>Both go away once the question is asked about a specific area, which is the only form the
-     * caller ever actually wanted.</p>
-     *
-     * <h2>Parked work deliberately does not count</h2>
-     * The first version of this counted {@link #PARKED} as well, on the reasoning that unsettled
-     * ground is unsettled whether or not anyone is looking at it. True, and disastrous: parked work
-     * resumes only when its chunk is loaded, a rupture corridor is mostly chunks nobody revisits, so
-     * something was always outstanding and the zone asking never released. Every geothermal feature
-     * inside it froze permanently.
-     *
-     * <p>The columns that matter are the ones near enough to be loaded, and those are in the queue.
-     * When a player does walk out to a parked stretch, {@link #onChunkLoaded} queues it and it
-     * settles then - around a spring that has long since rebuilt, which is a far better outcome
-     * than the spring never rebuilding at all.</p>
+     * Is settling still outstanding near here? Asked by {@link QuakeQuiet} before springs and volcanoes
+     * rebuild. Only queued work counts: parked work waits on chunks nobody may revisit, and counting it
+     * would hold a zone shut for ever.
      */
     public static synchronized boolean pendingNear(ServerLevel level, int x, int z, int radius) {
         for (Job job : QUEUE) {
@@ -312,6 +197,7 @@ public final class Weathering {
         return false;
     }
 
+    /** Settles a slice of the corridor, bounded by a column count and a wall-clock deadline. */
     public static void drain(MinecraftServer server, long budgetNanos) {
         if (QUEUE.isEmpty() || server == null) return;
         long deadline = System.nanoTime() + budgetNanos;
@@ -348,19 +234,14 @@ public final class Weathering {
                 park.put(k, job.excavated.get(k));   // the floor hint has to survive the wait too
                 continue;
             }
-            // Passes 0 and PASSES-1 bring down what is left hanging; the ones between take the raw
-            // edges off the rock. With falling switched off, every pass goes to the rock rules
-            // rather than being wasted.
+            // Passes 0 and the last bring down what hangs; the ones between relax the rock.
             boolean fallPass = (job.pass == 0 || job.pass == PASSES - 1)
                     && GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get();
             boolean moved;
             if (fallPass) {
                 moved = reseat(level, cx, cz, job.excavated.get(k));
-                // On the last pass the trunks are already gone, so anything still hanging is
-                // canopy that lost its tree.
+                // Last pass, after reseat: canopy that lost its tree, spires, hanging water.
                 if (job.pass == PASSES - 1) {
-                    // After reseat, so anything that was going to come down already has and what is
-                    // left standing really is standing on its own.
                     moved |= topple(level, cx, cz, job.excavated.get(k));
                     moved |= dropOrphanedLeaves(level, cx, cz);
                     moved |= dropUnsupportedWater(level, cx, cz);
@@ -373,39 +254,15 @@ public final class Weathering {
     }
 
     /**
-     * Brings down whatever the quake left hanging over this column.
+     * Brings down whatever the quake left hanging over this column, as one stack, keeping every block
+     * and its state. Plants whose ground fell past {@link #RIDE_LIMIT} are cleared instead, like a fresh
+     * landslide scarp. A gap holding fluid is left alone so a lake is never drained.
      *
-     * <p>Reads the run of air directly above the new ground, then the stack sitting on top of that
-     * run, and sets the whole stack back down. <b>Falling is not breaking:</b> every block survives
-     * the drop and keeps its state, it simply ends up lower. That is what lets this ignore whether a
-     * player put it there - a settled wall is a far better outcome than a floating one, and nothing
-     * is lost either way.</p>
+     * <p>Ground is found from {@code excavatedTop}, the highest cell the quake emptied, not from
+     * {@link TerrainProbe#groundY}, which takes a floating raft for the ground. Nothing below the
+     * excavation is examined, so a cave roof is never mistaken for a raft.</p>
      *
-     * <p>The one thing that does not survive is plant matter whose ground fell more than
-     * {@link #RIDE_LIMIT}. A tree can ride a subsiding slope down a few blocks, roots and all; past
-     * that the slope did not subside, it <em>failed</em>, and a fresh landslide scarp is bare. Rock
-     * and anything built is never deleted, however far it fell.</p>
-     *
-     * <p>A gap filled with fluid is left alone, rather than punching a hole in a lake to move a tree
-     * through it.</p>
-     *
-     * <h2>Where the ground is measured from</h2>
-     * Not from {@link TerrainProbe#groundY}, which is what this used to do and what left ice
-     * shelves and soil rafts hanging over a rift for good. {@code groundY} walks down from the
-     * heightmap and skips air, fluid, plants and tree parts - so a slab of ice or dirt floating in
-     * mid-air <b>is</b> the ground as far as it is concerned. It returned the top of the raft,
-     * {@code base = g + 1} was open sky, the drop came out as zero, and the method gave up before
-     * it had looked at anything. A tree standing on such a raft rode out the same way, which is the
-     * rest of the "some trees are still in the air" report.
-     *
-     * <p>So the anchor comes from the quake instead: {@code excavatedTop} is the highest cell it
-     * actually turned to air in this column, and the real ground is the first solid block at or
-     * below that. Nothing under the excavation is ever examined, which is what keeps this from
-     * mistaking a cave roof for a raft and dropping the countryside into it. Columns with no hint -
-     * the dilated ring, where there is orphaned canopy but never a raft - keep the old behaviour.</p>
-     *
-     * @param excavatedTop highest Y the quake emptied here, or {@link Integer#MIN_VALUE} if it
-     *                     never touched this column
+     * @param excavatedTop highest Y the quake emptied here, or {@link Integer#MIN_VALUE} if none
      * @return true if this column changed
      */
     private static boolean reseat(ServerLevel level, int x, int z, int excavatedTop) {
@@ -427,17 +284,14 @@ public final class Weathering {
         if (drop <= 0 || base >= gapLimit) return false;
         int limit = Math.min(base + STACK_LIMIT, roof);
 
-        // Read the hanging stack. Anything solid comes down; only a fluid stops the column, because
-        // dropping a stack through standing water would drain the lake it is sitting in.
+        // Read the hanging stack. Only fluid stops it: dropping through water would drain a lake.
         int top = base;
         boolean allPlant = true;
         while (top < limit) {
             BlockState s = level.getBlockState(m.set(x, top, z));
             if (s.isAir()) break;
             if (!s.getFluidState().isEmpty()) return false;
-            // isPlayerPlaced() does not recognise logs or leaves as natural, so a tree reads as a
-            // build to it. Checking isPlant() first is what keeps trees falling even when a player
-            // has switched build-dropping off - a floating forest was the original complaint.
+            // Trees are checked first, so they fall even when builds may not move.
             if (!mayMoveBuilds && !isPlant(s) && EruptionHandler.isPlayerPlaced(s)) return false;
             if (!isPlant(s)) allPlant = false;
             top++;
@@ -446,9 +300,7 @@ public final class Weathering {
         if (height <= 0) return false;
 
         if (allPlant && drop > RIDE_LIMIT) {
-            // Too far to have ridden it down. This ground did not subside, it gave way, and a fresh
-            // landslide scarp is bare rock. Only vegetation goes this way: clearing a build here
-            // would be destroying it rather than dropping it.
+            // Too far to have ridden it down: the vegetation goes, as on a fresh landslide scarp.
             for (int i = 0; i < height; i++) {
                 level.setBlock(new BlockPos(x, base + i, z), Blocks.AIR.defaultBlockState(), 2);
             }
@@ -464,12 +316,7 @@ public final class Weathering {
         for (int i = 0; i < height; i++) {
             level.setBlock(new BlockPos(x, g + 1 + i, z), stack[i], 2);
         }
-        // Dust where it lands, made of what landed. This is the one place in the mod where a block
-        // visibly falls, and it used to happen in complete silence and stillness: the column simply
-        // was somewhere else the next time you looked at it.
-        //
-        // Only for a drop worth seeing, and only sometimes - a rupture reseats hundreds of thousands
-        // of columns, and a puff off every one of them would be a dust storm rather than a landslide.
+        // A puff of dust where a stack lands, for a drop worth seeing and only sometimes.
         if (drop >= 2 && level.random.nextInt(24) == 0) {
             level.sendParticles(
                     new net.minecraft.core.particles.BlockParticleOption(
@@ -480,30 +327,6 @@ public final class Weathering {
         return true;
     }
 
-    /**
-     * Clears leaves the quake has orphaned.
-     *
-     * <h2>Why this is needed at all</h2>
-     * A canopy spreads over columns whose ground never moved, so {@link #reseat} never looks at
-     * them: the trunk column drops and is cleared, and the leaves around it are left hanging over
-     * untouched ground with a drop of zero.
-     *
-     * <p>Vanilla would normally rot them away. It cannot here. Leaf decay is driven by the
-     * {@code distance} property, which is only recomputed when a neighbour update arrives, and
-     * every edit this mod makes is written with flag 2 - client update, <b>no neighbour
-     * notification</b>. So the leaves keep whatever distance they had, {@code randomTick} never
-     * sees the 7 that would rot them, and they hang there permanently. They were not decaying
-     * slowly; most of them were never going to decay at all.</p>
-     *
-     * <p>Rather than send neighbour updates for hundreds of thousands of quake edits, the canopy is
-     * checked directly: a leaf with no log within {@link #LEAF_SUPPORT_RANGE} has lost its tree and
-     * goes immediately. The search walks outward in rings and stops at the first log, so a leaf
-     * still attached to something costs almost nothing to clear; only genuinely orphaned canopy
-     * pays for the full box, and the pass runs under the same wall-clock deadline as everything
-     * else here.</p>
-     *
-     * @return true if this column changed
-     */
     /** A column this thin cannot stand this tall in ground a quake has just shaken. */
     private static final int SLENDER_HEIGHT = 4;
 
@@ -511,19 +334,8 @@ public final class Weathering {
     private static final int BRACED_NEIGHBOURS = 2;
 
     /**
-     * Brings down the towers a rupture leaves standing in its own trench.
-     *
-     * <h2>Why {@link #reseat} does not already do this</h2>
-     * That method asks whether the ground fell out from <i>under</i> something. A tower has not lost
-     * its footing - it runs unbroken to the floor - so the gap it measures is zero and it walks away.
-     * The rule was not wrong, it simply had no notion of a column being too thin to stand up, and a
-     * quake that cuts a trench leaves plenty of them: one-block spires of loose cobble standing
-     * several blocks over the new floor, which is what testing photographed.
-     *
-     * <p>Real rock does hold up spires - hoodoos, sea stacks - so this is bounded to ground the
-     * earthquake actually moved. Anything the world generator meant to stand somewhere else is never
-     * looked at. And it <b>lowers</b> rather than deletes: the blocks land on the floor and keep
-     * their state, which is the same promise the rest of this class makes.</p>
+     * Brings down one-block spires a rupture left standing in its trench. Only on ground the quake
+     * moved, so natural hoodoos are never touched, and the blocks are lowered onto the foot, not deleted.
      */
     private static boolean topple(ServerLevel level, int x, int z, int excavatedTop) {
         int floor = excavatedTop == Integer.MIN_VALUE
@@ -553,12 +365,7 @@ public final class Weathering {
         // Braced for most of its height: a shoulder of rock, not a spire. Leave it.
         if (lonely * 2 < height) return false;
 
-        // Down and OUTWARD, from the top, into a mound around the foot.
-        //
-        // Straight down does nothing: a tower lowered onto its own footprint lands exactly where it
-        // already was. A spire that gives way spreads, so each block goes to the lowest of the eight
-        // surrounding columns - and only ever to somewhere strictly lower than it started, which is
-        // what makes the pile finite and the loop terminate.
+        // Each block goes to the lowest of the eight neighbours, strictly lower than it was, so it ends.
         boolean moved = false;
         int keep = floor + SLENDER_HEIGHT / 2;      // a stump is left, the way a broken spire is
         for (int y = top; y > keep; y--) {
@@ -609,6 +416,12 @@ public final class Weathering {
         return n;
     }
 
+    /**
+     * Clears leaves with no log within {@link #LEAF_SUPPORT_RANGE}. Vanilla would never rot them: the
+     * quake writes without neighbour updates, so their distance property is never recomputed.
+     *
+     * @return true if this column changed
+     */
     private static boolean dropOrphanedLeaves(ServerLevel level, int x, int z) {
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return false;
@@ -628,16 +441,7 @@ public final class Weathering {
     }
 
     /**
-     * Drops water the quake left standing in mid-air.
-     *
-     * <p>Carving the ground out from under a pond leaves its cells hanging. Vanilla would collapse
-     * them, but only on a neighbour update, and the quake writes with flag 2 - so the pond simply
-     * stays up there in the shape of the ground that used to hold it. Same root cause as the
-     * canopy, and just as visible.</p>
-     *
-     * <p>A cell is only cleared when the block under it is open air, so a pool that still has a
-     * floor is left exactly as it is. Clearing from the bottom up lets one pass take a whole
-     * hanging column rather than peeling one layer per pass.</p>
+     * Drops water the quake left standing in mid-air: every fluid body with air under its lowest cell.
      *
      * @return true if this column changed
      */
@@ -649,13 +453,7 @@ public final class Weathering {
         int roof = Math.min(g + 1 + GAP_SEARCH + STACK_LIMIT, level.getMaxBuildHeight() - 1);
         boolean changed = false;
 
-        // Walk up from the ground looking for the BOTTOM of a body of water that has air under it,
-        // then take the whole body.
-        //
-        // Testing each cell on its own was not enough: in a pond left hanging by a quake, only the
-        // lowest layer has air beneath it - every cell above has water below, so nothing read as
-        // unsupported and the pond stayed up there whole. That is the "all the water is hanging in
-        // the air and it did not even pour out" report.
+        // Find the bottom of each fluid body with air under it and take the whole body at once.
         int y = g + 1;
         while (y <= roof) {
             if (!level.getBlockState(m.set(x, y, z)).isAir()) { y++; continue; }
@@ -700,12 +498,8 @@ public final class Weathering {
     }
 
     /**
-     * First real ground at or below {@code top}, using the same idea of "ground" as
-     * {@link TerrainProbe#groundY} - air, fluid, plants and tree parts are not it - but starting
-     * from a height the caller chooses instead of from the heightmap.
-     *
-     * <p>That one difference is the whole point: started from the top of the world it would find
-     * a floating raft, started from the floor of the quake's own excavation it cannot.</p>
+     * First real ground at or below {@code top}, by {@link TerrainProbe#groundY}'s idea of ground but
+     * started from the quake's excavation, so a floating raft above it is never taken for the ground.
      *
      * @return the Y of the ground, or {@link Integer#MIN_VALUE} if there is none within reach
      */
@@ -764,8 +558,7 @@ public final class Weathering {
             return true;
         }
         if (g - lowest >= SCARP && foot != null) {
-            // The crest sheds one block and it comes to rest at the foot. Material is conserved,
-            // which is the difference between talus and simply deleting the overhang.
+            // The crest sheds one block onto the foot: talus, not deletion.
             BlockState at = level.getBlockState(foot);
             if (!at.isAir() && !TerrainProbe.isVegetation(at)) return false;
             if (EruptionHandler.isPlayerPlaced(at)) return false;

@@ -225,9 +225,8 @@ public final class CaveCollapse {
         if (cave == null) return;
         job.caves++;
 
-        // How hard the arch is working: a wide span under a thin roof is the one that fails. The roof
-        // counts at half weight, because rock arches over far more than its own thickness; at full
-        // weight a first test at M8 found 177 caves along the rupture and brought down two roofs.
+        // A wide span under a thin roof is the one that fails. The roof counts at half weight, since
+        // rock arches over far more than its own thickness.
         int span = span(level, x, cave.top(), z);
         double arch = Mth.clamp(span / (cave.roof() * 0.5 + 2.0), 0.0, 1.5) / 1.5;
         double weak = RockTypes.erodibility(level.getBlockState(new BlockPos(x, cave.top() + 1, z)));

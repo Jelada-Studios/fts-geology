@@ -18,33 +18,17 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Mid-ocean ridges: what a divergent boundary looks like when it happens under water.
+ * Mid-ocean ridges: a divergent boundary under water.
  *
- * <h2>Why this exists</h2>
- * Most of the planet's volcanism is not on land. It happens along sixty-odd thousand kilometres of
- * spreading ridge on the sea floor, where two oceanic plates pull apart, the mantle rises to fill the
- * gap and melts from the drop in pressure alone. Until now the mod knew a boundary was there - the
- * plate map drew it, the suitability table scored it - but the sea floor above it was ordinary sand,
- * so the single largest volcanic system on Earth was the one thing you could not go and look at.
- *
- * <h2>What gets built</h2>
  * <ul>
- *   <li>A <b>swell</b>: the ridge itself, standing above the abyssal plain because the new crust is
- *       hot and buoyant. It subsides again as it ages and moves away, which is why the profile falls
- *       off with distance from the axis rather than ending at a cliff.</li>
- *   <li>An <b>axial valley</b> down the crest - the median rift, where the crust is literally being
- *       torn open. It is the signature that tells a ridge apart from any other undersea hill.</li>
- *   <li><b>Pillow lava</b> on the flanks: the rounded lobes basalt freezes into when it erupts
- *       underwater.</li>
- *   <li><b>Black smokers</b> in the valley: chimneys of precipitated mineral standing over the vent,
- *       trailing a plume. These are also where life on Earth may have started, which makes them
- *       worth walking to.</li>
- *   <li><b>Sediment</b> thickening away from the axis, because older sea floor has had longer to
- *       collect it. Digging across a ridge therefore reads the age of the crust.</li>
+ *   <li>a <b>swell</b> of hot, buoyant new crust, falling off with distance from the axis;</li>
+ *   <li>an <b>axial valley</b> down the crest, where the crust is torn open;</li>
+ *   <li><b>pillow lava</b> on the floor near the axis;</li>
+ *   <li><b>black smokers</b> in the valley;</li>
+ *   <li><b>sediment</b> thickening away from the axis, so a trench across it reads the crust's age.</li>
  * </ul>
  *
- * <p>Everything is built on the sea floor and never replaces a player block. Nothing is allowed to
- * break the surface, so a ridge never turns into an unexpected island.</p>
+ * <p>Built on the sea floor only, never over a player block, and never breaking the surface.</p>
  */
 public final class OceanicRidge {
 
@@ -65,12 +49,8 @@ public final class OceanicRidge {
 
         PlateSample centre = TectonicMap.sampleCached(level.getLevel(), cp.getMinBlockX() + 8, cp.getMinBlockZ() + 8);
         if (centre.faultType() != FaultType.DIVERGENT) return;
-        // Continental rifting builds a valley on land (that is the earthquake system's job); only an
-        // ocean basin gets a spreading ridge.
-        // Decided from the LOCAL column, not from the plate as a whole. Two plates whose CENTRES sit
-        // on land are both classed continental, so a boundary running between them under a sea got no
-        // ridge at all - which is why none ever appeared. What matters is simply whether this piece of
-        // the boundary is under water.
+        // Only where this piece of the boundary is under water; a rift on land is the earthquake
+        // system's job.
         int centreFloor = TerrainProbe.groundY(level, cp.getMinBlockX() + 8, cp.getMinBlockZ() + 8);
         if (centreFloor == Integer.MIN_VALUE || centreFloor >= level.getSeaLevel() - 6) return;
 
@@ -103,20 +83,10 @@ public final class OceanicRidge {
         // There has to be open water standing over it; anything else is not sea floor.
         if (level.getBlockState(new BlockPos(x, floorY + 1, z)).getFluidState().isEmpty()) return 0;
 
-        // The swell. New crust is hot and rides high; it cools, contracts and sinks as it spreads,
-        // so height falls away from the axis instead of stopping at an edge.
-        //
-        // Smoothstep rather than t*t, because smoothstep has ZERO gradient at the axis: the crest is
-        // a broad plateau and the slope lives out on the flanks, which is the real profile of a
-        // mid-ocean ridge. t*t fell fastest exactly at the crest, and since the result is rounded to
-        // whole blocks that became a staircase of terraces every three blocks, every one of them a
-        // perfect line parallel to the boundary. That was the corduroy on the sea floor.
+        // The swell, on a smoothstep: a broad crest with the slope on the flanks, no terraces at the axis.
         double t = 1.0 - Mth.clamp(d / reach, 0.0, 1.0);
         double shape = t * t * (3.0 - 2.0 * t);
-        // And then break the contour lines outright. A smooth profile rounded to whole blocks always
-        // produces perfect level sets; nothing on a real sea floor is a perfect level set.
-        // Faded out at the far margin so the ridge dies into the abyssal plain instead of ending in
-        // a scatter of pits three blocks deep.
+        // Noise breaks the contour lines, faded out at the margin so the ridge dies into the plain.
         double relief = (noise(x, z, 11.0) * 1.7 + noise(x, z, 29.0) * 1.1)
                 * Mth.clamp(t * 3.0, 0.0, 1.0);
         // The swell only ever rises. Digging is the axial valley's job, and it is applied below.
@@ -131,11 +101,7 @@ public final class OceanicRidge {
         // Never let a ridge break the surface and become an accidental island.
         target = Math.min(target, sea - 4);
 
-        // The sediment blanket. None at all in the axial valley, where the crust is being made right
-        // now, thickening quickly away from it because older sea floor has had longer to collect it.
-        // Without this the ridge paved a two-hundred-block swathe of the sea bed in bare basalt; with
-        // it, a trench cut across the ridge reads the age of the crust off the wall, which is the
-        // observation that confirmed sea-floor spreading in the first place.
+        // Sediment: none in the axial valley, thickening away from it as the crust ages.
         int sediment = Math.max(0, (int) Math.round(
                 Math.pow(1.0 - t, 1.5) * 5.0 + noise(x, z, 17.0) * 1.4));
 
@@ -163,15 +129,7 @@ public final class OceanicRidge {
         return Math.max(placed, 1);
     }
 
-    /**
-     * One pillow: a low rounded lobe of chilled basalt on the axial floor.
-     *
-     * <p>Basalt erupting into cold water does not spread in sheets. It squeezes out through a crack,
-     * the outside freezes on contact and the inside keeps inflating, so the flow advances as a heap
-     * of rounded lobes - the single most recognisable rock on the sea floor. One stray block reads as
-     * a mistake; a lump two blocks across reads as a pillow, and a floor covered in them reads as a
-     * spreading ridge.</p>
-     */
+    /** One pillow: a low rounded lobe of chilled basalt, two blocks across so it reads as one. */
     private static int pillow(WorldGenLevel level, int x, int y, int z, int sea, RandomSource rng) {
         int r = 1 + rng.nextInt(2);
         int h = 1 + rng.nextInt(2);
@@ -236,9 +194,7 @@ public final class OceanicRidge {
                 }
             }
         }
-        // The plume. Soul sand's rising bubble column is the closest thing the game has to the black
-        // smoke that gives these vents their name, and unlike a magma column it lifts rather than
-        // drags, so swimming into one is a discovery instead of a drowning.
+        // The plume: soul sand's bubble column lifts rather than drags, so swimming in is no drowning.
         if (set(level, x, baseY + 1, z, Blocks.SOUL_SAND.defaultBlockState())) placed++;
         for (int h = 2; h <= height; h++) {
             if (set(level, x, baseY + h, z, Blocks.WATER.defaultBlockState())) placed++;

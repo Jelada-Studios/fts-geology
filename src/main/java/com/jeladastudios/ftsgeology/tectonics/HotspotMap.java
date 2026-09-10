@@ -11,23 +11,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Mantle hotspots - the intraplate volcanism that plate boundaries cannot explain.
+ * Mantle hotspots: the intraplate volcanism plate boundaries cannot explain, such as Yellowstone and
+ * Hawaii.
  *
- * <h2>Why this matters</h2>
- * About half the geysers on Earth are at Yellowstone, and Yellowstone is nowhere near a plate
- * boundary: it sits over a stationary plume of hot mantle. Hawaii is the same story. A model that
- * only knows about boundaries would miss the single most iconic geothermal field there is, so
- * hotspots are a first-class part of the model rather than an extra.
+ * <p>A plume is fixed while the plate slides over it, so volcanism is live only above the plume and
+ * older volcanoes trail back along the way the plate came from. {@link #sample} reports both the
+ * live strength and the position along that trail.</p>
  *
- * <h2>The trail</h2>
- * A plume is fixed in the mantle while the plate slides over it, so volcanism is only active
- * directly above the plume; older volcanoes are carried away and go extinct, leaving a chain
- * pointing back along the direction the plate came FROM. {@link #sample} reports both the live
- * strength and how far along that trail a column sits, which is what lets worldgen place one active
- * volcano and a line of dead ones behind it - the Hawaii-Emperor pattern.
- *
- * <p>Like {@link TectonicMap} this is pure seed-derived maths: no storage, no worldgen hooks, no
- * blocks touched.</p>
+ * <p>Like {@link TectonicMap}, pure seed-derived maths.</p>
  */
 public final class HotspotMap {
 
@@ -89,10 +80,7 @@ public final class HotspotMap {
                 double strength = dist >= radius ? 0.0
                         : Mth.clamp(1.0 - (dist / radius), 0.0, 1.0);
 
-                // Extinct trail: the plate has carried older volcanoes away, so the chain runs back
-                // along MINUS the plate velocity. Only worth resolving when we are close enough for
-                // the trail to reach us; the drift of a given plume is cached because it never
-                // changes.
+                // Extinct trail: back along minus the plate velocity. A plume's drift is cached.
                 boolean onTrail = false;
                 double trailAge = 1.0;
                 if (trailLength > 0.0 && dist <= trailLength) {
@@ -113,12 +101,8 @@ public final class HotspotMap {
                 }
             }
         }
-        // Ground the world generator has already painted as thermal outranks the plume grid.
-        //
-        // We cannot tell Terralith where to put its yellowstone and caldera biomes, but we can go
-        // where it went - and since Yellowstone is a hotspot and a caldera is what hotspot volcanism
-        // leaves behind, reading one as evidence of a plume is the geology rather than a shortcut.
-        // See ThermalBiomes for why this is safe with any terrain mod, or none.
+        // Ground the generator painted as thermal, such as Terralith's Yellowstone, outranks the
+        // plume grid; see ThermalBiomes.
         double painted = ThermalBiomes.strength(level, blockX, blockZ);
         if (painted > best.strength()) {
             return new Hotspot(painted, 0.0, 0.0, false);
@@ -127,24 +111,13 @@ public final class HotspotMap {
     }
 
     /**
-     * How deeply this column sits inside a <b>geyser basin</b>: 0 outside one, rising to 1 at its
-     * centre. Meaningful only where {@link #sample} already reports a live plume.
-     *
-     * <h2>Why a plume is not uniformly rich</h2>
-     * Yellowstone holds roughly half the geysers on Earth, but they are not sprinkled evenly over the
-     * caldera - they sit in a handful of basins (Upper, Lower, Norris, West Thumb) with miles of
-     * ordinary forest between them, because a geyser needs a specific plumbing of fractured rock and
-     * circulating water, not merely heat. Spreading vents evenly across a 700-block dome gave a
-     * thin scatter that never read as a geyser field at all. Clustering them into basins is both what
-     * the real thing does and what makes finding one feel like finding something.
-     *
-     * <p>Pure seed maths on its own coarse grid, exactly like the plume layer above it.</p>
+     * How deep this column sits inside a geyser basin: 0 outside, 1 at its centre. Meaningful only
+     * over a live plume. Geysers cluster in a few basins, as at Yellowstone, rather than scattering
+     * evenly over the dome.
      */
     public static double basinStrength(ServerLevel level, int blockX, int blockZ) {
         if (!GeyserConfig.HOTSPOTS_ENABLED.get()) return 0.0;
-        // A biome that is already painted as a thermal basin IS the basin - there is no sense in
-        // subdividing Terralith's Yellowstone into quiet country and hot country when the whole
-        // point of the place is that it is hot.
+        // A biome already painted as a thermal basin is the basin.
         double painted = ThermalBiomes.strength(level, blockX, blockZ);
         if (painted >= 0.8) return painted;
 
@@ -172,13 +145,8 @@ public final class HotspotMap {
     }
 
     /**
-     * Strength of the live plume dome here, 0 to 1, and nothing else: no trail, and no reading of
-     * the biome the generator painted.
-     *
-     * <p>For callers that only need to know whether they stand over a plume. {@link #sample} also
-     * asks {@link ThermalBiomes}, which takes the generator's base height - a full noise column -
-     * for every quart it has not seen, and the ore pass asks once per chunk, so it would pay that
-     * on nearly every chunk it touches.</p>
+     * Strength of the live plume dome here, 0 to 1, without the trail or the biome reading. Cheaper
+     * than {@link #sample}, which asks {@link ThermalBiomes} and so the generator's base height.
      */
     public static double plumeStrength(ServerLevel level, int blockX, int blockZ) {
         if (!GeyserConfig.HOTSPOTS_ENABLED.get()) return 0.0;
@@ -200,11 +168,7 @@ public final class HotspotMap {
         return best;
     }
 
-    /**
-     * Drift of the plate riding over a given plume. Constant for the life of the world, so it is
-     * cached: without this, sampling the hotspot field would re-run the whole Voronoi plate solve
-     * for every candidate plume of every column, which the chat map would feel immediately.
-     */
+    /** Drift of the plate over a plume, cached: it never changes and costs a full Voronoi solve. */
     private static final Map<String, double[]> DRIFT_CACHE = new ConcurrentHashMap<>();
 
     private static double[] plumeDrift(ServerLevel level, long seed, int cx, int cz,

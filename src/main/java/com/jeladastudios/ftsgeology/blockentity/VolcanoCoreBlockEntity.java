@@ -87,12 +87,8 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
     }
 
     /**
-     * Raises the mountain again after an earthquake flattened it, once per quake.
-     *
-     * <p>Stamped <b>before</b> the job is queued rather than after. A volcano job takes hundreds of
-     * ticks to drain and this method is reached once a second, so stamping afterwards would let
-     * several rebuilds of the same mountain pile into the queue while the first was still running.
-     * </p>
+     * Raises the mountain again after an earthquake flattened it, once per quake. Stamped before the
+     * job is queued, since the job outlives many of these checks.
      */
     private void rebuildAfterQuake(ServerLevel level, BlockPos pos, long quake) {
         if (type == null || originalBase == null || originalSummitY == Integer.MIN_VALUE) return;
@@ -114,13 +110,8 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
     private long rebuiltFor = Long.MIN_VALUE;
 
     /**
-     * The shape this core was built as, from NBT - or a reasonable guess for a world saved before
-     * the shape was recorded.
-     *
-     * <p>The guess reads what the core already stores. A fissure keeps its crater tiny and its ponds
-     * many; a caldera has the widest crater and a lake's worth of molten cells. Anything else is
-     * left null, which simply means that volcano will not raise itself again - a quiet no-op rather
-     * than a wrong mountain.</p>
+     * The shape this core was built as, from NBT, or a guess for an older save: a fissure has a tiny
+     * crater and many ponds, a caldera the widest crater. Null means it will not raise itself again.
      */
     private static com.jeladastudios.ftsgeology.volcano.VolcanoType readType(CompoundTag tag) {
         if (tag.contains("Type")) {
@@ -140,18 +131,9 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
     }
 
     /**
-     * Puts the magma back after an earthquake has taken it, once per quake.
-     *
-     * <h2>Why a volcano could die permanently</h2>
-     * The dormant branch begins {@code if (!hasLava(server, pos)) return;}, and {@link #hasLava}
-     * looks at the six cells touching the core. A quake that shears that magma out, or cools it
-     * against water it has just let in, makes that test false - and no code in the mod ever put lava
-     * back. The countdown to the next eruption stopped being decremented, and the mountain sat there
-     * for the rest of the world's life with a cold crater. Testing found exactly that.
-     *
-     * <p>The cells to restore are already recorded: {@code moltenCells} is the set the builder said
-     * must stay lava between eruptions. Until now only {@code coolScatteredLava} read it, and only to
-     * decide what <i>not</i> to cool - nothing read it to put anything back.</p>
+     * Puts the magma back after an earthquake has taken it, once per quake. Restores
+     * {@code moltenCells}, the cells the builder said must stay lava; without this a quake that
+     * sheared the lava from the core left the volcano cold for good.
      */
     private void refillAfterQuake(ServerLevel level, BlockPos pos) {
         long quake = com.jeladastudios.ftsgeology.quake.QuakeQuiet.released(
@@ -163,27 +145,18 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
             return;
         }
 
-        // Cool whatever the quake flung about before putting the proper lava back. Nothing else
-        // does it: coolScatteredLava only runs from the erupting phases, so a volcano the quake
-        // killed never tidied up after itself and its lava sat there for good.
+        // Cool what the quake flung about first; coolScatteredLava only runs while erupting.
         VolcanoEruption.coolScatteredLava(level, pos.above(), craterR, 20 + magnitude,
                 surfaceVents, moltenCells);
 
         int restored = refill(level, moltenCells);
 
-        // The recorded list is not always enough. It is filled by carveCalderaRow, carveFunnelPit
-        // and carveLavaLake - but carveFissureLine records nothing, so a fissure volcano carries an
-        // empty list and this would restore precisely zero cells and then mark the quake answered.
-        // The throat above the core is the one cell every volcano has, whatever its shape.
+        // The list can be empty on older saves, so the throat above the core is always tried too.
         if (restored == 0) {
             restored = refill(level, new long[]{pos.above().asLong()});
         }
 
-        // Stamped on success, not on the attempt.
-        //
-        // Stamping first made a transient failure permanent: nothing restored, quake marked as
-        // handled, and the mountain cold for the rest of the world's life. If this run found
-        // nothing to fill, the next check is welcome to try again.
+        // Stamped on success only, so a run that restored nothing is tried again.
         if (restored == 0) return;
         rechargedFor = quake;
         setChanged();
@@ -191,22 +164,12 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
     }
 
     /**
-     * Puts lava back into cells a quake emptied. Returns how many took it.
-     *
-     * <h2>Air is allowed, and that is the whole point</h2>
-     * This refused air, with the comment "never into open sky" - and that single line is why the
-     * fallback never worked. A quake <b>opens</b> the throat, so the cell above the core is air, and
-     * the one place the fallback exists to fill was the one place it skipped. It restored nothing
-     * for ever, silently.
-     *
-     * <p>The worry behind that line was real though, so it is answered properly rather than by
-     * refusing air outright. Lava goes in only where it would stay put:</p>
+     * Puts lava back into cells a quake emptied, air included, since a quake opens the throat.
+     * Returns how many took it. Lava goes in only where it stays put:
      * <ol>
      *   <li>something solid underneath, or the core itself;</li>
-     *   <li>all four horizontal neighbours solid or already lava - one open side and it pours down
-     *       the mountainside instead of filling;</li>
-     *   <li>at or below local ground, so a summit the quake sheared off does not get lava standing
-     *       on a pinnacle in the open air.</li>
+     *   <li>all four horizontal neighbours solid or already lava;</li>
+     *   <li>at or below local ground, never on a sheared-off pinnacle.</li>
      * </ol>
      */
     private int refill(ServerLevel level, long[] cells) {
@@ -260,12 +223,8 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
     }
 
     /**
-     * The cells that are meant to be lava between eruptions - the summit pool, a caldera's lake, a
-     * fissure's ponds.
-     *
-     * <p>Kept as an explicit list because the cooling sweep used to protect them with a radius, and
-     * a radius is the wrong shape for a crescent or a line of ponds: most of the lava a volcano was
-     * built with got turned to basalt after its first eruption and was never refilled.</p>
+     * Cells meant to stay lava between eruptions: summit pool, caldera lake, fissure ponds. Kept as a
+     * list because a radius cannot express those shapes.
      */
     public void setMoltenCells(List<BlockPos> cells) {
         long[] arr = new long[cells.size()];
@@ -274,13 +233,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         setChanged();
     }
 
-    /**
-     * Tells nearby players what this volcano is doing, so their client can draw its smoke.
-     *
-     * <p>The flank chimneys' black smoke used to be sent from here as particles, on the grounds that
-     * a packet and synced state were too much for a puff of smoke. With the whole column moving to
-     * the client the packet exists anyway, and the chimneys ride along in it.</p>
-     */
+    /** Tells nearby players what this volcano is doing, flank chimneys included, so their client can draw the smoke. */
     private void broadcastEruption(ServerLevel level, BlockPos summit) {
         byte code = phase == Phase.ERUPTING ? (byte) 2 : phase == Phase.RUMBLING ? (byte) 1 : (byte) 0;
         double[] wind = VolcanoEruption.wind(summit);
@@ -316,18 +269,12 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
 
         switch (be.phase) {
             case DORMANT -> {
-                // Does not wake up into ground a quake is still moving. An eruption already under
-                // way is left to finish - it is the starting of new work that produces the ruin,
-                // not the finishing of old.
+                // No new work in ground a quake is still moving; an eruption under way may finish.
                 if (com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(server, pos)) return;
-                // A quake that took the magma away used to kill the volcano outright: hasLava went
-                // false, this branch returned on every tick from then on, and nothing anywhere put
-                // lava back. That is the crater that cools after an earthquake and never refills.
+                // Restore magma a quake took, or hasLava stays false for good.
                 long quake = com.jeladastudios.ftsgeology.quake.QuakeQuiet.released(
                         server, pos.getX(), pos.getZ());
-                // Zero means no quake has been released here. It used to pass this test anyway, since
-                // rebuiltFor starts at Long.MIN_VALUE, and the summit crater is below the summit - so
-                // every new volcano "rebuilt" itself on its first quiet second and laid its apron twice.
+                // Zero means no quake was released here; without the check a new volcano rebuilt itself at once.
                 if (quake != 0L && quake > be.rebuiltFor) be.rebuildAfterQuake(server, pos, quake);
                 be.refillAfterQuake(server, pos);
                 if (!hasLava(server, pos)) return; // dead until it has lava again
@@ -349,14 +296,9 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                 }
             }
             case ERUPTING -> {
-                // The mountainside smokes hardest while it is actually erupting. It used to smoke
-                // only when DORMANT and RUMBLING: at the one moment the flank outlets are pouring
-                // lava they were completely silent, so the vents ran dry-looking while the summit
-                // had the whole show to itself.
+                // The flank vents smoke hardest while erupting.
                 be.idleSmoke(server, summit, 1.0f, false);
-                // Well lava up the crater so it spills down the mountain - but only so much of it.
-                // A real flow chills against the ground and stops; without a budget the mountain
-                // simply kept pouring until the whole flank was molten.
+                // Well lava up the crater, to a budget, so the flow is a tongue and not a flood.
                 if (be.spilled < GeyserConfig.VOLCANO_LAVA_BUDGET.get()
                         && VolcanoEruption.spillLava(server, summit)) {
                     be.spilled++;
@@ -391,13 +333,10 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
     }
 
     /**
-     * Black smoke off the crater lava lake itself and off the surface vents; intensity 0..1.
+     * Black smoke off the crater lake and the surface vents; intensity 0..1.
      *
-     * @param deposit whether the vents also lay down sulfur. Only while the volcano is quiet:
-     *                sulfur is a fumarole product, laid by gas escaping through a cool opening. An
-     *                erupting vent is pouring lava, not fuming - and at one attempt per vent per
-     *                second, a twenty-minute eruption across nineteen outlets would have painted
-     *                the whole mountain yellow.
+     * @param deposit whether vents also lay sulfur; only while quiet, since sulfur is a fumarole
+     *                product and an erupting vent pours lava
      */
     private void idleSmoke(ServerLevel level, BlockPos summit, float intensity, boolean deposit) {
         // A few random samples of the crater lava pool.
@@ -473,8 +412,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         magnitude = tag.contains("Magnitude") ? tag.getInt("Magnitude") : 12;
         craterR = tag.contains("CraterR") ? tag.getInt("CraterR") : 3;
         surfaceVents = tag.contains("SurfaceVents") ? tag.getLongArray("SurfaceVents") : new long[0];
-        // Absent on any world built before flank fumaroles existed; an empty array simply means
-        // that mountain has none, which is the right answer rather than a crash.
+        // Absent on worlds from before flank fumaroles; empty means none.
         fumaroles = tag.contains("Fumaroles") ? tag.getLongArray("Fumaroles") : new long[0];
         moltenCells = tag.contains("MoltenCells") ? tag.getLongArray("MoltenCells") : new long[0];
         rechargedFor = tag.contains("RechargedFor") ? tag.getLong("RechargedFor") : Long.MIN_VALUE;

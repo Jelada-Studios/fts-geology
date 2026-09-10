@@ -23,15 +23,9 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.Tags;
 
 /**
- * All spatial/physical side effects of an eruption. Kept stateless (static helpers) — the
- * {@link GeyserCoreBlockEntity} owns simulation state and calls into here.
- *
- * <h2>The vent mouth</h2>
- * Every effect takes a {@link BlockPos} {@code mouth}: the live exit of the vent, resolved each
- * second by {@link VentPathfinder} by tracing the actual open path from the chamber. Because it
- * is re-traced, the mouth <em>moves</em> in response to the player — plug the throat and it
- * blasts back through; cap it and it reroutes or force-breaches. Effects therefore always happen
- * wherever the water is currently getting out.
+ * The physical side effects of a geyser eruption, as stateless helpers; {@link GeyserCoreBlockEntity}
+ * owns the state. Every effect takes the live vent mouth, re-traced each second by
+ * {@link VentPathfinder}, so effects follow wherever the water is currently getting out.
  */
 public final class EruptionHandler {
 
@@ -40,27 +34,15 @@ public final class EruptionHandler {
     /** Max height the fallback dynamic finder walks above the core before giving up. */
     private static final int MAX_VENT_HEIGHT = 384;
 
-    /**
-     * Hard ceiling on the upward velocity any geyser may impose on an entity, per tick. Even if
-     * several vents overlap, nothing gets flung past ~10-12 blocks — this is the safety net that
-     * keeps a cluster of vents from launching you 100+ blocks into the sky.
-     */
+    /** Ceiling on the upward velocity any geyser gives an entity per tick, so overlapping vents cannot launch it. */
     private static final double MAX_UPDRAFT = 1.3;
 
-    /**
-     * The jet only grabs entities within this many blocks below the mouth. Without this, a tall
-     * surface vent would carry you up its entire shaft (tens of blocks); localising it to the
-     * exit keeps the launch to a sane ~8-10 blocks regardless of how deep the vent is.
-     */
+    /** The jet only grabs entities this far below the mouth, so a deep vent does not carry you up its whole shaft. */
     private static final int JET_REACH = 8;
 
     // === Vent geometry ======================================================
 
-    /**
-     * Fallback ceiling finder for buried geysers with no stamped surface Y: the Y of the highest
-     * open cell straight above the core before the first solid cap. Used as the pathfinder's
-     * ceiling when a surface opening wasn't stamped at generation.
-     */
+    /** Fallback ceiling for a buried geyser: the highest open cell straight above the core. */
     public static int findVentMouthYDynamic(ServerLevel level, BlockPos core) {
         int y = core.getY() + 1;
         int topLimit = Math.min(core.getY() + MAX_VENT_HEIGHT, level.getMaxBuildHeight() - 1);
@@ -252,10 +234,7 @@ public final class EruptionHandler {
         double burst = GeyserConfig.JET_BURST_VELOCITY.get() * sizeScale * decay;
         double vy = Math.min(sustained + burst, MAX_UPDRAFT);
 
-        // The steam pushes you up the ENTIRE shaft: the updraft column runs from the core all the
-        // way to the mouth, so if you drop in at the very bottom the jet carries you to the top.
-        // The per-tick MAX_UPDRAFT cap still bounds your speed, so this is a steady ride up rather
-        // than a launch — no matter how deep the vent is.
+        // The updraft runs the whole shaft, capped per tick, so anything dropped in rides up to the mouth.
         double bottom = core.getY();
         AABB column = new AABB(
                 mouth.getX(), bottom, mouth.getZ(),
@@ -270,20 +249,10 @@ public final class EruptionHandler {
             e.fallDistance = 0;
         }
 
-        // The mouth source is placed once per second by ventEruption, and only after the vent has
-        // reached the surface, so a climbing vent never leaves a tall water column. The runoff
-        // sheet around it IS refreshed per tick: it is flowing water, which drains in a few ticks,
-        // so anything slower than this would visibly flicker.
+        // The mouth source is placed once a second; the flowing runoff sheet is re-laid every tick.
         refreshRunoff(level, mouth);
 
-        // A jet, not a stack of puffs.
-        //
-        // This used to draw the column by placing a splash particle at every metre of its height and
-        // capping it with a cloud, which is a picture of a geyser rather than a geyser: the height
-        // was drawn rather than achieved, so nothing was ever moving and the whole thing read as
-        // gently steaming. What sells the real one is pressure - water leaving the ground faster
-        // than it can fall back - so the particles are now fired from the mouth with a real upward
-        // velocity and left to run out of it on their way up, spreading into fog as they slow.
+        // Particles fired from the mouth with real upward velocity, spreading into fog as they slow.
         double x = mouth.getX() + 0.5, z = mouth.getZ() + 0.5;
         double y = mouth.getY() + 1.0;
         double power = (0.9 + 1.4 * decay) * sizeScale;
@@ -311,23 +280,14 @@ public final class EruptionHandler {
      * Erosion) get genuine fluid. Only ever fills air, so it never overwrites terrain or builds.
      */
     public static void ventEruption(ServerLevel level, BlockPos mouth, LongOpenHashSet spilled) {
-        // Fill the mouth, then lay a small water patch over the surrounding surface — each column at
-        // ITS OWN surface height (so it works on slopes) — so a visible pool forms and runs off,
-        // rather than the mouth water just draining straight down the open shaft.
-        //
-        // Every cell filled is recorded in {@code spilled} so the eruption can take it back
-        // afterwards. These are real SOURCE blocks, and in vanilla two adjacent sources make
-        // infinite water: without the record the patch outlived the eruption and the geyser ran
-        // forever. Installations with Flowing Fluids never saw it, because finite water drains on
-        // its own - which is exactly why it went unnoticed for so long.
+        // Fill the mouth, and once in vanilla lay a small patch of sources on the ground around it, each
+        // recorded in spilled so the eruption can take it back and no infinite pool is left.
         if (level.getBlockState(mouth).isAir()) {
             level.setBlock(mouth, Blocks.WATER.defaultBlockState(), 3);
             level.scheduleTick(mouth, Fluids.WATER, 5);
         }
 
-        // Vanilla only, and only on the first second of the eruption: lay the pool once as real
-        // sources rather than re-laying a sheet every tick. Finite-water mods get the mouth alone
-        // and move the rest themselves.
+        // Vanilla only, and only on the first second; finite-water mods get the mouth alone.
         if (hasFiniteWater() || spilled == null || !spilled.isEmpty()) return;
         if (!level.getBlockState(mouth.above()).isAir()) return;
         for (int dx = -1; dx <= 1; dx++) {
@@ -346,27 +306,7 @@ public final class EruptionHandler {
         }
     }
 
-    /**
-     * Keeps a sheet of running water on the ground around the vent while it is spouting.
-     *
-     * <h2>Why this is flowing water and not more sources</h2>
-     * The runoff used to be laid down as SOURCE blocks, one per surrounding column. In vanilla a
-     * flowing cell with two horizontally adjacent sources becomes a source itself, so a ring of
-     * them seeded a pool that grew and then stayed - the geyser ran forever after its first
-     * eruption. Taking back the cells we placed was not enough either, because the ones vanilla
-     * promoted in between were never ours to take.
-     *
-     * <p>Only the mouth is a source now. One source alone can never promote anything, so nothing
-     * outlives the eruption: the sheet is re-laid every tick while the vent spouts and drains by
-     * itself within a second of it stopping. It is still genuine fluid, so Flowing Fluids and Water
-     * Erosion see what they expect.</p>
-     */
-    /**
-     * True when a mod that gives water real physics is present, in which case the runoff is left
-     * for it to move instead of being managed here.
-     *
-     * <p>Resolved once: {@code ModList} does not change after load, and this is asked from a tick.</p>
-     */
+    /** True when a mod that gives water real physics (Flowing Fluids) is installed. Resolved once. */
     private static Boolean finiteWater;
 
     public static boolean hasFiniteWater() {
@@ -376,13 +316,15 @@ public final class EruptionHandler {
         return finiteWater;
     }
 
+    /**
+     * Keeps a sheet of flowing water around the vent while it spouts. Flowing, not sources: two sources
+     * side by side make vanilla water infinite, and the geyser would never stop running.
+     */
     public static void refreshRunoff(ServerLevel level, BlockPos mouth) {
-        // With finite water installed the pool is that mod's to move: it drains on its own when the
-        // jet stops, so re-laying it every tick would fight it and make the surface stutter.
+        // With finite water the pool is that mod's to move.
         if (hasFiniteWater()) return;
 
-        // Only once the vent has actually opened at the surface - while it is still boring upward
-        // its mouth is capped, and laying water then would build a standing column.
+        // Only once the vent is open at the surface, or water would stand in a column.
         if (!level.getBlockState(mouth.above()).isAir()) return;
 
         BlockState flowing = Blocks.WATER.defaultBlockState()
@@ -395,8 +337,7 @@ public final class EruptionHandler {
                 if (cy > mouth.getY() + 1 || cy < mouth.getY() - 24) continue; // downhill only
                 BlockPos p = new BlockPos(cx, cy, cz);
                 BlockState at = level.getBlockState(p);
-                // Never touch standing water that was already there: a vent beside a pond is not
-                // entitled to rewrite the pond.
+                // Never touch standing water that was already there.
                 if (!at.isAir() && !(at.is(Blocks.WATER) && !at.getFluidState().isSource())) continue;
                 BlockState below = level.getBlockState(p.below());
                 if (below.isAir() || !below.getFluidState().isEmpty()) continue;
@@ -408,13 +349,8 @@ public final class EruptionHandler {
     // === Eruption teardown ==================================================
 
     /**
-     * Takes back the water the eruption put down, so the geyser stops flowing when it stops
-     * erupting.
-     *
-     * <p>Only cells this eruption actually filled are touched, and only while they still hold
-     * water. A pond that happened to be next to the vent is not ours and is left alone; a cell a
-     * player has since built in, or that another mod's finite water has already drained, no longer
-     * reads as water and is skipped.</p>
+     * Takes back the water the eruption put down, so the geyser stops flowing when it stops: only cells
+     * this eruption filled, plus water vanilla promoted between two of them.
      */
     public static void removeJetField(ServerLevel level, BlockPos mouth, LongOpenHashSet spilled) {
         if (level.getBlockState(mouth).getFluidState().is(FluidTags.WATER)) {
@@ -424,12 +360,7 @@ public final class EruptionHandler {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         for (long key : spilled) {
             int bx = BlockPos.getX(key), by = BlockPos.getY(key), bz = BlockPos.getZ(key);
-            // Take the cell back, and sweep its neighbours for water vanilla promoted.
-            //
-            // Two horizontally adjacent sources turn the flowing cell between them into a source
-            // as well, and that cell was never in this set - so clearing only what we placed left
-            // a seed behind and the pool grew back. One ring is enough: a promoted cell is by
-            // definition touching two of ours.
+            // Take the cell back, and any neighbour vanilla promoted to a source between two of ours.
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     m.set(bx + dx, by, bz + dz);
@@ -469,32 +400,7 @@ public final class EruptionHandler {
 
     // === Calcite chimney / cave sealing =====================================
 
-    /**
-     * Walls the four horizontal sides of the vent mouth with calcite (where they're open, water, or
-     * soft rock — never a build, never solid natural rock). Called every second while erupting, so:
-     * <ul>
-     *   <li>when the vent breaks into a <b>cave</b>, the water spilling out is boxed in and can't run
-     *       across the cave floor — it's forced to keep rising instead;</li>
-     *   <li>as the mouth climbs, each level it leaves behind is ringed, growing a calcite <b>chimney</b>
-     *       (a sinter tube) — visible from the very first eruption, while it's still flowing.</li>
-     * </ul>
-     * The top is always left open, so the spout itself is never capped.
-     *
-     * <p>Walls a short vertical <em>span</em> down from the mouth — not just the top cell — so a
-     * fast-climbing vent (a few blocks per second) still leaves a CONTINUOUS calcite tube instead
-     * of disconnected rings floating in a cave.</p>
-     */
-    /**
-     * Takes the tree off the top of a vent.
-     *
-     * <p>{@link #buildChimneyRim} only fills air, water and soft rock, and a log is none of those,
-     * so the rim was built around any trunk in the way and left it standing over the mouth with its
-     * roots gone - half a tree balanced on a geyser. A vent breaking the surface through a tree
-     * takes the tree with it.</p>
-     *
-     * <p>Kept to the vent and its rim rather than a clearing: a geyser is a hole in the ground, not
-     * a logging operation.</p>
-     */
+    /** Takes any tree off the top of a vent, which the chimney rim would otherwise leave balanced over the mouth. */
     public static void clearVentCanopy(ServerLevel level, BlockPos mouth) {
         for (int dx = -2; dx <= 2; dx++) {
             for (int dz = -2; dz <= 2; dz++) {
@@ -510,6 +416,11 @@ public final class EruptionHandler {
         }
     }
 
+    /**
+     * Walls the sides of the vent mouth, and a few blocks below it, with calcite where they are open,
+     * water or soft rock: a breakout into a cave is boxed in and forced upward, and a climbing vent grows
+     * a continuous sinter tube. The top stays open.
+     */
     public static void buildChimneyRim(ServerLevel level, BlockPos mouth) {
         clearVentCanopy(level, mouth);
         for (int dy = 0; dy <= CHIMNEY_WALL_SPAN; dy++) {
@@ -605,15 +516,8 @@ public final class EruptionHandler {
     // === Build-protection heuristic =========================================
 
     /**
-     * Conservative "did a player place this?" check. The logical inverse of
-     * {@link #isNaturalMatrix}: any naturally-generated rock/soil/sand/fluid (vanilla <em>and</em>
-     * modded, recognised by tag) is never treated as a build, so the geyser reliably forms in
-     * badlands terracotta, blackstone, dripstone caves and modded biomes — not just vanilla
-     * deepslate. Air is carvable, so it is never a "build" either.
-     *
-     * <p>This is the fix for the long-standing "no water/steam" bug: the old whitelist only knew a
-     * handful of vanilla deep stones, so in any other terrain {@code fillLayer} skipped the magma
-     * bed and chamber water (thinking they were player blocks), leaving a lone, dead core.</p>
+     * Did a player place this? The inverse of {@link #isNaturalMatrix}: natural rock, soil, sand, fluid,
+     * vegetation and trees, vanilla or modded by tag, never count as a build.
      */
     public static boolean isPlayerPlaced(BlockState s) {
         if (s.isAir()) return false;
@@ -628,40 +532,17 @@ public final class EruptionHandler {
     private static boolean isNaturalMatrix(BlockState s) {
         if (s.isAir()) return true;
         if (!s.getFluidState().isEmpty()) return true; // any water/lava, source or flowing
-        // Ground cover is part of the landscape, not somebody building. Leaving it out was the bug
-        // that made earthquakes refuse to move grassy terrain and left gaps in hot-spring walls:
-        // a tuft of grass on top of the soil read as a player block, so every safety check bailed.
+        // Ground cover is landscape, not a build.
         if (com.jeladastudios.ftsgeology.worldgen.TerrainProbe.isVegetation(s)) return true;
-        // Trees are grown by the world, not built by anybody. Leaving them out made every log and
-        // leaf read as a build, which had three visible consequences: earthquakes left forests
-        // hanging in mid-air because the rule that puts them back down refused to touch them,
-        // volcanoes built their cone around stray trunks instead of through them, and lava stopped
-        // at the tree line. The cost is that a log cabin now reads as terrain too - accepted
-        // deliberately, since a floating forest is the worse outcome of the two.
+        // Trees are landscape too, or quakes leave forests hanging; a log cabin counts as terrain as a result.
         if (s.is(BlockTags.LOGS) || s.is(BlockTags.LEAVES) || s.is(BlockTags.WART_BLOCKS)
                 || s.is(Blocks.MANGROVE_ROOTS) || s.is(Blocks.MUSHROOM_STEM)
                 || s.is(Blocks.BROWN_MUSHROOM_BLOCK) || s.is(Blocks.RED_MUSHROOM_BLOCK)) {
             return true;
         }
-        // The mod's own deposits are ground the mod itself laid down, so they have to read as
-        // terrain or every safety check treats them as somebody's build and works around them.
-        // That is why an earthquake ran straight past a hot-spring field and left it standing on an
-        // untouched island: sinter, the mats and the spring bed were all "player blocks" to this.
-        //
-        // The five functional blocks are deliberately NOT in here. A geyser core, its chamber and
-        // the two igniters are machinery rather than landscape; leaving them protected means a
-        // quake cannot cut a working geyser in half and leave an orphaned chamber behind.
-        //
-        // Every RAW geological block the mod places belongs here, and the worked forms deliberately
-        // do not. That line is the whole rule: a rock the world put down is landscape, and a polished
-        // slab or a staircase is somebody's wall.
-        //
-        // The list used to stop at sinter and the mats, and every block added since - the twelve
-        // rocks, the minerals, travertine, the cooling crust, and the basin's own crust, mud pots and
-        // vents - was silently a "player block". So an earthquake would not move any of them: a
-        // hot-spring field ended up standing on towers of its own mud pots and sinter crust while
-        // the ground around it collapsed. Adding a block without adding it here is an easy thing to
-        // miss and nothing complains, which is exactly why this list is written out in full.
+        // The mod's own raw deposits and rocks are landscape. Machinery (cores, chambers, igniters) and
+        // worked forms (polished, slabs, stairs) are not. A new raw block must be added here, or quakes
+        // and eruptions will treat it as a build.
         if (s.is(ModBlocks.HOT_SPRING.get())
                 || s.is(ModBlocks.SINTER.get())
                 || s.is(ModBlocks.SINTER_CRUST.get())

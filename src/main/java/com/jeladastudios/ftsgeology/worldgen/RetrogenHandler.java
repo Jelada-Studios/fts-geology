@@ -25,22 +25,12 @@ import static com.jeladastudios.ftsgeology.worldgen.SurfaceFeatures.*;
 import static com.jeladastudios.ftsgeology.worldgen.HotSpringSites.*;
 
 /**
- * Retroactively injects geyser systems into chunks — including pre-existing chunks in a
- * world created before the mod was installed.
+ * Queues geology for chunks as they load, including chunks from before the mod was installed, and
+ * works through the queue on the server tick.
  *
- * <h2>Tagging</h2>
- * Each processed chunk is stamped in its saved NBT with {@code geyser_system_generated = true}
- * (via {@link ChunkDataEvent.Save}). On load ({@link ChunkDataEvent.Load}) we read the stamp
- * into {@link #PROCESSED}. When a chunk is fully loaded on the server
- * ({@link ChunkEvent.Load}) and is <em>not</em> stamped, we scan and (maybe) build a system,
- * then mark it processed so the next save persists the stamp.
- *
- * <h2>Safety invariants</h2>
- * <ul>
- *   <li>Never touches any block at or above {@link GeyserConfig#RETROGEN_MAX_Y} (default -30).</li>
- *   <li>Only carves through naturally occurring deep rock — player blocks abort the column
- *       (see {@link EruptionHandler#isPlayerPlaced}).</li>
- * </ul>
+ * <p>Each processed chunk is stamped in its saved NBT and read back into {@link #PROCESSED} on load,
+ * so a chunk gets its surface features once. Deep work stays below
+ * {@link GeyserConfig#RETROGEN_MAX_Y} and never replaces player blocks.</p>
  */
 @Mod.EventBusSubscriber(modid = GeysersMod.MODID)
 public final class RetrogenHandler {
@@ -50,36 +40,19 @@ public final class RetrogenHandler {
     public static final String TAG_KEY = "geyser_system_generated";
 
     /**
-     * Version of the DEEP geology algorithm, stamped separately from the surface pass.
-     *
-     * <h2>Why a version and not another boolean</h2>
-     * The surface stamp is permanent on purpose: a chunk must never get a second geyser or a second
-     * volcano just because the mod was updated. But the deep boundary structure - the slab, the
-     * metamorphic root, the shear zone, the rift dykes - is invisible from the surface, replaces
-     * nothing a player made, and lives entirely below {@code retrogenMaxY}. When its algorithm is
-     * fixed there is no reason for a world to keep the broken version forever.
-     *
-     * <p>That is exactly what was happening: every chunk visited in an earlier session carried the
-     * permanent stamp, so {@link DeepStructure} never ran there again and successive rounds of fixes
-     * to it were invisible in the one world being used to test them. Bumping this constant makes
-     * already-visited chunks regenerate their deep geology, and only their deep geology, in the
-     * background as you travel.</p>
+     * Version of the deep geology algorithm, stamped apart from the permanent surface stamp. Bumping
+     * it regenerates deep structure in visited chunks, and only that, never a second geyser or volcano.
      */
     public static final int DEEP_VERSION = 2;
 
     public static final String DEEP_TAG = "fts_deep_version";
 
-    /**
-     * How many blocks above the original ground surface the vent is allowed to reach — i.e. the
-     * maximum height of the raised calcite chimney at the surface. Small, so a surfaced geyser gets
-     * a tidy 2–3 block cone/chimney, not a tower into the sky.
-     */
+    /** How far above the original ground a vent may reach: the height of its calcite chimney. */
     static final int SURFACE_CHIMNEY_HEIGHT = 2;
 
     /**
-     * Dimension-qualified chunk keys already known to be processed (loaded stamp or freshly
-     * done). Keying includes the dimension so identical chunk coordinates in different
-     * dimensions (e.g. Overworld vs Nether (0,0)) never collide.
+     * Dimension-qualified keys of chunks already processed, so equal coordinates in two dimensions
+     * never collide.
      */
     static final Set<String> PROCESSED = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
@@ -129,15 +102,9 @@ public final class RetrogenHandler {
         boolean deepDone = DEEP_CURRENT.contains(key);
         if (surfaceDone && deepDone) return;   // fully up to date
 
-        // Queue it rather than running it now. Generating a feature writes blocks well outside its
-        // own chunk - a volcano field reaches over a hundred blocks - and doing that from inside a
-        // chunk-load event forces neighbouring chunks to load, which fires more load events, which
-        // generate more features. During world creation that cascade never settles and the world
-        // never finishes generating. Draining a queue on the server tick instead means nothing runs
-        // until the world is actually up, and the work is bounded per tick.
-        //
-        // A chunk that already has its surface features but stale deep geology is queued DEEP ONLY,
-        // so re-running the fixed boundary structure can never duplicate a geyser or a volcano.
+        // Queued, not run now: features write outside their chunk, and doing that inside a load event
+        // loads neighbours and cascades during world creation. A chunk with its surface features but
+        // stale deep geology is queued deep-only.
         QUEUE.add(new QueuedChunk(level.dimension(), chunk.getPos(), surfaceDone));
     }
 
@@ -188,21 +155,16 @@ public final class RetrogenHandler {
         if (event.phase != net.minecraftforge.event.TickEvent.Phase.END) return;
         if (event.getServer() == null) return;
 
-        // One budget for the whole mod, opened by whichever tick handler runs first. Both of these
-        // shares are small on purpose: this is background construction, and it must not be able to
-        // empty the tick before the earthquake handler - which a player is actually watching - gets
-        // its turn. See TickBudget for what went wrong when every system kept its own deadline.
+        // One budget for the whole mod; these shares are small so the earthquake handler still gets
+        // its turn. See TickBudget.
         TickBudget.open(event.getServer().getTickCount());
 
-        // Volcanoes under construction get their slice first. They are the heaviest thing the mod
-        // builds, so they are emitted as steps and drained against a wall-clock deadline rather than
-        // raised in one tick - a large shield covers thousands of columns.
+        // Volcanoes under construction first, as steps against a wall-clock deadline.
         com.jeladastudios.ftsgeology.volcano.VolcanoJob.drain(event.getServer(),
                 TickBudget.slice(0.3));
 
-        // A volcano under construction slows chunk geology down rather than stopping it. Blocking
-        // outright looked tidier but would let the chunk queue grow without bound while exploring a
-        // hotspot, where volcanoes are common enough to arrive faster than they finish.
+        // A volcano under construction slows chunk geology rather than stopping it, so the queue
+        // cannot grow without bound.
         int budget = GeyserConfig.RETROGEN_CHUNKS_PER_TICK.get();
         if (com.jeladastudios.ftsgeology.volcano.VolcanoJob.busy()) budget = Math.max(1, budget / 2);
 
@@ -210,13 +172,8 @@ public final class RetrogenHandler {
             // A wall-clock brake as well as a chunk count, so the count above is a permission rather
             // than a promise: whichever runs out first stops the tick.
             long deadline = System.nanoTime() + TickBudget.slice(0.3);
-            // Chunks inside a quiet zone, held aside until the loop is over.
-            //
-            // They used to go straight back into the queue, which made the tick spin: pollNearest
-            // picks the chunk closest to a player, a player standing near a quake is closest to the
-            // quiet chunks, so the very next iteration pulled the same one back out. One chunk could
-            // absorb the entire per-tick budget, every tick, and starve retrogen for the whole
-            // server. Held aside, each is looked at once.
+            // Chunks in a quiet zone, held aside until the loop ends so the same one is not pulled
+            // again this tick.
             List<QueuedChunk> deferred = new ArrayList<>();
             for (int i = 0; i < budget && System.nanoTime() < deadline; i++) {
                 QueuedChunk q = pollNearest(event.getServer());
@@ -226,10 +183,8 @@ public final class RetrogenHandler {
                 LevelChunk chunk = level.getChunkSource().getChunkNow(q.pos().x, q.pos().z);
                 if (chunk == null) continue;
 
-                // Ground a quake is still working on, or still shedding debris into. Building a
-                // volcano or a spring field into it wastes the feature - this chunk gets exactly
-                // one geology pass ever, and spending it on land that is about to move is spending
-                // it on wreckage. Put it back and take it again when the ground is still.
+                // Ground a quake is still moving: held until it is still, since a chunk gets one
+                // surface pass ever.
                 if (com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(
                         level, q.pos().getMiddleBlockX(), q.pos().getMiddleBlockZ())) {
                     deferred.add(q);
@@ -240,18 +195,14 @@ public final class RetrogenHandler {
                 if (DEEP_CURRENT.contains(key) && (q.deepOnly() || PROCESSED.contains(key))) continue;
                 boolean finished = true;
                 try {
-                    // Deep geology first, whether or not the surface is still to come: the boundary
-                    // structure is what the surface features then sit on top of. A chunk generated
-                    // with the mod installed already got it from GeologyFeature and skips this.
+                    // Deep geology first; a chunk generated with the mod already has it from GeologyFeature.
                     if (!DEEP_CURRENT.contains(key)) {
                         DeepStructure.Report deep = q.deep() != null ? q.deep() : new DeepStructure.Report();
                         long started = System.nanoTime();
                         int next = DeepStructure.generate(level, q.pos(), deep, q.column(), deadline);
                         if (next < DeepStructure.DONE) {
                             longestStepNanos = Math.max(longestStepNanos, System.nanoTime() - started);
-                            // Out of time part way through. A chunk used to be finished regardless, and
-                            // with another mod taxing every block change one chunk alone overran the
-                            // whole slice (GitHub #1). Held with its place kept, resumed next tick.
+                            // Out of time part way through: held with its place kept, resumed next tick.
                             deferred.add(new QueuedChunk(q.dimension(), q.pos(), q.deepOnly(), next, deep));
                             finished = false;
                             continue;
@@ -283,9 +234,7 @@ public final class RetrogenHandler {
             QUEUE.addAll(deferred);     // back in the queue, but not before this tick is done
         }
 
-        // Say out loud whether the queue is keeping up. Without this there was no way to tell a
-        // structure that had not generated from one that had and was simply hard to find, which is
-        // exactly the question testing kept running into.
+        // Logged, so a structure that did not generate can be told from one that is hard to find.
         if (++reportTimer >= 200) {
             reportTimer = 0;
             int generated = GENERATED.getAndSet(0);
@@ -305,14 +254,8 @@ public final class RetrogenHandler {
     }
 
     /**
-     * Takes the queued chunk nearest a player, dropping any that are no longer loaded.
-     *
-     * <p>A plain FIFO was the reason geology so often seemed missing. At sixteen chunks a tick the
-     * throughput is fine, but the order was not: after world creation the queue already held the
-     * whole spawn area, and teleporting somewhere new put those chunks <em>behind</em> it. By the
-     * time their turn came the player had moved on, the chunk had unloaded, and it was skipped -
-     * only to be queued again behind an even longer backlog next visit. Working outward from
-     * wherever somebody actually is fixes that completely.</p>
+     * Takes the queued chunk nearest a player, dropping any that are no longer loaded. Nearest first,
+     * so a player who moves on is not left waiting behind an old backlog.
      */
     static QueuedChunk pollNearest(net.minecraft.server.MinecraftServer server) {
         QueuedChunk best = null;
@@ -328,18 +271,8 @@ public final class RetrogenHandler {
             if (level == null || level.getChunkSource().getChunkNow(q.pos().x, q.pos().z) == null) continue;
 
             double d = distanceToNearestPlayer(level, q.pos());
-            // `best == null` first, and it is not a tidiness detail - it is the whole reason this
-            // worked in single player and did nothing at all on a dedicated server.
-            //
-            // With nobody online, distanceToNearestPlayer has no player to measure to and returns
-            // Double.MAX_VALUE for every chunk. `d < bestDist` is then MAX_VALUE < MAX_VALUE, which
-            // is false, so no candidate was ever chosen, everything went straight back on the queue
-            // and this returned null forever. A server that generated its spawn area before anyone
-            // joined sat there with 529 chunks queued and placed nothing, for as long as it ran.
-            //
-            // Taking the first valid candidate unconditionally degrades to plain queue order when
-            // there is no player to sort by - which is the right behaviour anyway. An idle server
-            // has nothing better to do than get its geology in before the first player arrives.
+            // The first valid candidate is taken unconditionally: with nobody online every distance
+            // is MAX_VALUE, and a strict comparison would never pick one.
             if (best == null || d < bestDist) {
                 if (best != null) parked.add(best);
                 bestDist = d;

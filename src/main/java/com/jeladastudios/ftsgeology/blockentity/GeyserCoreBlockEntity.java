@@ -91,10 +91,8 @@ public class GeyserCoreBlockEntity extends BlockEntity {
     private static final int SURFACE_CHIMNEY_HEIGHT = 2;
 
     /**
-     * The highest cell the vent has bored up to so far — its "frontier". Persisted so the vent
-     * keeps drilling upward <em>cumulatively</em> across eruptions: each active trace resumes from
-     * here (a few blocks of new progress per second) instead of re-climbing from the core, which is
-     * what makes the vent slowly work its way to daylight rather than stalling just above the core.
+     * The highest cell the vent has bored up to. Each active trace resumes here, so the vent works
+     * its way to daylight across eruptions instead of re-climbing from the core.
      */
     private int ventTopY = UNKNOWN_MOUTH_Y;
 
@@ -174,12 +172,8 @@ public class GeyserCoreBlockEntity extends BlockEntity {
     // === Environment survey =================================================
 
     /**
-     * Measures the current chamber: counts real water blocks (V_su) and air cells (V_oda)
-     * over the <em>cached interior cell set</em> only, plus adjacent heat sources.
-     *
-     * <p>Cost is O(cells) with a hard {@link #MAX_CHAMBER_CELLS} ceiling — independent of any
-     * fixed cube radius — because the {@code GeyserChamberBlock} markers wall the flood-fill
-     * in tightly. This is the TPS-friendly path versus the old (2r+1)³ cube scan.</p>
+     * Measures the chamber: water (V_su) and air (V_oda) over the cached interior cells only, plus
+     * adjacent heat sources. O(cells), capped at {@link #MAX_CHAMBER_CELLS}.
      */
     private void surveyChamber(ServerLevel level, BlockPos pos) {
         if (chamberCells == null) {
@@ -294,12 +288,7 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         this.chamberCells = null;
     }
 
-    /**
-     * Emits the "pressure building" cue: bubbles rising off the chamber water (more, and joined by
-     * boiling splashes, the hotter it gets) plus a hiss that rises in volume/pitch as pressure
-     * nears the eruption threshold. Watch the water froth and listen for the whistle — that's your
-     * warning to clear the area.
-     */
+    /** The "pressure building" cue: bubbles and a hiss that rise as pressure nears the threshold. */
     private void emitPressureCue(ServerLevel level) {
         if (chamberCells == null) return;
         double boiling = GeyserConfig.BOILING_POINT_C.get();
@@ -458,21 +447,11 @@ public class GeyserCoreBlockEntity extends BlockEntity {
                 // Venting bleeds latent steam and pressure each second.
                 double vented = Math.max(latentSteam * 0.25, 500.0);
                 latentSteam = Math.max(0.0, latentSteam - vented);
-                // Grow the calcite chimney and seal any cave the vent broke into: wall the mouth's
-                // sides every second so water can't run off sideways, and a sinter tube rises with
-                // the climbing vent (visible from the first eruption, while it's still flowing).
+                // Wall the mouth every second, so water cannot run off sideways and a sinter tube
+                // grows with the climbing vent.
                 EruptionHandler.buildChimneyRim(level, mouth);
-                // Only spout real water once the vent has actually bored through to its opening —
-                // otherwise a deep vent leaves a tall standing water column as its mouth climbs.
-                // (While still boring upward it just breaches + steams.) And only while the basin
-                // has water (conservation).
-                // Spout water wherever the vent currently OPENS (the block above the mouth is
-                // air) — the rig's own hole for a sealed rig, a cave, or the surface. While the
-                // vent is still boring through solid rock its mouth is capped, so no water is
-                // placed there and no tall column builds.
-                // Natural geysers are fed by the water table, so they always have water to spout
-                // while erupting (even if their visible basin momentarily leaked into a cave).
-                // Only a sealed player rig (emergent) can genuinely run dry.
+                // Spout only where the vent opens to air, so a vent still boring through rock builds
+                // no standing column. Natural geysers are groundwater-fed; only a sealed rig runs dry.
                 boolean hasWater = !emergent || waterVolume >= 1.0;
                 boolean atExit = level.getBlockState(mouth.above()).isAir();
                 if (hasWater && atExit) {
@@ -550,26 +529,13 @@ public class GeyserCoreBlockEntity extends BlockEntity {
      * otherwise it only reports where the vent is currently blocked.
      */
     private BlockPos resolveMouth(ServerLevel level, BlockPos pos, boolean active) {
-        // Ceiling: a FIXED target captured once — the original ground surface plus a short chimney.
-        // If it isn't stamped yet (a geyser made before stamping existed, an emergent rig, etc.) we
-        // capture it the first time we resolve and freeze it. This is the fix for vents that grew a
-        // calcite chimney straight up to the world height limit: because the chimney lifts the
-        // WORLD_SURFACE heightmap, a live re-read would make the vent chase its own tower upward
-        // forever. Freezing the ceiling once stops that for good — new AND already-placed geysers.
-        //
-        // The surface is measured with TerrainProbe, NOT with the WORLD_SURFACE heightmap. That
-        // heightmap counts leaves and logs, so a geyser that happened to land under a spruce froze
-        // its ceiling at the top of the tree and then bored a calcite chimney up into the canopy —
-        // which is the "some geysers stand way too high off the ground, sometimes" report. Under a
-        // tree it was wrong by the height of the tree; in the open it was right, which is exactly the
-        // "sometimes". TerrainProbe walks past vegetation and answers with the actual ground.
+        // Ceiling: fixed once, from the real ground (TerrainProbe) plus a short chimney. A live
+        // WORLD_SURFACE read would chase its own calcite tower upward and count tree canopy as ground.
         if (ventMouthY == UNKNOWN_MOUTH_Y) {
             ventMouthY = probedCeiling(level, pos);
             setChanged();
         } else if (ventTopY == UNKNOWN_MOUTH_Y) {
-            // Existing worlds carry the old, tree-inflated stamp in their chunk data. Safe to
-            // re-measure it only while the vent has never bored anything: once a chimney exists it
-            // IS ground, and probing would simply read the tower straight back.
+            // Old stamps may be tree-inflated; re-measure only while the vent has bored nothing.
             int probed = probedCeiling(level, pos);
             if (ventMouthY > probed + 1) {
                 ventMouthY = probed;
@@ -583,9 +549,7 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         int startY = ventTopY != UNKNOWN_MOUTH_Y
                 ? ventTopY
                 : pos.getY() + GeyserConfig.CHAMBER_TARGET_HEIGHT.get();
-        // Boring is suspended while the ground overhead is still being rearranged: the vent would be
-        // cut through rock that is about to move, and the frontier it recorded would then point into
-        // the middle of nowhere. The column it has already bored is left exactly as it is.
+        // No boring while the ground overhead is still moving; the bored column is left as it is.
         boolean bore = active
                 && !com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(level, pos);
         BlockPos mouth = VentPathfinder.trace(level, pos, startY, ceilingY, pressure, bore);
@@ -597,13 +561,7 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         return mouth;
     }
 
-    /**
-     * Where the vent is allowed to open: the real ground over the core, plus a short chimney.
-     *
-     * <p>{@link TerrainProbe#groundY} rather than the WORLD_SURFACE heightmap, because that heightmap
-     * stops at the first leaf. The heightmap is kept only as a fallback for a column with no ground
-     * in it at all, which is a cave roof or the void and either way not somewhere a geyser opens.</p>
-     */
+    /** Where the vent may open: the real ground over the core plus a short chimney. */
     private static int probedCeiling(ServerLevel level, BlockPos pos) {
         int g = TerrainProbe.groundY(level, pos.getX(), pos.getZ());
         if (g == Integer.MIN_VALUE) {

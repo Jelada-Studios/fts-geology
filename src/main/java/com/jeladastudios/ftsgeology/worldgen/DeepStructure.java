@@ -22,36 +22,17 @@ import net.minecraft.world.level.block.state.BlockState;
  * different from digging anywhere else.
  *
  * <ul>
- *   <li><b>Subduction</b> - a slab of cold dense crust diving under the overriding plate, with magma
- *       chambers in the mantle wedge above it and the volcanic arc's own plutonic root higher up.
- *       This is the Wadati-Benioff zone.</li>
- *   <li><b>Rift</b> - crust pulled thin and intruded from below by bodies of gabbro and basalt,
- *       with hot rock riding high near the axis.</li>
- *   <li><b>Collision</b> - a thickened root of FOLDED metamorphic rock and pointedly no magma:
- *       crumpling two continents together makes mountains, not melt.</li>
- *   <li><b>Transform</b> - a narrow, near-vertical scar of shattered rock where the plates grind.</li>
+ *   <li><b>Subduction</b> - a dense slab diving under the overriding plate, magma chambers in the
+ *       mantle wedge above it and the arc's plutonic root higher up.</li>
+ *   <li><b>Rift</b> - thinned crust intruded from below by gabbro and basalt.</li>
+ *   <li><b>Collision</b> - a thickened root of folded metamorphic rock and no magma.</li>
+ *   <li><b>Transform</b> - a narrow, near-vertical scar of shattered rock.</li>
  * </ul>
  *
- * <h2>It reaches daylight now</h2>
- * All of this used to be squeezed between Y=-58 and Y=-30 - a 28-block window in a 384-block world,
- * which was trivially easy to tunnel straight past and conclude nothing had generated. Real boundary
- * rock does not stop at a depth: a collision root outcrops in mountainsides, a dyke swarm cuts the
- * entire crust, a strike-slip damage zone is a scar you can walk along.
- *
- * <p>So the structure now spans from bedrock to the surface - except for the top
- * {@code deepStructureSoilDepth} blocks of every column, which are left exactly as the terrain
- * generator made them. Meadows still look like meadows, and the geology shows in every cliff face,
- * ravine wall, cave and mine shaft. That is also what soil does in reality: it covers the bedrock
- * everywhere, and you only see what is underneath where something has cut through.</p>
- *
- * <p>Player blocks are never replaced, and nothing is ever added above a column's own surface, so
- * this can neither break a build nor change the skyline.</p>
- *
- * <h2>Written as the world is generated, where it can be</h2>
- * A chunk made after the mod is installed gets this from {@link GeologyFeature}, inside world
- * generation, where the writes land in a chunk nobody can see yet: no block-change hooks, no
- * lighting, nothing to send to a client, and no share of the server tick. Retrogen still does it for
- * chunks that already existed. Both go through exactly this code.
+ * <p>Spans bedrock to the surface, except a soil cover left as the generator made it, so the
+ * geology shows in cliffs, ravines and caves. Player blocks are never replaced and nothing is added
+ * above a column's surface. New chunks get this from {@link GeologyFeature} during generation;
+ * retrogen runs the same code for chunks that already existed.</p>
  */
 public final class DeepStructure {
 
@@ -66,19 +47,10 @@ public final class DeepStructure {
     }
 
     /**
-     * Builds the deep structure of a chunk, or as much of it as fits before {@code deadline}.
+     * Builds the deep structure of a chunk, or as much as fits before {@code deadline}, column by
+     * column, so a slow block-change hook (Sable, GitHub #1) cannot hold up a tick.
      *
-     * <h2>Why it can stop part way</h2>
-     * A chunk used to be done in one go, with the time budget only looked at between chunks. That is
-     * harmless while a couple of thousand rock swaps take well under a millisecond - until something
-     * else hooks every block change. On a server running Sable each write carried a physics query, a
-     * single chunk took several milliseconds on its own, and the budget could do nothing about it
-     * because it was never asked (GitHub #1). The work is column by column anyway, so this returns
-     * the column it reached and the caller brings it back next tick.
-     *
-     * @param report   carries the running block count between calls, so the per-chunk budget still
-     *                 holds across a resume, and turns "I could not see anything down there" into a
-     *                 number; may be null for a pass that is never interrupted
+     * @param report   running block count across calls; may be null for a pass never interrupted
      * @param start    first column to visit, 0 for a fresh chunk
      * @param deadline {@link System#nanoTime()} to stop at; at least one column is always done
      * @return the next column to visit, or {@link #DONE}
@@ -95,16 +67,8 @@ public final class DeepStructure {
             report.type = centre.faultType().toString();
             report.stress = centre.stress();
         }
-        // Cheap early out, and ONLY that.
-        //
-        // This used to be the real decision: one sample at the chunk's centre, and if its stress
-        // was under 0.25 the whole chunk got nothing. A chunk at 0.251 was fully built and its
-        // neighbour at 0.249 was untouched, which drew a hard, chunk-aligned edge across the
-        // landscape - sixteen blocks of geology, then sixteen blocks of none. Reported three times
-        // as "the separate basalt wall outside the volcano"; it was never the volcano.
-        //
-        // The gate is per column now, further down, and it fades rather than cuts. The margin here
-        // is generous because a chunk's corner can be a good deal more stressed than its middle.
+        // Cheap early out only; the real gate is per column and fades. Generous, because a chunk's
+        // corner can be more stressed than its middle.
         if (centre.stress() < 0.10) {
             if (report != null) report.note = "stress below 0.10 across the chunk - deep interior";
             return DONE;
@@ -120,9 +84,7 @@ public final class DeepStructure {
         long seed = level.getSeed();
         RandomSource rng = RandomSource.create(0L);
 
-        // Scattered visiting order. 97 is coprime with 256, so this walks all 256 columns of the
-        // chunk exactly once in an order that jumps around - which is what stops a budget shortfall
-        // from turning into a stripe of geology along one edge.
+        // 97 is coprime with 256: every column once, in a scattered order, so a budget stop leaves no stripe.
         for (int i = Math.max(0, start); i < DONE && budget > 0; i++) {
             if (i > start && System.nanoTime() >= deadline) return i;
             int k = (i * 97) & 0xFF;
@@ -132,20 +94,12 @@ public final class DeepStructure {
             if (col.faultType() == com.jeladastudios.ftsgeology.tectonics.FaultType.INTERIOR) continue;
             if (col.stress() < 0.25) continue;   // this column is too far from the boundary
 
-            // How much soil this column keeps over its bedrock, faded by stress.
-            //
-            // A fixed depth plus a hard stress cut is what produced the wall. Rock that simply
-            // retreats deeper as the boundary weakens has no edge at all: at the fault it reaches
-            // the surface, and a few hundred blocks out it is buried far enough that nothing shows
-            // until something cuts through. Same total structure, no line across the map.
+            // Soil cover over the rock, deepening as stress falls, so the structure fades out without an edge.
             int localSoil = outcropDepth(col.stress(), soil);
             int top = columnTop(level, x, z, hardCeiling, outcrop, localSoil);
             if (top <= floor + 4) continue;
 
-            // Each column rolls its own dice, seeded from the world and the column alone. The chunk
-            // used to share one stream, so where a pass stopped changed every column after it: a
-            // chunk interrupted by the budget came out different from one that was not, and the copy
-            // built at world generation would have disagreed with the copy built by retrogen.
+            // Dice seeded per column, so where a pass stopped cannot change the result.
             rng.setSeed(columnSeed(seed, x, z));
 
             int placed = switch (col.faultType()) {
@@ -181,13 +135,8 @@ public final class DeepStructure {
     }
 
     /**
-     * The highest block this column may be given boundary rock at.
-     *
-     * <p>Measured against this column's own soil AND its four neighbours', taking the lowest. A
-     * column's rock top can otherwise stand above the ground NEXT to it on a slope, and the band or
-     * dyke filling it then sticks out of the hillside as a free-standing pillar - which is what the
-     * stray basalt columns were. Taking the lowest neighbour means boundary rock can never rise
-     * above the soil beside it, while a cliff face still shows the whole section in the cut.</p>
+     * The highest block this column may be given boundary rock at: the lowest of its own and its
+     * four neighbours' soil tops, so rock never sticks out of a hillside as a pillar.
      */
     private static int columnTop(WorldGenLevel level, int x, int z, int hardCeiling,
                                  boolean outcrop, int soil) {
@@ -196,9 +145,7 @@ public final class DeepStructure {
         if (ground == Integer.MIN_VALUE) return hardCeiling;
         int lowest = ground;
         for (int[] d : NEIGHBOURS) {
-            // A neighbour whose chunk is not there is left out rather than asked for. Asking loads it
-            // on the server thread, and at the edge of the loaded area that is a whole chunk load in
-            // the middle of a single column, which no time budget can interrupt.
+            // A neighbour whose chunk is not loaded is left out; asking would load it.
             if (!level.hasChunk((x + d[0]) >> 4, (z + d[1]) >> 4)) continue;
             int n = TerrainProbe.groundY(level, x + d[0], z + d[1]);
             if (n != Integer.MIN_VALUE) lowest = Math.min(lowest, n);
@@ -209,14 +156,8 @@ public final class DeepStructure {
     private static final int[][] NEIGHBOURS = { {1, 0}, {-1, 0}, {0, 1}, {0, -1} };
 
     /**
-     * How deep the soil cover is for a column of this stress: the configured minimum right on an
-     * active boundary, deepening to {@link #BURIED_SOIL} as the stress falls away to the 0.25 floor.
-     *
-     * <p>This is the whole fix for the hard edge. The rock is still generated either way - the
-     * question is only how far under the surface its top sits, and pushing that down smoothly means
-     * the transition from "outcrops in the meadow" to "invisible without digging" happens over
-     * hundreds of blocks instead of at one chunk border. It is also what actually happens: bedrock
-     * is everywhere, and you see it where erosion or tectonics has stripped the cover off.</p>
+     * Soil depth for a column of this stress: the configured minimum on an active boundary,
+     * deepening to {@link #BURIED_SOIL} as stress falls to the 0.25 floor.
      */
     private static int outcropDepth(double stress, int minSoil) {
         double t = Mth.clamp((stress - 0.25) / 0.75, 0.0, 1.0);
@@ -230,12 +171,8 @@ public final class DeepStructure {
     private static final int BURIED_SOIL = 24;
 
     /**
-     * The descending slab, the mantle wedge above it, and the arc's plutonic root.
-     *
-     * <p>The slab itself stays deep, because in reality it is deep - that is the whole point of a
-     * Wadati-Benioff zone. What reaches the upper crust is the arc's plumbing: bodies of coarse
-     * intrusive rock that cooled from the same magma that feeds the volcanoes, plus the basalt dykes
-     * that carried it. Digging under a volcanic arc should find granite, and it now does.</p>
+     * The descending slab, the mantle wedge above it, and the arc's plutonic root: granite and
+     * diorite bodies and the basalt dykes that fed the volcanoes.
      */
     private static int subduction(WorldGenLevel level, int x, int z, PlateSample s,
                                   int floor, int top, double faultWidth, RandomSource rng) {
@@ -246,9 +183,7 @@ public final class DeepStructure {
         int deepTop = Math.min(top, floor + (int) Math.round((top - floor) * 0.45));
         int slabY = Mth.clamp((int) Math.round(deepTop - across * (deepTop - floor)), floor + 3, deepTop);
         for (int dy = 0, thickness = 3 + rng.nextInt(2); dy < thickness; dy++) {
-            // An ophiolite: the slab is old sea floor, so it carries the sea floor's own section -
-            // mantle peridotite and serpentinite at the bottom, gabbro, chert and basalt above. Dark
-            // rock either way, which is what makes it read against the deepslate around it.
+            // An ophiolite: old sea floor, peridotite and serpentinite under gabbro, chert and basalt.
             int y = slabY - dy;
             Block b;
             if (y < floor + 8) {
@@ -287,14 +222,8 @@ public final class DeepStructure {
     }
 
     /**
-     * Thinned crust intruded from below by bodies of gabbro and basalt.
-     *
-     * <p>This used to be a dike swarm: a column was either inside a dike, basalt from bedrock to
-     * daylight, or it was not. In section that read as vertical one-block stripes a hundred blocks
-     * tall, repeating across the whole zone, which is not what a rift looks like from the inside.
-     * Magma that stalls in thinned crust collects in pods of bounded height, so that is what this
-     * lays down, from a 3D noise field: a deep level of gabbro where the melt crystallised slowly,
-     * and a shallower level of basalt around the conduits that fed the surface.</p>
+     * Thinned crust intruded from below: pods of bounded height from a 3D noise field, gabbro at
+     * the deep level and basalt around the conduits higher up.
      */
     private static int rift(WorldGenLevel level, int x, int z, PlateSample s,
                             int floor, int top, double faultWidth, RandomSource rng) {
@@ -354,14 +283,8 @@ public final class DeepStructure {
     }
 
     /**
-     * The crustal root under a collision belt: metamorphic rock pushed far deeper than normal, and
-     * deliberately without a trace of magma - the Himalaya has the thickest crust on Earth and not
-     * one volcano.
-     *
-     * <p>The banding is <b>folded</b> rather than flat. Collision does not lay rock down in layers,
-     * it takes layers that already existed and crumples them, so a cliff face cuts wavy bands rather
-     * than a neat horizontal sandwich. Marble, gneiss, schist, slate and quartzite are the sequence
-     * itself: what limestone, granite, mudstone and sandstone become when a collision buries them.</p>
+     * The crustal root under a collision belt: metamorphic rock pushed deep, with no magma. The
+     * banding is folded: marble, gneiss, schist, slate and quartzite.
      */
     private static int collisionRoot(WorldGenLevel level, int x, int z, PlateSample s,
                                      int floor, int top, double faultWidth, RandomSource rng) {
@@ -393,12 +316,8 @@ public final class DeepStructure {
     }
 
     /**
-     * The shear zone: a narrow, near-vertical scar of shattered rock where the plates grind past one
-     * another. No melt, because sliding sideways generates none.
-     *
-     * <p>Deliberately narrow. A strike-slip damage zone is a small fraction of the boundary's width
-     * in reality, and keeping it that way is also what lets it run the full height of the crust
-     * without costing more than the wide, shallow structures do.</p>
+     * The shear zone: a narrow, near-vertical scar of shattered rock with no melt. Narrow enough to
+     * run the full height of the crust cheaply.
      */
     private static int shearZone(WorldGenLevel level, int x, int z, PlateSample s,
                                  int floor, int top, double faultWidth, RandomSource rng) {
@@ -436,8 +355,7 @@ public final class DeepStructure {
                             int top, RandomSource rng) {
         int placed = 0;
         java.util.List<BlockPos> cells = new java.util.ArrayList<>();
-        // Lobed rather than spherical: a smooth ball of magma blocks reads as a placed object, and
-        // the flat-sided result was what players were seeing as "cubes of magma" in cave walls.
+        // Lobed rather than spherical, so a chamber does not read as a placed object.
         double px = rng.nextDouble() * Math.PI * 2, pz = rng.nextDouble() * Math.PI * 2;
         for (int dx = -r - 1; dx <= r + 1; dx++) {
             for (int dy = -r; dy <= r; dy++) {
@@ -467,26 +385,15 @@ public final class DeepStructure {
         if (!level.hasChunk(x >> 4, z >> 4)) return false;
         BlockPos p = new BlockPos(x, y, z);
         BlockState s = level.getBlockState(p);
-        // Already this rock: nothing to write. On the retrogen path every write goes through the live
-        // chunk, which other mods hook - Sable ran a physics query on each one - so a write that
-        // changes nothing still costs the full price. It matters most when a chunk is gone over
-        // again, where almost every column is already what it would become.
+        // Already this rock: skip, since a no-op write through the live chunk still pays every hook.
         if (s.is(block)) return false;
         if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) return false;
-        // Never eat something the mod itself relies on. A geyser is heated by a slab of magma and
-        // driven by a block entity; replacing either with metamorphic banding would silently kill it,
-        // which matters on the retrofit path where deep structure can run over ground that already
-        // has a geyser system in it.
+        // Never eat what the mod relies on: a geyser's magma slab and its block entities.
         if (s.is(Blocks.MAGMA_BLOCK) || s.hasBlockEntity()) return false;
-        // Only ever replace rock. Air, water and lava are left alone so caves, aquifers and the
-        // shape of the terrain are untouched - the structure shows IN a cave wall, it does not
-        // fill the cave in.
+        // Only ever replace rock: caves, aquifers and the shape of the terrain are left alone.
         if (s.isAir() || !s.getFluidState().isEmpty()) return false;
-        // Clients told, neighbour shapes not recalculated. Rock swapped for rock has no shape to
-        // update, and asking for it made vanilla read all six neighbours - which for a column on the
-        // edge of the loaded area meant loading the next chunk on the server thread, part way through
-        // one column, where no time budget can reach. Generation never ran those updates either, so
-        // this is also what keeps the two paths writing the same thing.
+        // Clients told, neighbour shapes not recalculated: rock for rock has no shape to update, and
+        // the update would load neighbouring chunks at the edge of the loaded area.
         level.setBlock(p, block.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
         return true;
     }

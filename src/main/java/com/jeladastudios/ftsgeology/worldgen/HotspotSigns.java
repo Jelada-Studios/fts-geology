@@ -11,27 +11,11 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * The ground telling you a plume is under it, long before you can see a geyser.
+ * The ground telling you geothermal heat is under it, long before you see a geyser: fumarole fields
+ * of chimneys, mud, sulfur staining and pale crust.
  *
- * <h2>Why this exists rather than simply making hotspots commoner</h2>
- * A hotspot is the richest thing in the mod - a whole geyser basin - and on the default settings the
- * mean spacing between plumes is about twenty thousand blocks. That is a landmark you stumble on
- * once a world, and testing quite reasonably said it was too hard to find in survival.
- *
- * <p>The tempting fix is to make them common, and it is the wrong one. At twenty-five metres per
- * horizontal block that spacing is roughly five hundred kilometres, while Earth's forty-odd major
- * hotspots sit thousands of kilometres apart - the mod is already several times denser than the
- * planet it is modelling, and a mod used as a classroom simulation should not quietly stop being
- * true in order to be convenient.</p>
- *
- * <p>So the plume stays rare and becomes <b>legible</b> instead. Approaching one, the ground starts
- * to say so: sulfur staining, patches of pale crust, warm shallow water, the odd steaming vent -
- * sparse at the rim of the dome, unmistakable near the middle. Which is what a geothermal field
- * actually looks like from a distance, and it means finding one is a matter of reading the
- * landscape rather than walking twenty thousand blocks and getting lucky.</p>
- *
- * <p>It also gives the sulfur, crust, mud and vent blocks their first job in world generation.
- * Until now they existed only in the creative menu.</p>
+ * <p>Plumes stay rare, since the default spacing is already denser than Earth's hotspots; this makes
+ * them findable by reading the landscape instead.</p>
  */
 public final class HotspotSigns {
 
@@ -44,26 +28,14 @@ public final class HotspotSigns {
     private static final double FIELD_CHANCE = 0.055;
 
     /**
-     * Puts a fumarole field in this chunk, occasionally, if it stands over a plume.
-     *
-     * <h2>A line, not a sprinkle</h2>
-     * The first version scattered single blocks at random through every chunk of a dome, and testing
-     * called it right: it read as confetti. Real geothermal ground does not work that way - the vents
-     * follow the crack that is letting the steam up, so a field is a <b>line</b> with the hottest
-     * material along its middle and the cooler alteration spreading either side.
-     *
-     * <p>So these are rarer and far more deliberate. A field takes a bearing, walks it for twenty or
-     * thirty blocks, and lays bands out from that line: chimneys and mud on the trace itself, sulfur
-     * staining beside it, pale crust fading out at the edges. You come across one seldom, and when
-     * you do it is unmistakably a thing rather than scenery noise.</p>
+     * Puts a fumarole field in this chunk, occasionally, on geothermal ground. A field follows the
+     * crack letting the steam up: it walks a bearing for twenty or thirty blocks and lays bands out
+     * from that line, chimneys and mud on the trace, sulfur beside it, pale crust at the edges.
      */
     public static void generate(ServerLevel level, ChunkPos cp, RandomSource rng) {
         int cx = cp.getMinBlockX() + 8, cz = cp.getMinBlockZ() + 8;
 
-        // A plume is the rarest way to get venting ground and it was the only one this looked for.
-        // Iceland is a spreading ridge and Japan is a subduction arc; between them those two hold
-        // most of the fumarole fields on Earth, and both were bare. So the gate is now "is this
-        // ground geothermal", not "is this ground over a plume" - the bands below are unchanged.
+        // Any geothermal ground counts: a plume, a spreading ridge or a subduction arc.
         double strength = Math.max(
                 HotspotMap.sample(level, cx, cz).strength(),
                 boundaryHeat(level, cx, cz));
@@ -79,11 +51,8 @@ public final class HotspotSigns {
     }
 
     /**
-     * How hard a plate boundary is venting here, on the same scale as plume strength.
-     *
-     * <p>Restricted to the two settings that actually melt rock. A collision or transform boundary
-     * conducts water and gets hot springs - it already does - but a fumarole field wants a shallow
-     * magma body under it, and neither of those has one.</p>
+     * How hard a plate boundary is venting here, on the plume-strength scale. Only rifts and
+     * subduction arcs, the settings with shallow magma under them.
      */
     private static double boundaryHeat(ServerLevel level, int x, int z) {
         com.jeladastudios.ftsgeology.tectonics.PlateSample plate =
@@ -144,13 +113,7 @@ public final class HotspotSigns {
         TerrainProbe.clearVegetation(level, x, g, z, 1);
 
         if (band == 0) {
-            // On the trace: where the steam actually comes out.
-            //
-            // No intensity gate here any more. It used to need intensity over 0.45, which is the
-            // inner 231 blocks of a 700-block dome - about a ninth of it by area - so every field
-            // outside that was a fumarole field with no fumaroles in it. Testing found the mud and
-            // the crust and no chimneys anywhere, which is exactly that: the bands were painting
-            // and only this one line was refusing.
+            // On the trace: where the steam comes out.
             if (rng.nextInt(5) == 0) {
                 chimney(level, at, rng);
                 return;

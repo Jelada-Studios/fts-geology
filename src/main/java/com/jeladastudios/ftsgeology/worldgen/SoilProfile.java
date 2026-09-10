@@ -13,40 +13,14 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Soil that shows what it weathered out of.
+ * Soil that shows what it weathered out of: red laterite over basalt and other iron-rich rock, thin
+ * pale rendzina over limestone and marble, leached podzol over granite. Appearance only.
  *
- * <h2>Why the ground should not be the same brown everywhere</h2>
- * The mod puts named rock into the world - basalt at a hotspot, gabbro and peridotite at a spreading
- * ridge, marble and travertine where carbonate has been cooked - and then covers all of it with the
- * same grass, so the geology is only visible where it happens to be exposed. That is backwards.
- * Soil <b>is</b> the rotted top of the rock beneath it, and its colour is the most legible single
- * clue about what a place is made of:
+ * <p>Only named rock counts. {@code RockTypes.classify} calls plain stone plutonic, which would turn
+ * every hillside into podzol, so the feature stays where the mod has put geology.</p>
  *
- * <ul>
- *   <li>over basalt and the other iron-rich rocks, iron oxidises and the ground goes red - laterite,
- *       and the reason tropical soils are the colour they are;</li>
- *   <li>over limestone and marble, a thin pale calcareous soil - rendzina;</li>
- *   <li>over granite and its relatives, an acid soil with its nutrients washed down out of reach -
- *       podzol, and the reason those uplands are heath rather than farmland.</li>
- * </ul>
- *
- * <p>Nothing here models chemistry. It is the visible half of that, on its own, deliberately.</p>
- *
- * <h2>Why RockTypes.classify is not used directly, though it exists</h2>
- * It would have painted the entire world. {@code classify} deliberately falls back to
- * {@link com.jeladastudios.ftsgeology.instrument.RockTypes.Rock#PLUTONIC} for plain vanilla stone -
- * an honest answer to the question it is asked, since the upper continental crust really is granitic
- * on average - but "granitic on average" is not the same as "this is granite", and treating it as
- * such would have turned every hillside in the world into podzol. So the table below lists only
- * <b>named</b> rock, and anything else is no opinion and no change. The feature is therefore
- * confined to ground where the mod has actually put geology: near plate boundaries, around
- * volcanoes, and where {@code DeepStructure} has brought boundary rock up to the surface.
- *
- * <h2>Cost</h2>
- * Bedrock is a regional property - a granite pluton is hundreds of blocks across - so it is probed
- * <b>four times per chunk</b> rather than once per column, and the expensive per-column pass runs
- * only when at least one of those four probes came back with an opinion. Over ordinary countryside
- * the whole thing is four probes and out.
+ * <p>Bedrock is regional, so it is probed four times per chunk, and the per-column pass runs only
+ * when a probe found named rock.</p>
  */
 public final class SoilProfile {
 
@@ -75,14 +49,10 @@ public final class SoilProfile {
                 Soil soil = pick(probes, dx, dz, rng);
                 if (soil == Soil.NONE) continue;
 
-                // Patches, not speckle. Two scales so the edges of a patch are ragged rather than
-                // round, and a good half of the ground is left as ordinary soil - the point is that
-                // the place reads red or pale, not that every block of it does.
+                // Patches on two scales, leaving about half the ground as ordinary soil.
                 double n = com.jeladastudios.ftsgeology.util.ValueNoise.noise(x0 + dx, z0 + dz, 21.0)
                         + 0.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(x0 + dx + 8192, z0 + dz - 8192, 7.0);
-                // A ramp rather than a cut. A hard threshold on smooth noise draws a smooth CURVE,
-                // which is a contour line - and a contour line around a patch of soil reads as
-                // drawn on. Feathering it over a band lets the patch break up at its own edge.
+                // A feathered ramp rather than a cut, so a patch breaks up at its edge.
                 double keep = (n - 0.10) / 0.16;
                 if (keep <= 0.0 || (keep < 1.0 && rng.nextDouble() > keep)) continue;
 
@@ -92,24 +62,8 @@ public final class SoilProfile {
     }
 
     /**
-     * Which of the four probes this column follows.
-     *
-     * <h2>The seam this replaces was mine, and my own measurement could not see it</h2>
-     * This used to be {@code dx < 8 ? (dz < 8 ? a : c) : (dz < 8 ? b : d)} - nearest probe, winner
-     * takes the column - with a comment saying it avoided the chunk-aligned wall
-     * {@code DeepStructure} once drew. It does avoid that one. It draws an <b>eight-block quadrant
-     * wall</b> instead, and where two rock types meet under a chunk the soil changed along a
-     * dead-straight line down the middle of it.
-     *
-     * <p>What makes that worth writing down is that the round's measurement passed. It counted how
-     * often the noise mask's patch edges landed on a chunk boundary - 5.8% against 6.3% by chance,
-     * genuinely clean - and never once looked at the boundary between two soil TYPES, which is the
-     * line testing then photographed. Measuring the thing that was changed rather than the thing
-     * beside it is now the third bug of this shape.</p>
-     *
-     * <p>So the choice is weighted by distance and settled with a die: right on top of a probe it
-     * always wins, and half way between two of them it is a coin toss, so the change from one soil
-     * to the other happens across a band of ground where both appear rather than along an edge.</p>
+     * Which of the four probes this column follows: weighted by distance and settled with a die, so
+     * two soils change over a band where both appear rather than along a line.
      */
     private static Soil pick(Soil[] probes, int dx, int dz, RandomSource rng) {
         // The four probe points, in the order they were taken.
@@ -204,11 +158,7 @@ public final class SoilProfile {
     private static Block block(Soil soil, RandomSource rng) {
         int r = rng.nextInt(10);
         return switch (soil) {
-            // Red earth. It used to lead on plain terracotta with brown behind it, and testing could
-            // not tell whether there was any red soil in the world at all - fairly, because neither
-            // of those blocks is red, they are both a muted orange-brown. Iron oxide is RED, and
-            // that is the entire point of the laterite entry, so red terracotta leads now and the
-            // browner blocks are what breaks it up.
+            // Red earth: red terracotta leads, the browner blocks break it up.
             case LATERITE -> r < 5 ? Blocks.RED_TERRACOTTA
                     : r < 7 ? Blocks.TERRACOTTA
                     : r < 9 ? Blocks.BROWN_TERRACOTTA

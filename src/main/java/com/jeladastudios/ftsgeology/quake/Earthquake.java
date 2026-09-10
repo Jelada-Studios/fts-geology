@@ -34,14 +34,8 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * Runs earthquakes: plans them on a worker thread, then applies the deformation on the server
- * thread a slice at a time.
- *
- * <h2>Why it is spread over ticks</h2>
- * Budgeting the block edits protects the tick rate, but it is also the physically correct thing to
- * do. A real rupture travels along the fault at a couple of kilometres per second and a large
- * earthquake lasts tens of seconds - the ground does not deform all at once. So a quake visibly
- * tearing its way along the fault over a few seconds is more accurate than an instant snap, not
- * less.
+ * thread a slice at a time. A real rupture takes tens of seconds to run along its fault, so a quake
+ * tearing its way along over a few seconds is also the accurate choice.
  */
 @Mod.EventBusSubscriber(modid = GeysersMod.MODID)
 public final class Earthquake {
@@ -54,23 +48,12 @@ public final class Earthquake {
         final BlockPos epicentre;
         final QuakePlanner.Plan plan;
         final Deque<QuakePlanner.Edit> pending;
-        /**
-         * Game time the ground is allowed to start moving. The quake is filed with the seismic
-         * network the instant it is triggered, but the deformation is held back until here, so a
-         * station has a warning window to sound its siren in before anything shakes - which is the
-         * whole point of an early-warning network, and only possible because the alert travels
-         * faster than the ground does.
-         */
+        /** When the ground may start moving: the warning window lets seismographs sound first. */
         long startAt;
         int shakeTicks;
         /**
-         * How long the ground goes on rumbling, separately from how long the camera shakes.
-         *
-         * <p>These are two different things and were sharing one number. Strong motion - the part
-         * that throws you off your feet - is over in tens of seconds even for an M9, which is why
-         * {@link #shakeTicks} is capped at 400. The NOISE of a large rupture lasts a great deal
-         * longer, and so does this mod's deformation: a 400,000 edit quake takes minutes to apply,
-         * so the sound was finishing while the ground was still visibly moving.</p>
+         * How long the ground goes on rumbling. Separate from {@link #shakeTicks}: strong motion is
+         * over in tens of seconds, while a large quake's deformation takes minutes to apply.
          */
         final int rumbleTicks;
         int applied;
@@ -82,16 +65,11 @@ public final class Earthquake {
             this.plan = plan;
             this.startAt = startAt;
             this.pending = new ArrayDeque<>(plan.edits());
-            // The ground keeps deforming for as long as the edit list lasts, but the SHAKING is
-            // capped: a 400k-edit megathrust would otherwise rattle the camera for a solid minute,
-            // which stops reading as an earthquake and starts reading as a broken game. Real strong
-            // motion lasts tens of seconds even for an M9.
+            // The camera shake is capped even when the edits run for minutes: real strong motion
+            // lasts tens of seconds.
             this.shakeTicks = Mth.clamp(plan.edits().size()
                     / Math.max(1, GeyserConfig.QUAKE_BLOCKS_PER_TICK.get()) + 40, 40, 400);
-            // Scaled by magnitude: about twenty seconds for a small tremor, a full minute for a
-            // great earthquake. Real strong-motion duration does climb roughly with magnitude -
-            // Tohoku shook for six minutes - and it is the part of an earthquake you experience
-            // for longest, so cutting it short at twenty seconds sold the whole event short.
+            // About twenty seconds for a small tremor, a full minute for a great earthquake.
             this.rumbleTicks = Mth.clamp((int) Math.round(plan.magnitude() * 145), 400, 1300);
         }
     }
@@ -124,23 +102,14 @@ public final class Earthquake {
     }
 
     /**
-     *  forced true when the caller picked the fault type rather than reading it from the
-     *               ground. A forced rupture is allowed to run its full length through terrain that
-     *               is not that kind of boundary, which is what makes the demonstration command
-     *               work anywhere.
+     * @param forced true when the caller picked the fault type rather than reading it from the
+     *               ground; a forced rupture runs its full length through any terrain
      */
     public static void trigger(ServerLevel level, BlockPos epicentre, FaultType type,
                                double magnitude, double strikeX, double strikeZ, boolean forced) {
         if (!GeyserConfig.QUAKES_ENABLED.get() || type == FaultType.INTERIOR) return;
 
-        // Put the hypocentre ON the fault before tracing.
-        //
-        // The rupture starts wherever it is told to and then follows the local strike, so triggering
-        // one while standing thirty blocks off the boundary ran the whole thing down a line thirty
-        // blocks off - parallel-ish, but displaced. Two quakes fired from different spots on the
-        // same fault therefore came out on two different lines, which is the "the direction keeps
-        // changing" report. A real rupture is confined to the fault plane, so the epicentre is
-        // projected onto the boundary along its own normal first.
+        // Put the hypocentre on the fault first, so quakes fired from different spots follow one line.
         BlockPos epi = epicentre;
         PlateSample here = TectonicMap.sample(level, epicentre.getX(), epicentre.getZ());
         if (here.onFault() && here.faultDistance() > 1.0) {
@@ -151,19 +120,9 @@ public final class Earthquake {
         }
         final BlockPos epicentreOnFault = epi;
 
-        // Give the margin a fixed polarity.
-        //
-        // Subduction and collision are both one-sided: one plate goes under, and which side gets the
-        // trench or the foreland basin is decided by the sign of `across`, which comes from the
-        // strike, which comes from a normal pointing from OUR plate to the neighbour. Sample the
-        // same boundary from the other side and that normal is negated, so the whole margin
-        // mirrors. Two quakes on one boundary could therefore drop the side the previous one had
-        // lifted - which is geological nonsense: the ocean floor dives under the continent no
-        // matter where you happen to be standing when it goes off.
-        //
-        // So the direction is taken from the BOUNDARY rather than from the sampled side. The
-        // oceanic plate is the one that dives; between two of a kind the lower plate id does, which
-        // is arbitrary but stable, and stability is the whole point here.
+        // Fixed polarity: which side dives comes from the boundary, not from the side sampled, so two
+        // quakes on one margin never mirror it. Oceanic crust dives; between two of a kind, the lower
+        // plate id does.
         double sx = strikeX, sz = strikeZ;
         if ((type == FaultType.CONVERGENT_SUBDUCTION || type == FaultType.CONVERGENT_COLLISION)
                 && downGoingIsOurs(here)) {
@@ -171,8 +130,7 @@ public final class Earthquake {
             sz = -strikeZ;
         }
 
-        // Every stage is timed and logged. Three rounds of guessing where the cost was did not find
-        // it; the log naming the slow stage - or stopping before one of these lines - will.
+        // Every stage is timed and logged.
         long t0 = System.nanoTime();
         List<QuakePlanner.TracePoint> trace =
                 QuakePlanner.traceFault(level, epicentreOnFault, type, magnitude, sx, sz, forced);
@@ -196,18 +154,13 @@ public final class Earthquake {
         long t3 = System.nanoTime();
         GeysersMod.LOGGER.info("quake register done in {} ms", (t3 - t2) / 1_000_000);
 
-        // Filed for the instruments. A seismograph in an unloaded chunk cannot be told about this
-        // now, so the network keeps it and the station reads back through whatever it missed when
-        // its chunk comes round again - which is what an unattended station does.
+        // Filed for the instruments; a station in an unloaded chunk reads back what it missed.
         com.jeladastudios.ftsgeology.instrument.SeismicNetwork
                 .record(level, epicentreOnFault, type, magnitude, depthM);
 
         announce(level, epicentreOnFault, type, magnitude, depthM);
 
-        // No sound here any more. It used to fire a GENERIC_EXPLODE at trigger time; the warning
-        // and the boom now belong to the instruments and the ground itself. The ground is also
-        // held back by the warning window, so the planning below has that long to finish in - a
-        // large rupture that used to snap into being now has ten seconds of runway.
+        // The ground is held back by the warning window, which gives the planning below that long.
         long startAt = level.getGameTime() + GeyserConfig.QUAKE_WARNING_TICKS.get();
 
         // Worker thread: the expensive half. Touches nothing but the immutable snapshot.
@@ -268,20 +221,15 @@ public final class Earthquake {
         CaveCollapse.drain(event.getServer(),
                 com.jeladastudios.ftsgeology.util.TickBudget.slice(0.2));
 
-        // Release quiet zones whose OWN debris has finished coming down. Done after the drain above,
-        // so a zone can be released on the same tick the last of its talus lands. Each zone asks
-        // about its own ground - see Weathering.pendingNear.
+        // Release quiet zones whose own debris has landed; after the drains, so it can happen this tick.
         for (ServerLevel l : event.getServer().getAllLevels()) {
             QuakeQuiet.tick(l);
         }
 
         if (ACTIVE.isEmpty()) return;
         int budget = GeyserConfig.QUAKE_BLOCKS_PER_TICK.get();
-        // Hard wall-clock brake. However badly the block count is mis-estimated, a tick can never
-        // run away: the quake just takes longer. This is what stops the game locking up.
-        //
-        // The visible half of the mod, so it may use everything the tick has left rather than a
-        // fixed share: a player is standing there watching the ground move.
+        // Hard wall-clock brake: a mis-estimated block count makes the quake slower, never the tick.
+        // The visible half of the mod, so it may use whatever the tick has left.
         long deadline = System.nanoTime()
                 + com.jeladastudios.ftsgeology.util.TickBudget.remaining();
 
@@ -289,12 +237,7 @@ public final class Earthquake {
             ServerLevel level = event.getServer().getLevel(run.dimension);
             if (level == null) return true;
 
-            // Still in the warning window: filed, seismographs alerting, but the ground has not
-            // moved yet. Hold the whole run until its start time arrives.
-            //
-            // Read from the run's own level rather than the overworld. Game time happens to be
-            // shared across dimensions today, so both give the same answer, but startAt was set
-            // from this level and comparing a clock against itself does not rely on that.
+            // Still in the warning window: filed and alerting, but the ground holds until startAt.
             if (level.getGameTime() < run.startAt) return false;
 
             int placed = 0;
@@ -324,13 +267,9 @@ public final class Earthquake {
                 Weathering.enqueue(level, run.plan.edits());
                 // And the caves under it: an arch that stood for ten thousand years can fail in a minute.
                 CaveCollapse.enqueue(level, run.plan);
-                // The corridor stays shut until that settling is done - the rupture ending is not
-                // the same thing as the ground being still.
+                // The corridor stays shut until that settling is done.
                 QuakeQuiet.settling(level, run.plan.epicentre());
-                // And the plumbing under it has been rearranged, which is how a quake opens a
-                // spring that was not there before. Seeded now, but the source it plants will not
-                // start climbing until the zone releases, so it does not bore up through a slope
-                // that is still coming down.
+                // New springs are seeded now, but do not start climbing until the zone releases.
                 com.jeladastudios.ftsgeology.hydrology.SpringSeeding.afterQuake(
                         level, run.plan.epicentre(), run.plan.ruptureLength(), run.plan.magnitude());
             }
@@ -356,13 +295,8 @@ public final class Earthquake {
                     v.z + (level.random.nextDouble() - 0.5) * kick);
             p.hurtMarked = true;
 
-            // And the part that actually reads as an earthquake: the view moving.
-            //
-            // Re-sent a few times a second rather than every tick, because the packet carries an
-            // intensity and a run-out and the client fills in the frames between - see ShakePacket.
-            // The duration is deliberately longer than the gap between sends, so a shake fades out
-            // on its own if the quake stops or the player walks out of range instead of ending on a
-            // cliff, and cannot be left switched on by a packet that never arrives.
+            // The view moving. Re-sent a few times a second; the packet's run-out outlasts the gap,
+            // so a shake fades on its own if the packets stop.
             if (level.getGameTime() % 5L == 0L) {
                 float strength = (float) (falloff * (0.6 + run.plan.magnitude() / 3.0));
                 com.jeladastudios.ftsgeology.network.ModNetwork.sendShake(p, strength, 20);
@@ -373,16 +307,8 @@ public final class Earthquake {
     }
 
     /**
-     * Dust shaken off the ground around a player while the rupture is running.
-     *
-     * <h2>Why an earthquake had nothing on screen</h2>
-     * Everything the quake did to your senses was either felt or heard - the camera kick above, the
-     * siren, the rumble - and the only thing you could <i>see</i> was that the landscape had changed
-     * afterwards. Ground actually being shaken throws dust, and without it the strongest event in the
-     * mod looked like nothing at all until it was over.
-     *
-     * <p>It rides on the loop that was already running: the players in range and their distance
-     * falloff are both computed above, so this adds no search of its own and writes no blocks.</p>
+     * Dust shaken off the ground around a player while the rupture runs. Rides the player loop
+     * above, so it searches nothing and writes no blocks.
      */
     private static void dust(ServerLevel level, ServerPlayer p, double falloff) {
         // A few times a second rather than every tick. Twenty puffs a second per player reads as fog.
@@ -400,9 +326,7 @@ public final class Earthquake {
             // Nothing to shake loose off water, and nothing to see off air.
             if (s.isAir() || !s.getFluidState().isEmpty()) continue;
 
-            // The dust is made of the ground it comes off, so it is yellow over sand, black over
-            // basalt and white over snow. A single grey dust particle would cost exactly the same
-            // and be wrong everywhere except on stone.
+            // Made of the ground it comes off: yellow over sand, black over basalt.
             level.sendParticles(
                     new net.minecraft.core.particles.BlockParticleOption(
                             net.minecraft.core.particles.ParticleTypes.BLOCK, s),
@@ -412,17 +336,8 @@ public final class Earthquake {
     }
 
     /**
-     * The ground noise, restarted at the clip's own length until the rumble is over.
-     *
-     * <p>Two separate bugs got it here. It was keyed on {@code ticks % 420 == 0}, which cannot ever
-     * match - ticks is incremented before the check, so it is never zero - and it sat behind the
-     * {@code shakeTicks} guard, which expires after at most twenty seconds while a large rupture is
-     * still visibly tearing the ground open minutes later. So a quake either made no sound at all
-     * or went quiet long before it had finished.</p>
-     *
-     * <p>Volume above 1 is what sets the audible radius in Minecraft - sixteen blocks per unit - so
-     * it is scaled to carry about as far as the ground is actually moving, rather than being left
-     * at a polite 1.0 and going unheard by everyone the earthquake is happening to.</p>
+     * The ground noise, restarted at the clip's length until the rumble is over. Volume above 1 sets
+     * the audible radius (sixteen blocks per unit), so it carries about as far as the ground moves.
      */
     private static void rumble(ServerLevel level, Running run) {
         if (run.ticks > run.rumbleTicks) return;
@@ -459,13 +374,8 @@ public final class Earthquake {
             int z = p.blockPosition().getZ() + oz;
             PlateSample s = TectonicMap.sample(level, x, z);
             if (s.faultType() == FaultType.INTERIOR) continue;
-            // Recurrence, not a coin flip per interval.
-            //
-            // A fault does not rupture because a timer went off; it ruptures when it has stored
-            // enough strain, which takes a characteristic time. So the chance per roll is derived
-            // from a target RECURRENCE INTERVAL in in-game days, shortened on a highly stressed
-            // boundary and lengthened on a sleepy one. That turns earthquakes from something that
-            // happens every few minutes into something worth travelling to see.
+            // Recurrence, not a coin flip: the chance comes from a target interval in days, shorter
+            // on a highly stressed fault.
             double days = GeyserConfig.QUAKE_RECURRENCE_DAYS.get() / Math.max(0.15, s.stress());
             double rollsPerDay = 24000.0 / Math.max(1, interval);
             if (level.random.nextDouble() > 1.0 / Math.max(1.0, days * rollsPerDay)) continue;
@@ -482,21 +392,8 @@ public final class Earthquake {
     // === Magnitude and depth ================================================
 
     /**
-    /**
-    /**
-     * Magnitude, drawn the way nature draws it.
-     *
-     * <h2>Gutenberg-Richter</h2>
-     * Earthquakes are not spread evenly across their range. Almost everywhere on Earth, each step up
-     * in magnitude is about <b>ten times rarer</b> than the one below it - that is the
-     * Gutenberg-Richter law, and the exponent is close to 1 on every fault anyone has measured. So
-     * the magnitude comes from a truncated exponential across the band rather than a flat roll: a
-     * fault that can reach M9 mostly produces small events and only occasionally produces the giant,
-     * which is what makes the giant worth waiting for.
-     *
-     * <p>The bands themselves follow the real ordering: subduction megathrusts are the largest
-     * earthquakes the planet makes, collision zones are close behind, strike-slip faults sit in the
-     * middle, and spreading ridges are the mildest despite opening the most visible fissures.</p>
+     * Magnitude from a truncated Gutenberg-Richter distribution (b = 1): each step up is about ten
+     * times rarer. The bands follow the real order: subduction, collision, strike-slip, rift.
      */
     public static double rollMagnitude(FaultType type, double stress, RandomSource rng) {
         double lo, hi;
@@ -517,16 +414,8 @@ public final class Earthquake {
     }
 
     /**
-     * Focal depth. Subduction quakes nucleate far down the descending slab, while rift and
-     * strike-slip quakes are shallow crustal events - which is exactly why the shallow ones do so
-     * much surface damage for their size.
-     */
-    /**
-     * Is the plate the sample was taken on the one that goes under?
-     *
-     * <p>Dense oceanic crust always loses. Between two plates of the same kind nothing in the
-     * physics picks a winner, so the lower id is used: arbitrary, but the same answer from either
-     * side of the line, which is what stops the margin mirroring between quakes.</p>
+     * Is the plate the sample was taken on the one that goes under? Oceanic crust always does;
+     * between two of a kind the lower id does, the same answer from either side of the line.
      */
     private static boolean downGoingIsOurs(PlateSample s) {
         boolean ours = s.plateKind().isOceanic();

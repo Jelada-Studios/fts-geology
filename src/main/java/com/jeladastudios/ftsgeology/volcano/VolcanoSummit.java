@@ -35,29 +35,18 @@ public final class VolcanoSummit {
             case FISSURE_PONDS -> carveFissureLine(level, c);
         }
         if (c.vent == null) {
-            // Nothing seated (a fissure that found no workable ground, say): fall back to the axis
-            // so the volcano still has a working core rather than being left half-built.
+            // Nothing seated: fall back to the axis so the volcano still gets a working core.
             int g = TerrainProbe.groundY(level, c.x, c.z);
             c.vent = new BlockPos(c.x, g == Integer.MIN_VALUE ? c.summitY : g, c.z);
         }
     }
 
     /**
-     * A stratovolcano's crater: a funnel that steps inward as it goes down to a small lava lake, with
-     * smouldering magma on the walls. Standing on the rim you look down into it, which is the whole
-     * experience of a Fuji or a Vesuvius - not a lake at your feet.
-     *
-     * <h2>The lake has to be visible</h2>
-     * This used to end in a single lava block at the bottom of a funnel up to ten blocks deep, and
-     * one block down a throat that tapered to a point is invisible from the rim. That is precisely
-     * the "some volcanoes have no lava in the middle" report. Real stratocone craters do hold a small
-     * lake - Villarrica, Erebus, Nyiragongo - and the entire point of one is that you can lean over
-     * the edge and see it glowing down there. So the throat now bottoms out on a real floor instead
-     * of narrowing to nothing, and the funnel is shallower so the floor is in view from the rim.
+     * A stratovolcano's crater: a funnel stepping down to a lava lake on a real floor, shallow enough
+     * that the lake glows in view from the rim, as at Villarrica or Nyiragongo.
      */
     static void carveFunnelPit(ServerLevel level, Ctx c) {
-        // 0.55, not 0.35: at a 6-block crater the old fraction gave a pool of radius 2 - thirteen
-        // cells, which reads from above as a few scattered lava blocks rather than a lava lake.
+        // A lake about half the crater across, so it reads as a lake from above.
         int poolR = Math.max(2, (int) Math.round(c.craterR * 0.55));
         int depth = Mth.clamp(c.craterR + 1, 3, 7);
         int floorY = c.summitY - depth;
@@ -140,8 +129,7 @@ public final class VolcanoSummit {
         double r = c.craterR * 0.6;
         int vx = c.x + (int) Math.round(Math.cos(c.lakeAngle) * r);
         int vz = c.z + (int) Math.round(Math.sin(c.lakeAngle) * r);
-        // One block below the floor, matching the recessed lake carveCalderaRow lays down, so the
-        // core sits under lava rather than under the rim of it.
+        // One below the floor, matching the recessed lake, so the core sits under lava.
         BlockPos p = new BlockPos(vx, c.calderaFloorY - 1, vz);
         setRock(level, p.below(), Blocks.BASALT.defaultBlockState());
         setRock(level, p, Blocks.LAVA.defaultBlockState());
@@ -151,11 +139,7 @@ public final class VolcanoSummit {
         c.coreCraterR = Math.max(2, c.craterR / 3);
     }
 
-    /**
-     * A rift volcano builds no cone: the crust parts and lava wells out along the crack. This lays a
-     * line of ponds along the local fault strike, offset in <b>en-echelon</b> segments the way a real
-     * fissure swarm steps sideways rather than running dead straight.
-     */
+    /** A rift volcano: no cone, a line of ponds along the fault strike stepping sideways in en-echelon segments. */
     static void carveFissureLine(ServerLevel level, Ctx c) {
         int half = c.fissureHalf;
         int segLen = c.segLen;
@@ -169,37 +153,17 @@ public final class VolcanoSummit {
             BlockPos pond = seatPondCell(level, px, pz);
             if (pond == null) continue;
             if (c.vent == null) c.vent = pond;
-            // EVERY pond is recorded, not just the first.
-            //
-            // Only the first used to be, which meant the rest were not in the vent list either - so
-            // the final safety sweep saw them as stray exposed lava and walled them in, while the
-            // core went on firing its eruption particles out of ground that now looked solid. That
-            // is exactly the "the lava pool has vanished but the eruption still comes from there"
-            // report. Recorded here they are both protected from the sweep and given to the core, so
-            // the whole fissure swarm smokes and seeps together the way a real one does.
+            // Every pond is a vent, so the containment sweep leaves it open and the core smokes from it.
             c.vents.add(pond);
-            // And recorded as MOLTEN too, which this never did.
-            //
-            // Ctx.molten's own javadoc promises "every pond of a fissure swarm", and this was the
-            // one shape that put nothing in it - so a fissure volcano was born with an empty molten
-            // list, and the post-quake recharge that reads that list restored precisely nothing.
-            // The log said it plainly and nobody had looked: "vents: 35 cut of 6 sites, 0 molten
-            // cells". These ponds ARE the volcano's lava; they belong here.
+            // And molten, so the core keeps it lava after eruptions and quakes.
             c.molten.add(pond);
         }
         c.coreCraterR = 2;
     }
 
     /**
-     * Seats one fissure pond INTO the ground, with a spatter rampart around it.
-     *
-     * <h2>The diagonal wall of floating basalt</h2>
-     * The old version put the rampart at <b>this</b> cell's ground height on all four neighbours
-     * without ever asking what height those neighbours actually were. Across broken country - a
-     * badlands edge, say - the neighbour could be twenty blocks lower, so the collar hung in mid-air;
-     * strung out along a fault that produced exactly the diagonal basalt wall in the screenshot.
-     * Every neighbour is now read individually, and a cell whose surroundings are not level enough to
-     * hold a pond is skipped outright rather than built badly.
+     * Seats one fissure pond into the ground, with a spatter rampart built up from each neighbour's own
+     * ground. A cell whose neighbours are not level enough to hold a pond is skipped.
      *
      * @return the lava cell, or null if this spot could not hold one
      */
@@ -243,12 +207,8 @@ public final class VolcanoSummit {
             core.setMagnitude(c.magnitude);
             core.setCraterRadius(c.coreCraterR);
             core.setMoltenCells(c.molten);
-            // What the mountain was, so it can be put back after an earthquake flattens it. The
-            // ORIGINAL base, not the summit: a rebuild that measured from the current ground would
-            // stack a new cone on whatever survived and double the mountain's height.
-            // A large volcano records no shape to be raised again from. A quake cannot flatten a
-            // mountain that size, and the rebuild would lay the whole edifice out live, over several
-            // hundred chunks.
+            // What the mountain was, so it can be raised again after a quake: from the original base,
+            // or a rebuild would stack a new cone on the ruins. A large volcano records none.
             if (c.size != VolcanoSize.LARGE) {
                 core.setShape(c.type, c.size, new BlockPos(c.x, c.baseY, c.z), c.summitY);
             }
@@ -290,11 +250,7 @@ public final class VolcanoSummit {
         }
     }
 
-    /**
-     * Grows the root-like lava veins inside the mountain. Every step checks the local ground height
-     * so a vein can never wander out of a hillside and pour lava downhill, which is what used to set
-     * the countryside alight.
-     */
+    /** Root-like lava veins inside the mountain, kept clear of the local surface so none can break out. */
     static void growLavaBranches(ServerLevel level, Ctx c) {
         int fromY = c.reservoirY + 4;
         int toY = c.vent.getY() - 2;
@@ -323,14 +279,8 @@ public final class VolcanoSummit {
     // === Flank vents ========================================================
 
     /**
-     * Picks where the flank outlets go.
-     *
-     * <h2>Spacing, not luck</h2>
-     * Sites used to be drawn uniformly at random from a square, which clusters: half a dozen vents
-     * would end up within a few blocks of each other. Candidates are now rejected unless they clear
-     * every accepted vent by {@code minSpacing}, and the candidate distribution itself follows the
-     * type - radial and far out for a shield's lava tubes, high on the flanks for a stratocone, along
-     * the strike for a fissure swarm, and around the ring fault of a caldera.
+     * Picks flank outlet sites, each clear of the others by a minimum spacing and spread in the type's
+     * own pattern: upper flank, far and radial, along the strike, or round the ring fault.
      */
     static void chooseVents(ServerLevel level, Ctx c) {
         int minSpacing = 8 + c.magnitude / 2;
@@ -366,8 +316,7 @@ public final class VolcanoSummit {
             }
             default -> dist = outer;
         }
-        // A large volcano's outlets are cut live round its summit, where the world is loaded, so they
-        // are spread over that ring rather than piled up at its edge.
+        // A large volcano's outlets are cut live near the summit, spread over that loaded ring.
         if (c.liveReach > 0 && dist > c.liveReach) {
             dist = c.craterR + 3 + level.random.nextDouble() * Math.max(1, c.liveReach - c.craterR - 3);
         }
@@ -386,27 +335,11 @@ public final class VolcanoSummit {
     }
 
     /**
-     * Fumarole chimneys scattered over the flanks and the apron.
-     *
-     * <h2>Why a volcano needed them and did not have them</h2>
-     * The mod grew a whole geothermal surface vocabulary - sulfur, crust, mud, steam chimneys - and
-     * spent it entirely on hotspots, while the one place in the world that is unambiguously venting
-     * had none of it. A live cone is not a bare pile of rock; it leaks all over, and the fumaroles
-     * on its flanks are how you can tell it is still alive from a distance.
-     *
-     * <p>They also give the eruption something to do at ground level. The column is overhead and the
-     * lava is at the summit, so a player standing on the mountain saw the least of it; when the
-     * eruption starts these blow hard, right where the player is - see
-     * {@code VolcanoCoreBlockEntity.fumaroleSmoke}.</p>
-     *
-     * <p>The chimney itself is {@link com.jeladastudios.ftsgeology.worldgen.HotspotSigns#chimney},
-     * reused rather than reimplemented: it already builds the three-part tapering stack and already
-     * refuses a spot without headroom.</p>
+     * Steam chimneys over the flanks, from the crater rim out to the near apron. They show a live cone
+     * from a distance and blow black smoke during an eruption, right where the player stands.
      */
     static void cutFumaroles(ServerLevel level, Ctx c) {
-        // Rings out from the crater rim to the foot, since a real one vents up and down the cone
-        // rather than in a band. Scaled by size so a big mountain is not decorated as sparsely as a
-        // cinder cone.
+        // Scaled with size, so a big mountain is not as sparse as a cinder cone.
         int wanted = 4 + c.magnitude / 2;
         int tries = wanted * 4;
         for (int i = 0; i < tries && c.fumaroles.size() < wanted; i++) {
@@ -446,34 +379,17 @@ public final class VolcanoSummit {
             core.setSurfaceVents(c.vents);
             core.setFumaroles(c.fumaroles);
         }
-        // Said out loud, because "it feels like the vents do nothing" is not something you can act
-        // on. carveSeatedOutlet returns null silently when a site will not do, so a mountain with
-        // no working outlets looked exactly like a mountain whose particles were broken. Now the
-        // ratio is in the log and the two can be told apart.
+        // Logged, since an outlet site that will not do is skipped silently.
         GeysersMod.LOGGER.info("volcano {} vents: {} cut of {} sites, {} molten cells",
                 c.type, c.vents.size(), c.ventSites.size(), c.molten.size());
     }
 
     /**
-     * Seats a lava outlet INTO the hillside instead of dropping it on top. The lava ends up recessed
-     * below the rock around it with a basalt collar, so containment comes from the shape of the
-     * ground rather than from a fence built afterwards.
+     * Seats a lava outlet into the hillside: shaves a 5x5 bench down to the lowest ground in it, then
+     * recesses the lava under a basalt collar so it has nowhere to run. Refuses more than six blocks of
+     * relief, and checks the whole site before touching any of it.
      *
-     * <h2>It cuts its own bench</h2>
-     * This used to <em>demand</em> level ground - {@code findLevelSite(.., radius 2, tolerance 1)},
-     * which with its guard ring means a 7x7 patch flat to within one block. A volcano flank is a
-     * slope by definition, and on a stratocone it is close to 1:1, so a seven-block span drops six.
-     * The test therefore almost never passed, {@code c.vents} came back empty, and since both
-     * {@code seepVent} and the idle smoke are guarded on {@code surfaceVents.length > 0} the
-     * mountain had no working outlets at all: no lava on the flanks, and nothing to make the
-     * particles the eruption was supposed to show.
-     *
-     * <p>So it levels the patch itself now, down to the lowest ground in it. Taking the LOW point
-     * rather than an average is what keeps the old guarantee intact - the pool still sits below
-     * everything around it and still has nowhere to run. A real spatter vent builds itself the same
-     * small platform.</p>
-     *
-     * @return the lava cell, or null if this spot was genuinely unusable
+     * @return the lava cell, or null if this spot was unusable
      */
     static BlockPos carveSeatedOutlet(ServerLevel level, int vx, int vz) {
         // Nothing here may reach into an unloaded chunk; reading one loads it on the server thread.
@@ -491,18 +407,11 @@ public final class VolcanoSummit {
             }
         }
         if (g == Integer.MAX_VALUE) return null;
-        // Willing to cut a bench, not to gouge a cliff. Six blocks of relief across five is a steep
-        // flank and still fine; past that the notch would read as a bite taken out of the mountain,
-        // and there are plenty of other bearings to try.
+        // A bench, not a cliff: past six blocks of relief the notch would read as a bite out of the mountain.
         if (hi - g > 6) return null;
         if (g <= level.getSeaLevel() + 1) return null;   // never at the waterline
 
-        // Check the WHOLE site before touching any of it.
-        //
-        // Both loops below used to bail out with `return null` partway through, after they had
-        // already removed blocks - so a rejected site was left with a half-shaved notch in it, or a
-        // basalt collar with no lava inside. A site is either usable or it is left exactly as it
-        // was found; there is no half-built vent.
+        // Check the whole site first, so a rejected site is left exactly as it was.
         for (int dx = -2; dx <= 2; dx++) {
             for (int dz = -2; dz <= 2; dz++) {
                 for (int y = g; y <= g + 6; y++) {
@@ -513,8 +422,7 @@ public final class VolcanoSummit {
             }
         }
 
-        // Shave the bench down to that level. Only ever removes; nothing is stacked up, so the
-        // outlet cannot end up perched on a plinth of its own making.
+        // Shave down to that level. Only removes, so the outlet never stands on a plinth.
         for (int dx = -2; dx <= 2; dx++) {
             for (int dz = -2; dz <= 2; dz++) {
                 int x = vx + dx, z = vz + dz;
@@ -552,11 +460,7 @@ public final class VolcanoSummit {
             if (level.getBlockState(p).is(Blocks.BEDROCK)) break;
             if (level.getBlockState(p).getFluidState().is(FluidTags.LAVA)) break;
 
-            // Never write lava within reach of daylight. The vein used to head inward at whatever
-            // height it happened to be, so on a slope it emerged from the hillside and poured down -
-            // the same failure the branch carver already guards against. Here it dives instead,
-            // which leaves a few blocks of rock between the outlet pool and the vein: invisible, and
-            // far better than a lava fall.
+            // Dive rather than head inward within reach of daylight, so the vein never breaks out of a slope.
             int localGround = TerrainProbe.groundY(level, p.getX(), p.getZ());
             if (localGround == Integer.MIN_VALUE) break;
             if (p.getY() > localGround - LAVA_SURFACE_CLEARANCE) {
@@ -584,19 +488,8 @@ public final class VolcanoSummit {
     // === Geothermal field and the safety sweep ==============================
 
     /**
-    /**
-    /**
-     * Scatters hot springs and geysers <b>around</b> the volcano.
-     *
-     * <h2>Around, not on</h2>
-     * Sites used to be drawn from a square centred on the volcano, which includes the cone itself -
-     * so a geyser could and did erupt straight out of the summit. That is not where a geothermal
-     * field goes: the edifice is the plumbing, and the springs sit on the ground beside it where
-     * groundwater can circulate. Sites are now drawn from a ring outside the cone, and any candidate
-     * standing on rock the volcano laid down is rejected as well, so the apron stays clear too.
-     *
-     * <p>A caldera is the exception that proves it: its springs go ON the ring fault, because that
-     * circle of deep fractures is exactly what feeds them - which is where Yellowstone's basins are.
+     * Scatters hot springs and geysers in a ring around the volcano, never on its own rock. A caldera's
+     * go on its ring fault, whose fractures feed them, as in Yellowstone's basins.
      */
     static void placeField(ServerLevel level, Ctx c) {
         boolean ring = c.type.excavates();
@@ -643,21 +536,12 @@ public final class VolcanoSummit {
     }
 
     /**
-    /**
-     * Covers any lava that ended up with an open face.
-     *
-     * <p>Belt and braces: the vein carver and the vents keep lava underground or recessed by
-     * construction, but a single exposed cell is enough to set a forest alight, so the build ends by
-     * checking rather than trusting. Deliberately <b>targeted</b> rather than a sweep of the whole
-     * footprint - lava only ever exists at the summit and at the outlets, and scanning a shield's
-     * entire ninety-block apron through fifty levels of Y would have cost more than building the
-     * mountain did.</p>
+     * Walls any lava that ended up with an open face, around the summit and each outlet only: lava exists
+     * nowhere else, and a full-footprint sweep would cost more than the build.
      */
     static void sealExposedLava(ServerLevel level, Ctx c) {
         if (c.vent == null) return;
-        // The summit and its throat.
-        // Wide enough to cover a fissure swarm strung out along the strike, capped so a huge shield
-        // does not turn the check into a bigger job than the build.
+        // The summit and its throat, wide enough for a fissure's ponds, capped for a huge shield.
         int summitR = Math.min(Math.max(c.craterR + 5, c.coneBaseR + 4), 40);
         int hiY = Math.max(c.summitY, c.vent.getY()) + 3;
         sealBox(level, c, c.x, c.z, summitR, c.vent.getY() - 6, hiY);
@@ -706,15 +590,8 @@ public final class VolcanoSummit {
     // === Small helpers ======================================================
 
     /**
-     * Final check: any lava that could still run is removed.
-     *
-     * <p>{@code sealExposedLava} walls whatever neighbours it finds open, which is the right first
-     * move but leaves nothing to catch a cell it missed - and one missed cell on a slope is a lava
-     * fall and a burning forest. This is the verification behind it, and it is deliberately harsher:
-     * if a lava cell has any horizontal neighbour it could spread into, or one it could fall off,
-     * that lava simply does not get to exist. Everything the volcano is <em>supposed</em> to show -
-     * the summit pool, the fissure ponds, the flank outlets, the caldera lake - is recessed into its
-     * own basin by construction, so all of it passes.</p>
+     * Final check after the sealing: any lava cell that could still spread sideways or fall off an edge
+     * is turned to basalt. Everything meant to be open is recessed, so it passes.
      */
     static void verifyContainment(ServerLevel level, Ctx c) {
         if (c.vent == null) return;

@@ -70,16 +70,8 @@ public final class VolcanoPlan {
         /** Steam-vent chimneys on the flanks: quiet most of the time, filthy during an eruption. */
         final List<BlockPos> fumaroles = new ArrayList<>();
         /**
-         * Cells that are MEANT to be lava between eruptions - the crater pool, a caldera's lake
-         * crescent, every pond of a fissure swarm.
-         *
-         * <p>{@code coolScatteredLava} used to protect them with a radius, {@code coreCraterR}, and
-         * a radius is the wrong shape for two of the four summit styles. A caldera's lake is a
-         * crescent reaching {@code craterR * 0.85} while its keep radius was {@code craterR / 3}, and
-         * a fissure's ponds are strung along a line while its keep radius was 2 - so after the first
-         * eruption most of the lava a volcano was built with had been turned to basalt and never
-         * refilled. That is the "hardly any lava in the crater" report. Listing the actual cells
-         * makes the protection exactly the shape of the thing it is protecting.</p>
+         * Cells meant to be lava between eruptions: the crater pool, a caldera's lake, every pond of
+         * a fissure swarm. Listed because a radius is the wrong shape for most of them.
          */
         final List<BlockPos> molten = new ArrayList<>();
     }
@@ -93,12 +85,8 @@ public final class VolcanoPlan {
     }
 
     /**
-     * Works out every dimension of a volcano from a random source.
-     *
-     * <p>Kept apart from the site check so a large volcano can be planned from its own seed. World
-     * generation raises one a chunk at a time, on several threads, and every one of those chunks has
-     * to arrive at the same mountain; given the same seed this returns the same numbers, so they do.
-     * </p>
+     * Works out every dimension of a volcano from a random source. Kept apart from the site check so
+     * a large volcano can be planned from its seed: every chunk, on any thread, gets the same mountain.
      *
      * @return null when the volcano cannot stand here at all
      */
@@ -138,12 +126,8 @@ public final class VolcanoPlan {
         c.rimWidth = size.rimWidth();
         c.liveReach = size == VolcanoSize.LARGE ? LARGE_LIVE_REACH : 0;
         c.apronReach = c.coneBaseR + (int) Math.round(c.coneBaseR * size.apronReach(type)) + 6;
-        // Everything the volcano will lay rock on, not just the edifice. The clearing used to stop
-        // at the cone while the apron ran a third further out, so the outer band of debris was
-        // spread UNDER a standing forest - buildApronRow only calls clearVegetation, which by
-        // design leaves logs and leaves alone. That is the forest growing out of the basalt in the
-        // test shots. The fringe of snags in clearSiteRow scales with the radius, so widening it
-        // frays the edge further rather than mowing a bigger circle.
+        // Clear everything the volcano lays rock on, apron included, so no debris is spread under a
+        // standing forest.
         c.clearReach = Math.max(Math.max(c.coneBaseR, c.craterR), c.apronReach) + 6;
 
         c.reservoirR = GeyserConfig.VOLCANO_RESERVOIR_RADIUS.get() + rng.nextInt(1 + magnitude / 3);
@@ -168,17 +152,8 @@ public final class VolcanoPlan {
             c.flowPhase[i] = rng.nextDouble() * Math.PI * 2;
         }
         c.flowReach = Math.max(10, c.coneBaseR) * (1.05 + rng.nextDouble() * 0.45);
-        // A tongue measured in absolute blocks covers a share of the flank that falls off as 1/r:
-        // measured, a 20-block cone came out 21% flow and a 69-block shield only 6%, so the biggest
-        // mountains - the ones worth looking at - were the ones wearing threads. Scaling the width
-        // with the cone holds the proportion roughly steady, and it is what the real thing does:
-        // Mauna Loa's flows are kilometres across, not the same few metres a cinder cone's are.
-        //
-        // Thinned after testing called the first cut too heavy: it covered 22% of the flank in a few
-        // broad bands. More flows and narrower ones takes it to about 10%, which is also the truer
-        // arrangement - a cone is built from many thin flows over a long time, not a handful of wide
-        // ones. Continuity was re-measured alongside, because narrowing a channel is exactly how you
-        // perforate it: still no break in any of 492 centrelines.
+        // Flow width scales with the cone, so a big mountain is not threaded with thin lines. Many
+        // narrow flows cover about a tenth of the flank without breaking a centreline.
         c.flowWidth = Math.max(1.0, c.coneBaseR / 34.0);
 
         c.calderaFloorY = c.baseY - size.calderaDepth(rng);
@@ -206,12 +181,8 @@ public final class VolcanoPlan {
     }
 
     /**
-     * Checks the ground can actually carry this volcano.
-     *
-     * <p>Far more forgiving than it used to be, because the height-field edifice copes with slopes
-     * that the old ring builder could not: what it still refuses is ground that would make the
-     * volcano wrong rather than merely awkward - a shoreline, a site that is mostly water, or (for a
-     * caldera, which has to excavate a flat floor) seriously broken country.</p>
+     * Checks the ground can carry this volcano: refuses a shoreline, a mostly wet site, or, for a
+     * caldera, which excavates a flat floor, seriously broken country.
      */
     static boolean siteIsSuitable(ServerLevel level, Ctx c) {
         int centre = TerrainProbe.groundY(level, c.x, c.z);
@@ -234,16 +205,10 @@ public final class VolcanoPlan {
             }
         }
         if (samples == 0) return false;
-        // Water is refused hard now. A cone that reaches the shoreline leaves a sheer rampart around
-        // it, and a caldera cut below a lake drains it, so a site with any real amount of water in
-        // its footprint is simply not a volcano site.
+        // Water is refused: a cone at a shoreline leaves a rampart, and a caldera below a lake drains it.
         if (wet * 10 > samples) return false;
         if (blank * 8 > samples) return false;      // riddled with voids: no
-        // A caldera has to cut a flat floor, so it wants reasonable ground; the others grow happily
-        // out of a hillside now that they fill downward to meet it.
-        // A caldera has to cut a flat floor over eighty blocks across, so it wants genuinely even
-        // ground - the old tolerance turned a hillside into a quarry. The others grow happily out of
-        // a slope now that the cone fills downward to meet it.
+        // A caldera cuts a flat floor and wants even ground; the others grow out of a slope.
         int allowed = c.type.excavates() ? 8 + radius / 6 : 24 + radius;
         return (hi - lo) <= allowed;
     }

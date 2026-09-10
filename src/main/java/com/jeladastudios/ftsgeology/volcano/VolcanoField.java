@@ -33,18 +33,13 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Where the large volcanoes stand.
  *
- * <h2>Why not a structure</h2>
- * A structure start can only lay pieces within eight chunks of itself, about 128 blocks, and a large
- * stratovolcano's foot is nearly 200 blocks out while a shield's runs past 400. So the mountains are
- * decided the way the hotspots are: from the world seed over a coarse grid, as pure arithmetic. Any
- * chunk being generated can ask which volcanoes reach it and get the answer every other chunk gets,
- * on whatever thread it is running on, and build its own share of them.
+ * <p>Not a structure: a structure start reaches only eight chunks, and a large volcano's foot runs
+ * 200 to 400 blocks out. So, like the hotspots, sites come from the world seed over a coarse grid,
+ * and any chunk on any thread gets the same answer.</p>
  *
- * <h2>The setting decides, as it does for the small ones</h2>
- * A cell becomes a shield or a caldera over a mantle plume, a stratovolcano on a subduction arc and a
- * fissure on a rift. Anywhere else it stays empty. It is then refused on water, on ground too broken
- * for it, and wherever a village or another surface structure is due: a structure's buildings are
- * placed at the ground height the terrain had before the mountain, so they would end up inside it.
+ * <p>A cell becomes a shield or caldera over a plume, a stratovolcano on a subduction arc and a
+ * fissure on a rift. It is refused on water, on ground too broken for it, and where a surface
+ * structure is due, since that structure would be built inside the mountain.</p>
  */
 public final class VolcanoField {
 
@@ -174,9 +169,8 @@ public final class VolcanoField {
         int minX = cx * CELL + MARGIN, minZ = cz * CELL + MARGIN;
         int maxX = minX + span, maxZ = minZ + span;
 
-        // A plume first. There are far fewer of them than there is boundary, and a Mauna Loa is the
-        // grander sight; a centre just outside the usable part of the cell is pulled in, which keeps
-        // most plumes rather than a fifth of them.
+        // A plume first: fewer of them, and the grander sight. A centre just outside the usable part
+        // of the cell is pulled in.
         for (int[] p : HotspotMap.plumeCentres(level, minX - PLUME_PULL, minZ - PLUME_PULL,
                 maxX + PLUME_PULL, maxZ + PLUME_PULL)) {
             int x = Mth.clamp(p[0], minX, maxX), z = Mth.clamp(p[1], minZ, maxZ);
@@ -266,12 +260,9 @@ public final class VolcanoField {
     }
 
     /**
-     * True when a surface structure is due within {@code radius} blocks.
-     *
-     * <p>Asked of the structure placement itself - the same spacing grid and biome test the game uses -
-     * so it gives the answer for chunks nobody has generated. It errs towards refusing: a start whose
-     * layout would later fail still counts. Ruined portals are ignored; they turn up everywhere and a
-     * buried one is how they are meant to be found anyway.</p>
+     * True when a surface structure is due within {@code radius} blocks, asked of the structure
+     * placement itself so it works for ungenerated chunks. Errs towards refusing; ruined portals are
+     * ignored.
      */
     private static boolean structureInTheWay(ServerLevel level, ChunkGenerator gen, RandomState rs,
                                              int x, int z, int radius) {
