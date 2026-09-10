@@ -1822,7 +1822,7 @@ public final class VolcanoBuilder {
                 long dx = gx - c.x, dz = gz - c.z;
                 if (dx * dx + dz * dz > reach2) continue;
                 // Seeded by the column alone, so its dice fall the same whichever chunk came first.
-                rng.setSeed(columnSeed(site.seed(), gx, gz));
+                rng.setSeed(com.jeladastudios.ftsgeology.util.SeedHash.columnSeed(site.seed(), gx, gz));
                 if (c.coneHeight > 0) coneColumn(level, c, gx, gz, rng, true);
                 if (c.type.excavates()) calderaColumn(level, c, gx, gz, rng, true);
                 apronColumn(level, c, gx, gz, rng, true);
@@ -1930,14 +1930,6 @@ public final class VolcanoBuilder {
             }
         }
         return true;
-    }
-
-    private static long columnSeed(long seed, int x, int z) {
-        long h = seed ^ (x * 0x9E3779B97F4A7C15L) ^ (z * 0xC2B2AE3D27D4EB4FL);
-        h ^= h >>> 33;
-        h *= 0xFF51AFD7ED558CCDL;
-        h ^= h >>> 33;
-        return h;
     }
 
     /** Could lava here spread sideways, or fall off an edge? */

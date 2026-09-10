@@ -3,7 +3,7 @@ package com.jeladastudios.ftsgeology.quake;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
-import com.jeladastudios.ftsgeology.hydrology.RiverProfile;
+import com.jeladastudios.ftsgeology.instrument.RockTypes;
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
 import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
@@ -230,7 +230,7 @@ public final class CaveCollapse {
         // weight a first test at M8 found 177 caves along the rupture and brought down two roofs.
         int span = span(level, x, cave.top(), z);
         double arch = Mth.clamp(span / (cave.roof() * 0.5 + 2.0), 0.0, 1.5) / 1.5;
-        double weak = RiverProfile.erodibility(level, x, cave.top() + 1, z);
+        double weak = RockTypes.erodibility(level.getBlockState(new BlockPos(x, cave.top() + 1, z)));
         if (level.random.nextDouble() >= CHANCE * shaking * arch * (0.4 + 0.6 * weak)) return;
 
         boolean throughRoof = cave.roof() <= THIN_ROOF;

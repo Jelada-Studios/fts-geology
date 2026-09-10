@@ -222,14 +222,6 @@ public final class HotSpringShape {
      * thin over the lip, so the carbonate comes out of it fastest exactly along the overflow. The
      * streak therefore grows out of the rim rather than being drawn onto the ground beside it.</p>
      *
-     * <h2>The path is not a new piece of maths</h2>
-     * {@link com.jeladastudios.ftsgeology.hydrology.RiverProfile#downstream} already answers "which
-     * way does water leave this column", picking the steepest of the eight neighbours with the
-     * diagonals divided by their length, and returning null at a low point. It was written for the
-     * river erosion, which is switched off by default - but what is switched off is
-     * {@code Knickpoint.afterQuake}, not this, and a helper that finds the way downhill is exactly
-     * as correct either way.
-     *
      * <p>Only from a mature spring. A young pool has neither the deposit nor the flow to build a
      * terrace outside itself, which is the same reasoning that brings the colour bands in one at a
      * time rather than all at stage one.</p>
@@ -248,8 +240,12 @@ public final class HotSpringShape {
         BlockPos lip = null;
         int lowest = Integer.MAX_VALUE;
         java.util.Set<Long> tested = new java.util.HashSet<>();
+        // North, south, east, west: the order decides which of two equally low lips wins.
+        net.minecraft.core.Direction[] sides = {net.minecraft.core.Direction.NORTH,
+                net.minecraft.core.Direction.SOUTH, net.minecraft.core.Direction.EAST,
+                net.minecraft.core.Direction.WEST};
         for (BlockPos c : pool) {
-            for (net.minecraft.core.Direction d : com.jeladastudios.ftsgeology.hydrology.RiverProfile.sides()) {
+            for (net.minecraft.core.Direction d : sides) {
                 int nx = c.getX() + d.getStepX(), nz = c.getZ() + d.getStepZ();
                 long key = net.minecraft.core.BlockPos.asLong(nx, 0, nz);
                 if (cells.contains(key) || !tested.add(key)) continue;   // inside, or already looked

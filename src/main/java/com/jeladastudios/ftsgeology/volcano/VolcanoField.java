@@ -1,5 +1,8 @@
 package com.jeladastudios.ftsgeology.volcano;
 
+import static com.jeladastudios.ftsgeology.util.SeedHash.hash;
+import static com.jeladastudios.ftsgeology.util.SeedHash.rand01;
+
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.tectonics.HotspotMap;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
@@ -308,19 +311,4 @@ public final class VolcanoField {
         return false;
     }
 
-    private static long hash(long seed, int x, int z, long salt) {
-        long h = seed ^ salt;
-        h ^= x * 0x9E3779B97F4A7C15L;
-        h ^= z * 0xC2B2AE3D27D4EB4FL;
-        h ^= (h >>> 33);
-        h *= 0xFF51AFD7ED558CCDL;
-        h ^= (h >>> 33);
-        h *= 0xC4CEB9FE1A85EC53L;
-        h ^= (h >>> 33);
-        return h;
-    }
-
-    private static double rand01(long h) {
-        return (h >>> 11) * 0x1.0p-53;
-    }
 }

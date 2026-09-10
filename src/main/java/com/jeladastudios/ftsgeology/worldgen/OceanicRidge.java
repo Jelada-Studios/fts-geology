@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.worldgen;
 
+import static com.jeladastudios.ftsgeology.util.ValueNoise.noise;
+
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
@@ -188,33 +190,6 @@ public final class OceanicRidge {
             }
         }
         return placed;
-    }
-
-    /**
-     * Cheap value noise in [-1, 1], deterministic from world coordinates alone.
-     *
-     * <p>Used only to ragged the edges of things whose underlying profile is smooth. A smooth profile
-     * rounded to whole blocks produces perfect contour lines, and perfect contour lines are the one
-     * thing that instantly reads as generated rather than grown.</p>
-     */
-    static double noise(int x, int z, double scale) {
-        double fx = x / scale, fz = z / scale;
-        int x0 = Mth.floor(fx), z0 = Mth.floor(fz);
-        double ax = fx - x0, az = fz - z0;
-        ax = ax * ax * (3.0 - 2.0 * ax);
-        az = az * az * (3.0 - 2.0 * az);
-        return Mth.lerp(az,
-                Mth.lerp(ax, lattice(x0, z0), lattice(x0 + 1, z0)),
-                Mth.lerp(ax, lattice(x0, z0 + 1), lattice(x0 + 1, z0 + 1)));
-    }
-
-    /** One lattice value in [-1, 1]. */
-    static double lattice(int x, int z) {
-        long h = x * 0x9E3779B97F4A7C15L ^ z * 0xC2B2AE3D27D4EB4FL;
-        h ^= h >>> 29;
-        h *= 0xBF58476D1CE4E5B9L;
-        h ^= h >>> 32;
-        return ((h >>> 11) / (double) (1L << 53)) * 2.0 - 1.0;
     }
 
     /** Fresh volcanic rock: what the ridge is actually made of. */

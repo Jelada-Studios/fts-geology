@@ -78,8 +78,8 @@ public final class SoilProfile {
                 // Patches, not speckle. Two scales so the edges of a patch are ragged rather than
                 // round, and a good half of the ground is left as ordinary soil - the point is that
                 // the place reads red or pale, not that every block of it does.
-                double n = OceanicRidge.noise(x0 + dx, z0 + dz, 21.0)
-                        + 0.5 * OceanicRidge.noise(x0 + dx + 8192, z0 + dz - 8192, 7.0);
+                double n = com.jeladastudios.ftsgeology.util.ValueNoise.noise(x0 + dx, z0 + dz, 21.0)
+                        + 0.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(x0 + dx + 8192, z0 + dz - 8192, 7.0);
                 // A ramp rather than a cut. A hard threshold on smooth noise draws a smooth CURVE,
                 // which is a contour line - and a contour line around a patch of soil reads as
                 // drawn on. Feathering it over a band lets the patch break up at its own edge.

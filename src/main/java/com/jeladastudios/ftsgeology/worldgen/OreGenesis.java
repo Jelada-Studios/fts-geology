@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.worldgen;
 
+import com.jeladastudios.ftsgeology.util.ValueNoise;
+
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.tectonics.HotspotMap;
@@ -145,7 +147,7 @@ public final class OreGenesis {
                 int top = ground - 4;
 
                 // The upper seam: a buried delta swamp around Y=32, under a shale roof.
-                if (OceanicRidge.noise(x, z, 80.0) > -0.25) {
+                if (ValueNoise.noise(x, z, 80.0) > -0.25) {
                     int y = (int) Math.round(32.0 + 8.0 * Math.sin(x * 0.0075) + 6.0 * Math.cos(z * 0.0069)
                             + 1.5 * Math.sin(x * 0.2) + 1.5 * Math.cos(z * 0.2));
                     if (y < ground - 5 && y > d.level.getMinBuildHeight() + 10) {
@@ -156,13 +158,13 @@ public final class OreGenesis {
                 }
 
                 // The deep seam: carbonaceous shale buried long enough to sit in deepslate country.
-                if (OceanicRidge.noise(x + 7919, z - 7919, 64.0) > 0.30) {
+                if (ValueNoise.noise(x + 7919, z - 7919, 64.0) > 0.30) {
                     int y = (int) Math.round(-8.0 + 5.0 * Math.sin(x * 0.0056 + 1.2) + Math.sin(z * 0.13));
                     d.set(x, y, z, roll(x, y, z, 3) == 0 ? ModBlocks.SHALE.get() : Blocks.DEEPSLATE_COAL_ORE, top);
                 }
 
                 // Ironstone: a thin oolitic horizon around Y=18, with grains of ore scattered through it.
-                if (OceanicRidge.noise(x - 4099, z + 4099, 48.0) > 0.35 && roll(x, 18, z, 3) == 0) {
+                if (ValueNoise.noise(x - 4099, z + 4099, 48.0) > 0.35 && roll(x, 18, z, 3) == 0) {
                     int y = (int) Math.round(18.0 + 3.0 * Math.sin(z * 0.011) + 2.0 * Math.cos(x * 0.009));
                     if (ground > y + 6) d.set(x, y, z, Blocks.IRON_ORE, top);
                 }

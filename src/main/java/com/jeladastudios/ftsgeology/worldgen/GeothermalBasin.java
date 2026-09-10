@@ -218,8 +218,8 @@ public final class GeothermalBasin {
         // which is exactly what testing said about the first version of the fumarole fields. Two
         // slow noise fields give the floor areas instead: sinter flats, crusted ground between them,
         // and the odd wet hollow.
-        double flat = OceanicRidge.noise(x, z, 34.0);
-        double wet = OceanicRidge.noise(x + 4096, z - 4096, 19.0);
+        double flat = com.jeladastudios.ftsgeology.util.ValueNoise.noise(x, z, 34.0);
+        double wet = com.jeladastudios.ftsgeology.util.ValueNoise.noise(x + 4096, z - 4096, 19.0);
 
         TerrainProbe.clearVegetation(level, x, g, z, 2);
 

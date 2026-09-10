@@ -252,4 +252,17 @@ public final class RockTypes {
         Rock r = classify(s);
         return r != Rock.OTHER;
     }
+
+    /** How readily this rock gives way, from 0.2 (granite, gabbro) to 1 (loose sediment and soil). */
+    public static double erodibility(BlockState s) {
+        return switch (classify(s)) {
+            case SEDIMENT, SOIL -> 1.0;
+            case SEDIMENTARY -> 0.7;
+            case BIOGENIC -> 0.6;
+            case METAMORPHIC -> 0.35;
+            case VOLCANIC -> 0.3;
+            case PLUTONIC -> 0.2;
+            default -> 0.5;
+        };
+    }
 }
