@@ -52,6 +52,10 @@ public final class HotspotSigns {
      */
     public static void generate(WorldGenLevel level, ChunkPos cp) {
         ServerLevel model = level.getLevel();
+        // Not on or around a large volcano: its flanks are its own ground, and a chimney near the
+        // summit ends up hanging over the crater once it is carved.
+        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.nearLarge(
+                model, cp.getMiddleBlockX(), cp.getMiddleBlockZ(), 8)) return;
         long seed = level.getSeed();
         for (int ox = -REACH_CHUNKS; ox <= REACH_CHUNKS; ox++) {
             for (int oz = -REACH_CHUNKS; oz <= REACH_CHUNKS; oz++) {
@@ -137,6 +141,7 @@ public final class HotspotSigns {
         BlockState here = level.getBlockState(at);
         if (here.is(Blocks.BEDROCK)) return;
         if (EruptionHandler.isPlayerPlaced(here)) return;
+        if (volcanic(here)) return;                               // a volcano's own rock
 
         TerrainProbe.clearVegetation(level, x, g, z, 1);
 
@@ -163,6 +168,13 @@ public final class HotspotSigns {
                     ? Blocks.COARSE_DIRT.defaultBlockState()
                     : ModBlocks.SINTER_CRUST.get().defaultBlockState());
         }
+    }
+
+    /** Rock a volcano laid down, which geothermal paint leaves alone. */
+    static boolean volcanic(BlockState s) {
+        return s.is(Blocks.BASALT) || s.is(Blocks.SMOOTH_BASALT) || s.is(Blocks.BLACKSTONE)
+                || s.is(Blocks.TUFF) || s.is(Blocks.MAGMA_BLOCK) || s.is(Blocks.OBSIDIAN)
+                || s.is(ModBlocks.COOLING_LAVA_CRUST.get());
     }
 
     /** A two or three block chimney of the mineral its own steam has laid down. */

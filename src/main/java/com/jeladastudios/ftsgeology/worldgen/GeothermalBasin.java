@@ -61,6 +61,9 @@ public final class GeothermalBasin {
         if (!GeyserConfig.HOTSPOTS_ENABLED.get()) return;
 
         ServerLevel model = level.getLevel();
+        // A large volcano's footprint is its own ground, not a basin floor.
+        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.nearLarge(
+                model, cp.getMiddleBlockX(), cp.getMiddleBlockZ(), 8)) return;
         int x0 = cp.getMinBlockX(), z0 = cp.getMinBlockZ();
         // Four corners, not 256 columns and not one centre. See the class note.
         double s00 = basin(model, x0, z0);
@@ -163,6 +166,7 @@ public final class GeothermalBasin {
         if (EruptionHandler.isPlayerPlaced(here)) return false;
         // A spring's own work always wins, its colour bands above all.
         if (HotSpringShape.isCrust(here) || isBasinFloor(here)) return false;
+        if (HotspotSigns.volcanic(here)) return false;              // a volcano's own rock
 
         // Patches, not a sprinkle: two slow noise fields give sinter flats, crusted ground and wet hollows.
         double flat = ValueNoise.noise(x, z, 34.0);

@@ -72,6 +72,7 @@ public final class VolcanoSummit {
                 }
             }
         }
+        clearAboveCrater(level, c, c.craterR * 1.18 + 1.0);
         // The lake itself, seated on its own basalt floor with a crust of cooling magma at the shore.
         for (int dx = -poolR - 1; dx <= poolR + 1; dx++) {
             for (int dz = -poolR - 1; dz <= poolR + 1; dz++) {
@@ -120,8 +121,25 @@ public final class VolcanoSummit {
                 }
             }
         }
+        clearAboveCrater(level, c, c.craterR * 1.58 + 1.0);
         c.vent = new BlockPos(c.x, lakeY, c.z);
         c.coreCraterR = Math.max(2, c.craterR);
+    }
+
+    /**
+     * Clears whatever natural stands over a crater, up to eight blocks above the summit: a chimney or
+     * a tree put down before the crater was carved would otherwise be left hanging over the lava.
+     */
+    static void clearAboveCrater(ServerLevel level, Ctx c, double radius) {
+        int r = (int) Math.ceil(radius);
+        for (int dx = -r; dx <= r; dx++) {
+            for (int dz = -r; dz <= r; dz++) {
+                if (dx * dx + dz * dz > radius * radius) continue;
+                for (int y = c.summitY + 1; y <= c.summitY + 8; y++) {
+                    clearNatural(level, new BlockPos(c.x + dx, y, c.z + dz));
+                }
+            }
+        }
     }
 
     /** Finds the caldera's crescent lake and seats the core under it. */

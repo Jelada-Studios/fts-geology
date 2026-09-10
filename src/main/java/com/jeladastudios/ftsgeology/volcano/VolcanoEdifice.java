@@ -41,7 +41,7 @@ public final class VolcanoEdifice {
         double t = (dist - innerR) / Math.max(1.0, baseR - innerR);
         double frac = Math.pow(1.0 - t, c.type.flankExponent());
         // Roughness fades out at the rim so the edge still meets the apron cleanly.
-        double rough = surfaceNoise(c, gx, gz) * Math.max(1.0, c.coneHeight * 0.09) * (1.0 - t);
+        double rough = surfaceNoise(c, gx, gz) * Math.min(3.0, 1.0 + c.coneHeight * 0.02) * (1.0 - t);
         // From this column's own ground, so a volcano on a hill does not become a plateau.
         double seam = seamHeight(c);
         double span = Math.max(0.0, c.baseY - localGround + c.coneHeight - seam);
@@ -59,11 +59,15 @@ public final class VolcanoEdifice {
         return (int) Math.ceil(c.coneBaseR * 1.21) + 2;
     }
 
-    /** Roughness added before rounding, so the smooth profile does not show contour terraces. */
+    /**
+     * Roughness in -1..1 added before rounding, so the smooth profile does not show contour terraces.
+     * Two octaves of value noise offset per volcano: sine sums repeat, and on a big cone the repeats
+     * stood out as rows of identical ridges.
+     */
     static double surfaceNoise(Ctx c, int gx, int gz) {
-        return Math.sin(gx * 0.19 + c.phaseA) * Math.cos(gz * 0.23 + c.phaseB)
-                + 0.5 * Math.sin((gx + gz) * 0.11 + c.phaseC)
-                + 0.35 * Math.sin((gx - gz) * 0.31 + c.phaseA);
+        int ox = (int) (c.phaseA * 4096), oz = (int) (c.phaseB * 4096);
+        return (com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + ox, gz + oz, 13.0)
+                + 0.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx - oz, gz + ox, 5.0)) / 1.5;
     }
 
     static void buildConeRow(ServerLevel level, Ctx c, int dx) {
@@ -132,14 +136,17 @@ public final class VolcanoEdifice {
         if (dist < c.craterR * 0.9 || dist > c.flowReach) return false;
 
         double t = dist / c.flowReach;                       // 0 at the vent, 1 at the toe
+        // The channel winds as it runs downhill. The wander is in blocks, not in angle, so a flow far
+        // down the flank bends a few blocks either way instead of swinging round the mountain.
+        double amp = Mth.clamp(c.coneBaseR / 30.0, 2.0, 6.0);
+        double wave = Mth.clamp(c.coneBaseR / 4.0, 24.0, 48.0);
         for (int i = 0; i < c.flows; i++) {
-            // The channel snakes as it descends rather than running down a radius like a seam.
-            double centre = c.flowAim[i]
-                    + 0.26 * Math.sin(dist / 9.0 + c.flowPhase[i])
-                    + 0.12 * Math.sin(dist / 4.0 - c.flowPhase[i]);
+            double phase = c.flowPhase[i];
+            double wander = amp * (Math.sin(dist * Math.PI * 2 / wave + phase)
+                    + 0.35 * Math.sin(dist * Math.PI * 2 / (wave * 0.43) - phase));
             // Wrapped to -PI..PI so a flow near due west is not cut in two.
-            double delta = Math.atan2(Math.sin(ang - centre), Math.cos(ang - centre));
-            double across = Math.abs(delta) * dist;          // blocks measured across the flow
+            double delta = Math.atan2(Math.sin(ang - c.flowAim[i]), Math.cos(ang - c.flowAim[i]));
+            double across = Math.abs(delta * dist - wander);  // blocks measured across the flow
             if (across <= (0.9 + 2.0 * t * t) * c.flowWidth) return true;
         }
         return false;
@@ -285,7 +292,8 @@ public final class VolcanoEdifice {
             default -> coneRadius(c, ang);
         };
         if (dist <= localInner) return;
-        double edge = reach * (0.84 + 0.16 * Math.sin(3 * ang + c.phaseC));
+        double wobble = 0.84 + 0.16 * Math.sin(3 * ang + c.phaseC);
+        double edge = c.type == VolcanoType.FISSURE ? reach * wobble : localInner + c.apronLen * wobble;
         if (dist > edge || localInner >= edge) return;
 
         double t = 1.0 - (dist - localInner) / Math.max(1.0, edge - localInner);
@@ -399,7 +407,7 @@ public final class VolcanoEdifice {
 
             // Spared by the surface noise, not a per-column roll, so a tree is kept or cleared whole.
             double out = Mth.clamp((dist - solid) / Math.max(1.0, radius - solid), 0.0, 1.0);
-            double spare = (surfaceNoise(c, c.x + dx, c.z + dz) + 1.85) / 3.7;
+            double spare = (surfaceNoise(c, c.x + dx, c.z + dz) + 1.0) / 2.0;
             if (dist > solid && spare < out) continue;
 
             // Walk only as high as something stands in this column.

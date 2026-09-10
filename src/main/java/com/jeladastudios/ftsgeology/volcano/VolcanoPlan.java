@@ -46,6 +46,8 @@ public final class VolcanoPlan {
         int coneHeight, summitY, craterR, coneBaseR;
         int reservoirY, reservoirR;
         int clearReach, apronReach;
+        /** How far the apron runs out past the edifice's own foot at each bearing. */
+        double apronLen;
         int calderaFloorY, domeR, domeH;
         double lakeAngle, lakeWidth;
         double phaseA, phaseB, phaseC;
@@ -125,7 +127,21 @@ public final class VolcanoPlan {
         c.rimLift = size.rimLift(magnitude);
         c.rimWidth = size.rimWidth();
         c.liveReach = size == VolcanoSize.LARGE ? LARGE_LIVE_REACH : 0;
-        c.apronReach = c.coneBaseR + (int) Math.round(c.coneBaseR * size.apronReach(type)) + 6;
+        // The apron is measured from the edifice's own foot at each bearing, so a lobe swinging out
+        // can never swallow it and leave the cone ending on a step. A large one is capped so the whole
+        // footprint stays inside VolcanoField's cell margin.
+        double share = size.apronReach(type);
+        c.apronLen = size == VolcanoSize.LARGE
+                ? Mth.clamp(c.coneBaseR * share, 20.0, 56.0)
+                : c.coneBaseR * share + 6;
+        double foot = switch (type) {
+            case CALDERA -> c.craterR * 1.34 + c.rimWidth;
+            case FISSURE -> 0.0;
+            default -> c.coneBaseR * 1.21;
+        };
+        c.apronReach = type == VolcanoType.FISSURE
+                ? c.coneBaseR + (int) Math.round(c.coneBaseR * share) + 6
+                : (int) Math.ceil(foot + c.apronLen) + 1;
         // Clear everything the volcano lays rock on, apron included, so no debris is spread under a
         // standing forest.
         c.clearReach = Math.max(Math.max(c.coneBaseR, c.craterR), c.apronReach) + 6;
