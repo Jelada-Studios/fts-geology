@@ -46,6 +46,24 @@ public final class ModNetwork {
                 .decoder(ShakePacket::decode)
                 .consumerMainThread(ShakePacket::handle)
                 .add();
+        CHANNEL.messageBuilder(EruptionPacket.class, id++)
+                .encoder(EruptionPacket::encode)
+                .decoder(EruptionPacket::decode)
+                .consumerMainThread(EruptionPacket::handle)
+                .add();
+    }
+
+    /** How far away an eruption is still worth drawing: a column hundreds of blocks tall. */
+    private static final double ERUPTION_RANGE = 512.0;
+
+    /** Tells everyone near enough to see it what a volcano is doing. */
+    public static void sendEruption(ServerLevel level, EruptionPacket packet) {
+        double r2 = ERUPTION_RANGE * ERUPTION_RANGE;
+        for (ServerPlayer p : level.players()) {
+            double dx = p.getX() - packet.summit().getX(), dz = p.getZ() - packet.summit().getZ();
+            if (dx * dx + dz * dz > r2) continue;
+            CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), packet);
+        }
     }
 
     /** Tells one player their view is being shaken this hard for this long. */

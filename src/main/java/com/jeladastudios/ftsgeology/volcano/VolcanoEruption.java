@@ -23,13 +23,11 @@ public final class VolcanoEruption {
 
     private VolcanoEruption() {}
 
-    /** Pre-eruption warning: a thick black smoke plume + a low rumble from the crater. */
+    /**
+     * Pre-eruption warning: a low rumble from the crater. The black smoke that goes with it is drawn
+     * by the client from the state the core sends - see ClientEruptions.
+     */
     public static void rumble(ServerLevel level, BlockPos summit, int magnitude, long time) {
-        double x = summit.getX() + 0.5, z = summit.getZ() + 0.5;
-        level.sendParticles(ParticleTypes.LARGE_SMOKE, x, summit.getY() + 1.5, z,
-                8, 0.6, 0.4, 0.6, 0.02);
-        level.sendParticles(ParticleTypes.CAMPFIRE_SIGNAL_SMOKE, x, summit.getY() + 3.0, z,
-                3, 0.4, 0.6, 0.4, 0.01);
         if (time % 40L == 0L) {
             level.playSound(null, summit, SoundEvents.AMBIENT_BASALT_DELTAS_MOOD.value(), SoundSource.BLOCKS,
                     1.5f, 0.4f);
@@ -43,20 +41,9 @@ public final class VolcanoEruption {
         level.sendParticles(ParticleTypes.LAVA, x, summit.getY() + 1.0, z, 6, 0.5, 0.3, 0.5, 0.0);
         level.sendParticles(ParticleTypes.FLAME, x, summit.getY() + 1.5, z, 8, 0.5, 0.7, 0.5, 0.05);
 
-        // The base of the column, and it has to be BLACK.
-        //
-        // This was five smoke particles in a metre-wide puff, which testing called far too light -
-        // and rightly, because the ash column above it had meanwhile been built to reach the world
-        // ceiling. A plume that fans out enormously overhead and comes out of a wisp at the crater
-        // reads as two unrelated effects. So the throat is now dense and dark, and the column takes
-        // over from something already thick rather than from nothing.
-        level.sendParticles(ParticleTypes.LARGE_SMOKE, x, summit.getY() + 2.0, z,
-                18, 1.4, 1.0, 1.4, 0.05);
-        level.sendParticles(ParticleTypes.LARGE_SMOKE, x, summit.getY() + 5.0, z,
-                14, 2.0, 1.8, 2.0, 0.04);
-        // A little of the paler ash mixed through it, so the black is not a flat silhouette.
-        level.sendParticles(ParticleTypes.CAMPFIRE_SIGNAL_SMOKE, x, summit.getY() + 4.0, z,
-                4, 1.2, 1.2, 1.2, 0.02);
+        // The smoke - the black throat, the column over it and the pale cloud it spreads into - is
+        // drawn by the client from the state the core sends every two seconds. It used to be sent
+        // from here as particles, per player, every other tick; see ClientEruptions.
 
         int bombs = GeyserConfig.VOLCANO_BOMBS_PER_ERUPTION.get();
         int eruptTicks = Math.max(1, GeyserConfig.VOLCANO_ERUPT_TICKS.get());
@@ -69,11 +56,8 @@ public final class VolcanoEruption {
             level.playSound(null, summit, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 1.2f, 0.5f);
         }
 
-        // The part you can see from the far side of the valley.
-        ashColumn(level, summit, magnitude, eruptionTicks);
         ashfall(level, summit, magnitude);
         trailBombs(level);
-        if (eruptionTicks % 4 == 0) ashInTheAir(level, summit, magnitude);
         // The mountain shakes while it is going off, and much less far out than a quake does: an
         // eruption is felt on its own slopes, not across a county.
         if (eruptionTicks % 5 == 0) {
@@ -84,71 +68,6 @@ public final class VolcanoEruption {
     }
 
     // === Ash ================================================================
-
-    /**
-     * The eruption column: ash going up for hundreds of blocks and leaning off downwind.
-     *
-     * <h2>Why nothing above was ever visible from a distance</h2>
-     * Every particle in this class is emitted within a block or two of the vent, and the tallest of
-     * them - the fountain smoke in {@link #tickEruption} - reaches {@code summit + 4}. So a volcano
-     * in full eruption said nothing at all to anybody who was not standing on it, which for the
-     * single largest event in the mod is the wrong way round: in life an eruption column is the
-     * thing you see first and from furthest away, and it is how you know to go and look.
-     *
-     * <h2>The trap: ordinary sendParticles reaches 32 blocks</h2>
-     * {@code ServerLevel.sendParticles(type, x, y, z, ...)} only sends to players within <b>32
-     * blocks</b>. A column visible from three hundred is therefore impossible that way no matter how
-     * many particles are asked for - they are simply never sent, and the fix looks like it failed.
-     * The per-player overload with {@code longDistance = true} raises that to 512, so this walks the
-     * player list itself and sends to each one directly.
-     *
-     * <p>That also makes the cost controllable, because the budget can then depend on how far away
-     * the viewer is: somebody on the far ridge gets the silhouette, somebody on the slope gets the
-     * full thing.</p>
-     */
-    private static void ashColumn(ServerLevel level, BlockPos summit, int magnitude, int eruptionTicks) {
-        if (eruptionTicks % 2 != 0) return;      // twice a tick per player is fog, not a plume
-
-        // How high the column stands, bounded by the world rather than by taste: a big eruption
-        // should genuinely reach the ceiling, because that is what makes it read as enormous.
-        int height = Math.min(30 + magnitude * 20, level.getMaxBuildHeight() - summit.getY() - 2);
-        if (height < 12) return;
-
-        double[] wind = wind(summit);
-        double reach = 512.0;
-
-        for (net.minecraft.server.level.ServerPlayer p : level.players()) {
-            double dx = p.getX() - summit.getX(), dz = p.getZ() - summit.getZ();
-            double dist = Math.sqrt(dx * dx + dz * dz);
-            if (dist > reach) continue;
-
-            // Six segments up the column. Near the vent it is dense and dark; higher up it thins
-            // and spreads into the drifting cloud, which is the shape that reads as an ash plume
-            // rather than as a chimney.
-            int segments = 6;
-            int near = dist < 64 ? 4 : dist < 200 ? 3 : 2;
-            for (int i = 0; i < segments; i++) {
-                double t = (i + 0.5) / segments;
-                double y = summit.getY() + 1.0 + t * height;
-                // Leans downwind, further the higher it goes.
-                double lean = t * t * height * 0.45;
-                double x = summit.getX() + 0.5 + wind[0] * lean;
-                double z = summit.getZ() + 0.5 + wind[1] * lean;
-                // And widens, so the top is a cloud and the bottom is a stalk.
-                double spread = 1.0 + t * height * 0.10;
-
-                level.sendParticles(p, ParticleTypes.LARGE_SMOKE, true,
-                        x, y, z, near, spread, height / (double) segments * 0.4, spread, 0.01);
-                // The pale upper cloud, where the ash is fine enough to catch the light. Only for
-                // people close enough to tell two greys apart: past a couple of hundred blocks it is
-                // a silhouette either way, and this is a third of the packets the column sends.
-                if (t > 0.45 && dist < 256) {
-                    level.sendParticles(p, ParticleTypes.CAMPFIRE_SIGNAL_SMOKE, true,
-                            x, y, z, Math.max(1, near - 1), spread * 1.3, spread * 0.5, spread * 1.3, 0.005);
-                }
-            }
-        }
-    }
 
     /**
      * Ash settling out of the column onto the ground downwind.
@@ -257,7 +176,7 @@ public final class VolcanoEruption {
      * without storing anything: a volcano that ashes the eastern valley goes on ashing the eastern
      * valley, and the deposit on the ground stays consistent with the column in the sky.</p>
      */
-    private static double[] wind(BlockPos summit) {
+    public static double[] wind(BlockPos summit) {
         long h = summit.getX() * 0x9E3779B97F4A7C15L ^ summit.getZ() * 0xC2B2AE3D27D4EB4FL;
         h ^= h >>> 29; h *= 0xBF58476D1CE4E5B9L; h ^= h >>> 32;
         double a = ((h >>> 11) / (double) (1L << 53)) * Math.PI * 2.0;
@@ -334,35 +253,6 @@ public final class VolcanoEruption {
         }
     }
 
-
-    /**
-     * Ash drifting down through the air, as opposed to ash already on the ground.
-     *
-     * <p>The deposit was there and the fall itself was not, so the ground quietly turned grey around
-     * a player who never saw anything come down. Vanilla has the particle for it already -
-     * {@code ParticleTypes.ASH}, from the basalt deltas - so this needs no sprite of its own.</p>
-     */
-    private static void ashInTheAir(ServerLevel level, BlockPos summit, int magnitude) {
-        if (!GeyserConfig.VOLCANIC_ASHFALL.get()) return;
-
-        double[] wind = wind(summit);
-        int reach = Math.min(40 + magnitude * 8, 160);
-        for (net.minecraft.server.level.ServerPlayer p : level.players()) {
-            double dx = p.getX() - summit.getX(), dz = p.getZ() - summit.getZ();
-            double dist = Math.sqrt(dx * dx + dz * dz);
-            if (dist > reach + 32) continue;
-            // Falling harder downwind, the same lobe the deposit follows, so what is in the air
-            // agrees with what is on the ground.
-            double align = dist < 1 ? 1.0 : (dx / dist) * wind[0] + (dz / dist) * wind[1];
-            int count = (int) Math.round(6 * (0.25 + 0.75 * (align + 1.0) * 0.5));
-
-            level.sendParticles(p, ParticleTypes.ASH, true,
-                    p.getX() + (level.random.nextDouble() - 0.5) * 24,
-                    p.getY() + 6 + level.random.nextDouble() * 8,
-                    p.getZ() + (level.random.nextDouble() - 0.5) * 24,
-                    count, 10.0, 4.0, 10.0, 0.0);
-        }
-    }
 
     /**
      * Scorches exactly ONE block where a bomb lands: the topmost solid cell of that column is

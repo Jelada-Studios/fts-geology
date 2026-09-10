@@ -249,34 +249,6 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
     }
 
     /**
-     * The flank fumaroles blowing hard, while the mountain is erupting.
-     *
-     * <h2>Why the smoke comes from here rather than from the chimney block</h2>
-     * {@code SteamVentBlock} draws its own thread of steam in {@code animateTick}, which is a client
-     * random tick and costs the server nothing - exactly right for the idle state. But the client
-     * has no idea whether the volcano it is standing on is erupting, and telling it would mean a
-     * second packet and a piece of synced state for a puff of smoke.
-     *
-     * <p>The core already knows, and it already has the positions, so during an eruption it simply
-     * sends the heavy smoke itself. The chimney keeps its quiet wisp; this is laid over the top of
-     * it and stops the moment the eruption does, with nothing to reset.</p>
-     */
-    private void fumaroleSmoke(ServerLevel level) {
-        if (fumaroles.length == 0) return;
-        for (long packed : fumaroles) {
-            BlockPos p = BlockPos.of(packed);
-            // The chimney is three blocks of stack, so the smoke leaves from above the cap.
-            double x = p.getX() + 0.5, y = p.getY() + 2.2, z = p.getZ() + 0.5;
-            level.sendParticles(net.minecraft.core.particles.ParticleTypes.LARGE_SMOKE,
-                    x, y, z, 6, 0.35, 0.25, 0.35, 0.06);
-            if (level.random.nextInt(3) == 0) {
-                level.sendParticles(net.minecraft.core.particles.ParticleTypes.CAMPFIRE_SIGNAL_SMOKE,
-                        x, y + 0.6, z, 2, 0.3, 0.3, 0.3, 0.03);
-            }
-        }
-    }
-
-    /**
      * The cells that are meant to be lava between eruptions - the summit pool, a caldera's lake, a
      * fissure's ponds.
      *
@@ -291,6 +263,21 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         setChanged();
     }
 
+    /**
+     * Tells nearby players what this volcano is doing, so their client can draw its smoke.
+     *
+     * <p>The flank chimneys' black smoke used to be sent from here as particles, on the grounds that
+     * a packet and synced state were too much for a puff of smoke. With the whole column moving to
+     * the client the packet exists anyway, and the chimneys ride along in it.</p>
+     */
+    private void broadcastEruption(ServerLevel level, BlockPos summit) {
+        byte code = phase == Phase.ERUPTING ? (byte) 2 : phase == Phase.RUMBLING ? (byte) 1 : (byte) 0;
+        double[] wind = VolcanoEruption.wind(summit);
+        com.jeladastudios.ftsgeology.network.ModNetwork.sendEruption(level,
+                new com.jeladastudios.ftsgeology.network.EruptionPacket(summit, code, magnitude,
+                        (float) wind[0], (float) wind[1], GeyserConfig.VOLCANIC_ASHFALL.get(), fumaroles));
+    }
+
     public static void serverTick(Level level, BlockPos pos, BlockState state, VolcanoCoreBlockEntity be) {
         if (!(level instanceof ServerLevel server)) return;
         BlockPos summit = pos.above(); // the crater vent sits just above the core
@@ -301,10 +288,10 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         } else if (be.phase == Phase.ERUPTING) {
             be.eruptionTicks++;
             VolcanoEruption.tickEruption(server, summit, be.magnitude, be.eruptionTicks);
-            // Every few ticks, not every one: this is one packet per chimney and a big cone carries
-            // ten of them.
-            if (be.eruptionTicks % 3 == 0) be.fumaroleSmoke(server);
         }
+        // The heartbeat the client draws the smoke from. Every two seconds is plenty: the client
+        // holds the state for longer than that, and lets the smoke die only once beats stop coming.
+        if (be.phase != Phase.DORMANT && server.getGameTime() % 40L == 0L) be.broadcastEruption(server, summit);
 
         if (server.getGameTime() % 20L != 0L) return; // the cycle ticks once a second
 
@@ -326,6 +313,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                 if ((be.timer -= 20) <= 0) {
                     be.phase = Phase.RUMBLING;
                     be.timer = GeyserConfig.VOLCANO_RUMBLE_TICKS.get();
+                    be.broadcastEruption(server, summit);
                 }
             }
             case RUMBLING -> {
@@ -335,6 +323,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                     be.eruptionTicks = 0;
                     be.spilled = 0;
                     be.timer = GeyserConfig.VOLCANO_ERUPT_TICKS.get();
+                    be.broadcastEruption(server, summit);
                 }
             }
             case ERUPTING -> {
@@ -372,6 +361,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                     }
                     be.phase = Phase.DORMANT;
                     be.timer = dormantRoll(server);
+                    be.broadcastEruption(server, summit);   // tells the client it is over
                 }
             }
         }

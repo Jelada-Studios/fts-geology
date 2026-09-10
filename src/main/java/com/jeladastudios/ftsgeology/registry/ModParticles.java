@@ -45,4 +45,23 @@ public final class ModParticles {
     /** Sulfurous vapour, denser than air: creeps along the ground rather than rising. */
     public static final RegistryObject<SimpleParticleType> SULFUR_HAZE =
             PARTICLES.register("sulfur_haze", () -> new SimpleParticleType(false));
+
+    // The volcano's smoke joined these once the whole eruption column moved to the client: black
+    // throat smoke lit by the lava, and pale ash high up, are two more things vanilla has no word for.
+
+    /** Black eruption smoke, glowing for its first moments. Also the throat while it rumbles. */
+    public static final RegistryObject<SimpleParticleType> VOLCANIC_SMOKE =
+            PARTICLES.register("volcanic_smoke", () -> new SimpleParticleType(false));
+
+    /** The pale, slow cloud high in the column. */
+    public static final RegistryObject<SimpleParticleType> ASH_CLOUD =
+            PARTICLES.register("ash_cloud", () -> new SimpleParticleType(false));
+
+    /** Ash falling through the air downwind. */
+    public static final RegistryObject<SimpleParticleType> ASH_FLAKE =
+            PARTICLES.register("ash_flake", () -> new SimpleParticleType(false));
+
+    /** Black smoke out of a flank chimney while the mountain erupts. */
+    public static final RegistryObject<SimpleParticleType> VENT_SMOKE =
+            PARTICLES.register("vent_smoke", () -> new SimpleParticleType(false));
 }

@@ -27,5 +27,13 @@ public final class ClientSetup {
         event.registerSpriteSet(ModParticles.GEYSER_MIST.get(), GeothermalParticles.MistProvider::new);
         event.registerSpriteSet(ModParticles.MUD_BLOB.get(), GeothermalParticles.MudProvider::new);
         event.registerSpriteSet(ModParticles.SULFUR_HAZE.get(), GeothermalParticles.HazeProvider::new);
+        event.registerSpriteSet(ModParticles.VOLCANIC_SMOKE.get(),
+                com.jeladastudios.ftsgeology.client.particle.VolcanicParticles.SmokeProvider::new);
+        event.registerSpriteSet(ModParticles.ASH_CLOUD.get(),
+                com.jeladastudios.ftsgeology.client.particle.VolcanicParticles.CloudProvider::new);
+        event.registerSpriteSet(ModParticles.ASH_FLAKE.get(),
+                com.jeladastudios.ftsgeology.client.particle.VolcanicParticles.FlakeProvider::new);
+        event.registerSpriteSet(ModParticles.VENT_SMOKE.get(),
+                com.jeladastudios.ftsgeology.client.particle.VolcanicParticles.VentProvider::new);
     }
 }
