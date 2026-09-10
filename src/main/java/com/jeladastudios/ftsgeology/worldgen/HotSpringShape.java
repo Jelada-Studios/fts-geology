@@ -272,33 +272,6 @@ public final class HotSpringShape {
         }
     }
 
-    /**
-     * Retires a spring, leaving the crust it built behind.
-     *
-     * <p>Used when the water finds a new way out and this outlet dies. What is left is what a dead
-     * travertine terrace actually is: no water, no heat, the deposit still standing, and the
-     * colours gone - the mats are alive, and they do not outlive the spring that fed them.</p>
-     */
-    public static void abandon(ServerLevel level, int x, int z, int stage) {
-        int radius = radiusFor(stage) + 4;
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dz = -radius; dz <= radius; dz++) {
-                if (dx * dx + dz * dz > radius * radius) continue;
-                for (int dy = -3; dy <= 3; dy++) {
-                    BlockPos p = new BlockPos(x + dx, groundNear(level, x + dx, z + dz) + dy, z + dz);
-                    BlockState s = level.getBlockState(p);
-                    if (s.is(ModBlocks.HOT_SPRING.get())) {
-                        level.setBlock(p, Blocks.CALCITE.defaultBlockState(), 2);
-                    } else if (isMat(s)) {
-                        level.setBlock(p, ModBlocks.SINTER.get().defaultBlockState(), 2);
-                    } else if (s.is(Blocks.MAGMA_BLOCK)) {
-                        level.setBlock(p, Blocks.CALCITE.defaultBlockState(), 2);
-                    }
-                }
-            }
-        }
-    }
-
     // === Internals ==========================================================
 
     /**
@@ -515,11 +488,6 @@ public final class HotSpringShape {
         long[] out = new long[pool.size()];
         for (int i = 0; i < out.length; i++) out[i] = key(pool.get(i).getX(), pool.get(i).getZ());
         return out;
-    }
-
-    private static int groundNear(ServerLevel level, int x, int z) {
-        int g = TerrainProbe.groundY(level, x, z);
-        return g == Integer.MIN_VALUE ? level.getSeaLevel() : g;
     }
 
     /** Material a spring lays down, including its warm beds, which it may therefore take up again. */
