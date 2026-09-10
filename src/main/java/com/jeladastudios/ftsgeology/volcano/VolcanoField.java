@@ -37,8 +37,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * 200 to 400 blocks out. So, like the hotspots, sites come from the world seed over a coarse grid,
  * and any chunk on any thread gets the same answer.</p>
  *
- * <p>A cell becomes a shield or caldera over a plume, a stratovolcano on a subduction arc and a
- * fissure on a rift. It is refused on water, on ground too broken for it, and where a surface
+ * <p>A cell becomes a shield or caldera over a plume, a stratovolcano or now and then a caldera on a
+ * subduction arc, and a fissure or a shield on a rift. It is refused on water, on ground too broken for it, and where a surface
  * structure is due, since that structure would be built inside the mountain.</p>
  */
 public final class VolcanoField {
@@ -188,8 +188,12 @@ public final class VolcanoField {
             PlateSample s = TectonicMap.sampleCached(level, x, z);
             if (s.stress() < MIN_STRESS) continue;
             VolcanoType type = switch (s.faultType()) {
-                case CONVERGENT_SUBDUCTION -> VolcanoType.STRATOVOLCANO;
-                case DIVERGENT -> VolcanoType.FISSURE;
+                // A quarter of the arc volcanoes have blown their tops off, as at Crater Lake or Aso.
+                case CONVERGENT_SUBDUCTION -> rand01(hash(seed, i, 4, 0xCA2DL)) < 0.25
+                        ? VolcanoType.CALDERA : VolcanoType.STRATOVOLCANO;
+                // A third of the rift volcanoes have built a broad basalt shield, as many in Iceland have.
+                case DIVERGENT -> rand01(hash(seed, i, 5, 0x5E1DL)) < 0.35
+                        ? VolcanoType.SHIELD : VolcanoType.FISSURE;
                 default -> null;
             };
             if (type == null) continue;

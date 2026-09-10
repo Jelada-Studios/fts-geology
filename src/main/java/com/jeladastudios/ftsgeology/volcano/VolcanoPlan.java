@@ -48,6 +48,8 @@ public final class VolcanoPlan {
         int clearReach, apronReach;
         /** How far the apron runs out past the edifice's own foot at each bearing. */
         double apronLen;
+        /** Lava levels of a big fissure's ponds, by distance along the line, worked out once each. */
+        final java.util.Map<Integer, Integer> pondLevels = new java.util.HashMap<>();
         int calderaFloorY, domeR, domeH;
         double lakeAngle, lakeWidth;
         double phaseA, phaseB, phaseC;

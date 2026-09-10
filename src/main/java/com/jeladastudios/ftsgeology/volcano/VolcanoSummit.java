@@ -165,7 +165,8 @@ public final class VolcanoSummit {
         int span = hasRamparts(c) ? Math.min(half, POND_SEGMENT - 1) : half;
         for (int t = -span; t <= span; t++) {
             int seg = Math.floorDiv(t + half, segLen);
-            double lateral = ((seg % 2 == 0) ? 1 : -1) * (1 + seg % 3);
+            // A big fissure's ponds follow the same winding line as the rest of it.
+            double lateral = hasRamparts(c) ? fissureLateral(c, t) : ((seg % 2 == 0) ? 1 : -1) * (1 + seg % 3);
             int px = c.x + (int) Math.round(c.strikeX * t - c.strikeZ * lateral);
             int pz = c.z + (int) Math.round(c.strikeZ * t + c.strikeX * lateral);
             BlockPos pond = seatPondCell(level, px, pz);

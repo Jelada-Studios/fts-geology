@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.levelgen.Heightmap;
 import static com.jeladastudios.ftsgeology.volcano.VolcanoBuilder.*;
 import static com.jeladastudios.ftsgeology.volcano.VolcanoPlan.*;
@@ -307,9 +308,20 @@ public final class VolcanoEdifice {
         // Checked directly: hasFluidAbove would walk the column a second time.
         if (!level.getBlockState(new BlockPos(gx, ground + 1, gz)).getFluidState().isEmpty()) return;
 
+        // A big fissure's crack and ponds stand on their own ground: the apron thins away towards the
+        // line rather than burying it or stopping on a step beside it.
+        double band = 1.0;
+        if (hasRamparts(c)) {
+            double along = dx * c.strikeX + dz * c.strikeZ;
+            double across = -dx * c.strikeZ + dz * c.strikeX;
+            if (Math.abs(along) <= c.fissureHalf) {
+                band = Mth.clamp((Math.abs(across - fissureLateral(c, along)) - 4.0) / 8.0, 0.0, 1.0);
+                if (band <= 0.0) return;
+            }
+        }
         // Starts at the seam height the flank came down to and thins with a 1.5 power.
         double u = 1.0 - t;                       // 0 at the seam, 1 at the outer edge
-        int thickness = Math.max(0, (int) Math.round(seamHeight(c) * Math.pow(1.0 - u, 1.5)));
+        int thickness = Math.max(0, (int) Math.round(seamHeight(c) * Math.pow(1.0 - u, 1.5) * band));
         if (!worldgen) TerrainProbe.clearVegetation(level, gx, ground, gz, 2);
         BlockState native0 = level.getBlockState(new BlockPos(gx, ground, gz));
         for (int h = 0; h <= thickness; h++) {
@@ -335,29 +347,48 @@ public final class VolcanoEdifice {
         return c.type == VolcanoType.FISSURE && c.size != VolcanoSize.SMALL;
     }
 
-    /** A big fissure's line outside its central ponds: an open crack between low spatter ramparts, stepping sideways. */
-    static void fissureRampartColumn(LevelAccessor level, Ctx c, int gx, int gz, boolean worldgen) {
+    /**
+     * Where the ponds along a big fissure's line begin. Past the eruption's cooling sweep, which reaches
+     * 20 + magnitude blocks from the summit and would drain lava resting on rock the volcano laid.
+     */
+    static final int POND_START = POND_SEGMENT + 16;
+
+    /**
+     * Sideways offset of a big fissure's line at a distance along its strike: a slow wander of 12 to 20
+     * blocks, plus short en-echelon steps whose lengths come from noise, so no stretch of it repeats.
+     */
+    static double fissureLateral(Ctx c, double along) {
+        int a = (int) Math.round(along);
+        int ox = (int) (c.phaseA * 4096), oz = (int) (c.phaseB * 4096);
+        double amp = 12.0 + 8.0 * (c.phaseC / (Math.PI * 2));
+        double wander = amp * com.jeladastudios.ftsgeology.util.ValueNoise.noise(a + ox, oz, 70.0);
+        double step = com.jeladastudios.ftsgeology.util.ValueNoise.noise(a + oz, ox, 13.0) >= 0 ? 1.5 : -1.5;
+        return wander + step;
+    }
+
+    /** A big fissure's line outside its central ponds: ponds strung along it, a crusted crack between low ramparts. */
+    static void fissureRampartColumn(WorldGenLevel level, Ctx c, int gx, int gz, boolean worldgen) {
         int dx = gx - c.x, dz = gz - c.z;
         double along = dx * c.strikeX + dz * c.strikeZ;
         double out = Math.abs(along);
         if (out > c.fissureHalf || out < POND_SEGMENT) return;
         double across = -dx * c.strikeZ + dz * c.strikeX;
-        // The same en-echelon offsets carveFissureLine steps its ponds through.
-        int seg = Math.floorDiv((int) Math.round(along) + c.fissureHalf, c.segLen);
-        double lateral = ((seg % 2 == 0) ? 1 : -1) * (1 + seg % 3);
-        double off = Math.abs(across - lateral);
-        if (off > 3.5) return;
+        double off = Math.abs(across - fissureLateral(c, along));
+        if (off > 6.0) return;
         // Dies away over the last quarter towards each tip.
         double tip = Mth.clamp((1.0 - out / c.fissureHalf) * 4.0, 0.0, 1.0);
         if (tip <= 0.0) return;
+        if (pondColumn(level, c, gx, gz, along, across)) return;
+        if (off > 3.5) return;
 
         int ground = TerrainProbe.groundY(level, gx, gz);
         if (ground == Integer.MIN_VALUE) return;
         if (!level.getBlockState(new BlockPos(gx, ground + 1, gz)).getFluidState().isEmpty()) return;
-        if (off < 0.75) {
-            // The crack: open two blocks down and no more, so there is nowhere far to fall.
+        if (off < 0.9) {
+            // The crack: its top course gone and freshly skinned lava glowing one block down.
             TerrainProbe.clearVegetation(level, gx, ground, gz, 2);
-            for (int y = ground; y > ground - 2; y--) clearNatural(level, new BlockPos(gx, y, gz));
+            clearNatural(level, new BlockPos(gx, ground, gz));
+            setRock(level, new BlockPos(gx, ground - 1, gz), flowRock());
             return;
         }
         int lift = (int) Math.round((off < 2.25 ? 3.0 : 1.5) * tip);
@@ -369,6 +400,71 @@ public final class VolcanoEdifice {
                     (dark ? Blocks.BLACKSTONE : Blocks.BASALT).defaultBlockState());
         }
         if (worldgen) TerrainProbe.clearVegetation(level, gx, ground + lift, gz, 2);
+    }
+
+    /**
+     * One column of a lava pond on a big fissure's line, if it falls in one; the pond then owns the column.
+     * Ponds sit 16 to 24 blocks apart along the whole line, and each holds its lava at a level read from
+     * the generator's own terrain, so every chunk a pond crosses agrees on it and the lava stays walled in.
+     */
+    static boolean pondColumn(WorldGenLevel level, Ctx c, int gx, int gz, double along, double across) {
+        int side = along < 0 ? -1 : 1;
+        long key = Double.doubleToLongBits(c.phaseA) * 31 + Double.doubleToLongBits(c.phaseB);
+        int k = 0;
+        for (double a = POND_START; a <= c.fissureHalf - 12; k++) {
+            final double ap = side * a;
+            double da = along - ap;
+            if (Math.abs(da) <= 4.0) {
+                double dl = across - fissureLateral(c, ap);
+                if ((da / 4.0) * (da / 4.0) + (dl / 2.8) * (dl / 2.8) <= 1.0) {
+                    int h = c.pondLevels.computeIfAbsent((int) Math.round(ap), i -> pondLevel(level, c, ap));
+                    if (h == Integer.MIN_VALUE) return false;
+                    boolean lava = (da / 2.5) * (da / 2.5) + (dl / 1.3) * (dl / 1.3) <= 1.0;
+                    if (lava) {
+                        // Recessed into the ground on a basalt floor, open to the sky.
+                        setRock(level, new BlockPos(gx, h - 1, gz), Blocks.BASALT.defaultBlockState());
+                        setRock(level, new BlockPos(gx, h, gz), Blocks.LAVA.defaultBlockState());
+                        for (int y = h + 1; y <= h + 4; y++) clearNatural(level, new BlockPos(gx, y, gz));
+                    } else {
+                        // The spatter rim: solid from under the lava to one above it, filled down to the
+                        // column's own ground so it never floats.
+                        int ground = TerrainProbe.groundY(level, gx, gz);
+                        int from = ground == Integer.MIN_VALUE ? h - 1 : Math.min(h - 1, ground + 1);
+                        for (int y = from; y <= h + 1; y++) {
+                            setRock(level, new BlockPos(gx, y, gz), Blocks.BASALT.defaultBlockState());
+                        }
+                    }
+                    return true;
+                }
+            }
+            a += 16 + (int) (8 * com.jeladastudios.ftsgeology.util.SeedHash.rand01(
+                    com.jeladastudios.ftsgeology.util.SeedHash.hash(key, k, side, 0xF0DL)));
+        }
+        return false;
+    }
+
+    /**
+     * The Y a pond at this point of a big fissure's line holds its lava at: the generator's surface there,
+     * or {@link Integer#MIN_VALUE} where five probes across the pond are not level, or it would be in water.
+     */
+    static int pondLevel(WorldGenLevel level, Ctx c, double ap) {
+        ServerLevel model = level.getLevel();
+        net.minecraft.world.level.chunk.ChunkGenerator gen = model.getChunkSource().getGenerator();
+        net.minecraft.world.level.levelgen.RandomState rs = model.getChunkSource().randomState();
+        double lp = fissureLateral(c, ap);
+        final double[][] probes = { {0, 0}, {4, 0}, {-4, 0}, {0, 3}, {0, -3} };
+        int h = Integer.MIN_VALUE;
+        for (double[] p : probes) {
+            double a = ap + p[0], l = lp + p[1];
+            int x = c.x + (int) Math.round(c.strikeX * a - c.strikeZ * l);
+            int z = c.z + (int) Math.round(c.strikeZ * a + c.strikeX * l);
+            int floor = gen.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, model, rs) - 1;
+            int surface = gen.getBaseHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG, model, rs) - 1;
+            if (surface > floor) return Integer.MIN_VALUE;
+            if (h == Integer.MIN_VALUE) h = floor;
+            else if (Math.abs(floor - h) > 1) return Integer.MIN_VALUE;
+        }
+        return h <= gen.getSeaLevel() + 1 ? Integer.MIN_VALUE : h;
     }
 
     /**
