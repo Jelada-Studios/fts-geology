@@ -155,7 +155,7 @@ public final class HotSpringShape {
             return List.of();
         }
 
-        if (clearTrees) RetrogenHandler.clearCanopy(level, x, z, radius + 12);
+        if (clearTrees) HotSpringSites.clearCanopy(level, x, z, radius + 12);
 
         List<BlockPos> pool = fillHoles(poolCells(level, x, z, radius, waterY), waterY);
         if (pool.size() < 4) {
@@ -202,7 +202,7 @@ public final class HotSpringShape {
         rim(level, pool, waterY, crust);
 
         // Colours by age - see paintThermalRings. Stage 1 gets only its own bare deposit.
-        RetrogenHandler.paintRings(level, pool, x, z, waterY, stage);
+        HotSpringSites.paintRings(level, pool, x, z, waterY, stage);
 
         // And where the pool overflows, the streak it has laid down running away downhill.
         runoff(level, pool, waterY, stage);

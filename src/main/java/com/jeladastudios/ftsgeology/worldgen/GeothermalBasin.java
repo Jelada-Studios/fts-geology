@@ -30,7 +30,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * <h2>Why this is not a hull around the springs</h2>
  * The obvious implementation is to cluster the spring cores in an area and floor the region they
  * enclose. Two things rule it out. The first is mechanical: inside a basin
- * {@code RetrogenHandler.placeHotSpringAt} builds exactly one pool rather than a terrace chain, so
+ * {@code HotSpringSites.placeHotSpringAt} builds exactly one pool rather than a terrace chain, so
  * the springs in a basin are single systems scattered through separate chunks, and clustering them
  * would need a persistent record of every core the generator has ever placed - new saved state, and
  * a new class of bug to go with it.
@@ -242,11 +242,11 @@ public final class GeothermalBasin {
 
         // Between the flats, ground the runoff has poisoned - the same palette the halo round a
         // single spring already uses, so the two meet without a seam.
-        Block b = rng.nextInt(3) == 0 ? ModBlocks.SINTER_CRUST.get() : RetrogenHandler.haloBlock(level);
+        Block b = rng.nextInt(3) == 0 ? ModBlocks.SINTER_CRUST.get() : HotSpringSites.haloBlock(level);
         level.setBlock(at, b.defaultBlockState(), 2);
         // Bobby-socks trees: killed by the silica, left bleached and standing. Rare, or the basin
         // turns into a dead forest instead of an open flat.
-        if (rng.nextInt(110) == 0) RetrogenHandler.deadTree(level, at);
+        if (rng.nextInt(110) == 0) HotSpringSites.deadTree(level, at);
         return true;
     }
 

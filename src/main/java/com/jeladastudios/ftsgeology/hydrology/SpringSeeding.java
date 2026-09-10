@@ -4,7 +4,7 @@ import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.tectonics.GeothermalSuitability;
-import com.jeladastudios.ftsgeology.worldgen.RetrogenHandler;
+import com.jeladastudios.ftsgeology.worldgen.HotSpringSites;
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -96,7 +96,7 @@ public final class SpringSeeding {
             if (TerrainProbe.hasFluidAbove(level, x, z)) { badGround++; continue; }
             if (springNear(level, x, z)) { occupied++; continue; }
 
-            BlockPos source = RetrogenHandler.seedSourceAt(level, x, z, ground);
+            BlockPos source = HotSpringSites.seedSourceAt(level, x, z, ground);
             if (source == null) { refused++; continue; }
             GeysersMod.LOGGER.info(
                     "Earthquake opened a new spring source at {} (heat {}, {} blocks from the epicentre)",

@@ -5,7 +5,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.blockentity.GeyserCoreBlockEntity;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
-import com.jeladastudios.ftsgeology.worldgen.RetrogenHandler;
+import com.jeladastudios.ftsgeology.worldgen.SurfaceFeatures;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -104,7 +104,7 @@ public final class GeyserCommands {
                     ? requestedMagnitude
                     : GeyserCoreBlockEntity.MIN_MAGNITUDE + level.random.nextInt(8); // 5–12 by default
 
-            boolean placed = RetrogenHandler.forcePlace(level, corePos, magnitude, level.random);
+            boolean placed = SurfaceFeatures.forcePlace(level, corePos, magnitude, level.random);
             if (placed) {
                 final int mag = magnitude;
                 source.sendSuccess(() -> Component.translatable("command.fts_geology.geyser_magnitude_s_placed_at_s_s_s_it_wi", mag, corePos.getX(), coreY, corePos.getZ()), true);

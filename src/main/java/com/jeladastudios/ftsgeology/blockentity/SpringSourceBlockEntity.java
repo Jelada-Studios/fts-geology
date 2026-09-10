@@ -8,7 +8,7 @@ import com.jeladastudios.ftsgeology.quake.QuakeQuiet;
 import com.jeladastudios.ftsgeology.registry.ModBlockEntities;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.worldgen.HotSpringShape;
-import com.jeladastudios.ftsgeology.worldgen.RetrogenHandler;
+import com.jeladastudios.ftsgeology.worldgen.HotSpringSites;
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -107,7 +107,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
      * <h2>What this replaced</h2>
      * There was a {@code targetRadius} here that was written, saved to NBT, loaded back - and never
      * read by anything. Pool size comes from {@link HotSpringShape#radiusFor} alone. That mattered
-     * because {@code RetrogenHandler.placeHotSpringAt} sized the gap between the pools of a terrace
+     * because {@code HotSpringSites.placeHotSpringAt} sized the gap between the pools of a terrace
      * chain from the radius it passed to that dead setter: a stride of 6 to 20 blocks between pools
      * that all grew to stage 4, which is 21 blocks across. Every pair in every chain overlapped, and
      * since each pool sits a block lower than the one above it and each build clears the three

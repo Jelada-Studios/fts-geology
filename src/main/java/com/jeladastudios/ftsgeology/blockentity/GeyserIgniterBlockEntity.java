@@ -2,7 +2,7 @@ package com.jeladastudios.ftsgeology.blockentity;
 
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.registry.ModBlockEntities;
-import com.jeladastudios.ftsgeology.worldgen.RetrogenHandler;
+import com.jeladastudios.ftsgeology.worldgen.SurfaceFeatures;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -63,7 +63,7 @@ public class GeyserIgniterBlockEntity extends BlockEntity {
         int magnitude = 15; // a good big geyser from a deliberately-placed igniter
 
         // Deep underground, per the mod's realism goal — the vent then bores up to the surface here.
-        boolean placed = RetrogenHandler.forcePlace(level, corePos, magnitude, level.random);
+        boolean placed = SurfaceFeatures.forcePlace(level, corePos, magnitude, level.random);
 
         // Consume the igniter and mark the moment with a hiss.
         level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
