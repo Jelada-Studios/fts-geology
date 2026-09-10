@@ -241,8 +241,9 @@ public final class VolcanoField {
             }
         }
         // A river or a lake edge under the flank is fine; a volcano half in the sea is a job for the
-        // ocean volcanoes, not this.
-        if (wet > 2) return null;
+        // ocean volcanoes, not this. A shield's foot is over a thousand blocks across and rarely misses
+        // every lake, so it may fill over a few; the cone is laid over water at generation anyway.
+        if (wet > (type == VolcanoType.SHIELD ? 5 : 2)) return null;
 
         int lo = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
         for (int i = 0; i < 9; i++) {
