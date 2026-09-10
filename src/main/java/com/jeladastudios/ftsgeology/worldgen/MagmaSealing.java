@@ -3,7 +3,8 @@ package com.jeladastudios.ftsgeology.worldgen;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -19,6 +20,9 @@ import net.minecraft.world.level.block.state.BlockState;
  * <p>So any magma this mod places underground gets a rock skin on whichever faces are open. The heat
  * still works - the geyser reads its neighbours, not the view - and a player who digs into it still
  * finds the chamber, which is the point.</p>
+ *
+ * <p>Takes any level, not just the live one, because deep structure is also written while a chunk
+ * is still being generated.</p>
  */
 public final class MagmaSealing {
 
@@ -30,22 +34,23 @@ public final class MagmaSealing {
      * @param sealTop whether the face pointing up should be covered too; false where something is
      *                deliberately meant to sit directly on the magma, like a spring floor
      */
-    public static void seal(ServerLevel level, BlockPos magma, boolean sealTop) {
+    public static void seal(LevelAccessor level, BlockPos magma, boolean sealTop) {
         for (Direction d : Direction.values()) {
             if (!sealTop && d == Direction.UP) continue;
             BlockPos p = magma.relative(d);
+            if (!level.hasChunk(p.getX() >> 4, p.getZ() >> 4)) continue;   // never load a chunk for one face
             BlockState s = level.getBlockState(p);
             if (s.is(Blocks.BEDROCK) || s.is(Blocks.MAGMA_BLOCK)) continue;
             if (EruptionHandler.isPlayerPlaced(s)) continue;
             // Only fill what is actually open; solid rock already does the job.
             if (s.isAir() || !s.getFluidState().isEmpty() || TerrainProbe.isVegetation(s)) {
-                level.setBlock(p, skinFor(level, magma), 2);
+                level.setBlock(p, skinFor(magma), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
             }
         }
     }
 
     /** Seals a whole rectangular slab of magma - the shape a geyser heat bed takes. */
-    public static void sealSlab(ServerLevel level, BlockPos centre, int radius) {
+    public static void sealSlab(LevelAccessor level, BlockPos centre, int radius) {
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
                 BlockPos p = centre.offset(dx, 0, dz);
@@ -59,7 +64,7 @@ public final class MagmaSealing {
      * Rock to hide it behind. Deepslate below the transition, stone above it, so the patch matches
      * the layer it is in instead of announcing itself.
      */
-    private static BlockState skinFor(ServerLevel level, BlockPos at) {
+    private static BlockState skinFor(BlockPos at) {
         return at.getY() < 0
                 ? Blocks.DEEPSLATE.defaultBlockState()
                 : Blocks.STONE.defaultBlockState();

@@ -9,6 +9,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -42,28 +43,51 @@ import net.minecraft.world.level.block.state.BlockState;
  *
  * <p>Player blocks are never replaced, and nothing is ever added above a column's own surface, so
  * this can neither break a build nor change the skyline.</p>
+ *
+ * <h2>Written as the world is generated, where it can be</h2>
+ * A chunk made after the mod is installed gets this from {@link GeologyFeature}, inside world
+ * generation, where the writes land in a chunk nobody can see yet: no block-change hooks, no
+ * lighting, nothing to send to a client, and no share of the server tick. Retrogen still does it for
+ * chunks that already existed. Both go through exactly this code.
  */
 public final class DeepStructure {
 
     private DeepStructure() {}
 
-    /** Builds whatever deep structure this chunk belongs to. Cheap no-op away from boundaries. */
-    public static void generate(ServerLevel level, ChunkPos cp, RandomSource rng) {
-        generate(level, cp, rng, null);
+    /** Columns in a chunk, and what {@link #generate} returns once the last of them is done. */
+    public static final int DONE = 256;
+
+    /** Builds whatever deep structure this chunk belongs to, in one go. Cheap no-op away from boundaries. */
+    public static void generate(WorldGenLevel level, ChunkPos cp, Report report) {
+        generate(level, cp, report, 0, Long.MAX_VALUE);
     }
 
     /**
-     * As above, but optionally reports what it did. The report is what turns "I could not see
-     * anything down there" into a number, so a missing structure can be told apart from one that is
-     * present and merely hard to find.
+     * Builds the deep structure of a chunk, or as much of it as fits before {@code deadline}.
+     *
+     * <h2>Why it can stop part way</h2>
+     * A chunk used to be done in one go, with the time budget only looked at between chunks. That is
+     * harmless while a couple of thousand rock swaps take well under a millisecond - until something
+     * else hooks every block change. On a server running Sable each write carried a physics query, a
+     * single chunk took several milliseconds on its own, and the budget could do nothing about it
+     * because it was never asked (GitHub #1). The work is column by column anyway, so this returns
+     * the column it reached and the caller brings it back next tick.
+     *
+     * @param report   carries the running block count between calls, so the per-chunk budget still
+     *                 holds across a resume, and turns "I could not see anything down there" into a
+     *                 number; may be null for a pass that is never interrupted
+     * @param start    first column to visit, 0 for a fresh chunk
+     * @param deadline {@link System#nanoTime()} to stop at; at least one column is always done
+     * @return the next column to visit, or {@link #DONE}
      */
-    public static void generate(ServerLevel level, ChunkPos cp, RandomSource rng, Report report) {
+    public static int generate(WorldGenLevel level, ChunkPos cp, Report report, int start, long deadline) {
         if (!GeyserConfig.DEEP_STRUCTURE_ENABLED.get()) {
             if (report != null) report.note = "deep structure disabled in the config";
-            return;
+            return DONE;
         }
 
-        PlateSample centre = TectonicMap.sampleCached(level, cp.getMinBlockX() + 8, cp.getMinBlockZ() + 8);
+        ServerLevel world = level.getLevel();
+        PlateSample centre = TectonicMap.sampleCached(world, cp.getMinBlockX() + 8, cp.getMinBlockZ() + 8);
         if (report != null) {
             report.type = centre.faultType().toString();
             report.stress = centre.stress();
@@ -80,7 +104,7 @@ public final class DeepStructure {
         // is generous because a chunk's corner can be a good deal more stressed than its middle.
         if (centre.stress() < 0.10) {
             if (report != null) report.note = "stress below 0.10 across the chunk - deep interior";
-            return;
+            return DONE;
         }
 
         int floor = level.getMinBuildHeight() + 6;
@@ -88,16 +112,20 @@ public final class DeepStructure {
         boolean outcrop = GeyserConfig.DEEP_SURFACE_OUTCROP.get();
         int soil = GeyserConfig.DEEP_SOIL_DEPTH.get();
         double faultWidth = GeyserConfig.FAULT_WIDTH.get();
-        int budget = GeyserConfig.DEEP_STRUCTURE_BUDGET.get();
+        // The budget is for the whole chunk, so a resumed pass starts with what is left of it.
+        int budget = GeyserConfig.DEEP_STRUCTURE_BUDGET.get() - (report != null ? report.blocks : 0);
+        long seed = level.getSeed();
+        RandomSource rng = RandomSource.create(0L);
 
         // Scattered visiting order. 97 is coprime with 256, so this walks all 256 columns of the
         // chunk exactly once in an order that jumps around - which is what stops a budget shortfall
         // from turning into a stripe of geology along one edge.
-        for (int i = 0; i < 256 && budget > 0; i++) {
+        for (int i = Math.max(0, start); i < DONE && budget > 0; i++) {
+            if (i > start && System.nanoTime() >= deadline) return i;
             int k = (i * 97) & 0xFF;
             int x = cp.getMinBlockX() + (k >> 4);
             int z = cp.getMinBlockZ() + (k & 15);
-            PlateSample col = TectonicMap.sampleCached(level, x, z);
+            PlateSample col = TectonicMap.sampleCached(world, x, z);
             if (col.faultType() == com.jeladastudios.ftsgeology.tectonics.FaultType.INTERIOR) continue;
             if (col.stress() < 0.25) continue;   // this column is too far from the boundary
 
@@ -110,6 +138,12 @@ public final class DeepStructure {
             int localSoil = outcropDepth(col.stress(), soil);
             int top = columnTop(level, x, z, hardCeiling, outcrop, localSoil);
             if (top <= floor + 4) continue;
+
+            // Each column rolls its own dice, seeded from the world and the column alone. The chunk
+            // used to share one stream, so where a pass stopped changed every column after it: a
+            // chunk interrupted by the budget came out different from one that was not, and the copy
+            // built at world generation would have disagreed with the copy built by retrogen.
+            rng.setSeed(columnSeed(seed, x, z));
 
             int placed = switch (col.faultType()) {
                 case CONVERGENT_SUBDUCTION -> subduction(level, x, z, col, floor, top, faultWidth, rng);
@@ -130,6 +164,7 @@ public final class DeepStructure {
         if (report != null && report.blocks == 0 && report.note == null) {
             report.note = "budget exhausted or nothing matched in this chunk";
         }
+        return DONE;
     }
 
     /** What one chunk's worth of generation actually did, for the inspection command. */
@@ -143,7 +178,6 @@ public final class DeepStructure {
     }
 
     /**
-    /**
      * The highest block this column may be given boundary rock at.
      *
      * <p>Measured against this column's own soil AND its four neighbours', taking the lowest. A
@@ -152,13 +186,17 @@ public final class DeepStructure {
      * stray basalt columns were. Taking the lowest neighbour means boundary rock can never rise
      * above the soil beside it, while a cliff face still shows the whole section in the cut.</p>
      */
-    private static int columnTop(ServerLevel level, int x, int z, int hardCeiling,
+    private static int columnTop(WorldGenLevel level, int x, int z, int hardCeiling,
                                  boolean outcrop, int soil) {
         if (!outcrop) return hardCeiling;
         int ground = TerrainProbe.groundY(level, x, z);
         if (ground == Integer.MIN_VALUE) return hardCeiling;
         int lowest = ground;
         for (int[] d : NEIGHBOURS) {
+            // A neighbour whose chunk is not there is left out rather than asked for. Asking loads it
+            // on the server thread, and at the edge of the loaded area that is a whole chunk load in
+            // the middle of a single column, which no time budget can interrupt.
+            if (!level.hasChunk((x + d[0]) >> 4, (z + d[1]) >> 4)) continue;
             int n = TerrainProbe.groundY(level, x + d[0], z + d[1]);
             if (n != Integer.MIN_VALUE) lowest = Math.min(lowest, n);
         }
@@ -196,7 +234,7 @@ public final class DeepStructure {
      * intrusive rock that cooled from the same magma that feeds the volcanoes, plus the basalt dykes
      * that carried it. Digging under a volcanic arc should find granite, and it now does.</p>
      */
-    private static int subduction(ServerLevel level, int x, int z, PlateSample s,
+    private static int subduction(WorldGenLevel level, int x, int z, PlateSample s,
                                   int floor, int top, double faultWidth, RandomSource rng) {
         int placed = 0;
         double across = Mth.clamp(s.faultDistance() / faultWidth, 0.0, 1.0);
@@ -242,7 +280,7 @@ public final class DeepStructure {
      * a dyke, in which case it is basalt from bedrock to daylight, or it is not. That is what makes
      * a rift instantly recognisable in section, and it is far cheaper than filling the whole zone.</p>
      */
-    private static int rift(ServerLevel level, int x, int z, PlateSample s,
+    private static int rift(WorldGenLevel level, int x, int z, PlateSample s,
                             int floor, int top, double faultWidth, RandomSource rng) {
         int placed = 0;
         double across = Mth.clamp(s.faultDistance() / faultWidth, 0.0, 1.0);
@@ -299,7 +337,7 @@ public final class DeepStructure {
      * than a neat horizontal sandwich. Calcite, tuff and diorite stand in for marble, gneiss and the
      * granitic sheets that intrude them.</p>
      */
-    private static int collisionRoot(ServerLevel level, int x, int z, PlateSample s,
+    private static int collisionRoot(WorldGenLevel level, int x, int z, PlateSample s,
                                      int floor, int top, double faultWidth, RandomSource rng) {
         int placed = 0;
         double across = Mth.clamp(s.faultDistance() / faultWidth, 0.0, 1.0);
@@ -334,7 +372,7 @@ public final class DeepStructure {
      * in reality, and keeping it that way is also what lets it run the full height of the crust
      * without costing more than the wide, shallow structures do.</p>
      */
-    private static int shearZone(ServerLevel level, int x, int z, PlateSample s,
+    private static int shearZone(WorldGenLevel level, int x, int z, PlateSample s,
                                  int floor, int top, double faultWidth, RandomSource rng) {
         if (s.faultDistance() > faultWidth * 0.06) return 0;
         int placed = 0;
@@ -352,8 +390,16 @@ public final class DeepStructure {
 
     // === Helpers ============================================================
 
+    /** Dice for one column: the same whichever pass builds it and wherever that pass stopped. */
+    private static long columnSeed(long worldSeed, int x, int z) {
+        long h = worldSeed ^ 0x6A09E667F3BCC909L;
+        h ^= x * 0x9E3779B97F4A7C15L;
+        h ^= z * 0xC2B2AE3D27D4EB4FL;
+        return h ^ (h >>> 31);
+    }
+
     /** A rough, lobed pocket of one material, used for magma chambers. */
-    private static int blob(ServerLevel level, int x, int y, int z, int r, Block block,
+    private static int blob(WorldGenLevel level, int x, int y, int z, int r, Block block,
                             int top, RandomSource rng) {
         int placed = 0;
         java.util.List<BlockPos> cells = new java.util.ArrayList<>();
@@ -382,10 +428,17 @@ public final class DeepStructure {
     }
 
     /** Writes one block, refusing to breach this column's ceiling, bedrock, or anything a player made. */
-    private static boolean set(ServerLevel level, int x, int y, int z, Block block, int top) {
+    private static boolean set(WorldGenLevel level, int x, int y, int z, Block block, int top) {
         if (y > top || y <= level.getMinBuildHeight()) return false;
+        // A magma pocket near the edge reaches into the next chunk. Never load one to do it.
+        if (!level.hasChunk(x >> 4, z >> 4)) return false;
         BlockPos p = new BlockPos(x, y, z);
         BlockState s = level.getBlockState(p);
+        // Already this rock: nothing to write. On the retrogen path every write goes through the live
+        // chunk, which other mods hook - Sable ran a physics query on each one - so a write that
+        // changes nothing still costs the full price. It matters most when a chunk is gone over
+        // again, where almost every column is already what it would become.
+        if (s.is(block)) return false;
         if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) return false;
         // Never eat something the mod itself relies on. A geyser is heated by a slab of magma and
         // driven by a block entity; replacing either with metamorphic banding would silently kill it,
@@ -396,7 +449,12 @@ public final class DeepStructure {
         // shape of the terrain are untouched - the structure shows IN a cave wall, it does not
         // fill the cave in.
         if (s.isAir() || !s.getFluidState().isEmpty()) return false;
-        level.setBlock(p, block.defaultBlockState(), 2);
+        // Clients told, neighbour shapes not recalculated. Rock swapped for rock has no shape to
+        // update, and asking for it made vanilla read all six neighbours - which for a column on the
+        // edge of the loaded area meant loading the next chunk on the server thread, part way through
+        // one column, where no time budget can reach. Generation never ran those updates either, so
+        // this is also what keeps the two paths writing the same thing.
+        level.setBlock(p, block.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
         return true;
     }
 }

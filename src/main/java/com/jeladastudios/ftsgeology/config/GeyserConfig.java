@@ -122,6 +122,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue DEEP_SURFACE_OUTCROP;  // boundary rock reaches daylight
     public static final ForgeConfigSpec.IntValue DEEP_SOIL_DEPTH;           // topsoil left untouched
     public static final ForgeConfigSpec.BooleanValue OCEANIC_RIDGE_ENABLED;
+    public static final ForgeConfigSpec.BooleanValue GEOLOGY_AT_GENERATION; // deep geology written as chunks generate
 
     // --- Earthquakes --------------------------------------------------------
     public static final ForgeConfigSpec.BooleanValue QUAKES_ENABLED;
@@ -549,6 +550,14 @@ public final class GeyserConfig {
                         "zones get hot springs but never geysers, and plate interiors stay quiet.",
                         "Only affects NEWLY generated chunks.")
                 .define("tectonicPlacement", true);
+        GEOLOGY_AT_GENERATION = b
+                .comment("Write the deep geology while a chunk is being generated instead of afterwards.",
+                        "A chunk made after the mod was installed then gets its boundary rock and ocean",
+                        "ridges as part of world generation: nothing on the server tick, nothing sent to",
+                        "players, and nothing for mods that hook block changes to react to. Chunks that",
+                        "already existed still get it from the background queue as before.",
+                        "Turn off only if another world generation mod misbehaves with it.")
+                .define("geologyAtGeneration", true);
         DEEP_STRUCTURE_ENABLED = b
                 .comment("Generate the deep geology that defines each kind of plate boundary:",
                         "a descending slab and magma chambers under a subduction arc, thinned and",

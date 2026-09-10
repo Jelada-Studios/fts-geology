@@ -459,7 +459,7 @@ public final class TectonicCommands {
                         level.getSeed() ^ (((long) cp.x) << 32 | (cp.z & 0xFFFFFFFFL)));
                 com.jeladastudios.ftsgeology.worldgen.DeepStructure.Report r =
                         new com.jeladastudios.ftsgeology.worldgen.DeepStructure.Report();
-                com.jeladastudios.ftsgeology.worldgen.DeepStructure.generate(level, cp, rng, r);
+                com.jeladastudios.ftsgeology.worldgen.DeepStructure.generate(level, cp, r);
                 blocks += r.blocks;
                 if (r.note != null) note = r.note;
                 com.jeladastudios.ftsgeology.worldgen.OceanicRidge.generate(level, cp, rng);

@@ -7,7 +7,7 @@ import com.jeladastudios.ftsgeology.tectonics.FaultType;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
 import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
@@ -58,10 +58,10 @@ public final class OceanicRidge {
      * Builds whatever part of a ridge crosses this chunk. Cheap no-op anywhere that is not a
      * submerged spreading boundary.
      */
-    public static void generate(ServerLevel level, ChunkPos cp, RandomSource rng) {
+    public static void generate(WorldGenLevel level, ChunkPos cp, RandomSource rng) {
         if (!GeyserConfig.OCEANIC_RIDGE_ENABLED.get()) return;
 
-        PlateSample centre = TectonicMap.sampleCached(level, cp.getMinBlockX() + 8, cp.getMinBlockZ() + 8);
+        PlateSample centre = TectonicMap.sampleCached(level.getLevel(), cp.getMinBlockX() + 8, cp.getMinBlockZ() + 8);
         if (centre.faultType() != FaultType.DIVERGENT) return;
         // Continental rifting builds a valley on land (that is the earthquake system's job); only an
         // ocean basin gets a spreading ridge.
@@ -89,8 +89,8 @@ public final class OceanicRidge {
     }
 
     /** Rebuilds one sea-floor column of the ridge. Returns how many blocks it wrote. */
-    private static int column(ServerLevel level, int x, int z, int sea, double reach, RandomSource rng) {
-        PlateSample s = TectonicMap.sampleCached(level, x, z);
+    private static int column(WorldGenLevel level, int x, int z, int sea, double reach, RandomSource rng) {
+        PlateSample s = TectonicMap.sampleCached(level.getLevel(), x, z);
         if (s.faultType() != FaultType.DIVERGENT) return 0;
         double d = s.faultDistance();
         if (d > reach) return 0;
@@ -170,7 +170,7 @@ public final class OceanicRidge {
      * a mistake; a lump two blocks across reads as a pillow, and a floor covered in them reads as a
      * spreading ridge.</p>
      */
-    private static int pillow(ServerLevel level, int x, int y, int z, int sea, RandomSource rng) {
+    private static int pillow(WorldGenLevel level, int x, int y, int z, int sea, RandomSource rng) {
         int r = 1 + rng.nextInt(2);
         int h = 1 + rng.nextInt(2);
         if (y + h >= sea - 2) return 0;                        // never break the surface
@@ -240,7 +240,7 @@ public final class OceanicRidge {
      * <p>The heat source is sealed inside the tube, so the chimney glows and smokes without opening a
      * whirlpool in the water above it.</p>
      */
-    private static int blackSmoker(ServerLevel level, int x, int baseY, int z, int sea, RandomSource rng) {
+    private static int blackSmoker(WorldGenLevel level, int x, int baseY, int z, int sea, RandomSource rng) {
         int height = 3 + rng.nextInt(4);
         if (baseY + height >= sea - 3) return 0;
         int placed = 0;
@@ -283,12 +283,14 @@ public final class OceanicRidge {
     }
 
     /** Writes one block, refusing bedrock and anything a player made. */
-    private static boolean set(ServerLevel level, int x, int y, int z, BlockState state) {
+    private static boolean set(WorldGenLevel level, int x, int y, int z, BlockState state) {
         if (y <= level.getMinBuildHeight() || y >= level.getMaxBuildHeight()) return false;
+        if (!level.hasChunk(x >> 4, z >> 4)) return false;   // pillows and smokers reach over the edge
         BlockPos p = new BlockPos(x, y, z);
         BlockState s = level.getBlockState(p);
+        if (s == state) return false;   // already this: a write that changes nothing still costs one
         if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) return false;
-        level.setBlock(p, state, 2);
+        level.setBlock(p, state, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);   // see DeepStructure.set
         return true;
     }
 }

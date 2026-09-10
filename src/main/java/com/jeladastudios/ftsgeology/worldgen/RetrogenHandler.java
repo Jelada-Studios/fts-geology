@@ -156,8 +156,18 @@ public final class RetrogenHandler {
     private static final int VOLCANO_REACH = 48;
 
 
-    /** One chunk waiting for its geology, held until the world is running and calm. */
-    private record QueuedChunk(ResourceKey<Level> dimension, ChunkPos pos, boolean deepOnly) {}
+    /**
+     * One chunk waiting for its geology, held until the world is running and calm.
+     *
+     * <p>{@code column} and {@code deep} carry a deep pass that ran out of time part way through the
+     * chunk, so it picks up where it stopped instead of starting again.</p>
+     */
+    private record QueuedChunk(ResourceKey<Level> dimension, ChunkPos pos, boolean deepOnly,
+                               int column, DeepStructure.Report deep) {
+        QueuedChunk(ResourceKey<Level> dimension, ChunkPos pos, boolean deepOnly) {
+            this(dimension, pos, deepOnly, 0, null);
+        }
+    }
 
     private static final java.util.concurrent.ConcurrentLinkedQueue<QueuedChunk> QUEUE =
             new java.util.concurrent.ConcurrentLinkedQueue<>();
@@ -169,6 +179,14 @@ public final class RetrogenHandler {
     private static int doneSinceReport;
     private static int blocksSinceReport;
     private static int reportTimer;
+    /** Longest single deep pass since the last report: what one chunk actually cost the tick. */
+    private static long longestStepNanos;
+    /** Chunks that got their deep geology at generation. Bumped from world generation threads. */
+    private static final java.util.concurrent.atomic.AtomicInteger GENERATED =
+            new java.util.concurrent.atomic.AtomicInteger();
+    /** And the blocks those chunks were given, so a world that never reaches a boundary shows as 0. */
+    private static final java.util.concurrent.atomic.AtomicLong GENERATED_BLOCKS =
+            new java.util.concurrent.atomic.AtomicLong();
 
     /**
      * Generates queued chunks a few at a time. Server tick events do not fire while the spawn area
@@ -229,27 +247,43 @@ public final class RetrogenHandler {
                 }
 
                 String key = keyOf(level, chunk);
+                if (DEEP_CURRENT.contains(key) && (q.deepOnly() || PROCESSED.contains(key))) continue;
+                boolean finished = true;
                 try {
-                    if (q.deepOnly()) {
-                        // Retrofit only: the boundary structure, nothing that could put a second
-                        // geyser or volcano next to one that is already there.
-                        if (DEEP_CURRENT.contains(key)) continue;
+                    // Deep geology first, whether or not the surface is still to come: the boundary
+                    // structure is what the surface features then sit on top of. A chunk generated
+                    // with the mod installed already got it from GeologyFeature and skips this.
+                    if (!DEEP_CURRENT.contains(key)) {
+                        DeepStructure.Report deep = q.deep() != null ? q.deep() : new DeepStructure.Report();
+                        long started = System.nanoTime();
+                        int next = DeepStructure.generate(level, q.pos(), deep, q.column(), deadline);
+                        longestStepNanos = Math.max(longestStepNanos, System.nanoTime() - started);
+                        if (next < DeepStructure.DONE) {
+                            // Out of time part way through. A chunk used to be finished regardless, and
+                            // with another mod taxing every block change one chunk alone overran the
+                            // whole slice (GitHub #1). Held with its place kept, resumed next tick.
+                            deferred.add(new QueuedChunk(q.dimension(), q.pos(), q.deepOnly(), next, deep));
+                            finished = false;
+                            continue;
+                        }
                         RandomSource rng = RandomSource.create(
                                 level.getSeed() ^ (((long) q.pos().x) << 32 | (q.pos().z & 0xFFFFFFFFL)));
-                        DeepStructure.Report r = new DeepStructure.Report();
-                        DeepStructure.generate(level, q.pos(), rng, r);
                         OceanicRidge.generate(level, q.pos(), rng);
-                        blocksSinceReport += r.blocks;
-                    } else {
-                        if (PROCESSED.contains(key)) continue;
+                        blocksSinceReport += deep.blocks;
+                    }
+                    // A retrofit gets the deep pass only: nothing that could put a second geyser or
+                    // volcano next to one that is already there.
+                    if (!q.deepOnly() && !PROCESSED.contains(key)) {
                         blocksSinceReport += generateInChunk(level, chunk);
                     }
                     doneSinceReport++;
                 } catch (Exception e) {
                     GeysersMod.LOGGER.warn("Geology retrogen failed for chunk {}: {}", q.pos(), e.toString());
                 } finally {
-                    if (!q.deepOnly()) PROCESSED.add(key);
-                    DEEP_CURRENT.add(key);
+                    if (finished) {
+                        if (!q.deepOnly()) PROCESSED.add(key);
+                        DEEP_CURRENT.add(key);
+                    }
                     chunk.setUnsaved(true);
                 }
             }
@@ -261,12 +295,19 @@ public final class RetrogenHandler {
         // exactly the question testing kept running into.
         if (++reportTimer >= 200) {
             reportTimer = 0;
-            if (doneSinceReport > 0 || !QUEUE.isEmpty()) {
-                GeysersMod.LOGGER.info("retrogen: {} chunks in the last 10s, {} blocks placed, {} still queued",
-                        doneSinceReport, blocksSinceReport, QUEUE.size());
+            int generated = GENERATED.getAndSet(0);
+            if (doneSinceReport > 0 || generated > 0 || !QUEUE.isEmpty()) {
+                // The longest step is the number that matters with a mod hooking every block change:
+                // it has to stay inside retrogen's slice now that a chunk can stop part way through.
+                GeysersMod.LOGGER.info("retrogen: {} chunks in the last 10s, {} blocks placed, {} still queued, "
+                                + "longest step {} ms; {} chunks got their deep geology at generation ({} blocks)",
+                        doneSinceReport, blocksSinceReport, QUEUE.size(),
+                        String.format(java.util.Locale.ROOT, "%.2f", longestStepNanos / 1e6), generated,
+                        GENERATED_BLOCKS.getAndSet(0));
             }
             doneSinceReport = 0;
             blocksSinceReport = 0;
+            longestStepNanos = 0;
         }
     }
 
@@ -373,12 +414,8 @@ public final class RetrogenHandler {
                 ? GeothermalSuitability.at(level, centreX, centreZ)
                 : new GeothermalSuitability.Suitability(1.0, 1.0, 1.0, "Tectonic placement disabled.");
 
-        // Deep geology first: the boundary structure the surface features then sit on top of.
-        DeepStructure.Report deep = new DeepStructure.Report();
-        DeepStructure.generate(level, cp, rng, deep);
-
-        // Where that boundary is under water, it is a spreading ridge rather than a rift valley.
-        OceanicRidge.generate(level, cp, rng);
+        // Deep geology is no longer done here. It runs first, from the queue, where it can stop part
+        // way through a chunk and resume next tick - or it was already written at generation.
 
         // The ground over a mantle plume says so, more loudly the closer you get. This is how a
         // hotspot is meant to be found: by reading the landscape rather than by walking twenty
@@ -429,7 +466,7 @@ public final class RetrogenHandler {
 
         // One candidate column per chunk keeps density low and cost bounded.
         double chance = GeyserConfig.CHAMBER_SPAWN_CHANCE.get() * fit.geyser();
-        if (chance <= 0 || rng.nextDouble() >= chance) return deep.blocks;
+        if (chance <= 0 || rng.nextDouble() >= chance) return 0;
 
         int localX = rng.nextInt(12) + 2; // keep away from chunk borders (2..13)
         int localZ = rng.nextInt(12) + 2;
@@ -439,16 +476,16 @@ public final class RetrogenHandler {
         // Choose a core Y that leaves room for the chamber below the safety ceiling.
         int coreY = minY + 1;
         int chamberTop = coreY + chamberH; // must stay strictly below maxY
-        if (chamberTop >= maxY) return deep.blocks;
+        if (chamberTop >= maxY) return 0;
 
         BlockPos corePos = new BlockPos(worldX, coreY, worldZ);
 
-        if (!columnIsCarvable(level, corePos, chamberH, maxY)) return deep.blocks;
+        if (!columnIsCarvable(level, corePos, chamberH, maxY)) return 0;
 
         int magnitude = pickMagnitude(rng);
         buildSystem(level, corePos, chamberH, magnitude, rng, false, true); // natural: build-safe deep shaft + branches
         GeysersMod.LOGGER.debug("Geyser system (magnitude {}) placed at {}", magnitude, corePos);
-        return deep.blocks;
+        return 0;
     }
 
     /**
@@ -1243,5 +1280,15 @@ public final class RetrogenHandler {
                 ? lvl.dimension().location().toString()
                 : "unknown";
         return dim + "@" + chunk.getPos().toLong();
+    }
+
+    /**
+     * Records that a chunk got its deep geology while it was being generated, so retrogen never goes
+     * over it a second time. Called from world generation threads, which the sets are safe for.
+     */
+    public static void markDeepCurrent(ResourceKey<Level> dimension, ChunkPos pos, int blocks) {
+        DEEP_CURRENT.add(dimension.location() + "@" + pos.toLong());
+        GENERATED.incrementAndGet();
+        GENERATED_BLOCKS.addAndGet(blocks);
     }
 }
