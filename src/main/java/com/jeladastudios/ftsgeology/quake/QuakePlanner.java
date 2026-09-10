@@ -1057,7 +1057,7 @@ public final class QuakePlanner {
      * <p>Depth alone is not a substitute. A spring source is seated below anything a quake reaches,
      * but a quake can lower the ground, and the one after it measures from the new surface.</p>
      */
-    private static boolean machinery(BlockState s) {
+    static boolean machinery(BlockState s) {
         return s.is(ModBlocks.GEYSER_CORE.get())
                 || s.is(ModBlocks.GEYSER_CHAMBER.get())
                 || s.is(ModBlocks.GEYSER_IGNITER.get())

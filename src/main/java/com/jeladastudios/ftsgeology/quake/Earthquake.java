@@ -265,6 +265,10 @@ public final class Earthquake {
         Weathering.drain(event.getServer(),
                 com.jeladastudios.ftsgeology.util.TickBudget.slice(0.3));
 
+        // Cave roofs the shaking loaded past what they could carry, coming down along the rupture.
+        CaveCollapse.drain(event.getServer(),
+                com.jeladastudios.ftsgeology.util.TickBudget.slice(0.2));
+
         // Release quiet zones whose OWN debris has finished coming down. Done after the drain above,
         // so a zone can be released on the same tick the last of its talus lands. Each zone asks
         // about its own ground - see Weathering.pendingNear.
@@ -324,6 +328,8 @@ public final class Earthquake {
                 GeysersMod.LOGGER.info("quake finished: {} blocks over {} ticks", run.applied, run.ticks);
                 // The shaking stops, but the ground it left is raw. Let it relax.
                 Weathering.enqueue(level, run.plan.edits());
+                // And the caves under it: an arch that stood for ten thousand years can fail in a minute.
+                CaveCollapse.enqueue(level, run.plan);
                 // The corridor stays shut until that settling is done - the rupture ending is not
                 // the same thing as the ground being still.
                 QuakeQuiet.settling(level, run.plan.epicentre());

@@ -89,6 +89,7 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.hydrology.WaterTable.clearCache();
         com.jeladastudios.ftsgeology.volcano.VolcanoJob.clear();
         com.jeladastudios.ftsgeology.quake.Weathering.clear();
+        com.jeladastudios.ftsgeology.quake.CaveCollapse.clear();
         com.jeladastudios.ftsgeology.quake.PendingEdits.clear();
         com.jeladastudios.ftsgeology.instrument.SeismicNetwork.clear();
         // Also the quakes still mid-application. Without this a rupture that was half applied when

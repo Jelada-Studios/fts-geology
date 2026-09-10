@@ -133,6 +133,7 @@ public final class RetrogenHandler {
         // cheap, so it is safe to do inline.
         com.jeladastudios.ftsgeology.quake.PendingEdits.onChunkLoaded(level, chunk.getPos());
         com.jeladastudios.ftsgeology.quake.Weathering.onChunkLoaded(level, chunk.getPos());
+        com.jeladastudios.ftsgeology.quake.CaveCollapse.onChunkLoaded(level, chunk.getPos());
 
         String key = keyOf(level, chunk);
         boolean surfaceDone = PROCESSED.contains(key);

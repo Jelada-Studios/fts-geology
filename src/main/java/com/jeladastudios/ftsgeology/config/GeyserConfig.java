@@ -130,6 +130,8 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue QUAKES_BREAK_BUILDS;  // default OFF
     public static final ForgeConfigSpec.BooleanValue UNSUPPORTED_BLOCKS_FALL;   // default ON
     public static final ForgeConfigSpec.BooleanValue FALLING_INCLUDES_BUILDS;   // default ON
+    public static final ForgeConfigSpec.BooleanValue QUAKE_CAVE_COLLAPSE;       // cave roofs come down
+    public static final ForgeConfigSpec.IntValue CAVE_COLLAPSE_DEPTH;           // how deep a probe looks
     public static final ForgeConfigSpec.IntValue QUAKE_BLOCKS_PER_TICK;    // main-thread apply budget
     public static final ForgeConfigSpec.IntValue QUAKE_WARNING_TICKS;      // alert window before the ground moves
     public static final ForgeConfigSpec.IntValue QUAKE_AMBIENT_INTERVAL;   // ticks between ambient rolls
@@ -642,6 +644,16 @@ public final class GeyserConfig {
                         "deform a build in the first place; this only decides what happens to one that",
                         "has already been undermined.")
                 .define("fallingIncludesPlayerBlocks", true);
+        QUAKE_CAVE_COLLAPSE = b
+                .comment("Let a strong earthquake bring cave roofs down along its rupture. The bottom of a",
+                        "roof drops onto the cave floor as rubble and the void rises into the space it left;",
+                        "where the rock above was thin it reaches the surface and a sinkhole opens. Never",
+                        "moves a roof of player blocks, never buries anything standing in a cave, and leaves",
+                        "flooded caves and ground under water alone.")
+                .define("quakeCaveCollapse", true);
+        CAVE_COLLAPSE_DEPTH = b
+                .comment("How far below the surface, in blocks, a quake looks for caves to bring down.")
+                .defineInRange("caveCollapseDepth", 48, 8, 128);
         QUAKE_BLOCKS_PER_TICK = b
                 .comment("How many block edits a quake applies per tick on the server thread.",
                         "This is not just a performance budget: real ruptures travel along a fault at",

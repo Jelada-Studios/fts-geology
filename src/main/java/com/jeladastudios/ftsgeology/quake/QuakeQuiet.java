@@ -157,7 +157,8 @@ public final class QuakeQuiet {
                     // not, because parked work waits on a chunk visit that may never come. Either
                     // way the deadline wins.
                     if (now < z.mustReleaseBy
-                            && Weathering.pendingNear(level, z.x, z.z, z.radius)) continue;
+                            && (Weathering.pendingNear(level, z.x, z.z, z.radius)
+                                || CaveCollapse.pendingNear(level, z.x, z.z, z.radius))) continue;
                     z.phase = Phase.GRACE;
                     z.graceEnds = now + GRACE_TICKS;
                 }
