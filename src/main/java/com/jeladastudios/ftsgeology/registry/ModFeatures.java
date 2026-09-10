@@ -25,4 +25,12 @@ public final class ModFeatures {
     /** The deep geology of a chunk, written while it is generated. See {@link GeologyFeature}. */
     public static final RegistryObject<Feature<NoneFeatureConfiguration>> GEOLOGY =
             FEATURES.register("geology", () -> new GeologyFeature(NoneFeatureConfiguration.CODEC));
+
+    /**
+     * Large volcanoes, raised a chunk at a time as terrain generates. See
+     * {@link com.jeladastudios.ftsgeology.worldgen.VolcanoFieldFeature}.
+     */
+    public static final RegistryObject<Feature<NoneFeatureConfiguration>> VOLCANO_FIELD =
+            FEATURES.register("volcano_field", () -> new com.jeladastudios.ftsgeology.worldgen
+                    .VolcanoFieldFeature(NoneFeatureConfiguration.CODEC));
 }

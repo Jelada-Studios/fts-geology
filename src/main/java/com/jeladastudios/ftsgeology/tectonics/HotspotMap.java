@@ -219,6 +219,29 @@ public final class HotspotMap {
         ThermalBiomes.clearCache();
     }
 
+    /**
+     * Centres of the plumes inside a box of blocks, as {x, z}. The same arithmetic
+     * {@link #plumeStrength} runs, so it costs nothing but the seed.
+     */
+    public static java.util.List<int[]> plumeCentres(ServerLevel level, int minX, int minZ,
+                                                     int maxX, int maxZ) {
+        java.util.List<int[]> out = new java.util.ArrayList<>();
+        if (!GeyserConfig.HOTSPOTS_ENABLED.get()) return out;
+        double scale = GeyserConfig.HOTSPOT_SCALE.get();
+        double density = GeyserConfig.HOTSPOT_DENSITY.get();
+        long seed = level.getSeed();
+        for (int cx = Mth.floor(minX / scale) - 1; cx <= Mth.floor(maxX / scale) + 1; cx++) {
+            for (int cz = Mth.floor(minZ / scale) - 1; cz <= Mth.floor(maxZ / scale) + 1; cz++) {
+                if (!cellHasPlume(seed, cx, cz, density)) continue;
+                double px = plumeX(seed, cx, cz, scale), pz = plumeZ(seed, cx, cz, scale);
+                if (px >= minX && px <= maxX && pz >= minZ && pz <= maxZ) {
+                    out.add(new int[] {(int) Math.floor(px), (int) Math.floor(pz)});
+                }
+            }
+        }
+        return out;
+    }
+
     // === Layout =============================================================
 
     /** Only a fraction of grid cells host a plume, which is what keeps hotspots rare. */

@@ -66,10 +66,21 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
     private BlockPos originalBase;
     private int originalSummitY = Integer.MIN_VALUE;
 
+    private com.jeladastudios.ftsgeology.volcano.VolcanoSize size =
+            com.jeladastudios.ftsgeology.volcano.VolcanoSize.SMALL;
+
+    /**
+     * NBT flag on a core world generation left in a large volcano's chamber. Such a core is a marker:
+     * it finishes the summit and is then filled over. See {@code VolcanoBuilder.finishFieldVolcano}.
+     */
+    public static final String FIELD_PENDING = "FieldPending";
+    private boolean fieldPending;
+
     /** Called by the builder as the core is planted. */
-    public void setShape(com.jeladastudios.ftsgeology.volcano.VolcanoType t, BlockPos base,
-                         int summitY) {
+    public void setShape(com.jeladastudios.ftsgeology.volcano.VolcanoType t,
+                         com.jeladastudios.ftsgeology.volcano.VolcanoSize s, BlockPos base, int summitY) {
         this.type = t;
+        this.size = s;
         this.originalBase = base.immutable();
         this.originalSummitY = summitY;
         setChanged();
@@ -93,7 +104,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         rebuiltFor = quake;
         setChanged();
         if (com.jeladastudios.ftsgeology.volcano.VolcanoBuilder.rebuildEdifice(
-                level, originalBase, magnitude, type, originalSummitY)) {
+                level, originalBase, magnitude, type, originalSummitY, size)) {
             GeysersMod.LOGGER.info("Volcano at {} rebuilding after a quake ({} -> {})",
                     pos, here, originalSummitY);
         }
@@ -280,6 +291,14 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, VolcanoCoreBlockEntity be) {
         if (!(level instanceof ServerLevel server)) return;
+        // A marker world generation left for a large volcano. It is not a volcano yet: it finishes the
+        // summit once the ground around it has loaded, and the chamber's lava then takes its place.
+        if (be.fieldPending) {
+            if (server.getGameTime() % 20L == 0L) {
+                com.jeladastudios.ftsgeology.volcano.VolcanoBuilder.finishFieldVolcano(server, pos);
+            }
+            return;
+        }
         BlockPos summit = pos.above(); // the crater vent sits just above the core
 
         // Per-tick spectacle.
@@ -306,7 +325,10 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                 // lava back. That is the crater that cools after an earthquake and never refills.
                 long quake = com.jeladastudios.ftsgeology.quake.QuakeQuiet.released(
                         server, pos.getX(), pos.getZ());
-                if (quake > be.rebuiltFor) be.rebuildAfterQuake(server, pos, quake);
+                // Zero means no quake has been released here. It used to pass this test anyway, since
+                // rebuiltFor starts at Long.MIN_VALUE, and the summit crater is below the summit - so
+                // every new volcano "rebuilt" itself on its first quiet second and laid its apron twice.
+                if (quake != 0L && quake > be.rebuiltFor) be.rebuildAfterQuake(server, pos, quake);
                 be.refillAfterQuake(server, pos);
                 if (!hasLava(server, pos)) return; // dead until it has lava again
                 be.idleSmoke(server, summit, 0.4f, true); // lazy smoke off the crater + a vent or two
@@ -438,6 +460,8 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         if (type != null) tag.putString("Type", type.name());
         if (originalBase != null) tag.putLong("OriginalBase", originalBase.asLong());
         tag.putInt("OriginalSummitY", originalSummitY);
+        tag.putString("Size", size.name());
+        if (fieldPending) tag.putBoolean(FIELD_PENDING, true);
     }
 
     @Override
@@ -459,5 +483,15 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         originalBase = tag.contains("OriginalBase") ? BlockPos.of(tag.getLong("OriginalBase")) : null;
         originalSummitY = tag.contains("OriginalSummitY")
                 ? tag.getInt("OriginalSummitY") : Integer.MIN_VALUE;
+        // Every core saved before sizes existed was a small one.
+        size = com.jeladastudios.ftsgeology.volcano.VolcanoSize.SMALL;
+        if (tag.contains("Size")) {
+            try {
+                size = com.jeladastudios.ftsgeology.volcano.VolcanoSize.valueOf(tag.getString("Size"));
+            } catch (IllegalArgumentException ignored) {
+                // A size from a future build: treat it as small, the one that is never rebuilt wrong.
+            }
+        }
+        fieldPending = tag.getBoolean(FIELD_PENDING);
     }
 }

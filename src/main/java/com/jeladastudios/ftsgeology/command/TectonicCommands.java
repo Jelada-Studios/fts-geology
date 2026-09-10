@@ -25,6 +25,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerLevel;
 import com.jeladastudios.ftsgeology.volcano.VolcanoBuilder;
+import com.jeladastudios.ftsgeology.volcano.VolcanoField;
+import com.jeladastudios.ftsgeology.volcano.VolcanoSize;
 import com.jeladastudios.ftsgeology.volcano.VolcanoType;
 import com.jeladastudios.ftsgeology.worldgen.HotSpringShape;
 import com.jeladastudios.ftsgeology.worldgen.RetrogenHandler;
@@ -88,6 +90,16 @@ public final class TectonicCommands {
                                                 StringArgumentType.getString(ctx, "setting"), false))
                                         .then(Commands.literal("tp").executes(ctx -> find(ctx,
                                                 StringArgumentType.getString(ctx, "setting"), true)))))
+                        .then(Commands.literal("field")
+                                .executes(ctx -> field(ctx, null, false))
+                                .then(Commands.literal("tp").executes(ctx -> field(ctx, null, true)))
+                                .then(Commands.literal("seams").executes(TectonicCommands::fieldSeams))
+                                .then(Commands.argument("type", StringArgumentType.word())
+                                        .suggests((c, b) -> SharedSuggestionProvider.suggest(VOLCANO_TYPES, b))
+                                        .executes(ctx -> field(ctx,
+                                                StringArgumentType.getString(ctx, "type"), false))
+                                        .then(Commands.literal("tp").executes(ctx -> field(ctx,
+                                                StringArgumentType.getString(ctx, "type"), true)))))
                         .then(Commands.literal("quake")
                                 .executes(ctx -> quake(ctx, null, 0))
                                 .then(Commands.literal("cancel").executes(ctx -> {
@@ -110,6 +122,11 @@ public final class TectonicCommands {
                                         .suggests((c, b) -> SharedSuggestionProvider.suggest(FEATURES, b))
                                         .executes(ctx -> place(ctx,
                                                 StringArgumentType.getString(ctx, "feature"), 0))
+                                        // A volcano can be asked for at medium size. Large ones only
+                                        // come with new terrain; /geology field finds them.
+                                        .then(Commands.literal("medium").executes(ctx -> place(ctx,
+                                                StringArgumentType.getString(ctx, "feature"), 0,
+                                                VolcanoSize.MEDIUM)))
                                         // A hot spring takes an age. Being able to stand four of
                                         // them side by side is what makes the shape testable on its
                                         // own, apart from the water line that normally decides it.
@@ -122,6 +139,7 @@ public final class TectonicCommands {
 
     private static final String[] SETTINGS = {"subduction", "rift", "collision", "transform", "hotspot"};
     private static final String[] FAULTS = {"subduction", "rift", "collision", "transform"};
+    private static final String[] VOLCANO_TYPES = {"strato", "shield", "fissure", "caldera"};
     private static final String[] FEATURES = {"geyser", "hotspring", "volcano",
             "shield", "strato", "fissure", "caldera"};
 
@@ -635,6 +653,123 @@ public final class TectonicCommands {
         };
     }
 
+    // === /geology field =====================================================
+
+    /** Finds the nearest large volcano, and with tp puts the player beside its summit. */
+    private static int field(CommandContext<CommandSourceStack> ctx, String typeName, boolean teleport) {
+        // Unrecognised or absent means any type.
+        final VolcanoType only = typeName == null ? null : switch (typeName) {
+            case "strato" -> VolcanoType.STRATOVOLCANO;
+            case "shield" -> VolcanoType.SHIELD;
+            case "fissure" -> VolcanoType.FISSURE;
+            case "caldera" -> VolcanoType.CALDERA;
+            default -> null;
+        };
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        final int rings = 8;
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.field.searching")
+                .withStyle(ChatFormatting.GRAY), false);
+        // A cell is worked out from the generator's own terrain the first time it is asked about,
+        // which is slow; like find, it runs on a worker and only the answer comes back.
+        CompletableFuture
+                .supplyAsync(() -> VolcanoField.nearest(level, at.getX(), at.getZ(), rings, only),
+                        Util.backgroundExecutor())
+                .thenAcceptAsync(found -> {
+                    if (found == null) {
+                        source.sendFailure(Component.translatable("command.fts_geology.field.none",
+                                rings * 2560));
+                        return;
+                    }
+                    VolcanoField.Site s = found.site();
+                    int distance = (int) Math.round(Math.hypot(s.x() - at.getX(), s.z() - at.getZ()));
+                    // Also to the log: the reply arrives after the command has returned, which a
+                    // console connected over RCON never sees.
+                    GeysersMod.LOGGER.info("Nearest large volcano: {} at {} {} base {} summit {} reach {}, {} blocks away, {} in the search {}",
+                            s.type(), s.x(), s.z(), s.baseY(), s.summitY(), s.reach(), distance, found.count(),
+                            java.util.Arrays.toString(found.byType()));
+                    source.sendSuccess(() -> Component.translatable("command.fts_geology.field.found",
+                            s.type().name().toLowerCase(Locale.ROOT), s.x(), s.z(), s.baseY(), s.summitY(),
+                            distance, found.count()).withStyle(ChatFormatting.GREEN), false);
+                    if (teleport && source.getEntity() instanceof net.minecraft.server.level.ServerPlayer p) {
+                        // Beside the summit rather than on it: the crater is cut once the area loads.
+                        int tx = s.x() + 40, tz = s.z();
+                        level.getChunk(tx >> 4, tz >> 4);
+                        int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE,
+                                tx, tz);
+                        p.teleportTo(level, tx + 0.5, y + 1, tz + 0.5, p.getYRot(), p.getXRot());
+                    }
+                }, level.getServer())
+                .exceptionally(t -> {
+                    source.sendFailure(Component.translatable("command.fts_geology.search_failed_s", t));
+                    return null;
+                });
+        return 1;
+    }
+
+    /**
+     * Measures the steps in the ground across the nearest generated large volcano, separately for
+     * neighbouring columns inside one chunk and for neighbours either side of a chunk border.
+     *
+     * <p>The body is written a chunk at a time, in whatever order the chunks come, so this is the test
+     * of whether it came out as one mountain. If any chunk worked something out differently from its
+     * neighbour, the steps across borders come out larger than the ones inside chunks.</p>
+     */
+    private static int fieldSeams(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        VolcanoField.Found found = VolcanoField.nearest(level, at.getX(), at.getZ(), 1, null);
+        long[] inside = new long[3], border = new long[3];    // pairs, total step, steps of 4 or more
+        // A digest of every height measured. The same seed generated in a different chunk order has
+        // to give the same number, which is a stricter test than the steps: it would catch a chunk
+        // that is wrong all over rather than only at its edges.
+        long digest = 0;
+        int columns = 0;
+        if (found != null) {
+            VolcanoField.Site s = found.site();
+            int r = Math.min(s.edificeReach(), 240);
+            for (int x = s.x() - r; x < s.x() + r; x++) {
+                for (int z = s.z() - r; z < s.z() + r; z++) {
+                    double d = Math.hypot(x - s.x(), z - s.z());
+                    // The summit, its vents and chimneys are cut live and are meant to be steep.
+                    if (d > s.edificeReach() || d < 80) continue;
+                    if (!level.hasChunk(x >> 4, z >> 4)) continue;
+                    int here = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, x, z);
+                    if (here == Integer.MIN_VALUE) continue;
+                    digest = digest * 0x100000001B3L ^ (x * 73856093L ^ z * 19349663L ^ here);
+                    columns++;
+                    seam(level, x + 1, z, here, ((x + 1) & 15) == 0 ? border : inside);
+                    seam(level, x, z + 1, here, ((z + 1) & 15) == 0 ? border : inside);
+                }
+            }
+        }
+        if (inside[0] == 0 || border[0] == 0) {
+            source.sendFailure(Component.translatable("command.fts_geology.field.no_seams"));
+            return 0;
+        }
+        VolcanoField.Site s = found.site();
+        final String sum = Long.toHexString(digest);
+        final int measured = columns;
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.field.seams",
+                s.type().name().toLowerCase(Locale.ROOT), s.x(), s.z(),
+                inside[0], dec((double) inside[1] / inside[0], 2), dec(1000.0 * inside[2] / inside[0], 1),
+                border[0], dec((double) border[1] / border[0], 2), dec(1000.0 * border[2] / border[0], 1),
+                sum, measured), false);
+        return 1;
+    }
+
+    private static void seam(ServerLevel level, int x, int z, int here, long[] into) {
+        if (!level.hasChunk(x >> 4, z >> 4)) return;
+        int there = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, x, z);
+        if (there == Integer.MIN_VALUE) return;
+        int step = Math.abs(there - here);
+        into[0]++;
+        into[1] += step;
+        if (step >= 4) into[2]++;
+    }
+
     // === /geology suitability ===============================================
 
     /** Explains, for this exact column, why a geyser or volcano can or cannot form here. */
@@ -719,6 +854,11 @@ public final class TectonicCommands {
 
     /** Force-places a feature here, bypassing the suitability gate, to test the structure alone. */
     private static int place(CommandContext<CommandSourceStack> ctx, String what, int stage) {
+        return place(ctx, what, stage, VolcanoSize.SMALL);
+    }
+
+    private static int place(CommandContext<CommandSourceStack> ctx, String what, int stage,
+                             VolcanoSize size) {
         CommandSourceStack source = ctx.getSource();
         ServerLevel level = source.getLevel();
         BlockPos at = BlockPos.containing(source.getPosition());
@@ -742,7 +882,8 @@ public final class TectonicCommands {
                 int y = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, at.getX(), at.getZ());
                 if (y == Integer.MIN_VALUE) { ok = false; break; }
                 BlockPos base = new BlockPos(at.getX(), y, at.getZ());
-                int mag = 8 + level.random.nextInt(12);
+                int mag = size == VolcanoSize.SMALL
+                        ? 8 + level.random.nextInt(12) : size.magnitude(level.random.nextDouble());
                 // Naming a shape forces it, so all four can be compared side by side.
                 VolcanoType forced = switch (what) {
                     case "shield" -> VolcanoType.SHIELD;
@@ -752,8 +893,8 @@ public final class TectonicCommands {
                     default -> null;
                 };
                 ok = forced == null
-                        ? VolcanoBuilder.build(level, base, mag)
-                        : VolcanoBuilder.build(level, base, mag, forced);
+                        ? VolcanoBuilder.build(level, base, mag, size)
+                        : VolcanoBuilder.build(level, base, mag, forced, size);
             }
             case "geyser" -> {
                 int deepest = level.getMinBuildHeight() + 2;
@@ -767,6 +908,8 @@ public final class TectonicCommands {
             default -> ok = false;
         }
         final boolean done = ok;
+        final String named = size == VolcanoSize.SMALL
+                ? what : what + " (" + size.name().toLowerCase(Locale.ROOT) + ")";
         // Two keys, one placeholder each.
         //
         // There was one key, "%s%s here.", and the success branch handed the first placeholder a
@@ -775,7 +918,7 @@ public final class TectonicCommands {
         // here." The failure branch happened to read correctly, which is why it went unnoticed.
         source.sendSuccess(() -> Component.translatable(
                 done ? "command.fts_geology.placed_here" : "command.fts_geology.cannot_place_here",
-                what), false);
+                named), false);
         return done ? 1 : 0;
     }
 }

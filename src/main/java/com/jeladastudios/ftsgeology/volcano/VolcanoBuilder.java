@@ -19,9 +19,21 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import com.jeladastudios.ftsgeology.registry.ModBlockEntities;
+import net.minecraft.core.SectionPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Carves a whole volcano and its geothermal field.
@@ -50,11 +62,22 @@ public final class VolcanoBuilder {
     /** How far below the local ground a lava vein must stay so it can never break out of a slope. */
     private static final int LAVA_SURFACE_CLEARANCE = 6;
 
+    /** How far from its centre a large volcano's live finishing reaches: vents, chimneys and ponds. */
+    private static final int LARGE_LIVE_REACH = 64;
+
+    /** How far either side of its centre a big fissure keeps level ground for its ponds. */
+    private static final int POND_SEGMENT = 40;
+
     /** Builds the volcano with its base at the given position. Returns false if the site was refused. */
     public static boolean build(ServerLevel level, BlockPos summit, int magnitude) {
+        return build(level, summit, magnitude, VolcanoSize.SMALL);
+    }
+
+    /** Builds a volcano of the given size, its shape chosen by the setting. */
+    public static boolean build(ServerLevel level, BlockPos summit, int magnitude, VolcanoSize size) {
         VolcanoType type = VolcanoType.forLocation(level, summit.getX(), summit.getZ(),
                 magnitude, level.random);
-        return build(level, summit, magnitude, type);
+        return build(level, summit, magnitude, type, size);
     }
 
     /**
@@ -88,8 +111,9 @@ public final class VolcanoBuilder {
      * @return true if the rebuild was queued
      */
     public static boolean rebuildEdifice(ServerLevel level, BlockPos base, int magnitude,
-                                         VolcanoType type, int summitY) {
-        Ctx c = layout(level, base, magnitude, type);
+                                         VolcanoType type, int summitY, VolcanoSize size) {
+        if (size == VolcanoSize.LARGE) return false;
+        Ctx c = layout(level, base, magnitude, type, size);
         if (c == null) return false;
 
         // Pin the profile to the original mountain instead of the fresh roll layout just made.
@@ -97,20 +121,14 @@ public final class VolcanoBuilder {
             c.summitY = summitY;
             c.coneHeight = summitY - c.baseY;
             c.coneBaseR = c.coneHeight > 0
-                    ? (int) Math.round(c.craterR + c.coneHeight * type.coneSlope())
+                    ? (int) Math.round(c.craterR + c.coneHeight * c.coneSlope)
                     : c.craterR;
-            if (type == VolcanoType.FISSURE) c.coneBaseR = 6 + magnitude;
+            if (type == VolcanoType.FISSURE) c.coneBaseR = c.fissureHalf;
         }
 
         VolcanoJob job = new VolcanoJob(level, "rebuild " + type + " @ " + c.x + "," + c.z);
-        forEachRow(job, c.clearReach, dx -> lvl -> clearSiteRow(lvl, c, dx));
-        if (c.coneHeight > 0) {
-            forEachRow(job, c.coneBaseR + 2, dx -> lvl -> buildConeRow(lvl, c, dx));
-        }
-        if (c.type.excavates()) {
-            forEachRow(job, calderaRingReach(c), dx -> lvl -> carveCalderaRow(lvl, c, dx));
-        }
-        forEachRow(job, c.apronReach, dx -> lvl -> buildApronRow(lvl, c, dx));
+        // No ramparts: they are added on top of whatever stands, so a second pass would stack them.
+        queueEdifice(job, c, false);
         job.add(lvl -> buildSummit(lvl, c));
         job.add(lvl -> sealExposedLava(lvl, c));
         job.add(lvl -> verifyContainment(lvl, c));
@@ -118,26 +136,25 @@ public final class VolcanoBuilder {
     }
 
     public static boolean build(ServerLevel level, BlockPos base, int magnitude, VolcanoType type) {
-        Ctx c = layout(level, base, magnitude, type);
+        return build(level, base, magnitude, type, VolcanoSize.SMALL);
+    }
+
+    /**
+     * Plans a volcano of an explicit shape and size and queues it for construction.
+     *
+     * <p>Refuses {@link VolcanoSize#LARGE}. Those are raised only while new terrain generates; see
+     * {@link VolcanoField} and {@link #generateFieldChunk}.</p>
+     */
+    public static boolean build(ServerLevel level, BlockPos base, int magnitude, VolcanoType type,
+                                VolcanoSize size) {
+        if (size == VolcanoSize.LARGE) return false;
+        Ctx c = layout(level, base, magnitude, type, size);
         if (c == null) return false;
 
-        VolcanoJob job = new VolcanoJob(level, type + " @ " + c.x + "," + c.z);
+        VolcanoJob job = new VolcanoJob(level, size + " " + type + " @ " + c.x + "," + c.z);
 
-        // 1. Strip the canopy off the whole footprint before anything is raised.
-        forEachRow(job, c.clearReach, dx -> lvl -> clearSiteRow(lvl, c, dx));
-
-        // 2. The edifice itself, one row of columns at a time.
-        if (c.coneHeight > 0) {
-            forEachRow(job, c.coneBaseR + 2, dx -> lvl -> buildConeRow(lvl, c, dx));
-        }
-
-        // 3. A caldera does the opposite: it excavates its floor and throws up a ring scarp.
-        if (c.type.excavates()) {
-            forEachRow(job, calderaRingReach(c), dx -> lvl -> carveCalderaRow(lvl, c, dx));
-        }
-
-        // 4. The debris apron that blends whatever we built into the countryside.
-        forEachRow(job, c.apronReach, dx -> lvl -> buildApronRow(lvl, c, dx));
+        // 1-4. Canopy, edifice, caldera and apron.
+        queueEdifice(job, c, true);
 
         // 5. The summit: each type finishes differently.
         job.add(lvl -> buildSummit(lvl, c));
@@ -173,6 +190,22 @@ public final class VolcanoBuilder {
     /** Everything the steps need to know, computed once up front and then shared by all of them. */
     private static final class Ctx {
         VolcanoType type;
+        VolcanoSize size = VolcanoSize.SMALL;
+        double coneSlope;
+        /** Half the length of a fissure's line. */
+        int fissureHalf;
+        /** A caldera's ring scarp: how high it stands at its crest, and how far out it comes down. */
+        double rimLift;
+        int rimWidth = 6;
+        /** Outer edge of a caldera's lava lake crescent. */
+        double lakeOuter;
+        /** Length of one en-echelon segment of a fissure. */
+        int segLen = 8;
+        /**
+         * How far from the centre the live finishing of a large volcano may reach. Zero means no
+         * limit, which is right for anything built in one go into an area that is already loaded.
+         */
+        int liveReach;
         int magnitude;
         int x, z, baseY;
         int coneHeight, summitY, craterR, coneBaseR;
@@ -216,30 +249,60 @@ public final class VolcanoBuilder {
         final List<BlockPos> molten = new ArrayList<>();
     }
 
-    private static Ctx layout(ServerLevel level, BlockPos base, int magnitude, VolcanoType type) {
+    private static Ctx layout(ServerLevel level, BlockPos base, int magnitude, VolcanoType type,
+                              VolcanoSize size) {
+        Ctx c = plan(level, base.getX(), base.getY(), base.getZ(), magnitude, type, size,
+                level.random, TectonicMap.sample(level, base.getX(), base.getZ()));
+        // The site check scales with what we are actually about to occupy.
+        return c != null && siteIsSuitable(level, c) ? c : null;
+    }
+
+    /**
+     * Works out every dimension of a volcano from a random source.
+     *
+     * <p>Kept apart from the site check so a large volcano can be planned from its own seed. World
+     * generation raises one a chunk at a time, on several threads, and every one of those chunks has
+     * to arrive at the same mountain; given the same seed this returns the same numbers, so they do.
+     * </p>
+     *
+     * @return null when the volcano cannot stand here at all
+     */
+    private static Ctx plan(LevelHeightAccessor level, int x, int baseY, int z, int magnitude,
+                            VolcanoType type, VolcanoSize size, RandomSource rng, PlateSample plate) {
         Ctx c = new Ctx();
         c.type = type;
+        c.size = size;
         c.magnitude = magnitude;
-        c.x = base.getX();
-        c.z = base.getZ();
-        c.baseY = base.getY();
+        c.x = x;
+        c.z = z;
+        c.baseY = baseY;
 
-        c.craterR = Math.max(2, (int) Math.round(
-                (GeyserConfig.VOLCANO_CRATER_RADIUS.get() + magnitude / 3.0 + 1)
-                        * type.craterScale() * (0.85 + level.random.nextDouble() * 0.3)));
-        c.coneHeight = type.coneHeight(magnitude, level.random);
+        c.craterR = size.craterRadius(type, magnitude, rng);
+        c.coneHeight = size.coneHeight(type, magnitude, rng);
+        c.coneSlope = size.coneSlope(type);
+        int ceiling = level.getMaxBuildHeight() - 12;
+        if (c.baseY + c.coneHeight >= ceiling) {
+            // A giant on high ground is cut down to fit rather than lost, as long as most of it still
+            // stands. Anything else is refused, as it always was.
+            int fit = ceiling - 1 - c.baseY;
+            if (size != VolcanoSize.LARGE || c.coneHeight == 0 || fit < c.coneHeight * 0.6) return null;
+            c.coneHeight = fit;
+        }
         c.summitY = c.baseY + c.coneHeight;
-        if (c.summitY >= level.getMaxBuildHeight() - 12) return null;
 
         c.coneBaseR = c.coneHeight > 0
-                ? (int) Math.round(c.craterR + c.coneHeight * type.coneSlope())
+                ? (int) Math.round(c.craterR + c.coneHeight * c.coneSlope)
                 : c.craterR;
+        c.fissureHalf = size.fissureHalfLength(magnitude, rng);
         if (type == VolcanoType.FISSURE) {
             // A fissure has no cone, but it is not a point either: the swarm runs for tens of blocks
             // along the strike and floods the ground around it, so the footprint is the LINE.
-            c.coneBaseR = 6 + magnitude;
+            c.coneBaseR = c.fissureHalf;
         }
-        c.apronReach = c.coneBaseR + (int) Math.round(c.coneBaseR * type.apronReach()) + 6;
+        c.rimLift = size.rimLift(magnitude);
+        c.rimWidth = size.rimWidth();
+        c.liveReach = size == VolcanoSize.LARGE ? LARGE_LIVE_REACH : 0;
+        c.apronReach = c.coneBaseR + (int) Math.round(c.coneBaseR * size.apronReach(type)) + 6;
         // Everything the volcano will lay rock on, not just the edifice. The clearing used to stop
         // at the cone while the apron ran a third further out, so the outer band of debris was
         // spread UNDER a standing forest - buildApronRow only calls clearVegetation, which by
@@ -248,33 +311,28 @@ public final class VolcanoBuilder {
         // frays the edge further rather than mowing a bigger circle.
         c.clearReach = Math.max(Math.max(c.coneBaseR, c.craterR), c.apronReach) + 6;
 
-        // The site check scales with what we are actually about to occupy.
-        if (!siteIsSuitable(level, c)) return null;
-
-        c.reservoirR = GeyserConfig.VOLCANO_RESERVOIR_RADIUS.get()
-                + level.random.nextInt(1 + magnitude / 3);
-        c.reservoirY = Math.max(level.getMinBuildHeight() + 5,
-                c.baseY - 45 - level.random.nextInt(25));
+        c.reservoirR = GeyserConfig.VOLCANO_RESERVOIR_RADIUS.get() + rng.nextInt(1 + magnitude / 3);
+        c.reservoirY = Math.max(level.getMinBuildHeight() + 5, c.baseY - 45 - rng.nextInt(25));
         if (c.baseY - c.reservoirY < 12) return null;
 
-        c.phaseA = level.random.nextDouble() * Math.PI * 2;
-        c.phaseB = level.random.nextDouble() * Math.PI * 2;
-        c.phaseC = level.random.nextDouble() * Math.PI * 2;
-        c.bandSeed = level.random.nextInt(64);
+        c.phaseA = rng.nextDouble() * Math.PI * 2;
+        c.phaseB = rng.nextDouble() * Math.PI * 2;
+        c.phaseC = rng.nextDouble() * Math.PI * 2;
+        c.bandSeed = rng.nextInt(64);
 
         // Where this mountain's flows went. Two to four of them, spread around the circle with
         // enough jitter that they are not symmetrical, each running a little past the foot of the
         // cone so the tongue carries on over the apron instead of stopping at a contour.
-        c.flows = 2 + level.random.nextInt(3) + c.coneBaseR / 30;
+        c.flows = 2 + rng.nextInt(3) + c.coneBaseR / 30;
         c.flowAim = new double[c.flows];
         c.flowPhase = new double[c.flows];
-        double spin = level.random.nextDouble() * Math.PI * 2;
+        double spin = rng.nextDouble() * Math.PI * 2;
         for (int i = 0; i < c.flows; i++) {
             c.flowAim[i] = spin + i * (Math.PI * 2 / c.flows)
-                    + (level.random.nextDouble() - 0.5) * 0.9;
-            c.flowPhase[i] = level.random.nextDouble() * Math.PI * 2;
+                    + (rng.nextDouble() - 0.5) * 0.9;
+            c.flowPhase[i] = rng.nextDouble() * Math.PI * 2;
         }
-        c.flowReach = Math.max(10, c.coneBaseR) * (1.05 + level.random.nextDouble() * 0.45);
+        c.flowReach = Math.max(10, c.coneBaseR) * (1.05 + rng.nextDouble() * 0.45);
         // A tongue measured in absolute blocks covers a share of the flank that falls off as 1/r:
         // measured, a 20-block cone came out 21% flow and a 69-block shield only 6%, so the biggest
         // mountains - the ones worth looking at - were the ones wearing threads. Scaling the width
@@ -288,24 +346,57 @@ public final class VolcanoBuilder {
         // perforate it: still no break in any of 492 centrelines.
         c.flowWidth = Math.max(1.0, c.coneBaseR / 34.0);
 
-        c.calderaFloorY = c.baseY - (3 + level.random.nextInt(5));
+        c.calderaFloorY = c.baseY - size.calderaDepth(rng);
         c.domeR = Math.max(3, c.craterR / 3);
-        c.domeH = 3 + level.random.nextInt(4);
-        c.lakeAngle = level.random.nextDouble() * Math.PI * 2;
-        c.lakeWidth = Math.PI * (0.45 + level.random.nextDouble() * 0.35);
+        c.domeH = size.domeHeight(rng);
+        c.lakeAngle = rng.nextDouble() * Math.PI * 2;
+        c.lakeWidth = Math.PI * (0.45 + rng.nextDouble() * 0.35);
+        // A small caldera's lake runs most of the way to the ring. A big one's would then be thousands
+        // of lava cells, every one of them for the core to keep molten, so it stays a band by the dome.
+        c.lakeOuter = size == VolcanoSize.SMALL
+                ? c.craterR * 0.85 : Math.min(c.craterR * 0.85, c.domeR + 11.0);
+        c.segLen = 6 + rng.nextInt(5);
 
-        PlateSample s = TectonicMap.sample(level, c.x, c.z);
-        if (s.onFault()) {
-            double len = Math.hypot(s.faultStrikeX(), s.faultStrikeZ());
+        if (plate.onFault()) {
+            double len = Math.hypot(plate.faultStrikeX(), plate.faultStrikeZ());
             if (len > 1.0e-6) {
-                c.strikeX = s.faultStrikeX() / len;
-                c.strikeZ = s.faultStrikeZ() / len;
+                c.strikeX = plate.faultStrikeX() / len;
+                c.strikeZ = plate.faultStrikeZ() / len;
             }
         }
 
         c.ventCount = Math.max(3, (int) Math.round(
                 Mth.clamp(magnitude, 8, 22) * type.ventScale()));
         return c;
+    }
+
+    /**
+     * The shaping passes, a row of columns per step: canopy, cone, a caldera's excavation, the apron,
+     * and a big fissure's ramparts. Shared by a build and a rebuild.
+     */
+    private static void queueEdifice(VolcanoJob job, Ctx c, boolean ramparts) {
+        // Strip the canopy off the whole footprint before anything is raised.
+        forEachRow(job, c.clearReach, dx -> lvl -> clearSiteRow(lvl, c, dx));
+        // The edifice. Rows run as far out as the lobed foot can reach, not to the nominal radius:
+        // the columns within a row already did, and the rows themselves stopping short cut the lobes
+        // that swing out along the x axis off flat.
+        if (c.coneHeight > 0) {
+            forEachRow(job, coneReach(c), dx -> lvl -> buildConeRow(lvl, c, dx));
+        }
+        // A caldera does the opposite: it excavates its floor and throws up a ring scarp.
+        if (c.type.excavates()) {
+            forEachRow(job, calderaRingReach(c), dx -> lvl -> carveCalderaRow(lvl, c, dx));
+        }
+        // The debris apron that blends whatever we built into the countryside.
+        forEachRow(job, c.apronReach, dx -> lvl -> buildApronRow(lvl, c, dx));
+        if (ramparts && hasRamparts(c)) {
+            int reach = c.fissureHalf + 4;
+            forEachRow(job, reach, dx -> lvl -> {
+                for (int dz = -reach; dz <= reach; dz++) {
+                    fissureRampartColumn(lvl, c, c.x + dx, c.z + dz, false);
+                }
+            });
+        }
     }
 
     /** Queues one step per row of a square footprint, so no single step is a stall. */
@@ -467,31 +558,70 @@ public final class VolcanoBuilder {
         // it off flat wherever it did.
         int reach = coneReach(c);
         for (int dz = -reach; dz <= reach; dz++) {
-            double dist = Math.sqrt(dx * dx + dz * dz);
-            double ang = Math.atan2(dz, dx);
-            int gx = c.x + dx, gz = c.z + dz;
+            coneColumn(level, c, c.x + dx, c.z + dz, level.random, false);
+        }
+    }
 
-            int ground = TerrainProbe.groundY(level, gx, gz);
-            if (ground == Integer.MIN_VALUE) continue;
-            // Stop at the water's edge instead of walling a lake in. A cone that marches into open
-            // water leaves a sheer black rampart around the shoreline, which is what the shield
-            // built beside a lake looked like.
-            if (!level.getBlockState(new BlockPos(gx, ground + 1, gz)).getFluidState().isEmpty()) continue;
+    /**
+     * One column of the cone.
+     *
+     * <h2>Why every shaping step is a column</h2>
+     * A column reads its own ground and writes its own blocks and nothing else, so what happens to it
+     * cannot depend on what has happened to any other. That is what lets world generation raise a
+     * large volcano a chunk at a time, in whatever order the chunks come, and still end with one
+     * mountain rather than a patchwork with a step at every chunk border.
+     *
+     * @param worldgen true while the chunk is still being generated. Standing water under the cone
+     *                 is then filled over rather than walled around - a river through a mountain 150
+     *                 blocks tall would otherwise leave a slot canyon - and anything that grew on the
+     *                 old ground is cleared off the new top of the column.
+     */
+    private static void coneColumn(LevelAccessor level, Ctx c, int gx, int gz, RandomSource rng,
+                                   boolean worldgen) {
+        int dx = gx - c.x, dz = gz - c.z;
+        double dist = Math.sqrt((double) dx * dx + (double) dz * dz);
+        double ang = Math.atan2(dz, dx);
 
-            int target = coneTargetY(c, gx, gz, ground, dist, ang);
-            if (target == Integer.MIN_VALUE) continue;
-            // The land here is already higher than the mountain would be: leave it alone. That is
-            // both cheaper and what makes a volcano growing out of an existing range look right.
-            if (ground >= target) continue;
+        int ground = TerrainProbe.groundY(level, gx, gz);
+        if (ground == Integer.MIN_VALUE) return;
+        // Stop at the water's edge instead of walling a lake in. A cone that marches into open
+        // water leaves a sheer black rampart around the shoreline, which is what the shield
+        // built beside a lake looked like.
+        if (!worldgen && !level.getBlockState(new BlockPos(gx, ground + 1, gz)).getFluidState().isEmpty()) {
+            return;
+        }
 
-            TerrainProbe.clearVegetation(level, gx, ground, gz, 3);
-            // A flow is a skin over the flank, not a seam through it: only the surface course is
-            // crust, and the rock underneath is the ordinary interbedded pile.
-            boolean flow = flowAt(c, ang, dist);
-            for (int y = ground + 1; y <= target; y++) {
-                setRock(level, new BlockPos(gx, y, gz),
-                        flow && y == target ? flowRock() : coneRock(level, c, y));
-            }
+        int target = coneTargetY(c, gx, gz, ground, dist, ang);
+        if (target == Integer.MIN_VALUE) return;
+        // The land here is already higher than the mountain would be: leave it alone. That is
+        // both cheaper and what makes a volcano growing out of an existing range look right.
+        if (ground >= target) return;
+
+        if (!worldgen) TerrainProbe.clearVegetation(level, gx, ground, gz, 3);
+        // A flow is a skin over the flank, not a seam through it: only the surface course is
+        // crust, and the rock underneath is the ordinary interbedded pile.
+        boolean flow = flowAt(c, ang, dist);
+        for (int y = ground + 1; y <= target; y++) {
+            setRock(level, new BlockPos(gx, y, gz),
+                    flow && y == target ? flowRock() : coneRock(rng, c, y));
+        }
+        if (worldgen) clearCover(level, gx, target, gz);
+    }
+
+    /**
+     * Clears plants and tree parts left standing above a column's new top during generation.
+     *
+     * <p>This chunk's own trees are not in yet when the mountain goes up, but a neighbour's can
+     * already hang over it, and without this their crowns would float over the flank.</p>
+     */
+    private static void clearCover(LevelAccessor level, int x, int fromY, int z) {
+        int top = Math.min(fromY + 40, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z));
+        for (int y = fromY + 1; y <= top; y++) {
+            BlockPos p = new BlockPos(x, y, z);
+            BlockState s = level.getBlockState(p);
+            if (s.isAir()) continue;
+            if (!(s.is(BlockTags.LOGS) || s.is(BlockTags.LEAVES) || TerrainProbe.isVegetation(s))) return;
+            level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
         }
     }
 
@@ -552,19 +682,19 @@ public final class VolcanoBuilder {
                 .defaultBlockState();
     }
 
-    private static BlockState coneRock(ServerLevel level, Ctx c, int y) {
+    private static BlockState coneRock(RandomSource rng, Ctx c, int y) {
         return switch (c.type) {
             case STRATOVOLCANO -> switch (Math.floorMod((y + c.bandSeed) / 3, 4)) {
                 case 0 -> Blocks.TUFF.defaultBlockState();
                 case 2 -> Blocks.BLACKSTONE.defaultBlockState();
-                default -> (level.random.nextInt(5) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT)
+                default -> (rng.nextInt(5) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT)
                         .defaultBlockState();
             };
-            case SHIELD -> (level.random.nextInt(3) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT)
+            case SHIELD -> (rng.nextInt(3) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT)
                     .defaultBlockState();
-            case CALDERA -> (level.random.nextInt(3) == 0 ? Blocks.BLACKSTONE : Blocks.TUFF)
+            case CALDERA -> (rng.nextInt(3) == 0 ? Blocks.BLACKSTONE : Blocks.TUFF)
                     .defaultBlockState();
-            case FISSURE -> (level.random.nextInt(4) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT)
+            case FISSURE -> (rng.nextInt(4) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT)
                     .defaultBlockState();
         };
     }
@@ -592,78 +722,99 @@ public final class VolcanoBuilder {
 
     /** How far out the ring fault can possibly reach, scarp included. */
     private static int calderaRingReach(Ctx c) {
-        return (int) Math.ceil(c.craterR * 1.34) + 7;
+        return (int) Math.ceil(c.craterR * 1.34) + c.rimWidth + 1;
     }
 
     private static void carveCalderaRow(ServerLevel level, Ctx c, int dx) {
         int reach = calderaRingReach(c);
         for (int dz = -reach; dz <= reach; dz++) {
-            double dist = Math.sqrt(dx * dx + dz * dz);
-            double ang = Math.atan2(dz, dx);
-            double rr = ringRadius(c, ang);
-            int gx = c.x + dx, gz = c.z + dz;
-            int ground = TerrainProbe.groundY(level, gx, gz);
-            if (ground == Integer.MIN_VALUE) continue;
-            // Never cut below open water: the caldera floor would simply drain the lake into itself
-            // and leave a black bowl where the shoreline used to be.
-            if (!level.getBlockState(new BlockPos(gx, ground + 1, gz)).getFluidState().isEmpty()) continue;
-            // Roughness, so the floor does not read as a perfect contour. Clamped to never go BELOW
-            // the base floor level, because the lava lake sits one block under it and a floor cell
-            // lower than the lake would give it somewhere to run.
-            int rough = Math.max(0, (int) Math.round(surfaceNoise(c, gx, gz) * 1.2));
-
-            if (dist <= rr) {
-                boolean lake = inLakeSector(c, dist, ang);
-                // The lake sits at exactly the base level, no roughness and no dome, so every cell
-                // of it is at the same height.
-                int target = lake ? c.calderaFloorY : c.calderaFloorY + rough;
-                if (!lake && dist < c.domeR) {
-                    target += (int) Math.round(c.domeH * (1.0 - dist / Math.max(1.0, c.domeR)));
-                }
-                TerrainProbe.clearVegetation(level, gx, ground, gz, 3);
-                for (int y = target + 1; y <= ground + 2; y++) {
-                    clearNatural(level, new BlockPos(gx, y, gz));
-                }
-                for (int y = Math.min(ground, target); y <= target; y++) {
-                    setRock(level, new BlockPos(gx, y, gz), coneRock(level, c, y));
-                }
-                if (lake) {
-                    // Recessed by one block, exactly like the flank vents: the lake is the lowest
-                    // point of its own basin and so has nowhere to flow.
-                    BlockPos molten = new BlockPos(gx, target - 1, gz);
-                    setRock(level, molten, Blocks.LAVA.defaultBlockState());
-                    clearNatural(level, new BlockPos(gx, target, gz));
-                    c.molten.add(molten);   // this cell is MEANT to stay lava; see Ctx.molten
-                } else if (level.random.nextInt(6) == 0) {
-                    setRock(level, new BlockPos(gx, target, gz), Blocks.TUFF.defaultBlockState());
-                }
-            } else if (dist <= rr + 6) {
-                // The ring fault scarp.
-                //
-                // A perfect circle of equal height reads as a palisade, which is not what a ring
-                // fault looks like: a real caldera rim varies along its length and is cut through by
-                // low saddles - Crater Lake's rim has several. So the height is modulated round the
-                // circle and simply stops where the modulation bottoms out, leaving breaches.
-                double gate = 0.5 + 0.5 * Math.sin(3 * ang + c.phaseC)
-                        + 0.25 * Math.sin(5 * ang + c.phaseA);
-                if (gate < 0.22) continue;                     // a breach in the ring
-                double t = 1.0 - (dist - rr) / 6.0;
-                int lift = (int) Math.round((3 + c.magnitude / 5.0) * t
-                        * (0.3 + 0.7 * Mth.clamp(gate, 0.0, 1.0))) + rough;
-                if (lift < 1) continue;
-                TerrainProbe.clearVegetation(level, gx, ground, gz, 3);
-                for (int h = 1; h <= lift; h++) {
-                    setRock(level, new BlockPos(gx, ground + h, gz), coneRock(level, c, ground + h));
-                }
-            }
+            calderaColumn(level, c, c.x + dx, c.z + dz, level.random, false);
         }
+    }
+
+    /** One column of a caldera: its floor inside the ring fault, its scarp outside. See {@link #coneColumn}. */
+    private static void calderaColumn(LevelAccessor level, Ctx c, int gx, int gz, RandomSource rng,
+                                      boolean worldgen) {
+        int dx = gx - c.x, dz = gz - c.z;
+        double dist = Math.sqrt((double) dx * dx + (double) dz * dz);
+        double ang = Math.atan2(dz, dx);
+        double rr = ringRadius(c, ang);
+        if (dist > rr + c.rimWidth) return;
+        int ground = TerrainProbe.groundY(level, gx, gz);
+        if (ground == Integer.MIN_VALUE) return;
+        // Never cut below open water: the caldera floor would simply drain the lake into itself
+        // and leave a black bowl where the shoreline used to be. A large caldera being generated is
+        // floored over whatever water is in the way instead - four hundred blocks across there nearly
+        // always is some - but it still raises no scarp through a lake.
+        boolean wet = !level.getBlockState(new BlockPos(gx, ground + 1, gz)).getFluidState().isEmpty();
+        if (wet && !(worldgen && dist <= rr)) return;
+        // Roughness, so the floor does not read as a perfect contour. Clamped to never go BELOW
+        // the base floor level, because the lava lake sits one block under it and a floor cell
+        // lower than the lake would give it somewhere to run.
+        int rough = Math.max(0, (int) Math.round(surfaceNoise(c, gx, gz) * 1.2));
+
+        if (dist <= rr) {
+            boolean lake = inLakeSector(c, dist, ang);
+            // The lake sits at exactly the base level, no roughness and no dome, so every cell
+            // of it is at the same height.
+            int target = lake ? c.calderaFloorY : c.calderaFloorY + rough;
+            if (!lake && dist < c.domeR) {
+                target += (int) Math.round(c.domeH * (1.0 - dist / Math.max(1.0, c.domeR)));
+            }
+            int clearTop = ground + 2;
+            if (worldgen) {
+                // Up through any water and whatever grows here, not only the two cells above ground.
+                clearTop = Math.max(clearTop, Math.min(ground + 40,
+                        level.getHeight(Heightmap.Types.WORLD_SURFACE, gx, gz)));
+            } else {
+                TerrainProbe.clearVegetation(level, gx, ground, gz, 3);
+            }
+            for (int y = target + 1; y <= clearTop; y++) {
+                clearNatural(level, new BlockPos(gx, y, gz));
+            }
+            for (int y = Math.min(ground, target); y <= target; y++) {
+                setRock(level, new BlockPos(gx, y, gz), coneRock(rng, c, y));
+            }
+            if (lake) {
+                // Recessed by one block, exactly like the flank vents: the lake is the lowest
+                // point of its own basin and so has nowhere to flow.
+                BlockPos molten = new BlockPos(gx, target - 1, gz);
+                setRock(level, molten, Blocks.LAVA.defaultBlockState());
+                clearNatural(level, new BlockPos(gx, target, gz));
+                // This cell is MEANT to stay lava; see Ctx.molten. A generated lake is listed when its
+                // summit is finished instead, see collectCalderaLake.
+                if (!worldgen) c.molten.add(molten);
+            } else if (rng.nextInt(6) == 0) {
+                setRock(level, new BlockPos(gx, target, gz), Blocks.TUFF.defaultBlockState());
+            }
+            return;
+        }
+
+        // The ring fault scarp.
+        //
+        // A perfect circle of equal height reads as a palisade, which is not what a ring
+        // fault looks like: a real caldera rim varies along its length and is cut through by
+        // low saddles - Crater Lake's rim has several. So the height is modulated round the
+        // circle and simply stops where the modulation bottoms out, leaving breaches.
+        double gate = 0.5 + 0.5 * Math.sin(3 * ang + c.phaseC)
+                + 0.25 * Math.sin(5 * ang + c.phaseA);
+        if (gate < 0.22) return;                     // a breach in the ring
+        double t = 1.0 - (dist - rr) / c.rimWidth;
+        int lift = (int) Math.round(c.rimLift * t
+                * (0.3 + 0.7 * Mth.clamp(gate, 0.0, 1.0))) + rough;
+        if (lift < 1) return;
+        if (!worldgen) TerrainProbe.clearVegetation(level, gx, ground, gz, 3);
+        for (int h = 1; h <= lift; h++) {
+            setRock(level, new BlockPos(gx, ground + h, gz), coneRock(rng, c, ground + h));
+        }
+        if (worldgen) clearCover(level, gx, ground + lift, gz);
     }
 
     /** True inside the crescent of the caldera floor that holds the lava lake. */
     private static boolean inLakeSector(Ctx c, double dist, double ang) {
         double rel = Math.toRadians(Mth.wrapDegrees(Math.toDegrees(ang - c.lakeAngle)));
         return Math.abs(rel) <= c.lakeWidth * 0.5
-                && dist > c.domeR + 1 && dist < c.craterR * 0.85;
+                && dist > c.domeR + 1 && dist < c.lakeOuter;
     }
 
     /**
@@ -677,55 +828,54 @@ public final class VolcanoBuilder {
      */
     private static void buildApronRow(ServerLevel level, Ctx c, int dx) {
         int reach = c.apronReach;
+        for (int dz = -reach; dz <= reach; dz++) {
+            apronColumn(level, c, c.x + dx, c.z + dz, level.random, false);
+        }
+    }
+
+    /** One column of the apron. See {@link #coneColumn}. */
+    private static void apronColumn(LevelAccessor level, Ctx c, int gx, int gz, RandomSource rng,
+                                    boolean worldgen) {
+        int dx = gx - c.x, dz = gz - c.z;
+        int reach = c.apronReach;
+        double dist = apronDistance(c, dx, dz);
+        if (dist > reach) return;
+        double ang = Math.atan2(dz, dx);
         // Where the apron starts depends on what it is skirting. A caldera's begins outside its ring
         // scarp, or it would bury the very rim you stand on to look in. A fissure's begins at the
         // crack itself: what a rift erupts is a flood-basalt FIELD spreading out from the line, so an
         // annulus with bare ground in the middle would have been exactly backwards. The ponds are cut
         // into this field afterwards.
-        // The smallest the inner edge can be, used only to bail out early; a caldera recomputes it
-        // per column below, because its ring fault is not a circle.
-        // The smallest the inner edge can be for THIS type, used only to bail out early; both a
-        // caldera and a cone recompute it per column below, because neither outline is a circle.
-        int inner = switch (c.type) {
-            case CALDERA -> (int) Math.round(c.craterR * 0.66) + 6;
+        //
+        // And it starts where the edifice actually ENDS at this bearing, not at a fixed radius. A
+        // fixed one left a band of untouched grass wherever the outline came in narrow, which read as
+        // a moat between the volcano and its own skirt - and with the apron at its thickest right at
+        // its inner edge, as a wall standing on that grass.
+        double localInner = switch (c.type) {
+            case CALDERA -> ringRadius(c, ang) + c.rimWidth;
             case FISSURE -> 0;
-            default -> (int) Math.floor(c.coneBaseR * 0.79);
+            default -> coneRadius(c, ang);
         };
-        if (inner >= reach) return;
-        for (int dz = -reach; dz <= reach; dz++) {
-            double dist = Math.sqrt(dx * dx + dz * dz);
-            if (dist > reach) continue;
-            double ang = Math.atan2(dz, dx);
-            // The apron starts where the edifice actually ENDS at this bearing, not at a fixed
-            // radius. A fixed one left a band of untouched grass wherever the outline came in
-            // narrow, which read as a moat between the volcano and its own skirt - and with the
-            // apron at its thickest right at its inner edge, as a wall standing on that grass.
-            double localInner = switch (c.type) {
-                case CALDERA -> ringRadius(c, ang) + 6;
-                case FISSURE -> inner;
-                default -> coneRadius(c, ang);
-            };
-            if (dist <= localInner) continue;
-            double edge = reach * (0.84 + 0.16 * Math.sin(3 * ang + c.phaseC));
-            if (dist > edge || localInner >= edge) continue;
+        if (dist <= localInner) return;
+        double edge = reach * (0.84 + 0.16 * Math.sin(3 * ang + c.phaseC));
+        if (dist > edge || localInner >= edge) return;
 
-            double t = 1.0 - (dist - localInner) / Math.max(1.0, edge - localInner);
-            // A flow tongue runs past the foot of the cone, so it has to carry on across the apron
-            // or it stops dead on a contour line - which is the same "wall at a fixed radius" fault
-            // this row already had to be taught not to make.
-            boolean flow = flowAt(c, ang, dist);
-            // Speckling: certain near the cone, sparse at the rim. This is what dissolves the hard
-            // boundary the player was seeing between basalt and native terrain. The flow is exempt:
-            // it is a continuous sheet of rock, and speckling it would perforate the tongue.
-            if (!flow && level.random.nextDouble() > Mth.clamp(t * 1.7, 0.0, 1.0)) continue;
+        double t = 1.0 - (dist - localInner) / Math.max(1.0, edge - localInner);
+        // A flow tongue runs past the foot of the cone, so it has to carry on across the apron
+        // or it stops dead on a contour line - which is the same "wall at a fixed radius" fault
+        // this row already had to be taught not to make.
+        boolean flow = flowAt(c, ang, Math.sqrt((double) dx * dx + (double) dz * dz));
+        // Speckling: certain near the cone, sparse at the rim. This is what dissolves the hard
+        // boundary the player was seeing between basalt and native terrain. The flow is exempt:
+        // it is a continuous sheet of rock, and speckling it would perforate the tongue.
+        if (!flow && rng.nextDouble() > Mth.clamp(t * 1.7, 0.0, 1.0)) return;
 
-            int gx = c.x + dx, gz = c.z + dz;
-            int ground = TerrainProbe.groundY(level, gx, gz);
-            if (ground == Integer.MIN_VALUE) continue;
-            // Checked directly rather than through hasFluidAbove, which would walk the column down
-            // from the heightmap a second time. Over twenty thousand apron columns that doubling is
-            // most of the build cost.
-            if (!level.getBlockState(new BlockPos(gx, ground + 1, gz)).getFluidState().isEmpty()) continue;
+        int ground = TerrainProbe.groundY(level, gx, gz);
+        if (ground == Integer.MIN_VALUE) return;
+        // Checked directly rather than through hasFluidAbove, which would walk the column down
+        // from the heightmap a second time. Over twenty thousand apron columns that doubling is
+        // most of the build cost.
+        if (!level.getBlockState(new BlockPos(gx, ground + 1, gz)).getFluidState().isEmpty()) return;
 
             // Picks up at exactly the height the flank came down to, and fades from there.
             //
@@ -736,20 +886,83 @@ public final class VolcanoBuilder {
             // meet at the same height and the swell dies away over the apron's own length. The 1.5
             // power keeps it close to the mountain rather than laying an even shelf, which is also
             // how a real debris apron thins.
-            double u = 1.0 - t;                       // 0 at the seam, 1 at the outer edge
-            int thickness = (int) Math.round(seamHeight(c) * Math.pow(1.0 - u, 1.5));
-            TerrainProbe.clearVegetation(level, gx, ground, gz, 2);
-            BlockState native0 = level.getBlockState(new BlockPos(gx, ground, gz));
-            for (int h = 0; h <= Math.max(0, thickness); h++) {
-                // The blend-into-the-ground pass-through only makes sense for the surface cell.
-                // Handing it back at h > 0 would stack a copy of the local ground in the air - a
-                // grass block floating over the apron.
-                setRock(level, new BlockPos(gx, ground + h, gz),
-                        flow && h == Math.max(0, thickness)
-                                ? flowRock()
-                                : apronRock(level, t, h == 0 ? native0 : null));
-            }
+        double u = 1.0 - t;                       // 0 at the seam, 1 at the outer edge
+        int thickness = Math.max(0, (int) Math.round(seamHeight(c) * Math.pow(1.0 - u, 1.5)));
+        if (!worldgen) TerrainProbe.clearVegetation(level, gx, ground, gz, 2);
+        BlockState native0 = level.getBlockState(new BlockPos(gx, ground, gz));
+        for (int h = 0; h <= thickness; h++) {
+            // The blend-into-the-ground pass-through only makes sense for the surface cell.
+            // Handing it back at h > 0 would stack a copy of the local ground in the air - a
+            // grass block floating over the apron.
+            setRock(level, new BlockPos(gx, ground + h, gz),
+                    flow && h == thickness
+                            ? flowRock()
+                            : apronRock(rng, t, h == 0 ? native0 : null));
         }
+        // Only plants: the apron is a few blocks thick, and a tree beside it is still standing on
+        // real ground, so clearing its crown here would only leave half a tree.
+        if (worldgen) TerrainProbe.clearVegetation(level, gx, ground + thickness, gz, 2);
+    }
+
+    /**
+     * Distance the apron is laid out by. A fissure above the small size floods its basalt out along
+     * the crack rather than round a point, so its field is an ellipse three times longer than it is
+     * wide: a line four hundred blocks long in the middle of a round sheet would read as a volcano that
+     * had lost its cone.
+     */
+    private static double apronDistance(Ctx c, int dx, int dz) {
+        if (!hasRamparts(c)) return Math.sqrt((double) dx * dx + (double) dz * dz);
+        double along = dx * c.strikeX + dz * c.strikeZ;
+        double across = -dx * c.strikeZ + dz * c.strikeX;
+        return Math.hypot(along, across * 3.0);
+    }
+
+    private static boolean hasRamparts(Ctx c) {
+        return c.type == VolcanoType.FISSURE && c.size != VolcanoSize.SMALL;
+    }
+
+    /**
+     * The spatter ramparts along a big fissure's line, and the open crack between them.
+     *
+     * <p>A small fissure is short enough for its whole line to be ponds, cut once it is loaded. Four
+     * hundred blocks of ponds would be thousands of lava cells and need a live world the length of
+     * it, so a big one keeps its ponds to the middle and shows the rest of the line the way an older
+     * stretch of a real rift looks: a crack with a low wall of spatter either side, stepping sideways
+     * in segments. Worked out per column, like the rest of the edifice.</p>
+     */
+    private static void fissureRampartColumn(LevelAccessor level, Ctx c, int gx, int gz, boolean worldgen) {
+        int dx = gx - c.x, dz = gz - c.z;
+        double along = dx * c.strikeX + dz * c.strikeZ;
+        double out = Math.abs(along);
+        if (out > c.fissureHalf || out < POND_SEGMENT) return;
+        double across = -dx * c.strikeZ + dz * c.strikeX;
+        // The same en-echelon offsets carveFissureLine steps its ponds through.
+        int seg = Math.floorDiv((int) Math.round(along) + c.fissureHalf, c.segLen);
+        double lateral = ((seg % 2 == 0) ? 1 : -1) * (1 + seg % 3);
+        double off = Math.abs(across - lateral);
+        if (off > 3.5) return;
+        // Dies away over the last quarter towards each tip.
+        double tip = Mth.clamp((1.0 - out / c.fissureHalf) * 4.0, 0.0, 1.0);
+        if (tip <= 0.0) return;
+
+        int ground = TerrainProbe.groundY(level, gx, gz);
+        if (ground == Integer.MIN_VALUE) return;
+        if (!level.getBlockState(new BlockPos(gx, ground + 1, gz)).getFluidState().isEmpty()) return;
+        if (off < 0.75) {
+            // The crack: open two blocks down and no more, so there is nowhere far to fall.
+            TerrainProbe.clearVegetation(level, gx, ground, gz, 2);
+            for (int y = ground; y > ground - 2; y--) clearNatural(level, new BlockPos(gx, y, gz));
+            return;
+        }
+        int lift = (int) Math.round((off < 2.25 ? 3.0 : 1.5) * tip);
+        if (lift < 1) return;
+        if (!worldgen) TerrainProbe.clearVegetation(level, gx, ground, gz, 3);
+        for (int h = 1; h <= lift; h++) {
+            boolean dark = h == lift && Math.floorMod(gx * 31 + gz, 5) == 0;
+            setRock(level, new BlockPos(gx, ground + h, gz),
+                    (dark ? Blocks.BLACKSTONE : Blocks.BASALT).defaultBlockState());
+        }
+        if (worldgen) TerrainProbe.clearVegetation(level, gx, ground + lift, gz, 2);
     }
 
     /**
@@ -771,8 +984,8 @@ public final class VolcanoBuilder {
      *                null when the caller is filling a cell above the surface and must not be
      *                handed a copy of the ground
      */
-    private static BlockState apronRock(ServerLevel level, double t, BlockState native0) {
-        double r = level.random.nextDouble();
+    private static BlockState apronRock(RandomSource rng, double t, BlockState native0) {
+        double r = rng.nextDouble();
 
         // Outermost cells sometimes stay as they are. Ramps in below t = 0.3 and reaches roughly a
         // third of cells at the very edge - enough to fray the boundary, not enough to leave holes.
@@ -780,11 +993,11 @@ public final class VolcanoBuilder {
 
         // Basalt dominates near the cone, tephra at the rim; both are present throughout.
         double basalt = Mth.clamp(t * 1.15, 0.0, 1.0);
-        if (level.random.nextDouble() < basalt) {
-            return (level.random.nextInt(4) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT)
+        if (rng.nextDouble() < basalt) {
+            return (rng.nextInt(4) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT)
                     .defaultBlockState();
         }
-        return (level.random.nextInt(3) == 0 ? Blocks.GRAVEL : Blocks.TUFF).defaultBlockState();
+        return (rng.nextInt(3) == 0 ? Blocks.GRAVEL : Blocks.TUFF).defaultBlockState();
     }
     /**
      * Strips trees and ground cover from the footprint so the mountain never grows through them.
@@ -971,9 +1184,11 @@ public final class VolcanoBuilder {
      * fissure swarm steps sideways rather than running dead straight.
      */
     private static void carveFissureLine(ServerLevel level, Ctx c) {
-        int half = 6 + c.magnitude;
-        int segLen = 6 + level.random.nextInt(5);
-        for (int t = -half; t <= half; t++) {
+        int half = c.fissureHalf;
+        int segLen = c.segLen;
+        // A big fissure keeps its ponds to the middle; the rest of its line is ramparts.
+        int span = hasRamparts(c) ? Math.min(half, POND_SEGMENT - 1) : half;
+        for (int t = -span; t <= span; t++) {
             int seg = Math.floorDiv(t + half, segLen);
             double lateral = ((seg % 2 == 0) ? 1 : -1) * (1 + seg % 3);
             int px = c.x + (int) Math.round(c.strikeX * t - c.strikeZ * lateral);
@@ -1058,7 +1273,12 @@ public final class VolcanoBuilder {
             // What the mountain was, so it can be put back after an earthquake flattens it. The
             // ORIGINAL base, not the summit: a rebuild that measured from the current ground would
             // stack a new cone on whatever survived and double the mountain's height.
-            core.setShape(c.type, new BlockPos(c.x, c.baseY, c.z), c.summitY);
+            // A large volcano records no shape to be raised again from. A quake cannot flatten a
+            // mountain that size, and the rebuild would lay the whole edifice out live, over several
+            // hundred chunks.
+            if (c.size != VolcanoSize.LARGE) {
+                core.setShape(c.type, c.size, new BlockPos(c.x, c.baseY, c.z), c.summitY);
+            }
         }
         setRock(level, c.vent, Blocks.LAVA.defaultBlockState());
     }
@@ -1165,12 +1385,18 @@ public final class VolcanoBuilder {
             case ALONG_STRIKE -> {
                 // Strung out along the crack, with only a little scatter across it.
                 double along = (level.random.nextDouble() * 2 - 1) * (18 + c.magnitude * 2.5);
+                if (c.liveReach > 0) along = Mth.clamp(along, -c.liveReach, c.liveReach);
                 double across = (level.random.nextDouble() * 2 - 1) * 5;
                 return new int[] {
                         c.x + (int) Math.round(c.strikeX * along - c.strikeZ * across),
                         c.z + (int) Math.round(c.strikeZ * along + c.strikeX * across) };
             }
             default -> dist = outer;
+        }
+        // A large volcano's outlets are cut live round its summit, where the world is loaded, so they
+        // are spread over that ring rather than piled up at its edge.
+        if (c.liveReach > 0 && dist > c.liveReach) {
+            dist = c.craterR + 3 + level.random.nextDouble() * Math.max(1, c.liveReach - c.craterR - 3);
         }
         return new int[] {
                 c.x + (int) Math.round(Math.cos(ang) * dist),
@@ -1215,8 +1441,13 @@ public final class VolcanoBuilder {
             double edge = coneRadius(c, ang);
             // Clear of the crater, and out as far as the near apron.
             double d = c.craterR + 3 + level.random.nextDouble() * Math.max(6.0, edge * 1.05);
+            if (c.liveReach > 0) {
+                d = c.craterR + 3 + level.random.nextDouble() * Math.max(6.0, c.liveReach - c.craterR - 3);
+            }
             int fx = c.x + (int) Math.round(Math.cos(ang) * d);
             int fz = c.z + (int) Math.round(Math.sin(ang) * d);
+            // Never into a chunk that is not loaded: asking for its ground would load it on the spot.
+            if (!loaded(level, fx, fz, 2)) continue;
 
             int g = TerrainProbe.groundY(level, fx, fz);
             if (g == Integer.MIN_VALUE) continue;
@@ -1272,6 +1503,8 @@ public final class VolcanoBuilder {
      * @return the lava cell, or null if this spot was genuinely unusable
      */
     private static BlockPos carveSeatedOutlet(ServerLevel level, int vx, int vz) {
+        // Nothing here may reach into an unloaded chunk; reading one loads it on the server thread.
+        if (!loaded(level, vx, vz, 3)) return null;
         // The lowest real ground in the 5x5 the outlet will occupy. Anything that is not ground at
         // all - a cliff edge, open air - still disqualifies the site.
         int g = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
@@ -1536,6 +1769,177 @@ public final class VolcanoBuilder {
         }
     }
 
+    // === Large volcanoes ====================================================
+
+    /** Markers whose summit is queued, with the tick it was queued at. Server thread only. */
+    private static final Map<Long, Long> FINISHING = new HashMap<>();
+    /** A queued summit that has not replaced its marker after this long is tried again. */
+    private static final long FINISH_RETRY_TICKS = 6000L;
+
+    public static void clearFinishing() {
+        FINISHING.clear();
+    }
+
+    /** Plans a large volcano from its field seed. The same site gives the same mountain on any thread. */
+    private static Ctx fieldCtx(ServerLevel level, VolcanoField.Site site) {
+        return plan(level, site.x(), site.baseY(), site.z(), site.magnitude(), site.type(),
+                VolcanoSize.LARGE, RandomSource.create(site.seed()),
+                TectonicMap.sampleCached(level, site.x(), site.z()));
+    }
+
+    /**
+     * How far a large volcano planned from this seed would write anything, how far its mountain goes,
+     * and where its summit would stand; null if it cannot stand on this base at all.
+     */
+    public static int[] largeFootprint(ServerLevel level, int x, int baseY, int z, int magnitude,
+                                       VolcanoType type, long seed) {
+        Ctx c = plan(level, x, baseY, z, magnitude, type, VolcanoSize.LARGE, RandomSource.create(seed),
+                TectonicMap.sampleCached(level, x, z));
+        if (c == null) return null;
+        int edifice = switch (type) {
+            case CALDERA -> calderaRingReach(c);
+            case FISSURE -> c.fissureHalf + 4;
+            default -> coneReach(c);
+        };
+        return new int[] {c.clearReach, edifice, c.summitY};
+    }
+
+    /**
+     * Writes this chunk's share of a large volcano while the chunk is generated: the cone, a caldera's
+     * floor and scarp, the apron and a fissure's ramparts. Nothing outside the chunk is read or written.
+     *
+     * @return how many columns of the volcano fell in this chunk
+     */
+    public static int generateFieldChunk(WorldGenLevel level, ChunkPos cp, VolcanoField.Site site) {
+        Ctx c = fieldCtx(level.getLevel(), site);
+        if (c == null) return 0;
+        RandomSource rng = RandomSource.create(0L);
+        long reach2 = (long) (c.clearReach + 1) * (c.clearReach + 1);
+        int columns = 0;
+        for (int lx = 0; lx < 16; lx++) {
+            for (int lz = 0; lz < 16; lz++) {
+                int gx = cp.getMinBlockX() + lx, gz = cp.getMinBlockZ() + lz;
+                long dx = gx - c.x, dz = gz - c.z;
+                if (dx * dx + dz * dz > reach2) continue;
+                // Seeded by the column alone, so its dice fall the same whichever chunk came first.
+                rng.setSeed(columnSeed(site.seed(), gx, gz));
+                if (c.coneHeight > 0) coneColumn(level, c, gx, gz, rng, true);
+                if (c.type.excavates()) calderaColumn(level, c, gx, gz, rng, true);
+                apronColumn(level, c, gx, gz, rng, true);
+                if (hasRamparts(c)) fissureRampartColumn(level, c, gx, gz, true);
+                columns++;
+            }
+        }
+        if (cp.x == SectionPos.blockToSectionCoord(c.x) && cp.z == SectionPos.blockToSectionCoord(c.z)) {
+            placeMarker(level, c);
+        }
+        return columns;
+    }
+
+    /**
+     * Leaves a core in the magma chamber for the summit to be finished from.
+     *
+     * <p>The crater, the conduit, the vents and the core need a live world: they read the ground
+     * around them, and the core's block entity has to be filled in. So generation leaves a marker, a
+     * core flagged as unfinished, and once its chunk ticks it queues the rest - see
+     * {@link #finishFieldVolcano}. The chamber's lava goes in over it, so it leaves no trace.</p>
+     */
+    private static void placeMarker(WorldGenLevel level, Ctx c) {
+        net.minecraft.resources.ResourceLocation id =
+                BlockEntityType.getKey(ModBlockEntities.VOLCANO_CORE.get());
+        if (id == null) return;
+        BlockPos p = new BlockPos(c.x, c.reservoirY, c.z);
+        level.setBlock(p, ModBlocks.VOLCANO_CORE.get().defaultBlockState(), 2);
+        CompoundTag tag = new CompoundTag();
+        tag.putString("id", id.toString());
+        tag.putInt("x", p.getX());
+        tag.putInt("y", p.getY());
+        tag.putInt("z", p.getZ());
+        tag.putBoolean(VolcanoCoreBlockEntity.FIELD_PENDING, true);
+        // Replaces the placeholder the region put down for the new block, so the core loads flagged.
+        level.getChunk(p).setBlockEntityNbt(tag);
+    }
+
+    /**
+     * Finishes a large volcano's summit from its marker: crater, core, conduit, vents and chimneys.
+     * Called by the marker once a second until the chamber's lava has replaced it.
+     */
+    public static void finishFieldVolcano(ServerLevel level, BlockPos marker) {
+        long key = marker.asLong();
+        Long queued = FINISHING.get(key);
+        if (queued != null && level.getGameTime() - queued < FINISH_RETRY_TICKS) return;
+
+        VolcanoField.Site site = VolcanoField.siteAt(level, marker.getX(), marker.getZ());
+        Ctx c = site == null ? null : fieldCtx(level, site);
+        if (c == null || c.reservoirY != marker.getY()) {
+            // Nothing in the field accounts for this core, so the field no longer agrees with the world.
+            // Rock is better than a core with no mountain over it.
+            GeysersMod.LOGGER.warn("Large volcano marker at {} matches no planned site; removed", marker);
+            level.setBlock(marker, Blocks.BASALT.defaultBlockState(), 3);
+            return;
+        }
+        int area = Math.max(c.liveReach, (int) Math.ceil(c.lakeOuter)) + 8;
+        if (!loaded(level, c.x, c.z, area)) return;
+        if (com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(level, marker)) return;
+
+        VolcanoJob job = new VolcanoJob(level, "large " + c.type + " summit @ " + c.x + "," + c.z);
+        if (c.type.excavates()) job.add(lvl -> collectCalderaLake(lvl, c));
+        job.add(lvl -> buildSummit(lvl, c));
+        job.add(lvl -> fillLavaDisc(lvl, c.x, c.reservoirY, c.z, c.reservoirR, 3));
+        job.add(lvl -> plantCore(lvl, c));
+        job.add(lvl -> carveConduit(lvl, c));
+        job.add(lvl -> growLavaBranches(lvl, c));
+        job.add(lvl -> chooseVents(lvl, c));
+        for (int i = 0; i < c.ventCount; i++) {
+            final int idx = i;
+            job.add(lvl -> cutVent(lvl, c, idx));
+        }
+        job.add(lvl -> cutFumaroles(lvl, c));
+        job.add(lvl -> recordVents(lvl, c));
+        job.add(lvl -> sealExposedLava(lvl, c));
+        job.add(lvl -> verifyContainment(lvl, c));
+        job.add(lvl -> FINISHING.remove(key));
+        if (VolcanoJob.enqueue(job)) {
+            FINISHING.put(key, level.getGameTime());
+            GeysersMod.LOGGER.info("Large {} at {}, {}: finishing its summit (base Y {}, summit Y {})",
+                    c.type, c.x, c.z, c.baseY, c.summitY);
+        }
+    }
+
+    /**
+     * Lists a large caldera's lake for its core. The lake was laid while the chunks generated, so
+     * unlike a small caldera's there was no live pass to record it cell by cell as it went in.
+     */
+    private static void collectCalderaLake(ServerLevel level, Ctx c) {
+        int r = (int) Math.ceil(c.lakeOuter) + 1;
+        for (int dx = -r; dx <= r; dx++) {
+            for (int dz = -r; dz <= r; dz++) {
+                double dist = Math.sqrt((double) dx * dx + (double) dz * dz);
+                if (!inLakeSector(c, dist, Math.atan2(dz, dx))) continue;
+                BlockPos p = new BlockPos(c.x + dx, c.calderaFloorY - 1, c.z + dz);
+                if (level.getBlockState(p).getFluidState().is(FluidTags.LAVA)) c.molten.add(p);
+            }
+        }
+    }
+
+    /** True when every chunk within {@code radius} blocks is loaded. */
+    private static boolean loaded(ServerLevel level, int x, int z, int radius) {
+        for (int cx = (x - radius) >> 4; cx <= (x + radius) >> 4; cx++) {
+            for (int cz = (z - radius) >> 4; cz <= (z + radius) >> 4; cz++) {
+                if (!level.hasChunk(cx, cz)) return false;
+            }
+        }
+        return true;
+    }
+
+    private static long columnSeed(long seed, int x, int z) {
+        long h = seed ^ (x * 0x9E3779B97F4A7C15L) ^ (z * 0xC2B2AE3D27D4EB4FL);
+        h ^= h >>> 33;
+        h *= 0xFF51AFD7ED558CCDL;
+        h ^= h >>> 33;
+        return h;
+    }
+
     /** Could lava here spread sideways, or fall off an edge? */
     private static boolean canEscape(ServerLevel level, BlockPos p) {
         for (Direction d : Direction.Plane.HORIZONTAL) {
@@ -1547,14 +1951,14 @@ public final class VolcanoBuilder {
         return false;
     }
     /** Writes a block unless it is bedrock or something a player made. */
-    private static void setRock(ServerLevel level, BlockPos p, BlockState state) {
+    private static void setRock(LevelAccessor level, BlockPos p, BlockState state) {
         BlockState s = level.getBlockState(p);
         if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) return;
         level.setBlock(p, state, 2);
     }
 
     /** Empties a cell, but only if what is there is natural. */
-    private static void clearNatural(ServerLevel level, BlockPos p) {
+    private static void clearNatural(LevelAccessor level, BlockPos p) {
         BlockState s = level.getBlockState(p);
         if (s.isAir() || s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) return;
         level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);

@@ -118,6 +118,8 @@ public final class GeyserConfig {
     // --- Tectonic feature placement ----------------------------------------
     public static final ForgeConfigSpec.BooleanValue TECTONIC_PLACEMENT;   // gate geysers/springs on geology
     public static final ForgeConfigSpec.DoubleValue VOLCANO_SPAWN_CHANCE;  // per-chunk, before suitability
+    public static final ForgeConfigSpec.BooleanValue LARGE_VOLCANOES;      // raised with new terrain
+    public static final ForgeConfigSpec.DoubleValue LARGE_VOLCANO_CHANCE;  // share of suitable sites
     public static final ForgeConfigSpec.BooleanValue DEEP_STRUCTURE_ENABLED;
     public static final ForgeConfigSpec.BooleanValue DEEP_SURFACE_OUTCROP;  // boundary rock reaches daylight
     public static final ForgeConfigSpec.IntValue DEEP_SOIL_DEPTH;           // topsoil left untouched
@@ -605,6 +607,16 @@ public final class GeyserConfig {
                         "Deliberately tiny: volcanoes are huge structures and should be landmarks.",
                         "The suitability gate then removes them entirely outside volcanic settings.")
                 .defineInRange("volcanoSpawnChance", 0.0060D, 0.0D, 1.0D);
+        LARGE_VOLCANOES = b
+                .comment("Raise large volcanoes while new terrain generates: stratovolcanoes about 150 blocks",
+                        "tall on subduction arcs, fissures some 400 blocks long on rifts, and shields and",
+                        "calderas 400 blocks across over mantle plumes. Only chunks generated from now on get",
+                        "them; nothing this size is ever built into terrain that already exists.")
+                .define("largeVolcanoes", true);
+        LARGE_VOLCANO_CHANCE = b
+                .comment("Share of the suitable sites that get a large volcano. Set it before exploring, not",
+                        "after: a volcano straddling explored and new ground is only built on the new side.")
+                .defineInRange("largeVolcanoChance", 1.0D, 0.0D, 1.0D);
         b.pop();
 
         b.push("quakes");

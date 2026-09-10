@@ -565,9 +565,15 @@ public final class RetrogenHandler {
         BlockPos summit = new BlockPos(x, summitY, z);
         if (EruptionHandler.isPlayerPlaced(level.getBlockState(summit))) return;
 
+        // Not on the flank of a large one. The field is pure arithmetic, so this needs no record of
+        // where they were built - only the same question the generator asked.
+        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.nearLarge(level, x, z, 96)) return;
+
         int magnitude = 8 + rng.nextInt(12);
-        if (VolcanoBuilder.build(level, summit, magnitude)) {
-            GeysersMod.LOGGER.debug("Natural volcano (magnitude {}) placed at {}", magnitude, summit);
+        com.jeladastudios.ftsgeology.volcano.VolcanoSize size =
+                com.jeladastudios.ftsgeology.volcano.VolcanoSize.forMagnitude(magnitude);
+        if (VolcanoBuilder.build(level, summit, magnitude, size)) {
+            GeysersMod.LOGGER.debug("Natural {} volcano (magnitude {}) placed at {}", size, magnitude, summit);
         }
     }
 

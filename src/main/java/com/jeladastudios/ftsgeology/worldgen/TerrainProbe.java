@@ -138,7 +138,8 @@ public final class TerrainProbe {
      * Removes plant cover from a column so nothing is left to catch fire or float over a new basin.
      * Only ever clears {@link #isVegetation} blocks, so builds and trees are untouched.
      */
-    public static void clearVegetation(ServerLevel level, int x, int groundY, int z, int height) {
+    public static void clearVegetation(net.minecraft.world.level.LevelAccessor level, int x, int groundY,
+                                       int z, int height) {
         for (int dy = 1; dy <= height; dy++) {
             BlockPos p = new BlockPos(x, groundY + dy, z);
             BlockState s = level.getBlockState(p);
