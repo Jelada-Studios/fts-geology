@@ -7,6 +7,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.quake.Earthquake;
+import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.tectonics.DepthScale;
 import com.jeladastudios.ftsgeology.tectonics.FaultType;
 import com.jeladastudios.ftsgeology.tectonics.GeothermalSuitability;
@@ -331,6 +332,36 @@ public final class TectonicCommands {
         return 1;
     }
 
+    /** One run of the same deposit in a column, for the deposits part of /geology column. */
+    private record OreRun(int topY, int bottomY, String blockName, String genesisKey) {}
+
+    /** The process that left this block where it is, as a translation key, or null where that cannot be known. */
+    private static String oreGenesisKey(net.minecraft.world.level.block.state.BlockState st) {
+        if (st.is(ModBlocks.COOLING_LAVA_CRUST.get())) return "command.fts_geology.column.horizon.magma_sill";
+        if (st.is(ModBlocks.CHALCOPYRITE.get())) return "command.fts_geology.column.ore.chalcopyrite";
+        if (st.is(ModBlocks.MALACHITE.get())) return "command.fts_geology.column.ore.malachite";
+        if (st.is(ModBlocks.AZURITE.get())) return "command.fts_geology.column.ore.azurite";
+        if (st.is(ModBlocks.QUARTZ_VEIN.get())) return "command.fts_geology.column.ore.quartz_vein";
+        if (st.is(ModBlocks.PYRITE.get())) return "command.fts_geology.column.ore.pyrite";
+        if (st.is(ModBlocks.CINNABAR.get())) return "command.fts_geology.column.ore.cinnabar";
+        if (st.is(ModBlocks.GALENA.get())) return "command.fts_geology.column.ore.galena";
+        // Vanilla ores get no story. The game's own features scatter coal, iron, gold and lapis
+        // everywhere, and a column cannot tell a vein this laid from one vanilla did - so naming a
+        // process for them would mostly be telling a student something untrue.
+        return null;
+    }
+
+    /** What a setting should hold, said when a column happens to miss every deposit in it. */
+    private static String orePotentialKey(FaultType type) {
+        return switch (type) {
+            case CONVERGENT_SUBDUCTION -> "command.fts_geology.column.potential.subduction";
+            case CONVERGENT_COLLISION -> "command.fts_geology.column.potential.collision";
+            case DIVERGENT -> "command.fts_geology.column.potential.rift";
+            case TRANSFORM -> "command.fts_geology.column.potential.transform";
+            case INTERIOR -> "command.fts_geology.column.potential.interior";
+        };
+    }
+
     // === /geology column ====================================================
 
     /**
@@ -359,22 +390,42 @@ public final class TectonicCommands {
         String runName = null;
         int runTop = top;
         int shown = 0;
-        for (int y = top; y >= bottom && shown < 26; y--) {
+        // Deposits are gathered in the same walk, which no longer stops once the section is cut off
+        // at 26 lines: a vein below that point is still a vein.
+        List<OreRun> ores = new ArrayList<>();
+        String oreName = null, oreKey = null;
+        int oreTop = 0, oreBottom = 0;
+        for (int y = top; y >= bottom; y--) {
             net.minecraft.world.level.block.state.BlockState st =
                     level.getBlockState(new BlockPos(at.getX(), y, at.getZ()));
             String name = st.isAir() ? "air"
                     : net.minecraft.core.registries.BuiltInRegistries.BLOCK
                             .getKey(st.getBlock()).getPath();
-            if (runName == null) {
-                runName = name;
-                runTop = y;
-            } else if (!runName.equals(name)) {
-                lines.add(String.format("  Y %4d..%4d  %s", y + 1, runTop, runName));
-                shown++;
-                runName = name;
-                runTop = y;
+            if (shown < 26) {
+                if (runName == null) {
+                    runName = name;
+                    runTop = y;
+                } else if (!runName.equals(name)) {
+                    lines.add(String.format("  Y %4d..%4d  %s", y + 1, runTop, runName));
+                    shown++;
+                    runName = name;
+                    runTop = y;
+                }
+            }
+            boolean deposit = com.jeladastudios.ftsgeology.instrument.RockTypes.classify(st)
+                    == com.jeladastudios.ftsgeology.instrument.RockTypes.Rock.ORE
+                    || st.is(ModBlocks.COOLING_LAVA_CRUST.get());
+            if (deposit && name.equals(oreName)) {
+                oreBottom = y;
+            } else {
+                if (oreName != null) ores.add(new OreRun(oreTop, oreBottom, oreName, oreKey));
+                oreName = deposit ? name : null;
+                oreKey = deposit ? oreGenesisKey(st) : null;
+                oreTop = y;
+                oreBottom = y;
             }
         }
+        if (oreName != null) ores.add(new OreRun(oreTop, oreBottom, oreName, oreKey));
         if (runName != null && shown < 26) {
             lines.add(String.format("  Y %4d..%4d  %s", bottom, runTop, runName));
         }
@@ -382,6 +433,24 @@ public final class TectonicCommands {
         // the block name inside it is already localised by Minecraft.
         for (String line : lines) {
             source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GRAY), false);
+        }
+
+        // And the deposits in it, each named for the process that left it there. The Y range is
+        // formatted here rather than in the language file: Minecraft's translations take a plain
+        // %s, and a width like %4d there breaks the whole line.
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.column.ores_header")
+                .withStyle(ChatFormatting.GOLD), false);
+        if (ores.isEmpty()) {
+            source.sendSuccess(() -> Component.translatable("command.fts_geology.column.no_ores_here",
+                    Component.translatable(orePotentialKey(s.faultType()))).withStyle(ChatFormatting.DARK_GRAY), false);
+        }
+        for (OreRun r : ores) {
+            String range = String.format(Locale.ROOT, "%4d..%4d", r.bottomY(), r.topY());
+            MutableComponent line = r.genesisKey() == null
+                    ? Component.translatable("command.fts_geology.column.ore_entry_plain", range, r.blockName())
+                    : Component.translatable("command.fts_geology.column.ore_entry",
+                            range, r.blockName(), Component.translatable(r.genesisKey()));
+            source.sendSuccess(() -> line.withStyle(ChatFormatting.YELLOW), false);
         }
 
         // Name what the boundary should have left here, so the section can be read against it.
@@ -463,6 +532,7 @@ public final class TectonicCommands {
                 blocks += r.blocks;
                 if (r.note != null) note = r.note;
                 com.jeladastudios.ftsgeology.worldgen.OceanicRidge.generate(level, cp, rng);
+                blocks += com.jeladastudios.ftsgeology.worldgen.OreGenesis.generate(level, cp);
                 done++;
             }
         }

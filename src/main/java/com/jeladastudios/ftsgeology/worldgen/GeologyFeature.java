@@ -11,7 +11,7 @@ import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
 import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
 
 /**
- * The deep geology, written while a chunk is being generated instead of afterwards.
+ * The deep geology and its ore, written while a chunk is being generated instead of afterwards.
  *
  * <h2>Why this exists</h2>
  * Everything the mod did to the ground used to happen after a chunk had finished generating, from
@@ -39,7 +39,7 @@ public class GeologyFeature extends Feature<NoneFeatureConfiguration> {
     public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
         WorldGenLevel level = context.level();
         ChunkPos cp = new ChunkPos(context.origin());
-        int placed = 0;
+        int placed = 0, ore = 0;
         try {
             if (!GeyserConfig.GEOLOGY_AT_GENERATION.get()) return false;
             DeepStructure.Report report = new DeepStructure.Report();
@@ -49,13 +49,14 @@ public class GeologyFeature extends Feature<NoneFeatureConfiguration> {
             RandomSource rng = RandomSource.create(
                     level.getSeed() ^ (((long) cp.x) << 32 | (cp.z & 0xFFFFFFFFL)));
             OceanicRidge.generate(level, cp, rng);
+            ore = OreGenesis.generate(level, cp);
         } catch (RuntimeException e) {
             // Never take world generation down with it. Left unmarked, the chunk simply gets its
             // geology from retrogen once it has loaded.
             GeysersMod.LOGGER.warn("Geology at generation failed for chunk {}: {}", cp, e.toString());
             return false;
         }
-        RetrogenHandler.markDeepCurrent(level.getLevel().dimension(), cp, placed);
+        RetrogenHandler.markDeepCurrent(level.getLevel().dimension(), cp, placed, ore);
         return true;
     }
 }

@@ -169,6 +169,35 @@ public final class HotspotMap {
     }
 
     /**
+     * Strength of the live plume dome here, 0 to 1, and nothing else: no trail, and no reading of
+     * the biome the generator painted.
+     *
+     * <p>For callers that only need to know whether they stand over a plume. {@link #sample} also
+     * asks {@link ThermalBiomes}, which takes the generator's base height - a full noise column -
+     * for every quart it has not seen, and the ore pass asks once per chunk, so it would pay that
+     * on nearly every chunk it touches.</p>
+     */
+    public static double plumeStrength(ServerLevel level, int blockX, int blockZ) {
+        if (!GeyserConfig.HOTSPOTS_ENABLED.get()) return 0.0;
+        double scale = GeyserConfig.HOTSPOT_SCALE.get();
+        double density = GeyserConfig.HOTSPOT_DENSITY.get();
+        double radius = GeyserConfig.HOTSPOT_RADIUS.get();
+        long seed = level.getSeed();
+        int gx = Mth.floor(blockX / scale);
+        int gz = Mth.floor(blockZ / scale);
+        double best = 0.0;
+        for (int ox = -1; ox <= 1; ox++) {
+            for (int oz = -1; oz <= 1; oz++) {
+                int cx = gx + ox, cz = gz + oz;
+                if (!cellHasPlume(seed, cx, cz, density)) continue;
+                double d = Math.hypot(blockX - plumeX(seed, cx, cz, scale), blockZ - plumeZ(seed, cx, cz, scale));
+                if (d < radius) best = Math.max(best, 1.0 - d / radius);
+            }
+        }
+        return best;
+    }
+
+    /**
      * Drift of the plate riding over a given plume. Constant for the life of the world, so it is
      * cached: without this, sampling the hotspot field would re-run the whole Voronoi plate solve
      * for every candidate plume of every column, which the chat map would feel immediately.

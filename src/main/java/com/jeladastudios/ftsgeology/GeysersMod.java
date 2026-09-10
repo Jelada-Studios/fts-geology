@@ -141,6 +141,7 @@ public class GeysersMod {
             event.accept(ModItems.MUD_POT.get());
             event.accept(ModItems.STEAM_VENT.get());
             event.accept(ModItems.VOLCANIC_ASH.get());
+            event.accept(ModItems.VOLCANIC_BLACK_SAND.get());
             event.accept(ModItems.TRAVERTINE.get());
             event.accept(ModItems.RHYOLITE.get());
             event.accept(ModItems.GABBRO.get());

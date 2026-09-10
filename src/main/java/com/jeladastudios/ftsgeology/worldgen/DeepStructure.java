@@ -2,6 +2,7 @@ package com.jeladastudios.ftsgeology.worldgen;
 
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
+import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
 import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 import net.minecraft.core.BlockPos;
@@ -22,8 +23,8 @@ import net.minecraft.world.level.block.state.BlockState;
  *   <li><b>Subduction</b> - a slab of cold dense crust diving under the overriding plate, with magma
  *       chambers in the mantle wedge above it and the volcanic arc's own plutonic root higher up.
  *       This is the Wadati-Benioff zone.</li>
- *   <li><b>Rift</b> - crust pulled thin and split by a swarm of near-vertical basalt <b>dykes</b>
- *       that cut the whole column, with open fractures and hot rock near the axis.</li>
+ *   <li><b>Rift</b> - crust pulled thin and intruded from below by bodies of gabbro and basalt,
+ *       with hot rock riding high near the axis.</li>
  *   <li><b>Collision</b> - a thickened root of FOLDED metamorphic rock and pointedly no magma:
  *       crumpling two continents together makes mountains, not melt.</li>
  *   <li><b>Transform</b> - a narrow, near-vertical scar of shattered rock where the plates grind.</li>
@@ -243,22 +244,33 @@ public final class DeepStructure {
         int deepTop = Math.min(top, floor + (int) Math.round((top - floor) * 0.45));
         int slabY = Mth.clamp((int) Math.round(deepTop - across * (deepTop - floor)), floor + 3, deepTop);
         for (int dy = 0, thickness = 3 + rng.nextInt(2); dy < thickness; dy++) {
-            // Basalt and blackstone, not deepslate: at this depth the surrounding rock IS deepslate,
-            // so a deepslate slab was perfectly invisible. Dark volcanic rock reads instantly.
-            Block b = rng.nextInt(3) == 0 ? Blocks.BLACKSTONE : Blocks.BASALT;
-            if (set(level, x, slabY - dy, z, b, top)) placed++;
+            // An ophiolite: the slab is old sea floor, so it carries the sea floor's own section -
+            // mantle peridotite and serpentinite at the bottom, gabbro, chert and basalt above. Dark
+            // rock either way, which is what makes it read against the deepslate around it.
+            int y = slabY - dy;
+            Block b;
+            if (y < floor + 8) {
+                b = rng.nextBoolean() ? ModBlocks.PERIDOTITE.get() : ModBlocks.SERPENTINITE.get();
+            } else {
+                int roll = rng.nextInt(5);
+                b = roll == 0 ? ModBlocks.GABBRO.get()
+                        : roll == 1 ? ModBlocks.CHERT.get()
+                        : roll == 2 ? Blocks.BLACKSTONE : Blocks.BASALT;
+            }
+            if (set(level, x, y, z, b, top)) placed++;
         }
 
-        // The arc's plutonic root: granite and diorite bodies in the upper crust, above the wedge.
+        // The arc's plutonic root: granite, diorite and gabbro bodies in the upper crust, above the wedge.
         if (across < 0.6) {
             int bodies = 2;
             for (int i = 0; i < bodies; i++) {
                 double f = 0.55 + 0.35 * ((i + 0.5) / bodies);
                 int centre = (int) Math.round(floor + (top - floor) * f
                         + 4.0 * Math.sin(x * 0.048) + 3.0 * Math.sin(z * 0.037));
-                if (rng.nextInt(4) == 0) continue;            // patchy, not a continuous sheet
-                for (int dy = 0, thick = 2 + rng.nextInt(3); dy < thick; dy++) {
-                    Block b = rng.nextInt(3) == 0 ? Blocks.DIORITE : Blocks.GRANITE;
+                if (rng.nextInt(3) == 0) continue;            // patchy, not a continuous sheet
+                for (int dy = 0, thick = 6 + rng.nextInt(5); dy < thick; dy++) {
+                    int roll = rng.nextInt(4);
+                    Block b = roll == 0 ? Blocks.DIORITE : roll == 1 ? ModBlocks.GABBRO.get() : Blocks.GRANITE;
                     if (set(level, x, centre - dy, z, b, top)) placed++;
                 }
             }
@@ -273,56 +285,68 @@ public final class DeepStructure {
     }
 
     /**
-     * Thinned, fractured crust cut by a <b>dyke swarm</b>.
+     * Thinned crust intruded from below by bodies of gabbro and basalt.
      *
-     * <p>A dyke is a sheet of magma frozen in a crack, and at a rift they come in parallel swarms
-     * running along the axis - Iceland is built of them. A single column is therefore either inside
-     * a dyke, in which case it is basalt from bedrock to daylight, or it is not. That is what makes
-     * a rift instantly recognisable in section, and it is far cheaper than filling the whole zone.</p>
+     * <p>This used to be a dike swarm: a column was either inside a dike, basalt from bedrock to
+     * daylight, or it was not. In section that read as vertical one-block stripes a hundred blocks
+     * tall, repeating across the whole zone, which is not what a rift looks like from the inside.
+     * Magma that stalls in thinned crust collects in pods of bounded height, so that is what this
+     * lays down, from a 3D noise field: a deep level of gabbro where the melt crystallised slowly,
+     * and a shallower level of basalt around the conduits that fed the surface.</p>
      */
     private static int rift(WorldGenLevel level, int x, int z, PlateSample s,
                             int floor, int top, double faultWidth, RandomSource rng) {
         int placed = 0;
         double across = Mth.clamp(s.faultDistance() / faultWidth, 0.0, 1.0);
+        if (across > 0.75) return 0;
 
-        // Distance to the boundary, not a projection onto the fault normal.
-        //
-        // The normal turns as you move, so its level sets are not parallel lines - around a plate
-        // centre they fan out, and the swarm came out as a radial starburst on the sea floor. Level
-        // sets of the DISTANCE are parallel to the boundary by definition, which is also how a real
-        // dyke swarm lies: sheets along the rift axis. A little along-strike wobble keeps them from
-        // being perfect arcs.
-        double alongStrike = x * s.faultStrikeX() + z * s.faultStrikeZ();
-        double u = s.faultDistance() + 3.0 * Math.sin(alongStrike * 0.035);
-        double phase = Math.sin(u * 0.52) + 0.4 * Math.sin(u * 1.31 + 2.0);
-        boolean inDyke = phase > 1.05 - 0.35 * (1.0 - across);
-        if (inDyke) {
-            for (int y = floor; y <= top; y++) {
-                if (rng.nextInt(14) == 0) continue;           // the odd break in the sheet
-                Block b = rng.nextInt(4) == 0 ? Blocks.BLACKSTONE : Blocks.BASALT;
+        // The deep level: plutonic pods from a few blocks above bedrock up to about thirty.
+        int deepMinY = floor + 6;
+        int deepMaxY = Math.min(top, floor + 32);
+        for (int y = deepMinY; y <= deepMaxY; y++) {
+            double n = noise3D(x, y, z, 20.0, 10.0);
+            if (n <= 0.36 + 0.32 * across) continue;
+            Block b;
+            if (n > 0.60) {
+                b = (y < -20 && rng.nextInt(3) == 0) ? ModBlocks.COOLING_LAVA_CRUST.get() : ModBlocks.GABBRO.get();
+            } else if (n > 0.48) {
+                b = rng.nextBoolean() ? ModBlocks.GABBRO.get() : Blocks.BASALT;
+            } else {
+                b = rng.nextInt(3) == 0 ? Blocks.BLACKSTONE : Blocks.BASALT;
+            }
+            if (set(level, x, y, z, b, top)) placed++;
+        }
+        // The shallow level: basalt around the conduits, between Y=-15 and Y=18 where the crust
+        // allows, and only nearer the axis, where melt still reaches that high.
+        int midMinY = Math.max(deepMinY + 10, -15);
+        int midMaxY = Math.min(top - 4, 18);
+        if (midMaxY > midMinY && across < 0.60) {
+            for (int y = midMinY; y <= midMaxY; y++) {
+                double n = noise3D(x + 1024, y, z - 1024, 18.0, 9.0);
+                if (n <= 0.40 + 0.35 * across) continue;
+                Block b;
+                if (n > 0.62) {
+                    b = rng.nextBoolean() ? ModBlocks.COOLING_LAVA_CRUST.get() : ModBlocks.GABBRO.get();
+                } else if (n > 0.50) {
+                    b = Blocks.BASALT;
+                } else {
+                    b = rng.nextBoolean() ? Blocks.BLACKSTONE : Blocks.BASALT;
+                }
                 if (set(level, x, y, z, b, top)) placed++;
             }
         }
 
-        // Open fractures on the axis: the crust really has parted here.
-        if (across < 0.35 && rng.nextInt(9) == 0) {
-            int height = 6 + rng.nextInt(18);
-            int base = floor + rng.nextInt(Math.max(1, (top - floor) - height));
-            for (int y = base; y < base + height; y++) {
-                if (set(level, x, y, z, Blocks.AIR, top)) placed++;
-            }
-        }
         // Hot rock riding unusually high, because the mantle has come up to meet the thinned crust.
-        if (across < 0.7 && rng.nextInt(60) == 0) {
-            int y = floor + rng.nextInt(Math.max(1, (top - floor) / 2));
+        if (across < 0.6 && rng.nextInt(75) == 0) {
+            int y = floor + 4 + rng.nextInt(Math.max(1, (top - floor) / 2));
             if (set(level, x, y, z, Blocks.MAGMA_BLOCK, top)) {
                 placed++;
                 MagmaSealing.seal(level, new BlockPos(x, y, z), true);
             }
         }
-        if (across < 0.5 && rng.nextInt(220) == 0) {
-            int y = Mth.clamp(floor + rng.nextInt(12), floor + 2, top - 3);
-            placed += blob(level, x, y, z, 2, Blocks.MAGMA_BLOCK, top, rng);
+        if (across < 0.45 && rng.nextInt(260) == 0) {
+            int y = Mth.clamp(floor + rng.nextInt(14), floor + 2, top - 3);
+            placed += blob(level, x, y, z, 2 + rng.nextInt(2), Blocks.MAGMA_BLOCK, top, rng);
         }
         return placed;
     }
@@ -334,8 +358,8 @@ public final class DeepStructure {
      *
      * <p>The banding is <b>folded</b> rather than flat. Collision does not lay rock down in layers,
      * it takes layers that already existed and crumples them, so a cliff face cuts wavy bands rather
-     * than a neat horizontal sandwich. Calcite, tuff and diorite stand in for marble, gneiss and the
-     * granitic sheets that intrude them.</p>
+     * than a neat horizontal sandwich. Marble, gneiss, schist, slate and quartzite are the sequence
+     * itself: what limestone, granite, mudstone and sandstone become when a collision buries them.</p>
      */
     private static int collisionRoot(WorldGenLevel level, int x, int z, PlateSample s,
                                      int floor, int top, double faultWidth, RandomSource rng) {
@@ -351,12 +375,14 @@ public final class DeepStructure {
             if (rng.nextDouble() < across * (i / (double) bands)) continue;
             double f = (i + 0.5) / bands;
             int centre = (int) Math.round(floor + (top - floor) * f + fold);
-            int thick = 2 + rng.nextInt(3);
+            int thick = 5 + rng.nextInt(5);
             for (int dy = 0; dy < thick; dy++) {
                 Block b = switch (Math.floorMod(i * 2 + dy, 5)) {
-                    case 0, 3 -> Blocks.CALCITE;
-                    case 1 -> Blocks.DIORITE;
-                    default -> Blocks.TUFF;
+                    case 0 -> ModBlocks.MARBLE.get();
+                    case 1 -> ModBlocks.GNEISS.get();
+                    case 2 -> ModBlocks.SCHIST.get();
+                    case 3 -> ModBlocks.SLATE.get();
+                    default -> ModBlocks.QUARTZITE.get();
                 };
                 if (set(level, x, centre - dy, z, b, top)) placed++;
             }
@@ -378,9 +404,11 @@ public final class DeepStructure {
         int placed = 0;
         for (int y = floor; y <= top; y++) {
             if (rng.nextInt(4) != 0) continue;
-            Block b = switch (rng.nextInt(4)) {
+            Block b = switch (rng.nextInt(5)) {
                 case 0 -> Blocks.GRAVEL;
-                case 1 -> Blocks.TUFF;
+                case 1 -> ModBlocks.SHALE.get();
+                case 2 -> ModBlocks.SLATE.get();
+                case 3 -> Blocks.TUFF;
                 default -> Blocks.COBBLED_DEEPSLATE;
             };
             if (set(level, x, y, z, b, top)) placed++;
@@ -396,6 +424,32 @@ public final class DeepStructure {
         h ^= x * 0x9E3779B97F4A7C15L;
         h ^= z * 0xC2B2AE3D27D4EB4FL;
         return h ^ (h >>> 31);
+    }
+
+    /** Continuous 3D value noise in [-1, 1], for bodies of rock with a shape rather than a stripe. */
+    static double noise3D(int x, int y, int z, double scaleXZ, double scaleY) {
+        double fx = x / scaleXZ, fy = y / scaleY, fz = z / scaleXZ;
+        int x0 = Mth.floor(fx), y0 = Mth.floor(fy), z0 = Mth.floor(fz);
+        double ax = fx - x0, ay = fy - y0, az = fz - z0;
+        ax = ax * ax * (3.0 - 2.0 * ax);
+        ay = ay * ay * (3.0 - 2.0 * ay);
+        az = az * az * (3.0 - 2.0 * az);
+        return Mth.lerp(ay,
+                Mth.lerp(az,
+                        Mth.lerp(ax, lattice3D(x0, y0, z0), lattice3D(x0 + 1, y0, z0)),
+                        Mth.lerp(ax, lattice3D(x0, y0, z0 + 1), lattice3D(x0 + 1, y0, z0 + 1))),
+                Mth.lerp(az,
+                        Mth.lerp(ax, lattice3D(x0, y0 + 1, z0), lattice3D(x0 + 1, y0 + 1, z0)),
+                        Mth.lerp(ax, lattice3D(x0, y0 + 1, z0 + 1), lattice3D(x0 + 1, y0 + 1, z0 + 1))));
+    }
+
+    /** One lattice value of {@link #noise3D}. */
+    static double lattice3D(int x, int y, int z) {
+        long h = x * 0x9E3779B97F4A7C15L ^ y * 0x85157AF5L ^ z * 0xC2B2AE3D27D4EB4FL;
+        h ^= h >>> 29;
+        h *= 0xBF58476D1CE4E5B9L;
+        h ^= h >>> 32;
+        return ((h >>> 11) / (double) (1L << 53)) * 2.0 - 1.0;
     }
 
     /** A rough, lobed pocket of one material, used for magma chambers. */

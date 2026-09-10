@@ -79,26 +79,32 @@ public final class RockTypes {
         if (s.is(Blocks.BASALT) || s.is(Blocks.SMOOTH_BASALT) || s.is(Blocks.POLISHED_BASALT)
                 || s.is(Blocks.BLACKSTONE) || s.is(Blocks.POLISHED_BLACKSTONE)
                 || s.is(Blocks.TUFF) || s.is(Blocks.OBSIDIAN) || s.is(Blocks.CRYING_OBSIDIAN)
-                || s.is(Blocks.MAGMA_BLOCK) || s.is(Blocks.NETHERRACK)) {
+                || s.is(Blocks.MAGMA_BLOCK) || s.is(Blocks.NETHERRACK)
+                || isRhyolite(s) || s.is(ModBlocks.COOLING_LAVA_CRUST.get()) || s.is(ModBlocks.VOLCANIC_ASH.get())) {
             return Rock.VOLCANIC;
         }
 
         // --- Igneous, at depth ------------------------------------------------
         // Granite and diorite are magma that never got out: it cooled underground over thousands of
         // years, which is the only way crystals get big enough to see. Andesite sits between the
-        // two in composition and is put here with them.
+        // two in composition and is put here with them. Gabbro is the same story for basalt, and
+        // peridotite and serpentinite come up from the mantle itself.
         if (s.is(Blocks.GRANITE) || s.is(Blocks.DIORITE) || s.is(Blocks.ANDESITE)
                 || s.is(Blocks.POLISHED_GRANITE) || s.is(Blocks.POLISHED_DIORITE)
-                || s.is(Blocks.POLISHED_ANDESITE)) {
+                || s.is(Blocks.POLISHED_ANDESITE)
+                || isGabbro(s) || isPeridotite(s) || isSerpentinite(s)) {
             return Rock.PLUTONIC;
         }
 
         // --- Metamorphic ------------------------------------------------------
         // Deepslate is the mod's slate: mudstone buried deep enough and long enough to recrystallise
         // without ever melting. That it only appears below y=0 in vanilla is, for once, correct.
+        // Slate, schist, gneiss, marble and quartzite are the rest of that sequence, from barely
+        // cooked mudstone up to the roots of a collision belt.
         if (s.is(Blocks.DEEPSLATE) || s.is(Blocks.COBBLED_DEEPSLATE)
                 || s.is(Blocks.POLISHED_DEEPSLATE) || s.is(Blocks.DEEPSLATE_BRICKS)
-                || s.is(Blocks.DEEPSLATE_TILES)) {
+                || s.is(Blocks.DEEPSLATE_TILES)
+                || isSlate(s) || isSchist(s) || isGneiss(s) || isMarble(s) || isQuartzite(s)) {
             return Rock.METAMORPHIC;
         }
 
@@ -107,14 +113,19 @@ public final class RockTypes {
                 || s.is(BlockTags.GOLD_ORES) || s.is(BlockTags.REDSTONE_ORES)
                 || s.is(BlockTags.LAPIS_ORES) || s.is(BlockTags.DIAMOND_ORES)
                 || s.is(BlockTags.EMERALD_ORES) || s.is(Blocks.ANCIENT_DEBRIS)
-                || s.is(Blocks.NETHER_QUARTZ_ORE) || s.is(Blocks.NETHER_GOLD_ORE)) {
+                || s.is(Blocks.NETHER_QUARTZ_ORE) || s.is(Blocks.NETHER_GOLD_ORE)
+                || s.is(ModBlocks.PYRITE.get()) || s.is(ModBlocks.CHALCOPYRITE.get())
+                || s.is(ModBlocks.AZURITE.get()) || s.is(ModBlocks.CINNABAR.get())
+                || s.is(ModBlocks.GALENA.get()) || s.is(ModBlocks.MALACHITE.get())
+                || s.is(ModBlocks.QUARTZ_VEIN.get())) {
             return Rock.ORE;
         }
 
         // --- Laid down by life, or by the chemistry life drives ----------------
         // The mod's own hot-spring blocks belong here as much as coral does: a sinter terrace is
         // built by silica coming out of solution around the mats growing in it.
-        if (s.is(ModBlocks.SINTER.get()) || s.is(ModBlocks.MICROBIAL_MAT_ORANGE.get())
+        if (s.is(ModBlocks.SINTER.get()) || s.is(ModBlocks.SINTER_CRUST.get())
+                || s.is(ModBlocks.MICROBIAL_MAT_ORANGE.get())
                 || s.is(ModBlocks.MICROBIAL_MAT_YELLOW.get())
                 || s.is(ModBlocks.MICROBIAL_MAT_BROWN.get())
                 || s.is(ModBlocks.MICROBIAL_MAT_GREEN.get())
@@ -125,14 +136,15 @@ public final class RockTypes {
         // --- Sedimentary rock -------------------------------------------------
         // Sandstone is a dune or a beach that got buried and cemented; calcite and dripstone came
         // out of solution. Native sulfur is a fumarole deposit - a chemical sediment laid straight
-        // out of a gas.
+        // out of a gas. Shale and chert are bedded sediments, travertine a hot spring's precipitate.
         if (s.is(Blocks.SANDSTONE) || s.is(Blocks.SMOOTH_SANDSTONE) || s.is(Blocks.CUT_SANDSTONE)
                 || s.is(Blocks.CHISELED_SANDSTONE)
                 || s.is(Blocks.RED_SANDSTONE) || s.is(Blocks.SMOOTH_RED_SANDSTONE)
                 || s.is(Blocks.CUT_RED_SANDSTONE) || s.is(Blocks.CHISELED_RED_SANDSTONE)
                 || s.is(Blocks.CALCITE) || s.is(Blocks.DRIPSTONE_BLOCK)
                 || s.is(Blocks.PACKED_MUD) || s.is(Blocks.MUD_BRICKS)
-                || s.is(ModBlocks.NATIVE_SULFUR.get())) {
+                || s.is(ModBlocks.NATIVE_SULFUR.get())
+                || isShale(s) || isChert(s) || isTravertine(s)) {
             return Rock.SEDIMENTARY;
         }
 
@@ -159,6 +171,80 @@ public final class RockTypes {
         }
 
         return Rock.OTHER;
+    }
+
+    // A rock counts in every worked form - a polished slab of gabbro is still gabbro to the hammer.
+
+    private static boolean isRhyolite(BlockState s) {
+        return s.is(ModBlocks.RHYOLITE.get()) || s.is(ModBlocks.POLISHED_RHYOLITE.get())
+                || s.is(ModBlocks.RHYOLITE_SLAB.get()) || s.is(ModBlocks.RHYOLITE_STAIRS.get())
+                || s.is(ModBlocks.RHYOLITE_WALL.get());
+    }
+
+    private static boolean isGabbro(BlockState s) {
+        return s.is(ModBlocks.GABBRO.get()) || s.is(ModBlocks.POLISHED_GABBRO.get())
+                || s.is(ModBlocks.GABBRO_SLAB.get()) || s.is(ModBlocks.GABBRO_STAIRS.get())
+                || s.is(ModBlocks.GABBRO_WALL.get());
+    }
+
+    private static boolean isPeridotite(BlockState s) {
+        return s.is(ModBlocks.PERIDOTITE.get()) || s.is(ModBlocks.POLISHED_PERIDOTITE.get())
+                || s.is(ModBlocks.PERIDOTITE_SLAB.get()) || s.is(ModBlocks.PERIDOTITE_STAIRS.get())
+                || s.is(ModBlocks.PERIDOTITE_WALL.get());
+    }
+
+    private static boolean isSerpentinite(BlockState s) {
+        return s.is(ModBlocks.SERPENTINITE.get()) || s.is(ModBlocks.POLISHED_SERPENTINITE.get())
+                || s.is(ModBlocks.SERPENTINITE_SLAB.get()) || s.is(ModBlocks.SERPENTINITE_STAIRS.get())
+                || s.is(ModBlocks.SERPENTINITE_WALL.get());
+    }
+
+    private static boolean isSlate(BlockState s) {
+        return s.is(ModBlocks.SLATE.get()) || s.is(ModBlocks.POLISHED_SLATE.get())
+                || s.is(ModBlocks.SLATE_SLAB.get()) || s.is(ModBlocks.SLATE_STAIRS.get())
+                || s.is(ModBlocks.SLATE_WALL.get());
+    }
+
+    private static boolean isSchist(BlockState s) {
+        return s.is(ModBlocks.SCHIST.get()) || s.is(ModBlocks.POLISHED_SCHIST.get())
+                || s.is(ModBlocks.SCHIST_SLAB.get()) || s.is(ModBlocks.SCHIST_STAIRS.get())
+                || s.is(ModBlocks.SCHIST_WALL.get());
+    }
+
+    private static boolean isGneiss(BlockState s) {
+        return s.is(ModBlocks.GNEISS.get()) || s.is(ModBlocks.POLISHED_GNEISS.get())
+                || s.is(ModBlocks.GNEISS_SLAB.get()) || s.is(ModBlocks.GNEISS_STAIRS.get())
+                || s.is(ModBlocks.GNEISS_WALL.get());
+    }
+
+    private static boolean isMarble(BlockState s) {
+        return s.is(ModBlocks.MARBLE.get()) || s.is(ModBlocks.POLISHED_MARBLE.get())
+                || s.is(ModBlocks.MARBLE_SLAB.get()) || s.is(ModBlocks.MARBLE_STAIRS.get())
+                || s.is(ModBlocks.MARBLE_WALL.get());
+    }
+
+    private static boolean isQuartzite(BlockState s) {
+        return s.is(ModBlocks.QUARTZITE.get()) || s.is(ModBlocks.POLISHED_QUARTZITE.get())
+                || s.is(ModBlocks.QUARTZITE_SLAB.get()) || s.is(ModBlocks.QUARTZITE_STAIRS.get())
+                || s.is(ModBlocks.QUARTZITE_WALL.get());
+    }
+
+    private static boolean isShale(BlockState s) {
+        return s.is(ModBlocks.SHALE.get()) || s.is(ModBlocks.POLISHED_SHALE.get())
+                || s.is(ModBlocks.SHALE_SLAB.get()) || s.is(ModBlocks.SHALE_STAIRS.get())
+                || s.is(ModBlocks.SHALE_WALL.get());
+    }
+
+    private static boolean isChert(BlockState s) {
+        return s.is(ModBlocks.CHERT.get()) || s.is(ModBlocks.POLISHED_CHERT.get())
+                || s.is(ModBlocks.CHERT_SLAB.get()) || s.is(ModBlocks.CHERT_STAIRS.get())
+                || s.is(ModBlocks.CHERT_WALL.get());
+    }
+
+    private static boolean isTravertine(BlockState s) {
+        return s.is(ModBlocks.TRAVERTINE.get()) || s.is(ModBlocks.POLISHED_TRAVERTINE.get())
+                || s.is(ModBlocks.TRAVERTINE_SLAB.get()) || s.is(ModBlocks.TRAVERTINE_STAIRS.get())
+                || s.is(ModBlocks.TRAVERTINE_WALL.get());
     }
 
     /** True where the hammer has something to say - i.e. it is looking at rock, not at a fence. */

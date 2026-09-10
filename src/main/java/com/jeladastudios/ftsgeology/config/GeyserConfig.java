@@ -123,6 +123,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue DEEP_SOIL_DEPTH;           // topsoil left untouched
     public static final ForgeConfigSpec.BooleanValue OCEANIC_RIDGE_ENABLED;
     public static final ForgeConfigSpec.BooleanValue GEOLOGY_AT_GENERATION; // deep geology written as chunks generate
+    public static final ForgeConfigSpec.BooleanValue ORE_GENESIS_ENABLED;   // ore laid down by tectonic setting
 
     // --- Earthquakes --------------------------------------------------------
     public static final ForgeConfigSpec.BooleanValue QUAKES_ENABLED;
@@ -589,6 +590,14 @@ public final class GeyserConfig {
                         "planet's volcanism actually happens, so leaving the sea floor blank was the",
                         "biggest gap left in the model. Sea floor only; never touches player blocks.")
                 .define("oceanicRidgeEnabled", true);
+        ORE_GENESIS_ENABLED = b
+                .comment("Lay ore down where the geology that makes it is: porphyry copper with a",
+                        "malachite and azurite cap under subduction arcs, orogenic gold and skarn gems in",
+                        "collision belts, massive sulfides at rifts, galena along transform faults,",
+                        "hydrothermal veins through faults and geothermal fields, and coal and ironstone",
+                        "seams in the quiet basins between. Applies to chunks that have not had their",
+                        "deep geology yet; it never touches player blocks.")
+                .define("oreGenesisEnabled", true);
         VOLCANO_SPAWN_CHANCE = b
                 .comment("Per-chunk chance of a natural volcano BEFORE tectonic suitability is applied.",
                         "Deliberately tiny: volcanoes are huge structures and should be landmarks.",

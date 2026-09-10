@@ -93,6 +93,9 @@ public final class ModItems {
     public static final RegistryObject<Item> COOLING_LAVA_CRUST = ITEMS.register("cooling_lava_crust",
             () -> new BlockItem(ModBlocks.COOLING_LAVA_CRUST.get(), new Item.Properties()));
 
+    public static final RegistryObject<Item> VOLCANIC_BLACK_SAND = ITEMS.register("volcanic_black_sand",
+            () -> new BlockItem(ModBlocks.VOLCANIC_BLACK_SAND.get(), new Item.Properties()));
+
     // --- Mineral blocks ------------------------------------------------------
 
     public static final RegistryObject<Item> PYRITE = ITEMS.register("pyrite",

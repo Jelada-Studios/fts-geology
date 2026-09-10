@@ -187,6 +187,9 @@ public final class RetrogenHandler {
     /** And the blocks those chunks were given, so a world that never reaches a boundary shows as 0. */
     private static final java.util.concurrent.atomic.AtomicLong GENERATED_BLOCKS =
             new java.util.concurrent.atomic.AtomicLong();
+    /** How many of those were ore. */
+    private static final java.util.concurrent.atomic.AtomicLong GENERATED_ORE =
+            new java.util.concurrent.atomic.AtomicLong();
 
     /**
      * Generates queued chunks a few at a time. Server tick events do not fire while the spawn area
@@ -257,8 +260,8 @@ public final class RetrogenHandler {
                         DeepStructure.Report deep = q.deep() != null ? q.deep() : new DeepStructure.Report();
                         long started = System.nanoTime();
                         int next = DeepStructure.generate(level, q.pos(), deep, q.column(), deadline);
-                        longestStepNanos = Math.max(longestStepNanos, System.nanoTime() - started);
                         if (next < DeepStructure.DONE) {
+                            longestStepNanos = Math.max(longestStepNanos, System.nanoTime() - started);
                             // Out of time part way through. A chunk used to be finished regardless, and
                             // with another mod taxing every block change one chunk alone overran the
                             // whole slice (GitHub #1). Held with its place kept, resumed next tick.
@@ -269,7 +272,10 @@ public final class RetrogenHandler {
                         RandomSource rng = RandomSource.create(
                                 level.getSeed() ^ (((long) q.pos().x) << 32 | (q.pos().z & 0xFFFFFFFFL)));
                         OceanicRidge.generate(level, q.pos(), rng);
-                        blocksSinceReport += deep.blocks;
+                        int ore = OreGenesis.generate(level, q.pos());
+                        // Timed together with the last slice of the deep pass, because that is when it runs.
+                        longestStepNanos = Math.max(longestStepNanos, System.nanoTime() - started);
+                        blocksSinceReport += deep.blocks + ore;
                     }
                     // A retrofit gets the deep pass only: nothing that could put a second geyser or
                     // volcano next to one that is already there.
@@ -300,10 +306,10 @@ public final class RetrogenHandler {
                 // The longest step is the number that matters with a mod hooking every block change:
                 // it has to stay inside retrogen's slice now that a chunk can stop part way through.
                 GeysersMod.LOGGER.info("retrogen: {} chunks in the last 10s, {} blocks placed, {} still queued, "
-                                + "longest step {} ms; {} chunks got their deep geology at generation ({} blocks)",
+                                + "longest step {} ms; {} chunks got their deep geology at generation ({} blocks, {} of them ore)",
                         doneSinceReport, blocksSinceReport, QUEUE.size(),
                         String.format(java.util.Locale.ROOT, "%.2f", longestStepNanos / 1e6), generated,
-                        GENERATED_BLOCKS.getAndSet(0));
+                        GENERATED_BLOCKS.getAndSet(0) + GENERATED_ORE.get(), GENERATED_ORE.getAndSet(0));
             }
             doneSinceReport = 0;
             blocksSinceReport = 0;
@@ -1286,9 +1292,10 @@ public final class RetrogenHandler {
      * Records that a chunk got its deep geology while it was being generated, so retrogen never goes
      * over it a second time. Called from world generation threads, which the sets are safe for.
      */
-    public static void markDeepCurrent(ResourceKey<Level> dimension, ChunkPos pos, int blocks) {
+    public static void markDeepCurrent(ResourceKey<Level> dimension, ChunkPos pos, int blocks, int ore) {
         DEEP_CURRENT.add(dimension.location() + "@" + pos.toLong());
         GENERATED.incrementAndGet();
         GENERATED_BLOCKS.addAndGet(blocks);
+        GENERATED_ORE.addAndGet(ore);
     }
 }

@@ -11,7 +11,9 @@ import com.jeladastudios.ftsgeology.block.VolcanoCoreBlock;
 import com.jeladastudios.ftsgeology.block.VolcanoIgniterBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SandBlock;
 import net.minecraft.world.level.block.SlabBlock;
+import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.WallBlock;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -247,6 +249,13 @@ public final class ModBlocks {
                     .lightLevel(s -> 7)
                     .strength(2.0F, 6.0F)
                     .requiresCorrectToolForDrops()));
+
+    /** Volcanic black sand: basalt shattered by the sea and ground down by waves, as on Hawaiian beaches. */
+    public static final RegistryObject<Block> VOLCANIC_BLACK_SAND = BLOCKS.register("volcanic_black_sand",
+            () -> new SandBlock(0x141414, BlockBehaviour.Properties.copy(Blocks.SAND)
+                    .mapColor(MapColor.COLOR_BLACK)
+                    .strength(0.5F)
+                    .sound(SoundType.SAND)));
 
     // --- Mineral blocks ------------------------------------------------------
     //
