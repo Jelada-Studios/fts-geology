@@ -127,9 +127,23 @@ public final class FindCommands {
                 .supplyAsync(() -> VolcanoField.nearest(level, at.getX(), at.getZ(), rings, only),
                         Util.backgroundExecutor())
                 .thenAcceptAsync(found -> {
-                    if (found == null) {
+                    // What the search turned down, as water / relief / structure / other per type, so a
+                    // type that never turns up can be told from one that is only rare.
+                    int[] no = found.refused();
+                    Object[] perType = new Object[VolcanoType.values().length];
+                    for (VolcanoType type : VolcanoType.values()) {
+                        int b = type.ordinal() * VolcanoField.REASONS;
+                        perType[type.ordinal()] = no[b + VolcanoField.WATER] + "/" + no[b + VolcanoField.RELIEF]
+                                + "/" + no[b + VolcanoField.STRUCTURE] + "/" + no[b + VolcanoField.OTHER];
+                    }
+                    GeysersMod.LOGGER.info("Large volcano candidates refused, water/relief/structure/other: {}",
+                            java.util.Arrays.toString(perType));
+                    Component refusedLine = Component.translatable("command.fts_geology.field.refused", perType)
+                            .withStyle(ChatFormatting.GRAY);
+                    if (found.site() == null) {
                         source.sendFailure(Component.translatable("command.fts_geology.field.none",
                                 rings * 2560));
+                        source.sendSuccess(() -> refusedLine, false);
                         return;
                     }
                     VolcanoField.Site s = found.site();
@@ -142,6 +156,7 @@ public final class FindCommands {
                     source.sendSuccess(() -> Component.translatable("command.fts_geology.field.found",
                             s.type().name().toLowerCase(Locale.ROOT), s.x(), s.z(), s.baseY(), s.summitY(),
                             distance, found.count()).withStyle(ChatFormatting.GREEN), false);
+                    source.sendSuccess(() -> refusedLine, false);
                     if (teleport && source.getEntity() instanceof net.minecraft.server.level.ServerPlayer p) {
                         // Beside the summit rather than on it: the crater is cut once the area loads.
                         int tx = s.x() + 40, tz = s.z();
@@ -179,7 +194,7 @@ public final class FindCommands {
         int columns = 0;
         // The same counts in four rings out from the summit, logged, so a seam can be traced to a part.
         long[][] bands = new long[4][4];   // pairs inside, steps of 4+ inside, pairs across, steps across
-        if (found != null) {
+        if (found.site() != null) {
             VolcanoField.Site s = found.site();
             int r = Math.min(s.edificeReach(), 240);
             for (int x = s.x() - r; x < s.x() + r; x++) {

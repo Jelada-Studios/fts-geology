@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -63,10 +62,17 @@ public final class VolcanoField {
     }
 
     /**
-     * A search result: the nearest chosen site, how many chosen sites the search passed, and how many
-     * of those were of each type, by {@link VolcanoType} ordinal.
+     * A search result: the nearest chosen site or null, how many chosen sites the search passed, how many
+     * of those were of each type, by {@link VolcanoType} ordinal, and how many candidates were turned
+     * down, at type ordinal times {@link #REASONS} plus the reason.
      */
-    public record Found(Site site, int count, int[] byType) {}
+    public record Found(Site site, int count, int[] byType, int[] refused) {}
+
+    /** Why a candidate was turned down: water under it, broken ground, a structure due, anything else. */
+    public static final int WATER = 0, RELIEF = 1, STRUCTURE = 2, OTHER = 3, REASONS = 4;
+
+    /** A worked-out cell: its volcano, if any, and the candidates turned down on the way. */
+    private record Cell(Site site, int[] refused) {}
 
     /** Edge of a grid cell. Each cell holds at most one volcano. */
     static final int CELL = 2560;
@@ -82,7 +88,7 @@ public final class VolcanoField {
     /** How far a plume's centre may be pulled to fit its cell: the dome is still strong there. */
     private static final int PLUME_PULL = 420;
 
-    private static final Map<Long, Optional<Site>> CACHE = new ConcurrentHashMap<>();
+    private static final Map<Long, Cell> CACHE = new ConcurrentHashMap<>();
 
     /** The chosen large volcanoes whose footprint reaches into this chunk. */
     public static List<Site> sitesTouching(ServerLevel level, ChunkPos cp) {
@@ -147,9 +153,12 @@ public final class VolcanoField {
         double bestD = Double.MAX_VALUE;
         int count = 0;
         int[] byType = new int[VolcanoType.values().length];
+        int[] refused = new int[VolcanoType.values().length * REASONS];
         for (int ox = -rings; ox <= rings; ox++) {
             for (int oz = -rings; oz <= rings; oz++) {
-                Site s = site(level, cx0 + ox, cz0 + oz);
+                Cell cell = cell(level, cx0 + ox, cz0 + oz);
+                for (int i = 0; i < refused.length; i++) refused[i] += cell.refused()[i];
+                Site s = cell.site();
                 if (s == null || !s.chosen()) continue;
                 count++;
                 byType[s.type().ordinal()]++;
@@ -158,7 +167,7 @@ public final class VolcanoField {
                 if (d < bestD) { bestD = d; best = s; }
             }
         }
-        return best == null ? null : new Found(best, count, byType);
+        return new Found(best, count, byType, refused);
     }
 
     public static void clearCache() {
@@ -166,19 +175,24 @@ public final class VolcanoField {
     }
 
     private static Site site(ServerLevel level, int cx, int cz) {
+        return cell(level, cx, cz).site();
+    }
+
+    private static Cell cell(ServerLevel level, int cx, int cz) {
         long key = ((long) cx << 32) ^ (cz & 0xFFFFFFFFL);
-        Optional<Site> hit = CACHE.get(key);
+        Cell hit = CACHE.get(key);
         if (hit == null) {
             if (CACHE.size() > 50_000) CACHE.clear();
             // Two threads may work the same cell out at once. The answer is the same either way.
-            hit = Optional.ofNullable(evaluate(level, cx, cz));
+            hit = evaluate(level, cx, cz);
             CACHE.putIfAbsent(key, hit);
         }
-        return hit.orElse(null);
+        return hit;
     }
 
-    private static Site evaluate(ServerLevel level, int cx, int cz) {
+    private static Cell evaluate(ServerLevel level, int cx, int cz) {
         long seed = hash(level.getSeed(), cx, cz, 0x5EED1L);
+        int[] refused = new int[VolcanoType.values().length * REASONS];
         int span = CELL - 2 * MARGIN;
         int minX = cx * CELL + MARGIN, minZ = cz * CELL + MARGIN;
         int maxX = minX + span, maxZ = minZ + span;
@@ -192,8 +206,8 @@ public final class VolcanoField {
             // A really large hotspot volcano has often emptied its chamber and fallen in.
             VolcanoType type = rand01(hash(seed, 0, 0, 0xCA1DL)) < 0.34
                     ? VolcanoType.CALDERA : VolcanoType.SHIELD;
-            Site s = check(level, x, z, type, seed);
-            if (s != null) return s;
+            Site s = check(level, x, z, type, seed, refused);
+            if (s != null) return new Cell(s, refused);
         }
 
         for (int i = 0; i < TRIES; i++) {
@@ -214,17 +228,17 @@ public final class VolcanoField {
             // Rifts run long and largely over land, so left alone they out-numbered the arcs four to
             // one in testing. A flood-basalt fissure this size is the rarer sight in the real world.
             if (type == VolcanoType.FISSURE && rand01(hash(seed, i, 3, 0xF155L)) < 0.6) continue;
-            Site site = check(level, x, z, type, seed);
-            if (site != null) return site;
+            Site site = check(level, x, z, type, seed, refused);
+            if (site != null) return new Cell(site, refused);
         }
-        return null;
+        return new Cell(null, refused);
     }
 
     /**
      * Whether a large volcano of this type can stand here, from the generator's own terrain rather than
      * the world, which for most of these cells does not exist yet.
      */
-    private static Site check(ServerLevel level, int x, int z, VolcanoType type, long seed) {
+    private static Site check(ServerLevel level, int x, int z, VolcanoType type, long seed, int[] refused) {
         int magnitude = VolcanoSize.LARGE.magnitude(rand01(hash(seed, x, z, 0x3A6L)));
         ChunkGenerator gen = level.getChunkSource().getGenerator();
         RandomState rs = level.getChunkSource().randomState();
@@ -232,7 +246,7 @@ public final class VolcanoField {
 
         // Planned once on a provisional base, only to learn how wide a ring to sample.
         int[] probe = VolcanoBuilder.largeFootprint(level, x, sea + 8, z, magnitude, type, seed);
-        if (probe == null) return refuse(type, x, z, "no plan");
+        if (probe == null) return refuse(refused, type, OTHER, x, z, "no plan");
         int foot = probe[1];
 
         // The centre, then eight points half way out and eight at the foot.
@@ -249,7 +263,7 @@ public final class VolcanoField {
                 int surface = gen.getBaseHeight(px, pz, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
                 int floor = gen.getBaseHeight(px, pz, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
                 if (surface > floor || floor <= sea) {
-                    if (ring == 0) return refuse(type, x, z, "centre in water");
+                    if (ring == 0) return refuse(refused, type, WATER, x, z, "centre in water");
                     wet[ring]++;
                 }
                 ground[n++] = floor - 1;
@@ -258,35 +272,40 @@ public final class VolcanoField {
         // Water under the body of the mountain refuses it; a lake or a shore out at the foot does not,
         // since the apron carries on under water as a thin skin. A volcano half in the sea is a job for
         // the ocean volcanoes, not this.
-        if (wet[1] > (type == VolcanoType.SHIELD ? 3 : 2) || wet[2] > 6) {
-            return refuse(type, x, z, "wet " + wet[1] + " mid, " + wet[2] + " foot");
+        if (wet[1] > (type == VolcanoType.SHIELD ? 4 : 2) || wet[2] > 6) {
+            return refuse(refused, type, WATER, x, z, "wet " + wet[1] + " mid, " + wet[2] + " foot");
         }
 
-        int lo = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
-        for (int i = 0; i < 9; i++) {
-            lo = Math.min(lo, ground[i]);
-            hi = Math.max(hi, ground[i]);
-        }
-        // A caldera cuts a floor four hundred blocks across and needs ground that allows it; a cone
-        // grows out of whatever is there.
-        if (hi - lo > (type.excavates() ? 64 : 140)) return refuse(type, x, z, "relief " + (hi - lo));
+        // Without the highest and lowest of the nine inner points, so one peak or gorge under the body
+        // does not turn a whole mountain down. A caldera cuts a floor and needs ground that allows it; a
+        // shield is low and spreads over broken country; a cone grows out of whatever is there.
+        int[] inner = Arrays.copyOf(ground, 9);
+        Arrays.sort(inner);
+        int relief = inner[7] - inner[1];
+        int allowed = switch (type) {
+            case SHIELD -> 200;
+            case CALDERA -> 96;
+            default -> 140;
+        };
+        if (relief > allowed) return refuse(refused, type, RELIEF, x, z, "relief " + relief);
         int[] sorted = ground.clone();
         Arrays.sort(sorted);
         int baseY = sorted[8];
 
         int[] plan = VolcanoBuilder.largeFootprint(level, x, baseY, z, magnitude, type, seed);
-        if (plan == null) return refuse(type, x, z, "no plan at base " + baseY);
+        if (plan == null) return refuse(refused, type, OTHER, x, z, "no plan at base " + baseY);
         // Structures are placed before the mountain and would end up inside it, so none may stand on the
         // edifice itself; one out on the apron keeps its buildings, which the apron will not cover.
         if (structureInTheWay(level, gen, rs, x, z, plan[1] + 8)) {
-            return refuse(type, x, z, "structure within " + (plan[1] + 8));
+            return refuse(refused, type, STRUCTURE, x, z, "structure within " + (plan[1] + 8));
         }
         return new Site(x, z, baseY, plan[2], type, magnitude, seed, plan[0], plan[1],
                 rand01(hash(seed, x, z, 0xC40L)));
     }
 
-    /** Logs why a candidate site was turned down, at debug level, and refuses it. */
-    private static Site refuse(VolcanoType type, int x, int z, String why) {
+    /** Counts and logs why a candidate site was turned down, at debug level, and refuses it. */
+    private static Site refuse(int[] refused, VolcanoType type, int reason, int x, int z, String why) {
+        refused[type.ordinal() * REASONS + reason]++;
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("Large {} site at {},{} refused: {}", type, x, z, why);
         return null;
     }

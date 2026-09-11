@@ -253,6 +253,7 @@
   "command.fts_geology.field.found": "Nearest large volcano: %s at %s, %s. Base Y %s, summit Y %s, about %s blocks away (%s in the search area).",
   "command.fts_geology.field.seams": "%s at %s, %s. Inside chunks: %s column pairs, mean step %s, steps of 4 or more %s per thousand. Across chunk borders: %s pairs, mean step %s, steps of 4 or more %s per thousand. Height digest %s over %s columns.",
   "command.fts_geology.field.no_seams": "No generated large volcano near you to measure.",
+  "command.fts_geology.field.refused": "Candidates turned down in the search (water / relief / structure / other): strato %s, shield %s, fissure %s, caldera %s.",
   "command.fts_geology.no_geyser_core_found_in_the_column_here_": "No geyser core found in the column here (scanned %s to %s). Stand right on a geyser vent.",
   "command.fts_geology.geyser.debug": "Geyser @ %d,%d,%d | phase=%s temp=%s°C P=%s (thr %s) water=%s room=%s heat=%s mag=%d ventMouthY=%s eruptTicks=%d",
   "command.fts_geology.ticks_d_venttopy_s_below_core_1_s_above_": "  ticks=%d ventTopY=%s | below(core-1)=%s above(core+1)=%s",

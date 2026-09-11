@@ -63,7 +63,7 @@ public enum VolcanoSize {
      * build after generation at all.
      */
     double coneSlope(VolcanoType type) {
-        if (type == VolcanoType.SHIELD && this != SMALL) return this == MEDIUM ? 5.0 : 6.0;
+        if (type == VolcanoType.SHIELD && this != SMALL) return this == MEDIUM ? 5.0 : 4.5;
         // A big stratocone twice as wide as it is tall, so its flanks are not a spike.
         if (type == VolcanoType.STRATOVOLCANO && this == LARGE) return 2.0;
         return type.coneSlope();
