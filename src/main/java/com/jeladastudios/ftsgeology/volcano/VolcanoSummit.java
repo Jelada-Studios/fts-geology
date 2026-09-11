@@ -418,8 +418,9 @@ public final class VolcanoSummit {
     static void cutVent(ServerLevel level, Ctx c, int index) {
         if (index >= c.ventSites.size()) return;
         BlockPos site = c.ventSites.get(index);
-        BlockPos outlet = carveSeatedOutlet(level, site.getX(), site.getZ());
+        BlockPos outlet = buildSpatterCone(level, site.getX(), site.getZ());
         if (outlet == null) return;
+        GeysersMod.LOGGER.debug("Flank vent at {} {} {}", outlet.getX(), outlet.getY(), outlet.getZ());
         connectVentDown(level, outlet.below(), c.x, c.z, c.reservoirY + 2);
         c.vents.add(outlet);
     }
@@ -474,70 +475,123 @@ public final class VolcanoSummit {
                 c.type, c.vents.size(), c.ventSites.size(), c.molten.size());
     }
 
+    /** A flank vent's spatter cone: radius before its wobble, cinders scattered past it, most fill one column may take. */
+    private static final double CONE_R = 3.5;
+    private static final int CONE_SCATTER = 2;
+    private static final int CONE_MAX_FILL = 5;
+
     /**
-     * Seats a lava outlet into the hillside: shaves a 5x5 bench down to the lowest ground in it, then
-     * recesses the lava under a basalt collar so it has nowhere to run. Refuses more than six blocks of
-     * relief, and checks the whole site before touching any of it.
+     * Raises a small spatter cone round a flank outlet, the way a real side vent builds itself out of what it
+     * throws: a round, wobbling mound that only adds rock, merging into the slope on its uphill side, with
+     * the lava one block down inside a collar so it has nowhere to run. Cinders thin out past its foot.
+     * Refuses a column that would need more than {@link #CONE_MAX_FILL} blocks of fill, and checks the whole
+     * site before touching any of it.
      *
      * @return the lava cell, or null if this spot was unusable
      */
-    static BlockPos carveSeatedOutlet(ServerLevel level, int vx, int vz) {
+    static BlockPos buildSpatterCone(ServerLevel level, int vx, int vz) {
+        int outer = (int) Math.ceil(CONE_R * 1.22) + CONE_SCATTER;
         // Nothing here may reach into an unloaded chunk; reading one loads it on the server thread.
-        if (!loaded(level, vx, vz, 3)) return null;
-        // The lowest real ground in the 5x5 the outlet will occupy. Anything that is not ground at
-        // all - a cliff edge, open air - still disqualifies the site.
-        int g = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dz = -2; dz <= 2; dz++) {
-                int h = TerrainProbe.groundY(level, vx + dx, vz + dz);
-                if (h == Integer.MIN_VALUE) return null;
-                if (TerrainProbe.hasFluidAbove(level, vx + dx, vz + dz)) return null;  // lake or sea
-                g = Math.min(g, h);
-                hi = Math.max(hi, h);
-            }
-        }
-        if (g == Integer.MAX_VALUE) return null;
-        // A bench, not a cliff: past six blocks of relief the notch would read as a bite out of the mountain.
-        if (hi - g > 6) return null;
-        if (g <= level.getSeaLevel() + 1) return null;   // never at the waterline
+        if (!loaded(level, vx, vz, outer + 1)) return null;
 
-        // Check the whole site first, so a rejected site is left exactly as it was.
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dz = -2; dz <= 2; dz++) {
-                for (int y = g; y <= g + 6; y++) {
-                    BlockState s = level.getBlockState(new BlockPos(vx + dx, y, vz + dz));
-                    if (s.isAir()) continue;
-                    if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) return null;
-                }
-            }
-        }
-
-        // Shave down to that level. Only removes, so the outlet never stands on a plinth.
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dz = -2; dz <= 2; dz++) {
-                int x = vx + dx, z = vz + dz;
-                TerrainProbe.clearVegetation(level, x, g, z, 3);
-                for (int y = g + 1; y <= g + 6; y++) {
-                    BlockPos p = new BlockPos(x, y, z);
-                    if (level.getBlockState(p).isAir()) continue;
-                    level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
-                }
-            }
-        }
-
-        BlockPos lava = new BlockPos(vx, g, vz);
+        // The lava stands one above the highest ground of the 3x3 core, so nothing has to be cut to seat it.
+        int core = Integer.MIN_VALUE;
         for (int dx = -1; dx <= 1; dx++) {
             for (int dz = -1; dz <= 1; dz++) {
-                if (dx == 0 && dz == 0) continue;
-                BlockPos p = new BlockPos(vx + dx, g, vz + dz);
-                level.setBlock(p.above(), Blocks.BASALT.defaultBlockState(), 2);
-                level.setBlock(p, Blocks.BASALT.defaultBlockState(), 2);
+                int h = TerrainProbe.groundY(level, vx + dx, vz + dz);
+                if (h == Integer.MIN_VALUE) return null;
+                if (TerrainProbe.hasFluidAbove(level, vx + dx, vz + dz)) return null;   // lake or sea
+                core = Math.max(core, h);
             }
         }
+        if (core <= level.getSeaLevel() + 1) return null;   // never at the waterline
+        int lavaY = core + 1, rimY = lavaY + 1;
+        double phase = level.random.nextDouble() * Math.PI * 2;
+
+        // Work out every column first, so a rejected site is left exactly as it was.
+        int span = outer * 2 + 1;
+        int[] ground = new int[span * span];
+        int[] fillTo = new int[span * span];
+        double[] reach = new double[span * span];
+        for (int dx = -outer; dx <= outer; dx++) {
+            for (int dz = -outer; dz <= outer; dz++) {
+                int i = (dx + outer) * span + dz + outer;
+                double d = Math.sqrt(dx * dx + dz * dz);
+                double ang = Math.atan2(dz, dx);
+                double r = CONE_R * (1.0 + 0.14 * Math.sin(3 * ang + phase) + 0.08 * Math.sin(5 * ang - phase));
+                reach[i] = r;
+                fillTo[i] = Integer.MIN_VALUE;
+                ground[i] = Integer.MIN_VALUE;
+                if (d > r + CONE_SCATTER) continue;
+                int g = TerrainProbe.groundY(level, vx + dx, vz + dz);
+                ground[i] = g;
+                if (g == Integer.MIN_VALUE) {
+                    if (d <= r) return null;
+                    continue;
+                }
+                if (d > r) continue;                            // cinders only, decided when writing
+                boolean centre = dx == 0 && dz == 0;
+                // The collar stands at the rim; the flank falls away from it. Under the lava, a plug.
+                int want = centre ? lavaY - 1 : d <= 1.5 ? rimY : rimY - (int) Math.round((d - 1.5) * 0.8);
+                // The lava's cell and the air over it have to be free as well.
+                int checkTo = centre ? rimY : want;
+                if (want - g > CONE_MAX_FILL) return null;      // a cliff, not a slope
+                if (checkTo > g && TerrainProbe.hasFluidAbove(level, vx + dx, vz + dz)) return null;
+                for (int y = g + 1; y <= checkTo; y++) {
+                    BlockState s = level.getBlockState(new BlockPos(vx + dx, y, vz + dz));
+                    if (s.isAir() || TerrainProbe.isVegetation(s)) continue;
+                    if (!s.getFluidState().isEmpty() || s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) return null;
+                }
+                if (want > g) fillTo[i] = want;
+            }
+        }
+
+        net.minecraft.util.RandomSource rng = level.random;
+        for (int dx = -outer; dx <= outer; dx++) {
+            for (int dz = -outer; dz <= outer; dz++) {
+                int i = (dx + outer) * span + dz + outer;
+                int g = ground[i];
+                if (g == Integer.MIN_VALUE) continue;
+                int x = vx + dx, z = vz + dz;
+                if (fillTo[i] != Integer.MIN_VALUE) {
+                    TerrainProbe.clearVegetation(level, x, g, z, 3);
+                    for (int y = g + 1; y <= fillTo[i]; y++) {
+                        BlockState rock = y == fillTo[i] && !(dx == 0 && dz == 0) ? spatter(rng) : Blocks.BASALT.defaultBlockState();
+                        level.setBlock(new BlockPos(x, y, z), rock, 2);
+                    }
+                    continue;
+                }
+                // Past the mound, and on uphill ground it did not need to raise, cinders over the soil,
+                // thinning outward so the cone does not end on a line.
+                double d = Math.sqrt(dx * dx + dz * dz);
+                double chance = d <= reach[i] ? 0.7 : 0.7 * (1.0 - (d - reach[i]) / (CONE_SCATTER + 0.5));
+                if (rng.nextDouble() >= chance) continue;
+                BlockPos top = new BlockPos(x, g, z);
+                BlockState s = level.getBlockState(top);
+                if (s.isAir() || !s.getFluidState().isEmpty() || s.is(Blocks.BEDROCK)
+                        || EruptionHandler.isPlayerPlaced(s)) continue;
+                if (!level.getBlockState(top.above()).getFluidState().isEmpty()) continue;
+                TerrainProbe.clearVegetation(level, x, g, z, 2);
+                int roll = rng.nextInt(10);
+                level.setBlock(top, (roll < 4 ? Blocks.TUFF : roll < 7 ? Blocks.GRAVEL : Blocks.BLACKSTONE)
+                        .defaultBlockState(), 2);
+            }
+        }
+
+        BlockPos lava = new BlockPos(vx, lavaY, vz);
         level.setBlock(lava.below(), Blocks.BASALT.defaultBlockState(), 2);
         level.setBlock(lava, Blocks.LAVA.defaultBlockState(), 2);
         level.setBlock(lava.above(), Blocks.AIR.defaultBlockState(), 2);
         return lava;
+    }
+
+    /** The skin of a spatter cone: black cinders and basalt, some tuff, and here and there a still warm crust. */
+    private static BlockState spatter(net.minecraft.util.RandomSource rng) {
+        int r = rng.nextInt(10);
+        if (r < 4) return Blocks.BLACKSTONE.defaultBlockState();
+        if (r < 7) return Blocks.BASALT.defaultBlockState();
+        if (r < 9) return Blocks.TUFF.defaultBlockState();
+        return com.jeladastudios.ftsgeology.registry.ModBlocks.COOLING_LAVA_CRUST.get().defaultBlockState();
     }
 
     /**

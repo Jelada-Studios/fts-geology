@@ -185,6 +185,11 @@ public final class VolcanoPlan {
             c.flowPhase[i] = rng.nextDouble() * Math.PI * 2;
         }
         c.flowReach = Math.max(10, c.coneBaseR) * (1.05 + rng.nextDouble() * 0.45);
+        // A big stratocone's or fissure's flows give out a fifth sooner, around the foot, instead of running on
+        // far over the country.
+        if (size == VolcanoSize.LARGE && (type == VolcanoType.STRATOVOLCANO || type == VolcanoType.FISSURE)) {
+            c.flowReach *= 0.8;
+        }
         // Flow width scales with the cone, so a big mountain is not threaded with thin lines. Many
         // narrow flows cover about a tenth of the flank without breaking a centreline.
         // Flows are thin tongues, not bands that widen with the mountain; a shield's are many but narrow.
