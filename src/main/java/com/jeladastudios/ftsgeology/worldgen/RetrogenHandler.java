@@ -297,9 +297,10 @@ public final class RetrogenHandler {
             if (surfaceNanos > 0) {
                 long[] p = SurfaceFeatures.PART_NANOS;
                 GeysersMod.LOGGER.info("retrogen surface pass, ms: suitability {}, signs {}, basin {}, soil {}, "
-                                + "springs {}, volcanoes {}, geysers {}",
+                                + "springs {}, volcanoes {}, geysers {}; springs expected {}",
                         ms(p[0]), ms(p[1]), ms(p[2]), ms(p[3]), ms(p[4]), ms(p[5]),
-                        ms(surfaceNanos - p[0] - p[1] - p[2] - p[3] - p[4] - p[5]));
+                        ms(surfaceNanos - p[0] - p[1] - p[2] - p[3] - p[4] - p[5]),
+                        String.format(java.util.Locale.ROOT, "%.2f", SurfaceFeatures.EXPECTED_SPRINGS.sumThenReset()));
                 java.util.Arrays.fill(p, 0L);
                 surfaceNanos = 0;
             }

@@ -34,8 +34,14 @@ public final class SurfaceFeatures {
     /** How much denser hot springs get on properly geothermal ground. */
     static final double GEOTHERMAL_SPRING_BOOST = 1.25;
 
-    /** How much denser they get deep on a painted basin floor. */
-    static final double BASIN_SPRING_BOOST = 3.0;
+    /**
+     * How much denser they get deep on a painted basin floor. It comes on top of the plume's own boost, and
+     * above this the colour bands of neighbouring pools run into one another.
+     */
+    static final double BASIN_SPRING_BOOST = 2.25;
+
+    /** Springs the surface pass expected since the last report: the sum of its per-chunk chances. */
+    static final java.util.concurrent.atomic.DoubleAdder EXPECTED_SPRINGS = new java.util.concurrent.atomic.DoubleAdder();
 
     /** 0 on ordinary country, rising to 1 over a plume, a spreading ridge or a subduction arc. */
     static double geothermalGround(ServerLevel level, int x, int z) {
@@ -105,7 +111,9 @@ public final class SurfaceFeatures {
         double floor = net.minecraft.util.Mth.clamp(
                 (GeothermalBasin.basin(level, centreX, centreZ) - 0.30) / 0.30, 0.0, 1.0);
         springBoost = Math.max(springBoost, 1.0 + (BASIN_SPRING_BOOST - 1.0) * floor);
-        if (rng.nextDouble() < GeyserConfig.HOT_SPRING_SPAWN_CHANCE.get() * fit.hotSpring() * springBoost) {
+        double springChance = GeyserConfig.HOT_SPRING_SPAWN_CHANCE.get() * fit.hotSpring() * springBoost;
+        EXPECTED_SPRINGS.add(Math.min(1.0, springChance));
+        if (rng.nextDouble() < springChance) {
             generateHotSpring(level, cp, rng);
         }
         t = lap(4, t);

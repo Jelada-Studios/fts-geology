@@ -271,8 +271,8 @@ public final class HotSpringSites {
 
     /**
      * The microbial colour bands around a pool. Each temperature range has its own pigmented mats, so the
-     * rings are a thermometer, as at Grand Prismatic. Widths are rolled per spring, edges wobble, and the
-     * bands keep to the flat apron.
+     * rings are a thermometer, as at Grand Prismatic. Widths are rolled per spring and edges wobble. The mats
+     * keep to the flat apron; up a bank behind the pool the same rings show as stained, altered ground.
      */
     static void paintThermalRings(ServerLevel level, List<BlockPos> pool,
                                           int cx, int cz, int waterY, int stage) {
@@ -330,8 +330,18 @@ public final class HotSpringSites {
 
                 int g = TerrainProbe.groundY(level, x, z);
                 if (g == Integer.MIN_VALUE) continue;
-                // Mats keep to the flat apron; the halo may climb a little further.
-                if (Math.abs(g - waterY) > (inHalo ? 4 : 2)) continue;
+                int flat = inHalo ? 4 : 2;
+                if (g - waterY < -flat) continue;
+                // Mats keep to the flat apron, since they live in the film of water running off it. Up a bank no
+                // water runs, and steam and acid stain the ground instead: bleached white, sulfur yellow, iron
+                // orange and red, as on the walls of the Grand Canyon of the Yellowstone. Thinning with height.
+                boolean bank = g - waterY > flat;
+                if (bank) {
+                    int rise = g - waterY;
+                    if (rise > BANK_REACH
+                            || level.random.nextDouble() < (rise - flat) / (double) (BANK_REACH - flat + 1)) continue;
+                    b = altered(b, level.random);
+                }
                 // Never paint the floor under standing water, such as a neighbouring pool's bed.
                 if (!level.getBlockState(new BlockPos(x, g + 1, z)).getFluidState().isEmpty()) continue;
                 BlockPos p = new BlockPos(x, g, z);
@@ -340,8 +350,42 @@ public final class HotSpringSites {
                 if (!s.getFluidState().isEmpty()) continue;
                 TerrainProbe.clearVegetation(level, x, g, z, 2);
                 level.setBlock(p, b.defaultBlockState(), FLAGS);
-                if (inHalo && level.random.nextInt(30) == 0) deadTree(level, p, level.random);
+                if (bank) stainStepFace(level, x, g, z, b);
+                else if (inHalo && level.random.nextInt(30) == 0) deadTree(level, p, level.random);
             }
+        }
+    }
+
+    /** How far above the water line the stained ground climbs a bank. */
+    private static final int BANK_REACH = 10;
+
+    /** A band's colour as hydrothermally altered ground instead of a mat. The halo's crust stays as it is. */
+    static Block altered(Block band, net.minecraft.util.RandomSource rng) {
+        if (band == ModBlocks.SINTER.get()) return rng.nextBoolean() ? Blocks.CALCITE : Blocks.WHITE_TERRACOTTA;
+        if (band == ModBlocks.MICROBIAL_MAT_GREEN.get() || band == ModBlocks.MICROBIAL_MAT_YELLOW.get()) {
+            return Blocks.YELLOW_TERRACOTTA;
+        }
+        if (band == ModBlocks.MICROBIAL_MAT_ORANGE.get()) return Blocks.ORANGE_TERRACOTTA;
+        if (band == ModBlocks.MICROBIAL_MAT_BROWN.get()) {
+            return rng.nextBoolean() ? Blocks.RED_TERRACOTTA : Blocks.BROWN_TERRACOTTA;
+        }
+        return band;
+    }
+
+    /**
+     * On a bank of one-block steps the face of each step shows too. Where a neighbour stands two or more
+     * lower, the block under the stained top takes the same colour, so the bank is not striped with soil.
+     */
+    private static void stainStepFace(ServerLevel level, int x, int g, int z, Block b) {
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            int n = TerrainProbe.groundY(level, x + d.getStepX(), z + d.getStepZ());
+            if (n == Integer.MIN_VALUE || n > g - 2) continue;
+            BlockPos under = new BlockPos(x, g - 1, z);
+            BlockState s = level.getBlockState(under);
+            if (s.isAir() || !s.getFluidState().isEmpty() || s.is(Blocks.BEDROCK)
+                    || EruptionHandler.isPlayerPlaced(s)) return;
+            level.setBlock(under, b.defaultBlockState(), FLAGS);
+            return;
         }
     }
 
