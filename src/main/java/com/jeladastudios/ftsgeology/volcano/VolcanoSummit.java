@@ -34,11 +34,36 @@ public final class VolcanoSummit {
             case COLLAPSE_FLOOR -> seatCalderaVent(level, c);
             case FISSURE_PONDS -> carveFissureLine(level, c);
         }
-        if (c.vent == null) {
-            // Nothing seated: fall back to the axis so the volcano still gets a working core.
-            int g = TerrainProbe.groundY(level, c.x, c.z);
-            c.vent = new BlockPos(c.x, g == Integer.MIN_VALUE ? c.summitY : g, c.z);
+        seatFallbackVent(level, c);
+    }
+
+    /**
+     * Queues a volcano's summit. A funnel pit is carved a row of one layer per step: carved in one step,
+     * a big stratocone's took 64 ms of a single tick.
+     */
+    static void addSummit(VolcanoJob job, Ctx c) {
+        if (c.type.summitStyle() != VolcanoType.SummitStyle.FUNNEL_PIT) {
+            job.add(lvl -> buildSummit(lvl, c));
+            return;
         }
+        int reach = (int) Math.ceil(c.craterR * 1.18) + 2;
+        for (int d = 0; d <= funnelDepth(c); d++) {
+            for (int dx = -reach; dx <= reach; dx++) {
+                final int layer = d, row = dx;
+                job.add(lvl -> carveFunnelRow(lvl, c, layer, row));
+            }
+        }
+        job.add(lvl -> {
+            seatFunnelLake(lvl, c);
+            seatFallbackVent(lvl, c);
+        });
+    }
+
+    /** Nothing seated: fall back to the axis so the volcano still gets a working core. */
+    static void seatFallbackVent(ServerLevel level, Ctx c) {
+        if (c.vent != null) return;
+        int g = TerrainProbe.groundY(level, c.x, c.z);
+        c.vent = new BlockPos(c.x, g == Integer.MIN_VALUE ? c.summitY : g, c.z);
     }
 
     /**
@@ -46,34 +71,50 @@ public final class VolcanoSummit {
      * that the lake glows in view from the rim, as at Villarrica or Nyiragongo.
      */
     static void carveFunnelPit(ServerLevel level, Ctx c) {
-        // A lake about half the crater across, so it reads as a lake from above.
-        int poolR = Math.max(2, (int) Math.round(c.craterR * 0.55));
-        int depth = Mth.clamp(c.craterR + 1, 3, 7);
-        int floorY = c.summitY - depth;
-        for (int d = 0; d <= depth; d++) {
-            int y = c.summitY - d;
-            // Never narrower than the lake it has to hold: a funnel with a floor, not a spike.
-            double r = Math.max(poolR + 1.0, c.craterR * (1.0 - d / (double) (depth + 1)));
-            int reach = (int) Math.ceil(r) + 1;
-            for (int dx = -reach; dx <= reach; dx++) {
-                for (int dz = -reach; dz <= reach; dz++) {
-                    double dist = Math.sqrt(dx * dx + dz * dz);
-                    double ang = Math.atan2(dz, dx);
-                    double rr = r * (1.0 + 0.18 * Math.sin(3 * ang + c.phaseA));
-                    if (dist > rr) continue;
-                    BlockPos p = new BlockPos(c.x + dx, y, c.z + dz);
-                    if (dist > rr - 1.3) {
-                        // The wall of the funnel, still hot in places.
-                        setRock(level, p, (level.random.nextInt(6) == 0
-                                ? Blocks.MAGMA_BLOCK : Blocks.BLACKSTONE).defaultBlockState());
-                    } else {
-                        clearNatural(level, p);
-                    }
-                }
+        int reach = (int) Math.ceil(c.craterR * 1.18) + 2;
+        for (int d = 0; d <= funnelDepth(c); d++) {
+            for (int dx = -reach; dx <= reach; dx++) carveFunnelRow(level, c, d, dx);
+        }
+        seatFunnelLake(level, c);
+    }
+
+    /** A lake about half the crater across, so it reads as a lake from above. */
+    static int funnelPoolR(Ctx c) {
+        return Math.max(2, (int) Math.round(c.craterR * 0.55));
+    }
+
+    static int funnelDepth(Ctx c) {
+        return Mth.clamp(c.craterR + 1, 3, 7);
+    }
+
+    /** One row of one layer of the funnel, {@code d} blocks below the summit. */
+    static void carveFunnelRow(ServerLevel level, Ctx c, int d, int dx) {
+        int depth = funnelDepth(c);
+        int y = c.summitY - d;
+        // Never narrower than the lake it has to hold: a funnel with a floor, not a spike.
+        double r = Math.max(funnelPoolR(c) + 1.0, c.craterR * (1.0 - d / (double) (depth + 1)));
+        int reach = (int) Math.ceil(r * 1.18) + 1;
+        if (Math.abs(dx) > reach) return;
+        for (int dz = -reach; dz <= reach; dz++) {
+            double dist = Math.sqrt(dx * dx + dz * dz);
+            double ang = Math.atan2(dz, dx);
+            double rr = r * (1.0 + 0.18 * Math.sin(3 * ang + c.phaseA));
+            if (dist > rr) continue;
+            BlockPos p = new BlockPos(c.x + dx, y, c.z + dz);
+            if (dist > rr - 1.3) {
+                // The wall of the funnel, still hot in places.
+                setRock(level, p, (level.random.nextInt(6) == 0
+                        ? Blocks.MAGMA_BLOCK : Blocks.BLACKSTONE).defaultBlockState());
+            } else {
+                clearNatural(level, p);
             }
         }
-        clearAboveCrater(level, c, c.craterR * 1.18 + 1.0);
-        // The lake itself, seated on its own basalt floor with a crust of cooling magma at the shore.
+    }
+
+    /** The lake itself, seated on its own basalt floor with a crust of cooling magma at the shore. */
+    static void seatFunnelLake(ServerLevel level, Ctx c) {
+        int poolR = funnelPoolR(c);
+        int floorY = c.summitY - funnelDepth(c);
         for (int dx = -poolR - 1; dx <= poolR + 1; dx++) {
             for (int dz = -poolR - 1; dz <= poolR + 1; dz++) {
                 double dist = Math.sqrt(dx * dx + dz * dz);
@@ -121,32 +162,51 @@ public final class VolcanoSummit {
                 }
             }
         }
-        clearAboveCrater(level, c, c.craterR * 1.58 + 1.0);
         c.vent = new BlockPos(c.x, lakeY, c.z);
         c.coreCraterR = Math.max(2, c.craterR);
     }
 
     /**
-     * Clears whatever natural stands over a crater, up to eight blocks above the summit: a chimney or
-     * a tree put down before the crater was carved would otherwise be left hanging over the lava.
+     * Queues the clearing of whatever natural stands over a crater, up to eight blocks above the summit:
+     * a chimney or a tree put down before the crater was carved would otherwise hang over the lava. A row
+     * per step, since done in one on a big summit it stalled the tick.
      */
-    static void clearAboveCrater(ServerLevel level, Ctx c, double radius) {
+    static void addCraterClearing(VolcanoJob job, Ctx c) {
+        final double radius = switch (c.type.summitStyle()) {
+            case FUNNEL_PIT -> c.craterR * 1.18 + 1.0;
+            case LAVA_LAKE -> c.craterR * 1.58 + 1.0;
+            default -> 0.0;
+        };
         int r = (int) Math.ceil(radius);
-        for (int dx = -r; dx <= r; dx++) {
-            for (int dz = -r; dz <= r; dz++) {
-                if (dx * dx + dz * dz > radius * radius) continue;
-                for (int y = c.summitY + 1; y <= c.summitY + 8; y++) {
-                    clearNatural(level, new BlockPos(c.x + dx, y, c.z + dz));
-                }
+        for (int dx = -r; radius > 0 && dx <= r; dx++) {
+            final int row = dx;
+            job.add(lvl -> clearAboveCraterRow(lvl, c, row, radius));
+        }
+    }
+
+    static void clearAboveCraterRow(ServerLevel level, Ctx c, int dx, double radius) {
+        int r = (int) Math.ceil(radius);
+        for (int dz = -r; dz <= r; dz++) {
+            if (dx * dx + dz * dz > radius * radius) continue;
+            for (int y = c.summitY + 1; y <= c.summitY + 8; y++) {
+                clearNatural(level, new BlockPos(c.x + dx, y, c.z + dz));
             }
         }
     }
 
     /** Finds the caldera's crescent lake and seats the core under it. */
     static void seatCalderaVent(ServerLevel level, Ctx c) {
-        double r = c.craterR * 0.6;
-        int vx = c.x + (int) Math.round(Math.cos(c.lakeAngle) * r);
-        int vz = c.z + (int) Math.round(Math.sin(c.lakeAngle) * r);
+        // Under the lava lake, so the eruption comes out of it: a big caldera's round lake, or the middle
+        // of a small one's crescent.
+        int vx, vz;
+        if (c.size != VolcanoSize.SMALL) {
+            vx = (int) Math.round(c.lakeX);
+            vz = (int) Math.round(c.lakeZ);
+        } else {
+            double r = c.craterR * 0.6;
+            vx = c.x + (int) Math.round(Math.cos(c.lakeAngle) * r);
+            vz = c.z + (int) Math.round(Math.sin(c.lakeAngle) * r);
+        }
         // One below the floor, matching the recessed lake, so the core sits under lava.
         BlockPos p = new BlockPos(vx, c.calderaFloorY - 1, vz);
         setRock(level, p.below(), Blocks.BASALT.defaultBlockState());
@@ -154,7 +214,7 @@ public final class VolcanoSummit {
         clearNatural(level, p.above());
         c.vent = p;
         // Only the lake area stays molten between eruptions; the rest of the floor cools.
-        c.coreCraterR = Math.max(2, c.craterR / 3);
+        c.coreCraterR = c.size != VolcanoSize.SMALL ? (int) Math.ceil(c.lakeR) : Math.max(2, c.craterR / 3);
     }
 
     /** A rift volcano: no cone, a line of ponds along the fault strike stepping sideways in en-echelon segments. */
@@ -253,18 +313,29 @@ public final class VolcanoSummit {
     }
 
     static void fillLavaDisc(ServerLevel level, int cx, int cy, int cz, int r, int thickness) {
-        for (int dx = -r - 1; dx <= r + 1; dx++) {
-            for (int dz = -r - 1; dz <= r + 1; dz++) {
-                int d2 = dx * dx + dz * dz;
-                boolean inside = d2 <= r * r;
-                boolean wall = !inside && d2 <= (r + 1) * (r + 1);
-                if (!inside && !wall) continue;
-                for (int dy = -1; dy <= thickness; dy++) {
-                    BlockPos p = new BlockPos(cx + dx, cy + dy, cz + dz);
-                    if (level.getBlockState(p).is(Blocks.BEDROCK)) continue;
-                    boolean shell = (dy == -1 || dy == thickness || wall);
-                    level.setBlock(p, (shell ? Blocks.BASALT : Blocks.LAVA).defaultBlockState(), 2);
-                }
+        for (int dx = -r - 1; dx <= r + 1; dx++) fillLavaDiscRow(level, cx, cy, cz, r, thickness, dx);
+    }
+
+    /** Queues a volcano's magma chamber a row per step, so a big one does not fill a tick on its own. */
+    static void addLavaDisc(VolcanoJob job, Ctx c) {
+        for (int dx = -c.reservoirR - 1; dx <= c.reservoirR + 1; dx++) {
+            final int row = dx;
+            job.add(lvl -> fillLavaDiscRow(lvl, c.x, c.reservoirY, c.z, c.reservoirR, 3, row));
+        }
+    }
+
+    /** One row of a magma chamber: lava sealed in a basalt shell. */
+    static void fillLavaDiscRow(ServerLevel level, int cx, int cy, int cz, int r, int thickness, int dx) {
+        for (int dz = -r - 1; dz <= r + 1; dz++) {
+            int d2 = dx * dx + dz * dz;
+            boolean inside = d2 <= r * r;
+            boolean wall = !inside && d2 <= (r + 1) * (r + 1);
+            if (!inside && !wall) continue;
+            for (int dy = -1; dy <= thickness; dy++) {
+                BlockPos p = new BlockPos(cx + dx, cy + dy, cz + dz);
+                if (level.getBlockState(p).is(Blocks.BEDROCK)) continue;
+                boolean shell = (dy == -1 || dy == thickness || wall);
+                level.setBlock(p, (shell ? Blocks.BASALT : Blocks.LAVA).defaultBlockState(), 2);
             }
         }
     }

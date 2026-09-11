@@ -53,9 +53,10 @@ public final class HotspotSigns {
     public static void generate(WorldGenLevel level, ChunkPos cp) {
         ServerLevel model = level.getLevel();
         // Not on or around a large volcano: its flanks are its own ground, and a chimney near the
-        // summit ends up hanging over the crater once it is carved.
-        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.nearLarge(
-                model, cp.getMiddleBlockX(), cp.getMiddleBlockZ(), 8)) return;
+        // summit ends up hanging over the crater once it is carved. A caldera's floor is the exception.
+        int mx = cp.getMiddleBlockX(), mz = cp.getMiddleBlockZ();
+        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.nearLarge(model, mx, mz, 8)
+                && !com.jeladastudios.ftsgeology.volcano.VolcanoField.onCalderaFloor(model, mx, mz)) return;
         long seed = level.getSeed();
         for (int ox = -REACH_CHUNKS; ox <= REACH_CHUNKS; ox++) {
             for (int oz = -REACH_CHUNKS; oz <= REACH_CHUNKS; oz++) {

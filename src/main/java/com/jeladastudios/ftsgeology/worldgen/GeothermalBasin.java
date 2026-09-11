@@ -61,9 +61,10 @@ public final class GeothermalBasin {
         if (!GeyserConfig.HOTSPOTS_ENABLED.get()) return;
 
         ServerLevel model = level.getLevel();
-        // A large volcano's footprint is its own ground, not a basin floor.
-        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.nearLarge(
-                model, cp.getMiddleBlockX(), cp.getMiddleBlockZ(), 8)) return;
+        // A large volcano's footprint is its own ground, not a basin floor, except a caldera's floor.
+        int mx = cp.getMiddleBlockX(), mz = cp.getMiddleBlockZ();
+        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.nearLarge(model, mx, mz, 8)
+                && !com.jeladastudios.ftsgeology.volcano.VolcanoField.onCalderaFloor(model, mx, mz)) return;
         int x0 = cp.getMinBlockX(), z0 = cp.getMinBlockZ();
         // Four corners, not 256 columns and not one centre. See the class note.
         double s00 = basin(model, x0, z0);
@@ -108,7 +109,7 @@ public final class GeothermalBasin {
      * {@link HotspotMap#basinStrength}: a thermal biome is a basin by itself, but the seed grid needs
      * a plume under it.
      */
-    private static double basin(ServerLevel level, int x, int z) {
+    static double basin(ServerLevel level, int x, int z) {
         double p = ThermalBiomes.strength(level, x, z);
         if (p >= 0.8) return p;          // Terralith's Yellowstone and friends, free of charge
 

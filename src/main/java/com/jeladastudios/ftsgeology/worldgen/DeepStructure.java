@@ -136,22 +136,30 @@ public final class DeepStructure {
 
     /**
      * The highest block this column may be given boundary rock at: the lowest of its own and its
-     * four neighbours' soil tops, so rock never sticks out of a hillside as a pillar.
+     * four neighbours' soil tops, so rock never sticks out of a gentle hillside as a pillar. On a steep
+     * face erosion has stripped the soil, so there the rock comes up to just under the surface and the
+     * whole cliff shows it.
      */
     private static int columnTop(WorldGenLevel level, int x, int z, int hardCeiling,
                                  boolean outcrop, int soil) {
         if (!outcrop) return hardCeiling;
         int ground = TerrainProbe.groundY(level, x, z);
         if (ground == Integer.MIN_VALUE) return hardCeiling;
-        int lowest = ground;
+        int lowest = ground, highest = ground;
         for (int[] d : NEIGHBOURS) {
             // A neighbour whose chunk is not loaded is left out; asking would load it.
             if (!level.hasChunk((x + d[0]) >> 4, (z + d[1]) >> 4)) continue;
             int n = TerrainProbe.groundY(level, x + d[0], z + d[1]);
-            if (n != Integer.MIN_VALUE) lowest = Math.min(lowest, n);
+            if (n == Integer.MIN_VALUE) continue;
+            lowest = Math.min(lowest, n);
+            highest = Math.max(highest, n);
         }
+        if (highest - lowest >= STEEP) return ground - 1;
         return lowest - soil;
     }
+
+    /** Height difference across a column's neighbours at which the ground counts as a bare face. */
+    private static final int STEEP = 3;
 
     private static final int[][] NEIGHBOURS = { {1, 0}, {-1, 0}, {0, 1}, {0, -1} };
 

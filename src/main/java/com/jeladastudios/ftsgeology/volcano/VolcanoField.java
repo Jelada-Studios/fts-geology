@@ -114,6 +114,20 @@ public final class VolcanoField {
         return false;
     }
 
+    /** True on the floor of a chosen large caldera, where hot ground and springs belong. */
+    public static boolean onCalderaFloor(ServerLevel level, int x, int z) {
+        int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
+        for (int ox = -1; ox <= 1; ox++) {
+            for (int oz = -1; oz <= 1; oz++) {
+                Site s = site(level, cx0 + ox, cz0 + oz);
+                if (s == null || !s.chosen() || s.type() != VolcanoType.CALDERA) continue;
+                // Well inside the ring fault, clear of the inner wall at any bearing.
+                if (Math.hypot(x - s.x(), z - s.z()) < s.edificeReach() * 0.3) return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * The site centred exactly on this column, or null. Chosen or not: a volcano whose body was
      * generated before the setting changed still deserves its summit.
@@ -218,12 +232,13 @@ public final class VolcanoField {
 
         // Planned once on a provisional base, only to learn how wide a ring to sample.
         int[] probe = VolcanoBuilder.largeFootprint(level, x, sea + 8, z, magnitude, type, seed);
-        if (probe == null) return null;
+        if (probe == null) return refuse(type, x, z, "no plan");
         int foot = probe[1];
 
         // The centre, then eight points half way out and eight at the foot.
         int[] ground = new int[17];
-        int wet = 0, n = 0;
+        int[] wet = new int[3];
+        int n = 0;
         for (int ring = 0; ring <= 2; ring++) {
             int count = ring == 0 ? 1 : 8;
             for (int i = 0; i < count; i++) {
@@ -234,16 +249,18 @@ public final class VolcanoField {
                 int surface = gen.getBaseHeight(px, pz, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
                 int floor = gen.getBaseHeight(px, pz, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
                 if (surface > floor || floor <= sea) {
-                    if (ring == 0) return null;      // never centred in water
-                    wet++;
+                    if (ring == 0) return refuse(type, x, z, "centre in water");
+                    wet[ring]++;
                 }
                 ground[n++] = floor - 1;
             }
         }
-        // A river or a lake edge under the flank is fine; a volcano half in the sea is a job for the
-        // ocean volcanoes, not this. A shield's foot is over a thousand blocks across and rarely misses
-        // every lake, so it may fill over a few; the cone is laid over water at generation anyway.
-        if (wet > (type == VolcanoType.SHIELD ? 5 : 2)) return null;
+        // Water under the body of the mountain refuses it; a lake or a shore out at the foot does not,
+        // since the apron carries on under water as a thin skin. A volcano half in the sea is a job for
+        // the ocean volcanoes, not this.
+        if (wet[1] > (type == VolcanoType.SHIELD ? 3 : 2) || wet[2] > 6) {
+            return refuse(type, x, z, "wet " + wet[1] + " mid, " + wet[2] + " foot");
+        }
 
         int lo = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
         for (int i = 0; i < 9; i++) {
@@ -252,16 +269,26 @@ public final class VolcanoField {
         }
         // A caldera cuts a floor four hundred blocks across and needs ground that allows it; a cone
         // grows out of whatever is there.
-        if (hi - lo > (type.excavates() ? 48 : 140)) return null;
+        if (hi - lo > (type.excavates() ? 64 : 140)) return refuse(type, x, z, "relief " + (hi - lo));
         int[] sorted = ground.clone();
         Arrays.sort(sorted);
         int baseY = sorted[8];
 
         int[] plan = VolcanoBuilder.largeFootprint(level, x, baseY, z, magnitude, type, seed);
-        if (plan == null) return null;
-        if (structureInTheWay(level, gen, rs, x, z, plan[1] + 48)) return null;
+        if (plan == null) return refuse(type, x, z, "no plan at base " + baseY);
+        // Structures are placed before the mountain and would end up inside it, so none may stand on the
+        // edifice itself; one out on the apron keeps its buildings, which the apron will not cover.
+        if (structureInTheWay(level, gen, rs, x, z, plan[1] + 8)) {
+            return refuse(type, x, z, "structure within " + (plan[1] + 8));
+        }
         return new Site(x, z, baseY, plan[2], type, magnitude, seed, plan[0], plan[1],
                 rand01(hash(seed, x, z, 0xC40L)));
+    }
+
+    /** Logs why a candidate site was turned down, at debug level, and refuses it. */
+    private static Site refuse(VolcanoType type, int x, int z, String why) {
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("Large {} site at {},{} refused: {}", type, x, z, why);
+        return null;
     }
 
     /**

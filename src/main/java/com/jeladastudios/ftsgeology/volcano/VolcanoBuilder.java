@@ -82,7 +82,8 @@ public final class VolcanoBuilder {
         VolcanoJob job = new VolcanoJob(level, "rebuild " + type + " @ " + c.x + "," + c.z);
         // No ramparts: they are added on top of whatever stands, so a second pass would stack them.
         queueEdifice(job, c, false);
-        job.add(lvl -> buildSummit(lvl, c));
+        addSummit(job, c);
+        addCraterClearing(job, c);
         job.add(lvl -> sealExposedLava(lvl, c));
         job.add(lvl -> verifyContainment(lvl, c));
         return VolcanoJob.enqueue(job);
@@ -110,10 +111,11 @@ public final class VolcanoBuilder {
         queueEdifice(job, c, true);
 
         // 5. The summit: each type finishes differently.
-        job.add(lvl -> buildSummit(lvl, c));
+        addSummit(job, c);
+        addCraterClearing(job, c);
 
         // 6. Plumbing, once the vent position is known.
-        job.add(lvl -> fillLavaDisc(lvl, c.x, c.reservoirY, c.z, c.reservoirR, 3));
+        addLavaDisc(job, c);
         job.add(lvl -> plantCore(lvl, c));
         job.add(lvl -> carveConduit(lvl, c));
         job.add(lvl -> growLavaBranches(lvl, c));
@@ -284,8 +286,9 @@ public final class VolcanoBuilder {
 
         VolcanoJob job = new VolcanoJob(level, "large " + c.type + " summit @ " + c.x + "," + c.z);
         if (c.type.excavates()) job.add(lvl -> collectCalderaLake(lvl, c));
-        job.add(lvl -> buildSummit(lvl, c));
-        job.add(lvl -> fillLavaDisc(lvl, c.x, c.reservoirY, c.z, c.reservoirR, 3));
+        addSummit(job, c);
+        addCraterClearing(job, c);
+        addLavaDisc(job, c);
         job.add(lvl -> plantCore(lvl, c));
         job.add(lvl -> carveConduit(lvl, c));
         job.add(lvl -> growLavaBranches(lvl, c));
@@ -308,12 +311,12 @@ public final class VolcanoBuilder {
 
     /** Lists a large caldera's lake for its core, since generation laid it with no live pass to record it. */
     static void collectCalderaLake(ServerLevel level, Ctx c) {
-        int r = (int) Math.ceil(c.lakeOuter) + 1;
+        int r = (int) Math.ceil(c.lakeR) + 1;
+        int lx = (int) Math.round(c.lakeX), lz = (int) Math.round(c.lakeZ);
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {
-                double dist = Math.sqrt((double) dx * dx + (double) dz * dz);
-                if (!inLakeSector(c, dist, Math.atan2(dz, dx))) continue;
-                BlockPos p = new BlockPos(c.x + dx, c.calderaFloorY - 1, c.z + dz);
+                if (!inLake(c, lx + dx, lz + dz)) continue;
+                BlockPos p = new BlockPos(lx + dx, c.calderaFloorY - 1, lz + dz);
                 if (level.getBlockState(p).getFluidState().is(FluidTags.LAVA)) c.molten.add(p);
             }
         }

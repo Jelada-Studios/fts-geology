@@ -46,9 +46,14 @@ public final class TerrainProbe {
                 || s.is(Blocks.KELP_PLANT);
     }
 
-    /** Tree material: skipped when hunting for ground, but never treated as clearable. */
+    /**
+     * Tree material, huge mushrooms and bee nests included: skipped when hunting for ground, but never
+     * treated as clearable. A mushroom cap read as ground made a step of several blocks.
+     */
     private static boolean isTreePart(BlockState s) {
-        return s.is(BlockTags.LEAVES) || s.is(BlockTags.LOGS) || s.is(Blocks.MANGROVE_ROOTS);
+        return s.is(BlockTags.LEAVES) || s.is(BlockTags.LOGS) || s.is(Blocks.MANGROVE_ROOTS)
+                || s.is(Blocks.RED_MUSHROOM_BLOCK) || s.is(Blocks.BROWN_MUSHROOM_BLOCK)
+                || s.is(Blocks.MUSHROOM_STEM) || s.is(Blocks.BEE_NEST);
     }
 
     /**

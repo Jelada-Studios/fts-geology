@@ -3,10 +3,16 @@ package com.jeladastudios.ftsgeology.worldgen;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
+import com.jeladastudios.ftsgeology.tectonics.FaultType;
+import com.jeladastudios.ftsgeology.tectonics.HotspotMap;
+import com.jeladastudios.ftsgeology.tectonics.PlateSample;
+import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 import com.jeladastudios.ftsgeology.util.SeedHash;
 import com.jeladastudios.ftsgeology.util.ValueNoise;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelReader;
@@ -20,10 +26,11 @@ import net.minecraft.world.level.block.state.BlockState;
  * pale rendzina over limestone and marble, leached podzol over granite. Appearance only.
  *
  * <p>Only named rock counts. {@code RockTypes.classify} calls plain stone plutonic, which would turn
- * every hillside into podzol, so the feature stays where the mod has put geology.</p>
+ * every hillside into podzol, so the feature stays where the mod has put geology: near an active
+ * boundary or over a plume.</p>
  *
- * <p>Bedrock is regional, so it is probed four times per chunk, and the per-column pass runs only
- * when a probe found named rock. Each column rolls its own dice.</p>
+ * <p>Every column reads its own parent rock, and where the feature runs at all comes from stress
+ * interpolated between the chunk corners, so a soil patch never ends on a chunk border.</p>
  */
 public final class SoilProfile {
 
@@ -32,32 +39,38 @@ public final class SoilProfile {
     /** How deep under the surface to look for the parent rock before giving up. */
     private static final int PROBE_DEPTH = 12;
 
+    /** Setting strength where soil starts to show, the deep structure's own floor, and where it is full. */
+    private static final double GATE_MIN = 0.25, GATE_FULL = 0.40;
+
     private static final long SALT = 0x7A43E1C95D2F6B08L;
 
     private static final int FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
 
     private enum Soil { NONE, LATERITE, RENDZINA, PODZOL }
 
-    /** Paints this chunk's soil, if the rock under it has anything to say. */
+    /** Paints this chunk's soil where the rock under it has anything to say. */
     public static void generate(WorldGenLevel level, ChunkPos cp) {
         if (!GeyserConfig.SOIL_FROM_BEDROCK.get()) return;
 
+        ServerLevel model = level.getLevel();
         int x0 = cp.getMinBlockX(), z0 = cp.getMinBlockZ();
-        // Four probes, and the early exit that keeps this affordable everywhere else.
-        Soil a = probe(level, x0 + 3, z0 + 3);
-        Soil b = probe(level, x0 + 12, z0 + 3);
-        Soil c = probe(level, x0 + 3, z0 + 12);
-        Soil d = probe(level, x0 + 12, z0 + 12);
-        if (a == Soil.NONE && b == Soil.NONE && c == Soil.NONE && d == Soil.NONE) return;
+        // Four corners, shared with the neighbouring chunks, so the area this runs in has no edge.
+        double s00 = setting(model, x0, z0);
+        double s10 = setting(model, x0 + 16, z0);
+        double s01 = setting(model, x0, z0 + 16);
+        double s11 = setting(model, x0 + 16, z0 + 16);
+        if (Math.max(Math.max(s00, s10), Math.max(s01, s11)) <= GATE_MIN) return;
 
         long seed = level.getSeed() ^ SALT;
-        Soil[] probes = { a, b, c, d };
         for (int dx = 0; dx < 16; dx++) {
             for (int dz = 0; dz < 16; dz++) {
+                double s = Mth.lerp(dz / 16.0, Mth.lerp(dx / 16.0, s00, s10), Mth.lerp(dx / 16.0, s01, s11));
+                if (s <= GATE_MIN) continue;
                 int x = x0 + dx, z = z0 + dz;
                 RandomSource rng = RandomSource.create(SeedHash.columnSeed(seed, x, z));
-                Soil soil = pick(probes, dx, dz, rng);
-                if (soil == Soil.NONE) continue;
+                // Fades in over the gate band rather than starting on a line.
+                double gate = (s - GATE_MIN) / (GATE_FULL - GATE_MIN);
+                if (gate < 1.0 && rng.nextDouble() > gate) continue;
 
                 // Patches on two scales, leaving about half the ground as ordinary soil.
                 double n = ValueNoise.noise(x, z, 21.0) + 0.5 * ValueNoise.noise(x + 8192, z - 8192, 7.0);
@@ -65,43 +78,20 @@ public final class SoilProfile {
                 double keep = (n - 0.10) / 0.16;
                 if (keep <= 0.0 || (keep < 1.0 && rng.nextDouble() > keep)) continue;
 
-                paint(level, x, z, soil, rng);
+                paint(level, x, z, rng);
             }
         }
     }
 
-    /**
-     * Which of the four probes this column follows: weighted by distance and settled with a die, so
-     * two soils change over a band where both appear rather than along a line.
-     */
-    private static Soil pick(Soil[] probes, int dx, int dz, RandomSource rng) {
-        // The four probe points, in the order they were taken.
-        final int[] px = { 3, 12, 3, 12 };
-        final int[] pz = { 3, 3, 12, 12 };
-
-        double total = 0.0;
-        double[] weight = new double[4];
-        for (int i = 0; i < 4; i++) {
-            double ddx = dx - px[i], ddz = dz - pz[i];
-            // Inverse square of the distance, so influence falls away quickly enough that a probe
-            // still dominates its own corner instead of the whole chunk turning into an average.
-            weight[i] = 1.0 / (1.0 + (ddx * ddx + ddz * ddz) * 0.10);
-            total += weight[i];
-        }
-
-        double roll = rng.nextDouble() * total;
-        for (int i = 0; i < 4; i++) {
-            roll -= weight[i];
-            if (roll <= 0.0) return probes[i];
-        }
-        return probes[3];
+    /** How active the ground is here: boundary stress, or a plume's strength, whichever is more. */
+    private static double setting(ServerLevel model, int x, int z) {
+        PlateSample p = TectonicMap.sampleCached(model, x, z);
+        double boundary = p.faultType() == FaultType.INTERIOR ? 0.0 : p.stress();
+        return Math.max(boundary, HotspotMap.plumeStrength(model, x, z));
     }
 
     /** What the rock under this column is, read through whatever soil is lying on it. */
-    private static Soil probe(LevelReader level, int x, int z) {
-        int g = TerrainProbe.groundY(level, x, z);
-        if (g == Integer.MIN_VALUE) return Soil.NONE;
-
+    private static Soil probe(LevelReader level, int x, int g, int z) {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         for (int y = g; y > g - PROBE_DEPTH && y > level.getMinBuildHeight(); y--) {
             BlockState s = level.getBlockState(m.set(x, y, z));
@@ -148,8 +138,8 @@ public final class SoilProfile {
         return Soil.NONE;
     }
 
-    /** One column of soil, if there is soil there to change. */
-    private static void paint(WorldGenLevel level, int x, int z, Soil soil, RandomSource rng) {
+    /** One column of soil, if there is soil there and named rock under it. */
+    private static void paint(WorldGenLevel level, int x, int z, RandomSource rng) {
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return;
         if (TerrainProbe.hasFluidAbove(level, x, z)) return;    // a lake bed is not a soil profile
@@ -160,6 +150,9 @@ public final class SoilProfile {
         // laid down are left exactly as they are - this is a soil colour, not a resurfacing.
         if (!here.is(BlockTags.DIRT)) return;
         if (EruptionHandler.isPlayerPlaced(here)) return;
+
+        Soil soil = probe(level, x, g, z);
+        if (soil == Soil.NONE) return;
 
         BlockState put = block(soil, rng).defaultBlockState();
         // Plants cannot stand on terracotta or calcite, and no shape update will knock them off.

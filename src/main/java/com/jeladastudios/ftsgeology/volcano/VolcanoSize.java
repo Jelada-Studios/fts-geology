@@ -51,7 +51,7 @@ public enum VolcanoSize {
     int coneHeight(VolcanoType type, int magnitude, RandomSource rng) {
         if (this == SMALL) return type.coneHeight(magnitude, rng);
         return switch (type) {
-            case STRATOVOLCANO -> this == MEDIUM ? 44 + rng.nextInt(12) : 140 + rng.nextInt(16);
+            case STRATOVOLCANO -> this == MEDIUM ? 44 + rng.nextInt(12) : 112 + rng.nextInt(15);
             case SHIELD -> this == MEDIUM ? 22 + rng.nextInt(6) : 62 + rng.nextInt(12);
             case FISSURE, CALDERA -> 0;
         };
@@ -64,6 +64,8 @@ public enum VolcanoSize {
      */
     double coneSlope(VolcanoType type) {
         if (type == VolcanoType.SHIELD && this != SMALL) return this == MEDIUM ? 5.0 : 6.0;
+        // A big stratocone twice as wide as it is tall, so its flanks are not a spike.
+        if (type == VolcanoType.STRATOVOLCANO && this == LARGE) return 2.0;
         return type.coneSlope();
     }
 
@@ -75,7 +77,11 @@ public enum VolcanoSize {
     double apronReach(VolcanoType type) {
         if (this == SMALL || type == VolcanoType.CALDERA) return type.apronReach();
         if (this == MEDIUM) return Math.min(type.apronReach(), 0.35);
-        return type == VolcanoType.FISSURE ? 0.30 : 0.22;
+        return switch (type) {
+            case FISSURE -> 0.30;
+            case STRATOVOLCANO -> 0.45;      // room for its foothills
+            default -> 0.22;
+        };
     }
 
     /** Half the length of a fissure's line. */
@@ -91,8 +97,8 @@ public enum VolcanoSize {
     double rimLift(int magnitude) {
         return switch (this) {
             case SMALL -> 3 + magnitude / 5.0;
-            case MEDIUM -> 15;
-            case LARGE -> 40;
+            case MEDIUM -> 12;
+            case LARGE -> 28;
         };
     }
 
@@ -100,8 +106,9 @@ public enum VolcanoSize {
     int rimWidth() {
         return switch (this) {
             case SMALL -> 6;
-            case MEDIUM -> 12;
-            case LARGE -> 32;
+            // A big caldera's rim is a plateau, not a wall.
+            case MEDIUM -> 30;
+            case LARGE -> 90;
         };
     }
 

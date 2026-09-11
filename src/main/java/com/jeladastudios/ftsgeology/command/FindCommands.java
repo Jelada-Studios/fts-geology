@@ -177,6 +177,8 @@ public final class FindCommands {
         // that is wrong all over rather than only at its edges.
         long digest = 0;
         int columns = 0;
+        // The same counts in four rings out from the summit, logged, so a seam can be traced to a part.
+        long[][] bands = new long[4][4];   // pairs inside, steps of 4+ inside, pairs across, steps across
         if (found != null) {
             VolcanoField.Site s = found.site();
             int r = Math.min(s.edificeReach(), 240);
@@ -190,9 +192,18 @@ public final class FindCommands {
                     if (here == Integer.MIN_VALUE) continue;
                     digest = digest * 0x100000001B3L ^ (x * 73856093L ^ z * 19349663L ^ here);
                     columns++;
-                    seam(level, x + 1, z, here, ((x + 1) & 15) == 0 ? border : inside);
-                    seam(level, x, z + 1, here, ((z + 1) & 15) == 0 ? border : inside);
+                    int band = Math.min(3, (int) ((d - 80) / Math.max(1.0, s.edificeReach() - 80) * 4));
+                    boolean acrossX = ((x + 1) & 15) == 0, acrossZ = ((z + 1) & 15) == 0;
+                    tally(bands[band], seam(level, x + 1, z, here, acrossX ? border : inside), acrossX);
+                    tally(bands[band], seam(level, x, z + 1, here, acrossZ ? border : inside), acrossZ);
                 }
+            }
+            for (int b = 0; b < 4; b++) {
+                long[] t = bands[b];
+                com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(
+                        "Seams ring {} of 4: inside {} pairs, {} per thousand of 4+; across borders {} pairs, {} per thousand",
+                        b + 1, t[0], dec(t[0] == 0 ? 0 : 1000.0 * t[1] / t[0], 1),
+                        t[2], dec(t[2] == 0 ? 0 : 1000.0 * t[3] / t[2], 1));
             }
         }
         if (inside[0] == 0 || border[0] == 0) {
@@ -210,13 +221,22 @@ public final class FindCommands {
         return 1;
     }
 
-    static void seam(ServerLevel level, int x, int z, int here, long[] into) {
-        if (!level.hasChunk(x >> 4, z >> 4)) return;
+    /** Counts one neighbouring pair into {@code into}; returns the step, or -1 if there was none to measure. */
+    static int seam(ServerLevel level, int x, int z, int here, long[] into) {
+        if (!level.hasChunk(x >> 4, z >> 4)) return -1;
         int there = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, x, z);
-        if (there == Integer.MIN_VALUE) return;
+        if (there == Integer.MIN_VALUE) return -1;
         int step = Math.abs(there - here);
         into[0]++;
         into[1] += step;
         if (step >= 4) into[2]++;
+        return step;
+    }
+
+    private static void tally(long[] band, int step, boolean across) {
+        if (step < 0) return;
+        int i = across ? 2 : 0;
+        band[i]++;
+        if (step >= 4) band[i + 1]++;
     }
 }

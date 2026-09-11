@@ -31,6 +31,9 @@ public final class SurfaceFeatures {
     /** How much denser hot springs get on properly geothermal ground. */
     static final double GEOTHERMAL_SPRING_BOOST = 1.25;
 
+    /** How much denser they get deep on a painted basin floor. */
+    static final double BASIN_SPRING_BOOST = 3.0;
+
     /** 0 on ordinary country, rising to 1 over a plume, a spreading ridge or a subduction arc. */
     static double geothermalGround(ServerLevel level, int x, int z) {
         double plume = com.jeladastudios.ftsgeology.tectonics.HotspotMap.sample(level, x, z).strength();
@@ -91,6 +94,10 @@ public final class SurfaceFeatures {
         // An occasional hot spring, up to a quarter denser on geothermal ground, ramped rather than
         // switched on at a line.
         double springBoost = 1.0 + (GEOTHERMAL_SPRING_BOOST - 1.0) * geothermalGround(level, centreX, centreZ);
+        // A painted basin floor is meant to be crowded with pools, so there it climbs to BASIN_SPRING_BOOST.
+        double floor = net.minecraft.util.Mth.clamp(
+                (GeothermalBasin.basin(level, centreX, centreZ) - 0.30) / 0.30, 0.0, 1.0);
+        springBoost = Math.max(springBoost, 1.0 + (BASIN_SPRING_BOOST - 1.0) * floor);
         if (rng.nextDouble() < GeyserConfig.HOT_SPRING_SPAWN_CHANCE.get() * fit.hotSpring() * springBoost) {
             generateHotSpring(level, cp, rng);
         }

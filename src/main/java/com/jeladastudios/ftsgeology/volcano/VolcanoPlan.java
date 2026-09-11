@@ -32,8 +32,10 @@ public final class VolcanoPlan {
         /** A caldera's ring scarp: how high it stands at its crest, and how far out it comes down. */
         double rimLift;
         int rimWidth = 6;
-        /** Outer edge of a caldera's lava lake crescent. */
+        /** Outer edge of a caldera's lava lake, from the centre. */
         double lakeOuter;
+        /** A big caldera's round lava lake: its centre and radius. */
+        double lakeX, lakeZ, lakeR;
         /** Length of one en-echelon segment of a fissure. */
         int segLen = 8;
         /**
@@ -64,6 +66,10 @@ public final class VolcanoPlan {
         double flowReach;
         /** Widens the tongues with the mountain, so a shield is not threaded rather than striped. */
         double flowWidth = 1.0;
+        /** Exponent of the flank profile: above 1 concave. */
+        double flankExponent = 1.0;
+        /** Height of the ridges and gullies down the flank; 0 for a smooth one. */
+        double ridgeHeight;
         double strikeX = 1, strikeZ = 0;
         int ventCount;
         /** Filled in by the summit step: the lava cell the core sits under. */
@@ -116,6 +122,12 @@ public final class VolcanoPlan {
             c.coneHeight = fit;
         }
         c.summitY = c.baseY + c.coneHeight;
+        // A big stratocone has a gentler profile, so its top does not rise into a spike, and carries
+        // ridges and gullies instead of a smooth skin.
+        c.flankExponent = type == VolcanoType.STRATOVOLCANO && size == VolcanoSize.LARGE
+                ? 1.5 : type.flankExponent();
+        c.ridgeHeight = type == VolcanoType.STRATOVOLCANO && size != VolcanoSize.SMALL
+                ? Math.min(9.0, c.coneHeight * 0.07) : 0.0;
 
         c.coneBaseR = c.coneHeight > 0
                 ? (int) Math.round(c.craterR + c.coneHeight * c.coneSlope)
@@ -134,7 +146,7 @@ public final class VolcanoPlan {
         // footprint stays inside VolcanoField's cell margin.
         double share = size.apronReach(type);
         c.apronLen = size == VolcanoSize.LARGE
-                ? Mth.clamp(c.coneBaseR * share, 20.0, 56.0)
+                ? Mth.clamp(c.coneBaseR * share, 20.0, type == VolcanoType.STRATOVOLCANO ? 130.0 : 56.0)
                 : c.coneBaseR * share + 6;
         double foot = switch (type) {
             case CALDERA -> c.craterR * 1.34 + c.rimWidth;
@@ -160,7 +172,9 @@ public final class VolcanoPlan {
         // Where this mountain's flows went. Two to four of them, spread around the circle with
         // enough jitter that they are not symmetrical, each running a little past the foot of the
         // cone so the tongue carries on over the apron instead of stopping at a contour.
-        c.flows = 2 + rng.nextInt(3) + c.coneBaseR / 30;
+        // A stratocone keeps to a few flows; a shield is covered in them.
+        int moreFlows = rng.nextInt(3);
+        c.flows = type == VolcanoType.STRATOVOLCANO ? 2 + moreFlows : 2 + moreFlows + c.coneBaseR / 30;
         c.flowAim = new double[c.flows];
         c.flowPhase = new double[c.flows];
         double spin = rng.nextDouble() * Math.PI * 2;
@@ -172,17 +186,29 @@ public final class VolcanoPlan {
         c.flowReach = Math.max(10, c.coneBaseR) * (1.05 + rng.nextDouble() * 0.45);
         // Flow width scales with the cone, so a big mountain is not threaded with thin lines. Many
         // narrow flows cover about a tenth of the flank without breaking a centreline.
-        c.flowWidth = Math.max(1.0, c.coneBaseR / 34.0);
+        // Flows are thin tongues, not bands that widen with the mountain; a shield's are many but narrow.
+        c.flowWidth = type == VolcanoType.FISSURE || type == VolcanoType.STRATOVOLCANO ? 0.8
+                : type == VolcanoType.SHIELD ? 1.1 : Math.max(1.0, c.coneBaseR / 34.0);
 
-        c.calderaFloorY = c.baseY - size.calderaDepth(rng);
+        // A small caldera is a pit; a big one's floor lies at the level of the land around it, and its
+        // depth comes from the plateau rising round it rather than from digging.
+        int depth = size.calderaDepth(rng);
+        c.calderaFloorY = size == VolcanoSize.SMALL ? c.baseY - depth : c.baseY;
         c.domeR = Math.max(3, c.craterR / 3);
         c.domeH = size.domeHeight(rng);
         c.lakeAngle = rng.nextDouble() * Math.PI * 2;
         c.lakeWidth = Math.PI * (0.45 + rng.nextDouble() * 0.35);
-        // A small caldera's lake runs most of the way to the ring. A big one's would then be thousands
-        // of lava cells, every one of them for the core to keep molten, so it stays a band by the dome.
-        c.lakeOuter = size == VolcanoSize.SMALL
-                ? c.craterR * 0.85 : Math.min(c.craterR * 0.85, c.domeR + 11.0);
+        // A small caldera's lake is a crescent running most of the way to the ring. A big one has a small
+        // round lake out towards the ring fault instead, where its eruptions come from.
+        if (size == VolcanoSize.SMALL) {
+            c.lakeOuter = c.craterR * 0.85;
+        } else {
+            double lakeDist = VolcanoEdifice.ringRadius(c, c.lakeAngle) * 0.72;
+            c.lakeR = 4.0 + 3.0 * (c.lakeWidth - Math.PI * 0.45) / (Math.PI * 0.35);
+            c.lakeX = c.x + Math.cos(c.lakeAngle) * lakeDist;
+            c.lakeZ = c.z + Math.sin(c.lakeAngle) * lakeDist;
+            c.lakeOuter = lakeDist + c.lakeR;
+        }
         c.segLen = 6 + rng.nextInt(5);
 
         if (plate.onFault()) {

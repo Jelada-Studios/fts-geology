@@ -64,9 +64,15 @@ public final class OreGenesis {
         if (centre.stress() >= 0.20) {
             switch (centre.faultType()) {
                 case CONVERGENT_SUBDUCTION -> porphyryCopper(d, centre);
-                case CONVERGENT_COLLISION -> orogenicGold(d);
+                case CONVERGENT_COLLISION -> {
+                    orogenicGold(d);
+                    quartzRidges(d, world);
+                }
                 case DIVERGENT -> massiveSulfides(d);
-                case TRANSFORM -> faultGouge(d);
+                case TRANSFORM -> {
+                    faultGouge(d);
+                    quartzRidges(d, world);
+                }
                 default -> {}
             }
         }
@@ -116,6 +122,31 @@ public final class OreGenesis {
             BlockPos p = new BlockPos(x, y, z);
             BlockState s = level.getBlockState(p);
             if (s.is(block) || s.hasBlockEntity() || !isHostRock(s)) return;
+            level.setBlock(p, block.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+            placed++;
+        }
+
+        /** Replaces a column's surface with a mineral trace, where the surface is natural soil or rock. */
+        void surface(int x, int z, Block block) {
+            int g = ground(x, z);
+            if (g == Integer.MIN_VALUE) return;
+            BlockPos p = new BlockPos(x, g, z);
+            BlockState s = level.getBlockState(p);
+            if (!(s.is(BlockTags.DIRT) || s.is(Blocks.GRAVEL) || isHostRock(s))) return;
+            if (!level.getBlockState(p.above()).getFluidState().isEmpty()) return;
+            level.setBlock(p, block.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+            placed++;
+        }
+
+        /** Stands a block on a column's surface, as part of a low ridge, where there is open air for it. */
+        void ridge(int x, int z, Block block) {
+            int g = ground(x, z);
+            if (g == Integer.MIN_VALUE) return;
+            BlockPos p = new BlockPos(x, g + 1, z);
+            BlockState below = level.getBlockState(p.below());
+            if (!(below.is(BlockTags.DIRT) || isHostRock(below))) return;
+            BlockState here = level.getBlockState(p);
+            if (!here.isAir() && !TerrainProbe.isVegetation(here)) return;
             level.setBlock(p, block.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
             placed++;
         }
@@ -213,6 +244,9 @@ public final class OreGenesis {
             int ground = d.ground(px, pz);
             if (ground == Integer.MIN_VALUE || ground < 25) continue;
             int py = Mth.clamp(ground - depth, 6, ground - 5);
+            // Over a shallow pocket the oxidised cap shows at the surface: the gossan a prospector
+            // walks the hills looking for.
+            if (ground - py <= 20) gossan(d, px, pz);
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dy = -1; dy <= 1; dy++) {
                     for (int dz = -1; dz <= 1; dz++) {
@@ -222,6 +256,42 @@ public final class OreGenesis {
                         d.set(x, y, z, b, ground - 4);
                     }
                 }
+            }
+        }
+    }
+
+    /** Rust-stained ground with flecks of malachite green and azurite blue over a copper pocket. */
+    private static void gossan(Deposit d, int px, int pz) {
+        for (int x = px - 2; x <= px + 2; x++) {
+            for (int z = pz - 2; z <= pz + 2; z++) {
+                int r = roll(x, 7919, z, 12);
+                if (r >= 7) continue;
+                d.surface(x, z, r == 0 ? ModBlocks.MALACHITE.get()
+                        : r == 1 ? ModBlocks.AZURITE.get()
+                        : r <= 3 ? Blocks.RED_TERRACOTTA : Blocks.COARSE_DIRT);
+            }
+        }
+    }
+
+    /**
+     * Quartz veins weathered out as low ridges along the strike of a collision belt or a transform:
+     * the hard vein stands proud of the softer rock around it. Decided per column from the fault's own
+     * strike, a line every 37 blocks across it, broken into segments, so no ridge stops at a chunk border.
+     */
+    private static void quartzRidges(Deposit d, ServerLevel world) {
+        for (int lx = 0; lx < 16; lx++) {
+            for (int lz = 0; lz < 16; lz++) {
+                int x = d.x0 + lx, z = d.z0 + lz;
+                PlateSample p = TectonicMap.sampleCached(world, x, z);
+                if (p.stress() < 0.35) continue;
+                double len = Math.hypot(p.faultStrikeX(), p.faultStrikeZ());
+                if (len < 1.0e-6) continue;
+                double sx = p.faultStrikeX() / len, sz = p.faultStrikeZ() / len;
+                long across = Math.round(-x * sz + z * sx);
+                if (Math.floorMod(across, 37L) != 0) continue;
+                long along = Math.round(x * sx + z * sz);
+                if (ValueNoise.noise((int) along, (int) (across / 37) * 97, 18.0) < 0.35) continue;
+                d.ridge(x, z, ModBlocks.QUARTZ_VEIN.get());
             }
         }
     }
@@ -337,6 +407,8 @@ public final class OreGenesis {
                 int z = startZ + (int) Math.round(sz * step) - roll(startZ, step, startX, 2);
                 int ground = d.ground(x, z);
                 if (ground == Integer.MIN_VALUE) continue;   // walked out of the chunk
+                // Now and then the vein's cinnabar weathers out at the surface above it.
+                if (roll(x, 4243, z, 14) == 0) d.surface(x, z, ModBlocks.CINNABAR.get());
                 int base = bottom + roll(x, step, z, Math.max(1, top - bottom));
                 int span = 4 + roll(z, step, x, 8);
                 for (int dy = 0; dy < span; dy++) {
