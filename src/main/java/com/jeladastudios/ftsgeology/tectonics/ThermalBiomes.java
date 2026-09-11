@@ -77,9 +77,9 @@ public final class ThermalBiomes {
     // === Lookup =============================================================
 
     /**
-     * Cached per quart position. Biomes are painted in 4x4x4 cells anyway, so resolving finer than
-     * that would be re-asking the same question, and the map and suitability commands sample tens of
-     * thousands of columns at a time.
+     * Cached per 16-block cell, read at the cell's centre so every column in it gets the same answer
+     * whichever asks first. Thermal biomes are hundreds of blocks across, and the map and suitability
+     * commands sample tens of thousands of columns at a time.
      */
     private static final Map<Long, Match> CACHE = new ConcurrentHashMap<>();
     private static final int CACHE_MAX = 60000;
@@ -87,21 +87,21 @@ public final class ThermalBiomes {
     private static Match lookup(ServerLevel level, int blockX, int blockZ) {
         if (!GeyserConfig.BIOME_ANCHORING.get()) return NONE;
 
-        long key = ((long) QuartPos.fromBlock(blockX) & 0xFFFFFFFFL)
-                | (((long) QuartPos.fromBlock(blockZ) & 0xFFFFFFFFL) << 32);
+        int cellX = blockX >> 4, cellZ = blockZ >> 4;
+        long key = ((long) cellX & 0xFFFFFFFFL) | (((long) cellZ & 0xFFFFFFFFL) << 32);
         Match hit = CACHE.get(key);
         if (hit != null) return hit;
 
-        Match found = classify(level, blockX, blockZ);
+        Match found = classify(level, (cellX << 4) + 8, (cellZ << 4) + 8);
         if (CACHE.size() > CACHE_MAX) CACHE.clear();
         CACHE.put(key, found);
         return found;
     }
 
     /**
-     * Asks the world biome source what sits here, at the chunk generator's surface height. Sea level
-     * would read a different biome under a mountain, often a cave biome, and the generator height
-     * answers for columns far from any loaded chunk.
+     * Asks the world biome source what sits here, read above the terrain. Up there the noise depth is
+     * negative, which always matches a surface biome and never a cave biome, so no terrain height is
+     * needed: finding one ran the whole noise column and was most of this mod's retrogen cost.
      */
     private static Match classify(ServerLevel level, int blockX, int blockZ) {
         try {
@@ -109,10 +109,7 @@ public final class ThermalBiomes {
             Climate.Sampler sampler = chunkSource.randomState().sampler();
             BiomeSource biomes = chunkSource.getGenerator().getBiomeSource();
 
-            int surface = chunkSource.getGenerator().getBaseHeight(blockX, blockZ,
-                    net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG,
-                    level, chunkSource.randomState());
-            int sampleY = Math.max(surface - 2, level.getSeaLevel());
+            int sampleY = level.getMaxBuildHeight() - 8;
 
             Holder<Biome> biome = biomes.getNoiseBiome(
                     QuartPos.fromBlock(blockX),

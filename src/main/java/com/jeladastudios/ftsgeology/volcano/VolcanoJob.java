@@ -38,6 +38,9 @@ public final class VolcanoJob {
     private final Deque<Step> steps = new ArrayDeque<>();
     private final String label;
     private int done;
+    /** Wall time spent running this job's steps, and its slowest single step. */
+    private long nanos, slowest;
+    private int slowestIndex;
 
     public VolcanoJob(ServerLevel level, String label) {
         this.dimension = level.dimension();
@@ -98,15 +101,25 @@ public final class VolcanoJob {
 
             while (!job.steps.isEmpty() && System.nanoTime() < deadline) {
                 Step s = job.steps.poll();
+                long started = System.nanoTime();
                 try {
                     s.run(level);
                 } catch (Exception e) {
                     GeysersMod.LOGGER.warn("Volcano step failed ({}): {}", job.label, e.toString());
                 }
+                long took = System.nanoTime() - started;
+                job.nanos += took;
+                if (took > job.slowest) {
+                    job.slowest = took;
+                    job.slowestIndex = job.done;
+                }
                 job.done++;
             }
             if (job.steps.isEmpty()) {
-                GeysersMod.LOGGER.debug("Volcano finished: {} ({} steps)", job.label, job.done);
+                // Logged with its cost, so a slow build can be traced to the step that made it slow.
+                GeysersMod.LOGGER.info("Volcano finished: {} ({} steps, {} ms, slowest step #{} {} ms)",
+                        job.label, job.done, String.format(java.util.Locale.ROOT, "%.1f", job.nanos / 1e6),
+                        job.slowestIndex, String.format(java.util.Locale.ROOT, "%.1f", job.slowest / 1e6));
                 QUEUE.remove(0);
             }
         }

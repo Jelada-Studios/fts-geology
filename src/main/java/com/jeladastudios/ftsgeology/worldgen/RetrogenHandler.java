@@ -177,7 +177,7 @@ public final class RetrogenHandler {
 
         // Volcanoes under construction first, as steps against a wall-clock deadline.
         com.jeladastudios.ftsgeology.volcano.VolcanoJob.drain(event.getServer(),
-                TickBudget.slice(0.3));
+                TickBudget.slice(0.2));
 
         // A volcano under construction slows chunk geology rather than stopping it, so the queue
         // cannot grow without bound.

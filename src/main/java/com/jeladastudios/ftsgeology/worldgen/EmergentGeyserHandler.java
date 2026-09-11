@@ -63,39 +63,34 @@ public final class EmergentGeyserHandler {
         int minWater = GeyserConfig.EMERGENT_MIN_WATER.get();
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
 
+        // Lava first: it is rare, so most scans end after reading each cell's fluid once. The box is
+        // searched lavaDepth deeper, since a candidate rock near its floor can have its lava below it.
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {
-                for (int dy = -r; dy <= r; dy++) {
+                for (int dy = -r - lavaDepth; dy < r; dy++) {
                     m.set(centre.getX() + dx, centre.getY() + dy, centre.getZ() + dz);
-                    BlockState s = level.getBlockState(m);
+                    if (!level.getBlockState(m).getFluidState().is(FluidTags.LAVA)) continue;
 
-                    // Candidate separating layer: a solid, non-fluid rock cell...
-                    if (s.isAir() || !s.getFluidState().isEmpty()) continue;
-                    if (!s.isSolidRender(level, m)) continue;
+                    for (int up = 1; up <= lavaDepth && dy + up <= r; up++) {
+                        BlockPos rock = new BlockPos(m.getX(), m.getY() + up, m.getZ());
+                        BlockState s = level.getBlockState(rock);
+                        // Candidate separating layer: a solid, non-fluid rock cell...
+                        if (s.isAir() || !s.getFluidState().isEmpty()) continue;
+                        if (!s.isSolidRender(level, rock)) continue;
+                        // ...with water directly above...
+                        if (!level.getBlockState(rock.above()).getFluidState().is(FluidTags.WATER)) continue;
+                        // ...and enough connected water to matter.
+                        int water = countWaterPocket(level, rock.above(), minWater);
+                        if (water < minWater) continue;
+                        // ...and not right next to an existing core (avoid duplicates).
+                        if (coreNearby(level, rock)) continue;
 
-                    BlockPos rock = m.immutable();
-                    // ...with water directly above...
-                    if (!level.getBlockState(rock.above()).getFluidState().is(FluidTags.WATER)) continue;
-                    // ...and lava within lavaDepth below.
-                    if (!hasLavaBelow(level, rock, lavaDepth)) continue;
-                    // ...and enough connected water to matter.
-                    int water = countWaterPocket(level, rock.above(), minWater);
-                    if (water < minWater) continue;
-                    // ...and not right next to an existing core (avoid duplicates).
-                    if (coreNearby(level, rock)) continue;
-
-                    ignite(level, rock, water);
-                    return; // one ignition per scan keeps it calm
+                        ignite(level, rock, water);
+                        return; // one ignition per scan keeps it calm
+                    }
                 }
             }
         }
-    }
-
-    private static boolean hasLavaBelow(ServerLevel level, BlockPos rock, int depth) {
-        for (int i = 1; i <= depth; i++) {
-            if (level.getBlockState(rock.below(i)).getFluidState().is(FluidTags.LAVA)) return true;
-        }
-        return false;
     }
 
     /** Counts connected water cells (capped). Returns as soon as the cap is hit. */
