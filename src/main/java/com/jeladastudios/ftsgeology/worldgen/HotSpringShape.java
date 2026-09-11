@@ -276,6 +276,38 @@ public final class HotSpringShape {
         }
     }
 
+    /**
+     * Puts a pool's own basin back after a quake moved the floor under it: natural ground that rose into the
+     * pool comes out up to six blocks over the water line, and columns that fell away are floored to just
+     * under it, eight blocks at most. Only the pool's recorded columns are touched.
+     *
+     * @return false when nothing is recorded or one of its columns is not loaded
+     */
+    public static boolean restoreBasin(ServerLevel level, long[] cells, int waterY) {
+        if (cells.length == 0 || waterY <= level.getMinBuildHeight() + 8) return false;
+        for (long c : cells) {
+            if (!level.hasChunkAt(new BlockPos(unpackX(c), waterY, unpackZ(c)))) return false;
+        }
+        for (long c : cells) {
+            int x = unpackX(c), z = unpackZ(c);
+            for (int y = waterY; y <= waterY + 6; y++) {
+                BlockPos p = new BlockPos(x, y, z);
+                BlockState s = level.getBlockState(p);
+                if (s.isAir() || !s.getFluidState().isEmpty()) continue;
+                if (s.is(Blocks.BEDROCK) || s.hasBlockEntity() || EruptionHandler.isPlayerPlaced(s)) continue;
+                level.setBlock(p, Blocks.AIR.defaultBlockState(), FLAGS);
+            }
+            int g = TerrainProbe.groundY(level, x, z);
+            if (g == Integer.MIN_VALUE || g >= waterY - 1) continue;
+            for (int y = Math.max(g + 1, waterY - 8); y <= waterY - 1; y++) {
+                BlockPos p = new BlockPos(x, y, z);
+                if (EruptionHandler.isPlayerPlaced(level.getBlockState(p))) continue;
+                level.setBlock(p, Blocks.CALCITE.defaultBlockState(), FLAGS);
+            }
+        }
+        return true;
+    }
+
     // === Internals ==========================================================
 
     /**

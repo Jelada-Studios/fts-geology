@@ -139,11 +139,14 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         long quake = com.jeladastudios.ftsgeology.quake.QuakeQuiet.released(
                 level, pos.getX(), pos.getZ());
         if (quake == 0L || quake <= rechargedFor) return;
-        if (hasLava(level, pos)) {                        // the quake left the magma alone
-            rechargedFor = quake;
-            setChanged();
+        // Judged by the lake itself, not by the core's neighbours: one lava cell left beside the core read
+        // as an untouched lake while the rest of it had been filled with rock.
+        if (moltenIntact(level) && hasLava(level, pos)) {
+            stampRecharge(quake);
             return;
         }
+        if (lastRefillTry != Long.MIN_VALUE && level.getGameTime() - lastRefillTry < REFILL_RETRY_TICKS) return;
+        lastRefillTry = level.getGameTime();
 
         // Cool what the quake flung about first; coolScatteredLava only runs while erupting.
         VolcanoEruption.coolScatteredLava(level, pos.above(), craterR, 20 + magnitude,
@@ -152,20 +155,47 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         int restored = refill(level, moltenCells);
 
         // The list can be empty on older saves, so the throat above the core is always tried too.
-        if (restored == 0) {
+        if (restored == 0 && !hasLava(level, pos)) {
             restored = refill(level, new long[]{pos.above().asLong()});
         }
 
-        // Stamped on success only, so a run that restored nothing is tried again.
-        if (restored == 0) return;
+        if (restored > 0) {
+            GeysersMod.LOGGER.info("Volcano at {} recharged after a quake: {} cells", pos, restored);
+            stampRecharge(quake);
+        } else if (++refillTries >= REFILL_TRIES) {
+            // Nothing would take lava in three tries: said once, and no more sweeps for this quake.
+            GeysersMod.LOGGER.info("Volcano at {} could not refill its lake after a quake ({} molten cells recorded)",
+                    pos, moltenCells.length);
+            stampRecharge(quake);
+        }
+    }
+
+    /** Tries at the current quake's refill and when the last was; not saved, so a reload allows a few more. */
+    private int refillTries;
+    private long lastRefillTry = Long.MIN_VALUE;
+    private static final int REFILL_TRIES = 3;
+    private static final long REFILL_RETRY_TICKS = 200L;
+
+    private void stampRecharge(long quake) {
         rechargedFor = quake;
+        refillTries = 0;
+        lastRefillTry = Long.MIN_VALUE;
         setChanged();
-        GeysersMod.LOGGER.info("Volcano at {} recharged after a quake: {} cells", pos, restored);
+    }
+
+    /** Whether nine in ten of the cells meant to be molten still are. True when none are recorded. */
+    private boolean moltenIntact(ServerLevel level) {
+        if (moltenCells.length == 0) return true;
+        int lava = 0;
+        for (long c : moltenCells) {
+            if (level.getBlockState(BlockPos.of(c)).getFluidState().is(FluidTags.LAVA)) lava++;
+        }
+        return lava * 10 >= moltenCells.length * 9;
     }
 
     /**
-     * Puts lava back into cells a quake emptied, air included, since a quake opens the throat.
-     * Returns how many took it. Lava goes in only where it stays put:
+     * Puts lava back into cells a quake emptied or filled with rock, and takes off the rock it pushed over
+     * them, so the lake is open again. Returns how many took it. Lava goes in only where it stays put:
      * <ol>
      *   <li>something solid underneath, or the core itself;</li>
      *   <li>all four horizontal neighbours solid or already lava;</li>
@@ -178,10 +208,17 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
             BlockPos p = BlockPos.of(c);
             BlockState s = level.getBlockState(p);
             if (!s.getFluidState().isEmpty()) continue;                  // already lava or water
-            if (EruptionHandler.isPlayerPlaced(s)) continue;
-            if (s.isAir() && !contained(level, p)) continue;
+            if (EruptionHandler.isPlayerPlaced(s) || s.hasBlockEntity()) continue;
+            if (!contained(level, p)) continue;
             level.setBlock(p, Blocks.LAVA.defaultBlockState(), 2);
             restored++;
+            for (int up = 1; up <= 3; up++) {
+                BlockPos a = p.above(up);
+                BlockState over = level.getBlockState(a);
+                if (over.isAir() || !over.getFluidState().isEmpty()) break;
+                if (EruptionHandler.isPlayerPlaced(over) || over.hasBlockEntity() || over.is(Blocks.BEDROCK)) break;
+                level.setBlock(a, Blocks.AIR.defaultBlockState(), 2);
+            }
         }
         return restored;
     }

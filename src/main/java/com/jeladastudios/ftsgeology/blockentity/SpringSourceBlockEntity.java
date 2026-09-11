@@ -323,10 +323,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
         // spring's own excavation.
         if (Math.abs(ring - oldWater) <= 1) {
             // It has not: rebuild exactly where the spring was.
-            if (!applyStage(level, stage)) {
-                setChanged();
-                return false;       // unstamped: the next check may find better ground
-            }
+            if (!applyStage(level, stage)) return recoverPool(level, quake, ring);
             resitedFor = quake;
             GeysersMod.LOGGER.info("Spring at {},{} rebuilt after a quake, same level",
                     siteX(), siteZ());
@@ -341,12 +338,41 @@ public class SpringSourceBlockEntity extends BlockEntity {
         datumY = capped;
         if (!applyStage(level, stage)) {
             datumY = capped - moved;                        // put the datum back; nothing was built
-            setChanged();
-            return false;                                   // unstamped, so it can try again
+            return recoverPool(level, quake, ring);
         }
         resitedFor = quake;
         GeysersMod.LOGGER.info("Spring at {},{} re-sited after a quake: ground moved {} blocks",
                 siteX(), siteZ(), moved);
+        setChanged();
+        return true;
+    }
+
+    /**
+     * For a pool that will not go back where it was because the quake broke the floor under it rather than
+     * the ground around it. Its own basin is put back first, then the level the ground was left at is tried;
+     * if neither holds a pool the spring gives up for this quake instead of trying again every check.
+     *
+     * @return true, since the check was spent either way
+     */
+    private boolean recoverPool(ServerLevel level, long quake, int ring) {
+        resitedFor = quake;
+        if (HotSpringShape.restoreBasin(level, poolCells, datumY - 1) && applyStage(level, stage)) {
+            GeysersMod.LOGGER.info("Spring at {},{} restored its basin after a quake", siteX(), siteZ());
+            setChanged();
+            return true;
+        }
+        int old = datumY;
+        datumY = ring + 1;
+        if (datumY != old && applyStage(level, stage)) {
+            GeysersMod.LOGGER.info("Spring at {},{} followed the ground after a quake: {} blocks",
+                    siteX(), siteZ(), datumY - old);
+            setChanged();
+            return true;
+        }
+        datumY = old;
+        dormant = true;
+        GeysersMod.LOGGER.info("Spring at {},{} could not hold a pool after a quake; dormant until the ground moves again",
+                siteX(), siteZ());
         setChanged();
         return true;
     }
