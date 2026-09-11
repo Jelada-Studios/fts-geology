@@ -213,8 +213,14 @@ public class SpringSourceBlockEntity extends BlockEntity {
                 be.setChanged();
                 if (be.rebuildBarred(server)) return;
                 if (be.applyStage(server, be.stage)) {
+                    be.stalled = 0;
                     be.noteRebuild(server);
                     GeysersMod.LOGGER.debug("Spring at {},{} dug itself out",
+                            be.siteX(), be.siteZ());
+                } else if (be.stalled >= STALL_LIMIT) {
+                    // Its pool will not go back here and nothing is changing: it rests until a quake moves the ground.
+                    be.dormant = true;
+                    GeysersMod.LOGGER.info("Spring at {},{} cannot hold a pool here; dormant until the ground moves",
                             be.siteX(), be.siteZ());
                 }
                 return;
@@ -296,6 +302,9 @@ public class SpringSourceBlockEntity extends BlockEntity {
 
         if (!surfaced || stage <= 0) {                     // never had a pool; let it climb
             resitedFor = quake;
+            // A line that gave up surfacing gets another try on the moved ground.
+            dormant = false;
+            stalled = 0;
             setChanged();
             return false;
         }
@@ -574,14 +583,20 @@ public class SpringSourceBlockEntity extends BlockEntity {
         }
 
         setVent(vent);
-        stalled = 0;
         // Water in daylight is a spring at once, a small one. The canopy comes off only here and on
         // growth.
         if (!applyStage(level, 1, true)) {
+            // Counted across tries, or a spring that surfaces where no pool fits climbs and fails for ever.
             stalled++;
+            if (stalled >= STALL_LIMIT) {
+                dormant = true;
+                GeysersMod.LOGGER.info("Spring line at {} cannot open a pool at Y {}; dormant until the ground moves",
+                        pos, ground);
+            }
             setChanged();
             return;
         }
+        stalled = 0;
         stage = 1;
         surfaced = true;
         rebuilds = 0;
