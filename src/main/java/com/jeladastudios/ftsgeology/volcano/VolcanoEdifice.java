@@ -277,12 +277,12 @@ public final class VolcanoEdifice {
      */
     static BlockState shieldSurface(RandomSource rng, Ctx c, int gx, int y, int gz, BlockState rock) {
         double h = (y - c.baseY) / (double) Math.max(1, c.coneHeight);
-        if (c.size != VolcanoSize.SMALL && shieldTongue(c, gx, gz) > 0.42) {
+        if (c.size != VolcanoSize.SMALL && shieldTongue(c, gx, gz) > 0.5) {
             int r = rng.nextInt(10);
             return (r < 6 ? Blocks.BASALT : r < 9 ? Blocks.SMOOTH_BASALT : Blocks.BLACKSTONE).defaultBlockState();
         }
-        double line = 0.5 + 0.1 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + 311, gz - 311, 45.0);
-        if (h > line + 0.22) {
+        double line = 0.62 + 0.1 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + 311, gz - 311, 45.0);
+        if (h > line + 0.18) {
             int r = rng.nextInt(10);
             return (r < 5 ? Blocks.BASALT : r < 8 ? Blocks.SMOOTH_BASALT : Blocks.BLACKSTONE).defaultBlockState();
         }
