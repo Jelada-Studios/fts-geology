@@ -21,6 +21,12 @@ public final class HotSpringSites {
 
     private HotSpringSites() {}
 
+    /** No neighbour shape updates: at the edge of the loaded area they load the next chunk on the server thread. */
+    private static final int FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
+
+    /** How far from a pool's centre its bands, halo, canopy clearing and runoff reach. */
+    private static final int POOL_REACH = 56;
+
     /** Builds a hot spring system here: one broad pool on the flat, a terrace chain on a slope. */
     public static boolean placeHotSpringAt(ServerLevel level, int x, int z) {
         return placeHotSpringAt(level, x, z, HotSpringShape.MAX_STAGE);
@@ -77,6 +83,9 @@ public final class HotSpringSites {
         int matureR = HotSpringShape.radiusFor(chainStage);
 
         for (int i = 0; i < terraces; i++) {
+            // A pool that would reach into an unloaded chunk ends the chain rather than loading it.
+            if (!areaLoaded(level, (px - POOL_REACH) >> 4, (pz - POOL_REACH) >> 4,
+                    (px + POOL_REACH) >> 4, (pz + POOL_REACH) >> 4)) break;
             // Every pool is a mineral water line run to maturity: the same builder as after a quake.
             if (openSpring(level, px, pz, chainStage, stage)) placed++;
             // Step downhill clear of this pool's widest wobbled edge, with bearing and stride varied so
@@ -147,13 +156,13 @@ public final class HotSpringSites {
             if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) continue;
             // The last few blocks under the pool floor are the throat, sealed with the spring's own
             // deposit. Everything below that is the water column itself.
-            level.setBlock(p, y >= groundY - 4 ? choke : water, 2);
+            level.setBlock(p, y >= groundY - 4 ? choke : water, FLAGS);
             // Skin the wall so the column does not open into a cave it happens to pass.
             for (Direction d : Direction.Plane.HORIZONTAL) {
                 BlockPos w = p.relative(d);
                 BlockState ws = level.getBlockState(w);
                 if (ws.isAir() || !ws.getFluidState().isEmpty()) {
-                    if (!EruptionHandler.isPlayerPlaced(ws)) level.setBlock(w, choke, 2);
+                    if (!EruptionHandler.isPlayerPlaced(ws)) level.setBlock(w, choke, FLAGS);
                 }
             }
         }
@@ -202,7 +211,7 @@ public final class HotSpringSites {
 
         // Core level: a rock ring keeping the heat off the water, with the core in the middle.
         fillLayer(level, core, rad, Blocks.DEEPSLATE);
-        level.setBlock(core, coreBlock, 2);
+        level.setBlock(core, coreBlock, FLAGS);
 
         // The water itself, walled so it cannot leak into a cave alongside.
         for (int dy = 1; dy <= chamberH; dy++) {
@@ -243,7 +252,7 @@ public final class HotSpringSites {
                     boolean tree = s.is(net.minecraft.tags.BlockTags.LOGS)
                             || s.is(net.minecraft.tags.BlockTags.LEAVES);
                     if (!tree && !TerrainProbe.isVegetation(s)) break;   // something real: stop
-                    level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                    level.setBlock(p, Blocks.AIR.defaultBlockState(), FLAGS);
                 }
             }
         }
@@ -330,7 +339,7 @@ public final class HotSpringSites {
                 if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) continue;
                 if (!s.getFluidState().isEmpty()) continue;
                 TerrainProbe.clearVegetation(level, x, g, z, 2);
-                level.setBlock(p, b.defaultBlockState(), 2);
+                level.setBlock(p, b.defaultBlockState(), FLAGS);
                 if (inHalo && level.random.nextInt(30) == 0) deadTree(level, p, level.random);
             }
         }

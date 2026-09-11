@@ -163,6 +163,24 @@ public final class RetrogenHandler {
     static long surfaceNanos;
 
     /**
+     * Chunks around a queued chunk that must be loaded before its springs and geysers are built: a
+     * stage 4 pool, its bands, halo and runoff reach about 56 blocks from a centre inside the chunk.
+     */
+    static final int SURFACE_REACH = 4;
+
+    /** True when every chunk in the box is loaded. Corners first, since they are the likeliest missing. */
+    static boolean areaLoaded(ServerLevel level, int minCx, int minCz, int maxCx, int maxCz) {
+        if (!level.hasChunk(minCx, minCz) || !level.hasChunk(maxCx, maxCz)
+                || !level.hasChunk(minCx, maxCz) || !level.hasChunk(maxCx, minCz)) return false;
+        for (int cx = minCx; cx <= maxCx; cx++) {
+            for (int cz = minCz; cz <= maxCz; cz++) {
+                if (!level.hasChunk(cx, cz)) return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Generates queued chunks a few at a time. Server tick events do not fire while the spawn area
      * is being prepared, so this naturally holds everything back until world creation has finished.
      */
@@ -234,6 +252,16 @@ public final class RetrogenHandler {
                     // A retrofit gets the deep pass only: nothing that could put a second geyser or
                     // volcano next to one that is already there.
                     if (!q.deepOnly() && !PROCESSED.contains(key)) {
+                        // Springs and geysers read and write past the chunk, which would load an unloaded
+                        // neighbour on this thread. Held until the ground around it is in.
+                        ChunkPos cp = q.pos();
+                        if (!areaLoaded(level, cp.x - SURFACE_REACH, cp.z - SURFACE_REACH,
+                                cp.x + SURFACE_REACH, cp.z + SURFACE_REACH)) {
+                            DEEP_CURRENT.add(key);
+                            deferred.add(new QueuedChunk(q.dimension(), cp, false));
+                            finished = false;
+                            continue;
+                        }
                         long started = System.nanoTime();
                         blocksSinceReport += generateInChunk(level, chunk);
                         surfaceNanos += System.nanoTime() - started;
@@ -269,8 +297,9 @@ public final class RetrogenHandler {
             if (surfaceNanos > 0) {
                 long[] p = SurfaceFeatures.PART_NANOS;
                 GeysersMod.LOGGER.info("retrogen surface pass, ms: suitability {}, signs {}, basin {}, soil {}, "
-                                + "springs/geysers/volcanoes {}",
-                        ms(p[0]), ms(p[1]), ms(p[2]), ms(p[3]), ms(surfaceNanos - p[0] - p[1] - p[2] - p[3]));
+                                + "springs {}, volcanoes {}, geysers {}",
+                        ms(p[0]), ms(p[1]), ms(p[2]), ms(p[3]), ms(p[4]), ms(p[5]),
+                        ms(surfaceNanos - p[0] - p[1] - p[2] - p[3] - p[4] - p[5]));
                 java.util.Arrays.fill(p, 0L);
                 surfaceNanos = 0;
             }

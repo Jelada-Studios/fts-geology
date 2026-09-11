@@ -26,6 +26,9 @@ public final class SurfaceFeatures {
 
     private SurfaceFeatures() {}
 
+    /** No neighbour shape updates: at the edge of the loaded area they load the next chunk on the server thread. */
+    private static final int FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
+
     // === Generation =========================================================
 
     /** How much denser hot springs get on properly geothermal ground. */
@@ -48,8 +51,11 @@ public final class SurfaceFeatures {
         return Math.min(1.0, Math.max(plume, boundary) * 2.0);
     }
 
-    /** Nanoseconds spent on each part of the surface pass since the last report: suitability, signs, basin, soil. */
-    static final long[] PART_NANOS = new long[4];
+    /**
+     * Nanoseconds spent on each part of the surface pass since the last report: suitability, signs, basin,
+     * soil, springs, volcanoes. Geysers are what is left of the whole pass.
+     */
+    static final long[] PART_NANOS = new long[6];
 
     private static long lap(int part, long since) {
         long now = System.nanoTime();
@@ -93,6 +99,7 @@ public final class SurfaceFeatures {
 
         // An occasional hot spring, up to a quarter denser on geothermal ground, ramped rather than
         // switched on at a line.
+        t = System.nanoTime();
         double springBoost = 1.0 + (GEOTHERMAL_SPRING_BOOST - 1.0) * geothermalGround(level, centreX, centreZ);
         // A painted basin floor is meant to be crowded with pools, so there it climbs to BASIN_SPRING_BOOST.
         double floor = net.minecraft.util.Mth.clamp(
@@ -101,10 +108,12 @@ public final class SurfaceFeatures {
         if (rng.nextDouble() < GeyserConfig.HOT_SPRING_SPAWN_CHANCE.get() * fit.hotSpring() * springBoost) {
             generateHotSpring(level, cp, rng);
         }
+        t = lap(4, t);
         // Volcanoes are rare and only where magma is generated; VolcanoJob spreads the build over ticks.
         if (fit.volcano() > 0 && rng.nextDouble() < GeyserConfig.VOLCANO_SPAWN_CHANCE.get() * fit.volcano()) {
             generateVolcano(level, cp, rng);
         }
+        lap(5, t);
 
         // One candidate column per chunk keeps density low and cost bounded.
         double chance = GeyserConfig.CHAMBER_SPAWN_CHANCE.get() * fit.geyser();
@@ -247,7 +256,7 @@ public final class SurfaceFeatures {
 
         // 2. Core level: rock ring separating lava from water, with the core at its centre.
         fillLayer(level, core, rad, Blocks.DEEPSLATE);
-        level.setBlock(core, ModBlocks.GEYSER_CORE.get().defaultBlockState(), 2);
+        level.setBlock(core, ModBlocks.GEYSER_CORE.get().defaultBlockState(), FLAGS);
         GeyserCoreBlockEntity coreBe =
                 level.getBlockEntity(core) instanceof GeyserCoreBlockEntity be ? be : null;
         if (coreBe != null) coreBe.setMagnitude(magnitude);
@@ -282,7 +291,7 @@ public final class SurfaceFeatures {
             for (int dz = -rad; dz <= rad; dz++) {
                 BlockPos p = center.offset(dx, 0, dz);
                 if (EruptionHandler.isPlayerPlaced(level.getBlockState(p))) continue;
-                level.setBlock(p, block.defaultBlockState(), 2);
+                level.setBlock(p, block.defaultBlockState(), FLAGS);
             }
         }
     }
@@ -296,7 +305,7 @@ public final class SurfaceFeatures {
                 BlockState s = level.getBlockState(p);
                 if (EruptionHandler.isPlayerPlaced(s)) continue;
                 if (s.isAir() || !s.getFluidState().isEmpty()) {
-                    level.setBlock(p, Blocks.DEEPSLATE.defaultBlockState(), 2);
+                    level.setBlock(p, Blocks.DEEPSLATE.defaultBlockState(), FLAGS);
                 }
             }
         }
@@ -328,7 +337,7 @@ public final class SurfaceFeatures {
             boolean blocked = aggressive ? s.is(Blocks.BEDROCK) : !isShaftClearable(s);
             if (blocked) break;
             if (!s.isAir()) {
-                level.setBlock(m.immutable(), Blocks.AIR.defaultBlockState(), 2);
+                level.setBlock(m.immutable(), Blocks.AIR.defaultBlockState(), FLAGS);
             }
             reached = y;
         }

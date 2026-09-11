@@ -368,7 +368,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
                 BlockPos p = new BlockPos(cx, y, cz);
                 if (level.getBlockState(p).getFluidState().isEmpty()) continue;
                 if (!ourWater(level, p)) continue;
-                level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                level.setBlock(p, Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS | net.minecraft.world.level.block.Block.UPDATE_KNOWN_SHAPE);
                 cleared++;
             }
         }
@@ -496,7 +496,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
                 if (EruptionHandler.isPlayerPlaced(s)) continue;
                 noteRock(s);
                 if (level.random.nextInt(3) == 0) continue;      // patchy, not a tiled pipe
-                level.setBlock(p, deposit(), 2);
+                level.setBlock(p, deposit(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS | net.minecraft.world.level.block.Block.UPDATE_KNOWN_SHAPE);
             }
         }
     }
@@ -543,7 +543,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
         for (int dy = 1; dy <= 4; dy++) {
             BlockPos p = vent.below(dy);
             if (level.getBlockState(p).is(ModBlocks.HOT_SPRING.get())) {
-                level.setBlock(p, deposit(), 2);
+                level.setBlock(p, deposit(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS | net.minecraft.world.level.block.Block.UPDATE_KNOWN_SHAPE);
             }
         }
 

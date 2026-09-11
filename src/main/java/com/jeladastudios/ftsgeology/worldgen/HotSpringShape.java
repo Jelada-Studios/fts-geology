@@ -6,6 +6,7 @@ import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -45,6 +46,9 @@ public final class HotSpringShape {
 
     /** One warm bed per this many cells of pool floor. */
     private static final int CELLS_PER_BED = 12;
+
+    /** No neighbour shape updates: at the edge of the loaded area they load the next chunk on the server thread. */
+    private static final int FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
 
     /** Reads the original ground level here, for a spring that does not have one yet. */
     public static int datumFor(ServerLevel level, int x, int z) {
@@ -130,7 +134,7 @@ public final class HotSpringShape {
                 BlockState s = level.getBlockState(p);
                 if (s.isAir()) continue;
                 if (EruptionHandler.isPlayerPlaced(s)) continue;
-                level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                level.setBlock(p, Blocks.AIR.defaultBlockState(), FLAGS);
             }
             // Floor up to the water line where the ground has fallen away below it.
             int g = TerrainProbe.groundY(level, cx, cz);
@@ -138,9 +142,9 @@ public final class HotSpringShape {
             for (int y = from; y <= waterY - 1; y++) {
                 BlockPos p = new BlockPos(cx, y, cz);
                 if (EruptionHandler.isPlayerPlaced(level.getBlockState(p))) continue;
-                level.setBlock(p, Blocks.CALCITE.defaultBlockState(), 2);
+                level.setBlock(p, Blocks.CALCITE.defaultBlockState(), FLAGS);
             }
-            level.setBlock(cell, Blocks.WATER.defaultBlockState(), 2);
+            level.setBlock(cell, Blocks.WATER.defaultBlockState(), FLAGS);
         }
 
         // Warm beds spread through the floor, not one in the middle, so the whole pool steams.
@@ -267,7 +271,7 @@ public final class HotSpringShape {
                         : level.random.nextInt(2) == 0
                             ? ModBlocks.TRAVERTINE.get().defaultBlockState()
                             : ModBlocks.SINTER.get().defaultBlockState();
-                level.setBlock(at, put, 2);
+                level.setBlock(at, put, FLAGS);
             }
         }
     }
@@ -412,7 +416,7 @@ public final class HotSpringShape {
                     boolean holdsWater = !s.isAir() && s.getFluidState().isEmpty()
                             && !TerrainProbe.isVegetation(s);
                     if (holdsWater) continue;
-                    level.setBlock(edge, crust, 2);
+                    level.setBlock(edge, crust, FLAGS);
                 }
 
                 // And a broken lip above it, for looks rather than containment.
@@ -421,7 +425,7 @@ public final class HotSpringShape {
                 if (EruptionHandler.isPlayerPlaced(s)) continue;
                 if (!s.isAir() && !TerrainProbe.isVegetation(s)) continue;
                 if (level.random.nextInt(3) != 0) continue;
-                level.setBlock(lip, crust, 2);
+                level.setBlock(lip, crust, FLAGS);
             }
         }
     }
@@ -447,8 +451,8 @@ public final class HotSpringShape {
 
     private static void seatBed(ServerLevel level, BlockPos at, BlockState bed) {
         if (EruptionHandler.isPlayerPlaced(level.getBlockState(at))) return;
-        level.setBlock(at, bed, 2);
-        level.setBlock(at.below(2), Blocks.MAGMA_BLOCK.defaultBlockState(), 2);
+        level.setBlock(at, bed, FLAGS);
+        level.setBlock(at.below(2), Blocks.MAGMA_BLOCK.defaultBlockState(), FLAGS);
         MagmaSealing.seal(level, at.below(2), false);
     }
 
