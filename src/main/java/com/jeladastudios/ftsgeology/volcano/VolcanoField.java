@@ -4,6 +4,7 @@ import static com.jeladastudios.ftsgeology.util.SeedHash.hash;
 import static com.jeladastudios.ftsgeology.util.SeedHash.rand01;
 
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
+import com.jeladastudios.ftsgeology.tectonics.FaultType;
 import com.jeladastudios.ftsgeology.tectonics.HotspotMap;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
 import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
@@ -25,8 +26,10 @@ import net.minecraft.world.level.levelgen.structure.placement.RandomSpreadStruct
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -38,7 +41,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>A cell becomes a shield or caldera over a plume, a stratovolcano or now and then a caldera on a
  * subduction arc, and a fissure or a shield on a rift. It is refused on water, on ground too broken for it, and where a surface
- * structure is due, since that structure would be built inside the mountain.</p>
+ * structure is due, since that structure would be built inside the mountain. A shield or caldera turned down
+ * for water or a structure is tried again on the ground around it, which the plume or arc covers as well.</p>
  */
 public final class VolcanoField {
 
@@ -74,6 +78,9 @@ public final class VolcanoField {
     /** A worked-out cell: its volcano, if any, and the candidates turned down on the way. */
     private record Cell(Site site, int[] refused) {}
 
+    /** One structure set's possible start chunk, whose answer is kept while a cell is worked out. */
+    private record StructureKey(int set, long chunk) {}
+
     /** Edge of a grid cell. Each cell holds at most one volcano. */
     static final int CELL = 2560;
     /**
@@ -87,8 +94,10 @@ public final class VolcanoField {
     private static final double MIN_STRESS = 0.4;
     /** How far a plume's centre may be pulled to fit its cell: the dome is still strong there. */
     private static final int PLUME_PULL = 420;
+    /** Ground tried around a refused shield or caldera: four bearings at half its foot, at the foot, and half as far again. */
+    private static final int SHIFTS = 12;
 
-    private static final Map<Long, Cell> CACHE = new ConcurrentHashMap<>();
+    private static final Map<Long, CompletableFuture<Cell>> CACHE = new ConcurrentHashMap<>();
 
     /** The chosen large volcanoes whose footprint reaches into this chunk. */
     public static List<Site> sitesTouching(ServerLevel level, ChunkPos cp) {
@@ -180,14 +189,28 @@ public final class VolcanoField {
 
     private static Cell cell(ServerLevel level, int cx, int cz) {
         long key = ((long) cx << 32) ^ (cz & 0xFFFFFFFFL);
-        Cell hit = CACHE.get(key);
+        CompletableFuture<Cell> hit = CACHE.get(key);
         if (hit == null) {
             if (CACHE.size() > 50_000) CACHE.clear();
-            // Two threads may work the same cell out at once. The answer is the same either way.
-            hit = evaluate(level, cx, cz);
-            CACHE.putIfAbsent(key, hit);
+            CompletableFuture<Cell> mine = new CompletableFuture<>();
+            hit = CACHE.putIfAbsent(key, mine);
+            if (hit == null) {
+                // This thread works the cell out. A cell that tries the ground round a refused site is slow,
+                // so any other thread asking meanwhile waits for this answer instead of repeating the work.
+                long started = System.nanoTime();
+                try {
+                    mine.complete(evaluate(level, cx, cz));
+                } catch (RuntimeException | Error e) {
+                    CACHE.remove(key, mine);
+                    mine.completeExceptionally(e);
+                    throw e;
+                }
+                com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("Large volcano cell {},{} worked out in {} ms",
+                        cx, cz, (System.nanoTime() - started) / 1_000_000);
+                hit = mine;
+            }
         }
-        return hit;
+        return hit.join();
     }
 
     private static Cell evaluate(ServerLevel level, int cx, int cz) {
@@ -196,6 +219,8 @@ public final class VolcanoField {
         int span = CELL - 2 * MARGIN;
         int minX = cx * CELL + MARGIN, minZ = cz * CELL + MARGIN;
         int maxX = minX + span, maxZ = minZ + span;
+        // Nearby candidates ask after the same structure starts over and over; each is worked out once.
+        Map<StructureKey, Boolean> structures = new HashMap<>();
 
         // A plume first: fewer of them, and the grander sight. A centre just outside the usable part
         // of the cell is pulled in.
@@ -206,7 +231,7 @@ public final class VolcanoField {
             // A really large hotspot volcano has often emptied its chamber and fallen in.
             VolcanoType type = rand01(hash(seed, 0, 0, 0xCA1DL)) < 0.34
                     ? VolcanoType.CALDERA : VolcanoType.SHIELD;
-            Site s = check(level, x, z, type, seed, refused);
+            Site s = checkNear(level, x, z, type, seed, refused, null, minX, minZ, maxX, maxZ, structures);
             if (s != null) return new Cell(s, refused);
         }
 
@@ -228,31 +253,98 @@ public final class VolcanoField {
             // Rifts run long and largely over land, so left alone they out-numbered the arcs four to
             // one in testing. A flood-basalt fissure this size is the rarer sight in the real world.
             if (type == VolcanoType.FISSURE && rand01(hash(seed, i, 3, 0xF155L)) < 0.6) continue;
-            Site site = check(level, x, z, type, seed, refused);
+            Site site = checkNear(level, x, z, type, seed, refused, s.faultType(), minX, minZ, maxX, maxZ,
+                    structures);
             if (site != null) return new Cell(site, refused);
         }
         return new Cell(null, refused);
     }
 
     /**
+     * {@link #check}, and for a shield or caldera turned down for water or a structure, the same check on the
+     * ground around it. Those two need hundreds of blocks of dry ground with no village on it, which one point
+     * seldom has, while the plume or arc under it spreads well past that point. Only the first candidate is
+     * counted as refused, so the counts stay a count of candidates.
+     *
+     * @param fault the boundary a moved site has to stay on, or null for a plume
+     */
+    private static Site checkNear(ServerLevel level, int x, int z, VolcanoType type, long seed, int[] refused,
+                                  FaultType fault, int minX, int minZ, int maxX, int maxZ,
+                                  Map<StructureKey, Boolean> structures) {
+        int b = type.ordinal() * REASONS;
+        int water = refused[b + WATER], structure = refused[b + STRUCTURE];
+        Site site = check(level, x, z, type, seed, refused, structures);
+        if (site != null || (type != VolcanoType.SHIELD && type != VolcanoType.CALDERA)) return site;
+        // Broken ground or no plan at all: moving over would not help.
+        if (refused[b + WATER] == water && refused[b + STRUCTURE] == structure) return null;
+
+        int foot = footAt(level, x, z, type, seed);
+        if (foot <= 0) return null;
+        double spin = rand01(hash(seed, x, z, 0x5F1L)) * Math.PI * 2;
+        int[] uncounted = new int[refused.length];
+        for (int i = 0; i < SHIFTS; i++) {
+            // Ring by ring outward, each turned half way between the bearings of the one inside it.
+            int ring = i / 4;
+            double a = spin + Math.PI * 0.5 * (i % 4) + (ring % 2 == 1 ? Math.PI * 0.25 : 0.0);
+            double r = foot * (0.5 + 0.5 * ring);
+            int sx = x + (int) Math.round(Math.cos(a) * r), sz = z + (int) Math.round(Math.sin(a) * r);
+            // Inside the usable part of the cell, or two volcanoes could overlap.
+            if (sx < minX || sx > maxX || sz < minZ || sz > maxZ) continue;
+            if (fault == null) {
+                if (HotspotMap.plumeStrength(level, sx, sz) < 0.4) continue;
+            } else {
+                PlateSample p = TectonicMap.sampleCached(level, sx, sz);
+                if (p.stress() < MIN_STRESS || p.faultType() != fault) continue;
+            }
+            // Two height samples rule most of the sea out before a full check is paid for.
+            if (centreWet(level, sx, sz)) continue;
+            Site moved = check(level, sx, sz, type, seed, uncounted, structures);
+            if (moved != null) return moved;
+        }
+        return null;
+    }
+
+    /** The magnitude of a large volcano planned at this point. */
+    private static int magnitudeAt(long seed, int x, int z) {
+        return VolcanoSize.LARGE.magnitude(rand01(hash(seed, x, z, 0x3A6L)));
+    }
+
+    /** How far out a large volcano of this type planned here reaches, or 0 where it cannot be planned. */
+    private static int footAt(ServerLevel level, int x, int z, VolcanoType type, long seed) {
+        int sea = level.getChunkSource().getGenerator().getSeaLevel();
+        // Planned once on a provisional base, only to learn how wide a ring to sample.
+        int[] probe = VolcanoBuilder.largeFootprint(level, x, sea + 8, z, magnitudeAt(seed, x, z), type, seed);
+        return probe == null ? 0 : probe[1];
+    }
+
+    /** True where the generator puts water, or ground at the sea, on this column. */
+    private static boolean centreWet(ServerLevel level, int x, int z) {
+        ChunkGenerator gen = level.getChunkSource().getGenerator();
+        RandomState rs = level.getChunkSource().randomState();
+        int surface = gen.getBaseHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
+        int floor = gen.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
+        return surface > floor || floor <= gen.getSeaLevel();
+    }
+
+    /**
      * Whether a large volcano of this type can stand here, from the generator's own terrain rather than
      * the world, which for most of these cells does not exist yet.
      */
-    private static Site check(ServerLevel level, int x, int z, VolcanoType type, long seed, int[] refused) {
-        int magnitude = VolcanoSize.LARGE.magnitude(rand01(hash(seed, x, z, 0x3A6L)));
+    private static Site check(ServerLevel level, int x, int z, VolcanoType type, long seed, int[] refused,
+                              Map<StructureKey, Boolean> structures) {
+        int magnitude = magnitudeAt(seed, x, z);
         ChunkGenerator gen = level.getChunkSource().getGenerator();
         RandomState rs = level.getChunkSource().randomState();
         int sea = gen.getSeaLevel();
 
-        // Planned once on a provisional base, only to learn how wide a ring to sample.
-        int[] probe = VolcanoBuilder.largeFootprint(level, x, sea + 8, z, magnitude, type, seed);
-        if (probe == null) return refuse(refused, type, OTHER, x, z, "no plan");
-        int foot = probe[1];
+        int foot = footAt(level, x, z, type, seed);
+        if (foot <= 0) return refuse(refused, type, OTHER, x, z, "no plan");
 
         // The centre, then eight points half way out and eight at the foot.
         int[] ground = new int[17];
         int[] wet = new int[3];
         int n = 0;
+        int wetMid = type == VolcanoType.SHIELD ? 4 : 2;
         for (int ring = 0; ring <= 2; ring++) {
             int count = ring == 0 ? 1 : 8;
             for (int i = 0; i < count; i++) {
@@ -268,13 +360,12 @@ public final class VolcanoField {
                 }
                 ground[n++] = floor - 1;
             }
+            // Water under the body of the mountain refuses it; a lake or a shore out at the foot does not,
+            // since the apron carries on under water as a thin skin. A volcano half in the sea is a job for
+            // the ocean volcanoes, not this. A body already too wet is refused before its foot is sampled.
+            if (ring == 1 && wet[1] > wetMid) return refuse(refused, type, WATER, x, z, "wet " + wet[1] + " mid");
         }
-        // Water under the body of the mountain refuses it; a lake or a shore out at the foot does not,
-        // since the apron carries on under water as a thin skin. A volcano half in the sea is a job for
-        // the ocean volcanoes, not this.
-        if (wet[1] > (type == VolcanoType.SHIELD ? 4 : 2) || wet[2] > 6) {
-            return refuse(refused, type, WATER, x, z, "wet " + wet[1] + " mid, " + wet[2] + " foot");
-        }
+        if (wet[2] > 6) return refuse(refused, type, WATER, x, z, "wet " + wet[2] + " foot");
 
         // Without the highest and lowest of the nine inner points, so one peak or gorge under the body
         // does not turn a whole mountain down. A caldera cuts a floor and needs ground that allows it; a
@@ -296,7 +387,7 @@ public final class VolcanoField {
         if (plan == null) return refuse(refused, type, OTHER, x, z, "no plan at base " + baseY);
         // Structures are placed before the mountain and would end up inside it, so none may stand on the
         // edifice itself; one out on the apron keeps its buildings, which the apron will not cover.
-        if (structureInTheWay(level, gen, rs, x, z, plan[1] + 8)) {
+        if (structureInTheWay(level, gen, rs, x, z, plan[1] + 8, structures)) {
             return refuse(refused, type, STRUCTURE, x, z, "structure within " + (plan[1] + 8));
         }
         return new Site(x, z, baseY, plan[2], type, magnitude, seed, plan[0], plan[1],
@@ -314,15 +405,19 @@ public final class VolcanoField {
      * True when a surface structure is due within {@code radius} blocks, asked of the structure
      * placement itself so it works for ungenerated chunks. Errs towards refusing; ruined portals are
      * ignored.
+     *
+     * @param due answers already worked out for this cell, by structure set and start chunk
      */
     private static boolean structureInTheWay(ServerLevel level, ChunkGenerator gen, RandomState rs,
-                                             int x, int z, int radius) {
+                                             int x, int z, int radius, Map<StructureKey, Boolean> due) {
         ChunkGeneratorStructureState state = level.getChunkSource().getGeneratorState();
         long seed = state.getLevelSeed();
         int minCX = (x - radius) >> 4, maxCX = (x + radius) >> 4;
         int minCZ = (z - radius) >> 4, maxCZ = (z + radius) >> 4;
         long r2 = (long) radius * radius;
+        int index = -1;
         for (Holder<StructureSet> set : state.possibleStructureSets()) {
+            index++;
             if (!(set.value().placement() instanceof RandomSpreadStructurePlacement spread)) continue;
             List<Structure> surface = new ArrayList<>();
             for (StructureSet.StructureSelectionEntry e : set.value().structures()) {
@@ -340,15 +435,30 @@ public final class VolcanoField {
                     int bx = cand.getMiddleBlockX(), bz = cand.getMiddleBlockZ();
                     long dx = bx - x, dz = bz - z;
                     if (dx * dx + dz * dz > r2) continue;
-                    if (!spread.isStructureChunk(state, cand.x, cand.z)) continue;
-                    int y = gen.getBaseHeight(bx, bz, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
-                    Holder<Biome> biome = gen.getBiomeSource().getNoiseBiome(QuartPos.fromBlock(bx),
-                            QuartPos.fromBlock(y), QuartPos.fromBlock(bz), rs.sampler());
-                    for (Structure s : surface) {
-                        if (s.biomes().contains(biome)) return true;
+                    StructureKey key = new StructureKey(index, cand.toLong());
+                    Boolean hit = due.get(key);
+                    if (hit == null) {
+                        hit = structureDue(level, gen, rs, state, spread, cand, surface);
+                        due.put(key, hit);
                     }
+                    if (hit) return true;
                 }
             }
+        }
+        return false;
+    }
+
+    /** Whether one of these surface structures really starts in this candidate chunk. */
+    private static boolean structureDue(ServerLevel level, ChunkGenerator gen, RandomState rs,
+                                        ChunkGeneratorStructureState state, RandomSpreadStructurePlacement spread,
+                                        ChunkPos cand, List<Structure> surface) {
+        if (!spread.isStructureChunk(state, cand.x, cand.z)) return false;
+        int bx = cand.getMiddleBlockX(), bz = cand.getMiddleBlockZ();
+        int y = gen.getBaseHeight(bx, bz, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
+        Holder<Biome> biome = gen.getBiomeSource().getNoiseBiome(QuartPos.fromBlock(bx),
+                QuartPos.fromBlock(y), QuartPos.fromBlock(bz), rs.sampler());
+        for (Structure s : surface) {
+            if (s.biomes().contains(biome)) return true;
         }
         return false;
     }
