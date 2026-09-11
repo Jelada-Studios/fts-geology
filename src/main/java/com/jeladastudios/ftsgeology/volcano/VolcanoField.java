@@ -129,6 +129,21 @@ public final class VolcanoField {
         return false;
     }
 
+    /** The chosen large volcanoes whose mountain reaches into this box of blocks. */
+    public static List<Site> sitesInBox(ServerLevel level, int minX, int minZ, int maxX, int maxZ) {
+        List<Site> out = new ArrayList<>(1);
+        for (int cx = Math.floorDiv(minX, CELL) - 1; cx <= Math.floorDiv(maxX, CELL) + 1; cx++) {
+            for (int cz = Math.floorDiv(minZ, CELL) - 1; cz <= Math.floorDiv(maxZ, CELL) + 1; cz++) {
+                Site s = site(level, cx, cz);
+                if (s == null || !s.chosen()) continue;
+                int r = s.edificeReach();
+                if (s.x() + r < minX || s.x() - r > maxX || s.z() + r < minZ || s.z() - r > maxZ) continue;
+                out.add(s);
+            }
+        }
+        return out;
+    }
+
     /** True on the floor of a chosen large caldera, where hot ground and springs belong. */
     public static boolean onCalderaFloor(ServerLevel level, int x, int z) {
         int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);

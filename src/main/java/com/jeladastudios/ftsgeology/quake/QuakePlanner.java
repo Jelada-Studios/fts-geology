@@ -308,6 +308,28 @@ public final class QuakePlanner {
             Column c = columns.get(key(x, z));
             return c == null ? 0 : c.stack().length;
         }
+
+        /** Large volcanoes over the corridor, found while the snapshot is taken. */
+        private final java.util.List<com.jeladastudios.ftsgeology.volcano.VolcanoField.Site> volcanoes =
+                new java.util.ArrayList<>();
+
+        /**
+         * How much of the quake a column takes: all of it in open country, a quarter rising to all of it across
+         * a large volcano's body, and none in the zone round its crater, so the mountain keeps its shape, its
+         * flows and its summit lake through a rupture.
+         */
+        public double quakeFactorAt(int x, int z) {
+            double f = 1.0;
+            for (com.jeladastudios.ftsgeology.volcano.VolcanoField.Site s : volcanoes) {
+                double body = s.edificeReach();
+                double d = Math.hypot(x - s.x(), z - s.z());
+                if (d >= body) continue;
+                double zone = Math.max(40.0, body * 0.15);
+                double k = d <= zone ? 0.0 : 0.25 + 0.75 * smootherstep((d - zone) / Math.max(1.0, body - zone));
+                f = Math.min(f, k);
+            }
+            return f;
+        }
     }
 
     /**
@@ -360,6 +382,19 @@ public final class QuakePlanner {
                         && insideGeneratedStructure(level, cx, g, cz);
                 snap.columns.put(Snapshot.key(cx, cz), new Snapshot.Column(g, wet, generated, stack));
             });
+        }
+        // Large volcanoes over the captured ground, so the plan can spare their bodies.
+        if (snap.size() > 0) {
+            int minX = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
+            for (long k : snap.columns.keySet()) {
+                int x = (int) k, z = (int) (k >>> 32);
+                minX = Math.min(minX, x);
+                maxX = Math.max(maxX, x);
+                minZ = Math.min(minZ, z);
+                maxZ = Math.max(maxZ, z);
+            }
+            snap.volcanoes.addAll(com.jeladastudios.ftsgeology.volcano.VolcanoField.sitesInBox(
+                    level, minX, minZ, maxX, maxZ));
         }
         return snap;
     }
@@ -528,6 +563,8 @@ public final class QuakePlanner {
             case CONVERGENT_COLLISION -> collisionDelta(across, slip, magnitude);
             default -> 0;
         };
+        // A large volcano's body takes a share of the movement and its crater zone none; see quakeFactorAt.
+        delta = (int) Math.round(delta * snap.quakeFactorAt(x, z));
         if (delta == 0) return null;
         int top = snap.groundAt(x, z);
         if (delta > 0) {
@@ -764,6 +801,8 @@ public final class QuakePlanner {
                                              double sx, double sz, double slip, double magnitude,
                                              RandomGenerator rng, boolean mayBreakBuilds) {
         if (slip <= 0.02) return null;
+        // Offsets are carried whole, not scaled, so ground a large volcano mostly shields stays where it is.
+        if (snap.quakeFactorAt(x, z) < 0.5) return null;
         int top = snap.groundAt(x, z);
 
         // The mole track, with the odd sag pond where the fault steps.
