@@ -71,8 +71,10 @@ public final class SurfaceFeatures {
 
     static int generateInChunk(ServerLevel level, LevelChunk chunk) {
         ChunkPos cp = chunk.getPos();
-        RandomSource rng = RandomSource.create(
-                level.getSeed() ^ (((long) cp.x) << 32 | (cp.z & 0xFFFFFFFFL)));
+        // Mixed rather than the seed with the chunk position XORed in: the legacy generator's first number then
+        // barely changed along z, so whole columns of chunks passed the spring roll together and springs stood in rows.
+        RandomSource rng = RandomSource.create(com.jeladastudios.ftsgeology.util.SeedHash.mix(
+                com.jeladastudios.ftsgeology.util.SeedHash.columnSeed(level.getSeed(), cp.x, cp.z) ^ 0x5F7A1CEL));
 
         int maxY = GeyserConfig.RETROGEN_MAX_Y.get();   // e.g. -30 (exclusive ceiling)
         int minY = GeyserConfig.RETROGEN_MIN_Y.get();   // e.g. -60
