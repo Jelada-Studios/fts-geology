@@ -163,9 +163,31 @@ public final class VolcanoField {
         int count = 0;
         int[] byType = new int[VolcanoType.values().length];
         int[] refused = new int[VolcanoType.values().length * REASONS];
+        int side = 2 * rings + 1;
+        Cell[] cells = new Cell[side * side];
+        // A cell is slow to work out the first time and needs no other, so off the server thread a search spreads
+        // them over a few workers. The answer is put together in the same order either way.
+        int workers = level.getServer().isSameThread() ? 1
+                : Mth.clamp(Runtime.getRuntime().availableProcessors() / 2, 1, 8);
+        CompletableFuture<?>[] parts = new CompletableFuture<?>[workers];
+        for (int w = 0; w < workers; w++) {
+            int first = w;
+            Runnable part = () -> {
+                for (int i = first; i < cells.length; i += workers) {
+                    cells[i] = cell(level, cx0 - rings + i / side, cz0 - rings + i % side);
+                }
+            };
+            if (workers == 1) {
+                part.run();
+                parts[w] = CompletableFuture.completedFuture(null);
+            } else {
+                parts[w] = CompletableFuture.runAsync(part, net.minecraft.Util.backgroundExecutor());
+            }
+        }
+        CompletableFuture.allOf(parts).join();
         for (int ox = -rings; ox <= rings; ox++) {
             for (int oz = -rings; oz <= rings; oz++) {
-                Cell cell = cell(level, cx0 + ox, cz0 + oz);
+                Cell cell = cells[(ox + rings) * side + (oz + rings)];
                 for (int i = 0; i < refused.length; i++) refused[i] += cell.refused()[i];
                 Site s = cell.site();
                 if (s == null || !s.chosen()) continue;
