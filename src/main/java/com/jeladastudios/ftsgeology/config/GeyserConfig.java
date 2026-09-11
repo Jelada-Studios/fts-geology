@@ -154,6 +154,7 @@ public final class GeyserConfig {
 
     // --- Integration with other mods ----------------------------------------
     public static final ForgeConfigSpec.BooleanValue SUGGEST_OPTIONAL_MODS;   // default ON
+    public static final ForgeConfigSpec.IntValue STALL_REPORT_SECONDS;       // default 30, 0 = off
 
     // --- Hydrology (groundwater) ---------------------------------------------
     public static final ForgeConfigSpec.BooleanValue WATER_TABLE_ENABLED;
@@ -784,6 +785,14 @@ public final class GeyserConfig {
                         "limit rather than anything here, and a player has no way of knowing that.",
                         "Turn off if you are assembling a pack and would rather say it yourself.")
                 .define("suggestOptionalMods", true);
+        b.pop();
+
+        b.push("diagnostics");
+        STALL_REPORT_SECONDS = b
+                .comment("If the server thread goes this many seconds without finishing a tick, write every",
+                        "thread's stack to logs/fts_geology_stall.txt, once per stall. The stacks show what the",
+                        "game was waiting on when it froze. Nothing else is read or written. 0 turns it off.")
+                .defineInRange("stallReportSeconds", 30, 0, 3600);
         b.pop();
 
         b.push("instruments");
