@@ -3,6 +3,7 @@ package com.jeladastudios.ftsgeology.volcano;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
 import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
+import com.jeladastudios.ftsgeology.worldgen.HotSpringShape;
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -127,7 +128,7 @@ public final class VolcanoPlan {
         c.flankExponent = type == VolcanoType.STRATOVOLCANO && size == VolcanoSize.LARGE
                 ? 1.5 : type.flankExponent();
         c.ridgeHeight = type == VolcanoType.STRATOVOLCANO && size != VolcanoSize.SMALL
-                ? Math.min(9.0, c.coneHeight * 0.07) : 0.0;
+                ? Math.min(5.0, c.coneHeight * 0.04) : 0.0;
 
         c.coneBaseR = c.coneHeight > 0
                 ? (int) Math.round(c.craterR + c.coneHeight * c.coneSlope)
@@ -225,8 +226,9 @@ public final class VolcanoPlan {
     }
 
     /**
-     * Checks the ground can carry this volcano: refuses a shoreline, a mostly wet site, or, for a
-     * caldera, which excavates a flat floor, seriously broken country.
+     * Checks the ground can carry this volcano: refuses a shoreline, a mostly wet site, a hot spring
+     * anywhere under the cone or apron, or, for a caldera, which excavates a flat floor, seriously
+     * broken country.
      */
     static boolean siteIsSuitable(ServerLevel level, Ctx c) {
         int centre = TerrainProbe.groundY(level, c.x, c.z);
@@ -235,15 +237,28 @@ public final class VolcanoPlan {
         if (centre <= level.getMinBuildHeight() + 24) return false;
 
         int radius = Math.max(8, c.coneBaseR);
+        // Springs are looked for out to the apron's edge: rock raised round a pool stops at its water and
+        // leaves the pool as a pit in the mountain.
+        int springRadius = Math.max(radius, c.apronReach);
         int lo = centre, hi = centre, wet = 0, blank = 0, samples = 0;
         int stepSize = Math.max(2, radius / 8);
-        for (int dx = -radius; dx <= radius; dx += stepSize) {
-            for (int dz = -radius; dz <= radius; dz += stepSize) {
-                if (dx * dx + dz * dz > radius * radius) continue;
-                samples++;
-                int g = TerrainProbe.groundY(level, c.x + dx, c.z + dz);
-                if (g == Integer.MIN_VALUE) { blank++; continue; }
-                if (TerrainProbe.hasFluidAbove(level, c.x + dx, c.z + dz)) wet++;
+        for (int dx = -springRadius; dx <= springRadius; dx += stepSize) {
+            for (int dz = -springRadius; dz <= springRadius; dz += stepSize) {
+                int d2 = dx * dx + dz * dz;
+                if (d2 > springRadius * springRadius) continue;
+                boolean inner = d2 <= radius * radius;
+                int sx = c.x + dx, sz = c.z + dz;
+                if (!inner && !level.hasChunk(sx >> 4, sz >> 4)) continue;
+                if (inner) samples++;
+                int g = TerrainProbe.groundY(level, sx, sz);
+                if (g == Integer.MIN_VALUE) {
+                    if (inner) blank++;
+                    continue;
+                }
+                boolean fluid = !level.getBlockState(new BlockPos(sx, g + 1, sz)).getFluidState().isEmpty();
+                if (HotSpringShape.isSpringGround(level.getBlockState(new BlockPos(sx, g, sz)), fluid)) return false;
+                if (!inner) continue;
+                if (fluid) wet++;
                 lo = Math.min(lo, g);
                 hi = Math.max(hi, g);
             }

@@ -505,6 +505,11 @@ public final class HotSpringShape {
         return isMat(s);
     }
 
+    /** True for a spring's colour bands, warm bed, or calcite pool floor under water. */
+    public static boolean isSpringGround(BlockState s, boolean underWater) {
+        return isMat(s) || s.is(ModBlocks.HOT_SPRING.get()) || (underWater && s.is(Blocks.CALCITE));
+    }
+
     private static boolean isMat(BlockState s) {
         return s.is(ModBlocks.MICROBIAL_MAT_GREEN.get())
                 || s.is(ModBlocks.MICROBIAL_MAT_YELLOW.get())

@@ -52,21 +52,34 @@ public final class VolcanoEdifice {
     }
 
     /**
-     * Ridges and gullies running down a flank, in -1..1: noise stretched along the radius so each is
-     * long and narrow, and narrowing towards the summit the way real ones converge. Blended across the
-     * bearing where the angle wraps, so there is no seam on the west side.
+     * Ridges and gullies running down a flank, in -1..1: broad and rounded, some 60 blocks across at the
+     * foot and converging towards the summit the way real ones do.
      */
     static double radialRidges(Ctx c, double ang, double dist) {
+        return polarNoise(ang, dist, c.coneBaseR * 1.5, (int) (c.phaseC * 4096), 1.0, 90.0);
+    }
+
+    /**
+     * Value noise round the vent, in -1..1: {@code around} noise units per radian across the flank and
+     * {@code dist / stretch} along it, so features run downslope and narrow towards the summit. Blended
+     * across the bearing where the angle wraps, so there is no seam on the west side.
+     */
+    static double polarNoise(double ang, double dist, double around, int offset, double stretch, double scale) {
         double u = ang < 0 ? ang + Math.PI * 2 : ang;
-        double around = c.coneBaseR * 4.0;
-        int ox = (int) (c.phaseC * 4096);
-        int d = (int) Math.round(dist);
-        double a = com.jeladastudios.ftsgeology.util.ValueNoise.noise((int) Math.round(u * around) + ox, d, 48.0);
+        int d = (int) Math.round(dist / stretch);
+        double a = com.jeladastudios.ftsgeology.util.ValueNoise.noise((int) Math.round(u * around) + offset, d, scale);
         double wrap = u - (Math.PI * 2 - 0.5);
         if (wrap <= 0) return a;
         double b = com.jeladastudios.ftsgeology.util.ValueNoise.noise(
-                (int) Math.round((u - Math.PI * 2) * around) + ox, d, 48.0);
+                (int) Math.round((u - Math.PI * 2) * around) + offset, d, scale);
         return Mth.lerp(wrap / 0.5, a, b);
+    }
+
+    /** Old lava tongues on a stratocone's flank, in -1..1: a few blocks to twenty wide, long down the slope. */
+    static double oldLava(Ctx c, int gx, int gz) {
+        int dx = gx - c.x, dz = gz - c.z;
+        return polarNoise(Math.atan2(dz, dx), Math.sqrt((double) dx * dx + (double) dz * dz),
+                c.coneBaseR * 0.8, (int) (c.phaseA * 4096) + 7919, 4.0, 14.0);
     }
 
     /** Radius of the cone's lobed foot at one bearing. The cone and the apron both use it, so they meet. */
@@ -114,29 +127,36 @@ public final class VolcanoEdifice {
 
         int ground = TerrainProbe.groundY(level, gx, gz);
         if (ground == Integer.MIN_VALUE) return;
-        // Stop at the water's edge rather than walling a lake in.
-        if (!worldgen && !level.getBlockState(new BlockPos(gx, ground + 1, gz)).getFluidState().isEmpty()) {
-            return;
+        int water = 0;
+        while (water < 16 && !level.getBlockState(new BlockPos(gx, ground + 1 + water, gz)).getFluidState().isEmpty()) {
+            water++;
         }
 
         int target = coneTargetY(c, gx, gz, ground, dist, ang);
         if (target == Integer.MIN_VALUE) return;
+        // A river or lake low on the flank keeps its water: its bed is raised to a block under the surface
+        // instead of the channel being filled flat with rock.
+        boolean underWater = water > 0 && target <= ground + water + 3;
+        if (underWater) target = ground + water - 1;
+        // Higher up, a live build stops at the shore rather than walling a lake in.
+        else if (water > 0 && !worldgen) return;
         // Ground already above the mountain's profile is left alone.
         if (ground >= target) return;
 
-        if (!worldgen) TerrainProbe.clearVegetation(level, gx, ground, gz, 3);
+        if (!worldgen && !underWater) TerrainProbe.clearVegetation(level, gx, ground, gz, 3);
         // A flow is a skin: only the top course is crust.
-        boolean flow = flowAt(c, ang, dist);
+        boolean flow = !underWater && flowAt(c, ang, dist);
         for (int y = ground + 1; y <= target; y++) {
             BlockState rock = coneRock(rng, c, gx, y, gz);
             if (y == target) {
-                if (flow) rock = flowRock();
+                if (underWater) rock = ModBlocks.VOLCANIC_BLACK_SAND.get().defaultBlockState();
+                else if (flow) rock = flowRock();
                 else if (c.type == VolcanoType.STRATOVOLCANO) rock = stratoSurface(rng, c, gx, y, gz, rock);
                 else if (c.type == VolcanoType.SHIELD) rock = shieldSurface(rng, c, gx, y, gz, rock);
             }
             setRock(level, new BlockPos(gx, y, gz), rock);
         }
-        if (worldgen) clearCover(level, gx, target, gz);
+        if (worldgen && !underWater) clearCover(level, gx, target, gz);
     }
 
     /** Clears plants and neighbouring trees' crowns left above a column's new top during generation. */
@@ -218,13 +238,25 @@ public final class VolcanoEdifice {
 
     /**
      * The skin of a stratocone column: grass low on the flank, where world generation's vegetation step
-     * then grows trees, coarse scree above a ragged tree line, and bare rock higher up.
+     * then grows trees, thinning through scree above a ragged tree line, bare rock higher up, and on a
+     * medium or large cone dark tongues of old lava down the middle and upper flank.
      */
     static BlockState stratoSurface(RandomSource rng, Ctx c, int gx, int y, int gz, BlockState rock) {
         double h = (y - c.baseY) / (double) Math.max(1, c.coneHeight);
         double line = 0.24 + 0.10 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx, gz, 40.0);
-        if (h < line) return Blocks.GRASS_BLOCK.defaultBlockState();
-        if (h < line + 0.12 && rng.nextInt(3) != 0) return Blocks.COARSE_DIRT.defaultBlockState();
+        if (h > line && c.size != VolcanoSize.SMALL
+                && oldLava(c, gx, gz) > 0.38 - 0.12 * rng.nextDouble()) {
+            int r = rng.nextInt(10);
+            return (r < 5 ? Blocks.BASALT : r < 8 ? Blocks.BLACKSTONE : Blocks.SMOOTH_BASALT).defaultBlockState();
+        }
+        // Fine noise rather than a dice roll decides the mix, so grass and scree break up in small patches.
+        double jitter = 0.5 + 0.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + 57, gz - 57, 4.0);
+        double grass = Mth.clamp(1.0 - (h - line + 0.06) / 0.14, 0.0, 1.0);
+        if (jitter < grass) return Blocks.GRASS_BLOCK.defaultBlockState();
+        double scree = Mth.clamp(1.0 - (h - line) / 0.20, 0.0, 1.0);
+        if (jitter < scree) {
+            return (rng.nextInt(3) == 0 ? Blocks.GRAVEL : Blocks.COARSE_DIRT).defaultBlockState();
+        }
         return rock;
     }
 
@@ -466,18 +498,6 @@ public final class VolcanoEdifice {
         // Flows carry on across the apron rather than stopping on a contour.
         boolean flow = flowAt(c, ang, Math.sqrt((double) dx * dx + (double) dz * dz));
         double hill = foothillHeight(c, gx, gz, t);
-        // Speckled: certain near the edifice, sparse at the edge. Flows and hills are never speckled.
-        if (!flow && hill < 1.0 && rng.nextDouble() > Mth.clamp(t * 1.7, 0.0, 1.0)) return;
-
-        int ground = TerrainProbe.groundY(level, gx, gz);
-        if (ground == Integer.MIN_VALUE) return;
-        // Checked directly: hasFluidAbove would walk the column a second time.
-        int water = 0;
-        while (water < 8 && !level.getBlockState(new BlockPos(gx, ground + 1 + water, gz)).getFluidState().isEmpty()) {
-            water++;
-        }
-        // Under water the apron only carries on while the chunk generates; a live build stops at the shore.
-        if (water > 0 && !worldgen) return;
 
         // A big fissure's crack and ponds stand on their own ground: towards the line the apron thins to
         // a single course of rock, so it neither buries them nor leaves a strip of grass beside them.
@@ -491,36 +511,55 @@ public final class VolcanoEdifice {
         }
         // Starts at the seam height the flank came down to and thins with a 1.5 power.
         double u = 1.0 - t;                       // 0 at the seam, 1 at the outer edge
-        // A shield's skirt thins faster, so its long outer edge fades into the ground instead of a rim.
-        double fade = c.type == VolcanoType.SHIELD ? 2.5 : 1.5;
+        // A shield's and a fissure's skirt thin faster, so the long outer edge fades into the ground.
+        double fade = c.type == VolcanoType.SHIELD ? 2.5 : c.type == VolcanoType.FISSURE ? 2.2 : 1.5;
         double nativeBand = c.type == VolcanoType.SHIELD ? 0.5 : 0.3;
         int thickness = Math.max(0, (int) Math.round(seamHeight(c) * Math.pow(1.0 - u, fade) * band));
+        int lift = (int) Math.round(hill);
+        int top = thickness + lift;
+        // Where nothing is raised any more the apron only picks the ground's material, speckled towards the
+        // edge so it dissolves into the land. A raised column is never skipped, or natural ground would be
+        // left sunk between its neighbours.
+        if (top == 0 && !flow && rng.nextDouble() > Mth.clamp(t * 1.7, 0.0, 1.0)) return;
+
+        int ground = TerrainProbe.groundY(level, gx, gz);
+        if (ground == Integer.MIN_VALUE) return;
+        // Checked directly: hasFluidAbove would walk the column a second time.
+        int water = 0;
+        while (water < 8 && !level.getBlockState(new BlockPos(gx, ground + 1 + water, gz)).getFluidState().isEmpty()) {
+            water++;
+        }
+        // Under water the apron only carries on while the chunk generates; a live build stops at the shore.
+        if (water > 0 && !worldgen) return;
 
         if (water > 0) {
             // A thin skin down the shore instead of the edifice ending on a step into the water, never
             // built up to the surface, with black sand where the water is shallow.
-            int top = Math.min(thickness, Math.max(0, water - 2));
-            for (int h = 0; h <= top; h++) {
-                setRock(level, new BlockPos(gx, ground + h, gz), h == top && water <= 3
+            int skin = Math.min(thickness, Math.max(0, water - 2));
+            for (int h = 0; h <= skin; h++) {
+                setRock(level, new BlockPos(gx, ground + h, gz), h == skin && water <= 3
                         ? ModBlocks.VOLCANIC_BLACK_SAND.get().defaultBlockState()
-                        : apronRock(rng, t, null, nativeBand));
+                        : apronBody(rng, c, gx, ground + h, gz, t, null, nativeBand));
             }
             return;
         }
 
-        int lift = (int) Math.round(hill);
-        int top = thickness + lift;
         if (!worldgen) TerrainProbe.clearVegetation(level, gx, ground, gz, 2);
         BlockState native0 = level.getBlockState(new BlockPos(gx, ground, gz));
         for (int h = 0; h <= top; h++) {
+            int y = ground + h;
             BlockState b;
             if (flow && h == top) b = flowRock();
             // A foothill is soil over rock, so the vegetation step grows grass and trees on it.
             else if (lift > 0 && h == top) b = Blocks.GRASS_BLOCK.defaultBlockState();
             else if (lift > 0 && h >= top - 2) b = Blocks.DIRT.defaultBlockState();
-            // Only the surface cell may keep the native block; above it the block would float.
-            else b = apronRock(rng, t, h == 0 ? native0 : null, nativeBand);
-            setRock(level, new BlockPos(gx, ground + h, gz), b);
+            else {
+                // Only the surface cell may keep the native block; above it the block would float.
+                b = apronBody(rng, c, gx, y, gz, t, h == 0 ? native0 : null, nativeBand);
+                // The top carries on the flank's own skin, so there is no second ring at the foot.
+                if (h == top && b != native0) b = apronSurface(rng, c, gx, y, gz, b);
+            }
+            setRock(level, new BlockPos(gx, y, gz), b);
         }
         // Only plants: a tree beside the apron still stands on real ground.
         if (worldgen) TerrainProbe.clearVegetation(level, gx, ground + top, gz, 2);
@@ -659,13 +698,31 @@ public final class VolcanoEdifice {
     }
 
     /**
-     * Apron material, mixed rather than banded: basalt more likely near the edifice, tephra towards the
-     * edge, and native ground mixed in at the very edge so the apron fades out.
+     * Apron rock: the edifice's own palette, so the skirt carries on from the flank, with native ground
+     * mixed in at the very edge so it fades out. A fissure's field keeps its basalt, see {@link #apronRock}.
      *
      * @param t       1 at the apron's inner edge, 0 at its outer edge
      * @param native0    the surface block here, or null above the surface where it must not be reused
      * @param nativeBand the outer share of the apron, by {@code t}, where the native block mixes in
      */
+    static BlockState apronBody(RandomSource rng, Ctx c, int gx, int y, int gz, double t,
+                                BlockState native0, double nativeBand) {
+        if (c.type == VolcanoType.FISSURE) return apronRock(rng, t, native0, nativeBand);
+        if (native0 != null && t < nativeBand && rng.nextDouble() > t / nativeBand * 0.7 + 0.3) return native0;
+        return coneRock(rng, c, gx, y, gz);
+    }
+
+    /** The top of an apron column, continuing the edifice's own skin down past its foot. */
+    static BlockState apronSurface(RandomSource rng, Ctx c, int gx, int y, int gz, BlockState rock) {
+        return switch (c.type) {
+            case STRATOVOLCANO -> stratoSurface(rng, c, gx, y, gz, rock);
+            case SHIELD -> shieldSurface(rng, c, gx, y, gz, rock);
+            case CALDERA -> calderaSurface(rng, gx, gz, rock);
+            case FISSURE -> rock;
+        };
+    }
+
+    /** A fissure's apron: basalt more likely near the crack, tephra towards the edge, native ground at the very edge. */
     static BlockState apronRock(RandomSource rng, double t, BlockState native0, double nativeBand) {
         double r = rng.nextDouble();
 
