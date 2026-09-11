@@ -301,10 +301,10 @@ public final class VolcanoField {
     }
 
     /**
-     * {@link #check}, and for a shield or caldera turned down for water or a structure, the same check on the
-     * ground around it. Those two need hundreds of blocks of dry ground with no village on it, which one point
+     * {@link #check}, and for a cone or caldera turned down for water or a structure, the same check on the
+     * ground around it. Those need hundreds of blocks of dry ground with no village on it, which one point
      * seldom has, while the plume or arc under it spreads well past that point. Only the first candidate is
-     * counted as refused, so the counts stay a count of candidates.
+     * counted as refused, so the counts stay a count of candidates. A fissure runs along its rift and is not moved.
      *
      * @param fault the boundary a moved site has to stay on, or null for a plume
      */
@@ -314,7 +314,7 @@ public final class VolcanoField {
         int b = type.ordinal() * REASONS;
         int water = refused[b + WATER], structure = refused[b + STRUCTURE];
         Site site = check(level, x, z, type, seed, refused, structures);
-        if (site != null || (type != VolcanoType.SHIELD && type != VolcanoType.CALDERA)) return site;
+        if (site != null || type == VolcanoType.FISSURE) return site;
         // Broken ground or no plan at all: moving over would not help.
         if (refused[b + WATER] == water && refused[b + STRUCTURE] == structure) return null;
 
