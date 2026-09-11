@@ -210,6 +210,9 @@ public final class VolcanoField {
                 hit = mine;
             }
         }
+        // The server thread never waits on another thread: it works a cell still in progress out itself.
+        // Waiting would stall the game, and hang it for good if that thread ever needed the server.
+        if (!hit.isDone() && level.getServer().isSameThread()) return evaluate(level, cx, cz);
         return hit.join();
     }
 

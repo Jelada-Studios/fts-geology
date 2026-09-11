@@ -44,25 +44,23 @@ public final class FindCommands {
         // up, and doing that on the server thread stalled the game for seconds. It is pure maths
         // over the seed, so it runs on a worker and only the answer comes back.
         CompletableFuture
-                .supplyAsync(() -> search(level, at, what), Util.backgroundExecutor())
-                // The destination chunk, so the column has a real surface instead of the bottom of the world.
-                // Asked for off the server thread, so it is generated on the workers while the game keeps
-                // ticking; from the server thread the whole generation would run inside the tick.
-                .thenComposeAsync(hit -> hit == null ? CompletableFuture.completedFuture((Hit) null)
-                        : level.getChunkSource().getChunkFuture(hit.x() >> 4, hit.z() >> 4,
-                                net.minecraft.world.level.chunk.ChunkStatus.FULL, true).thenApply(loaded -> hit),
-                        Util.backgroundExecutor())
-                .thenAcceptAsync(hit -> {
-                    if (hit == null) {
+                .supplyAsync(() -> {
+                    Hit hit = search(level, at, what);
+                    // The generator's own surface there. The chunk is usually not loaded, and reading it would give
+                    // the bottom of the world or build the chunk inside the tick.
+                    return hit == null ? null : new Located(hit, surfaceY(level, hit.x(), hit.z()));
+                }, Util.backgroundExecutor())
+                .thenAcceptAsync(found -> {
+                    if (found == null) {
                         source.sendFailure(Component.translatable("command.fts_geology.no_s_found_within_about_21000_blocks_try", what));
                         return;
                     }
-                    int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE,
-                            hit.x(), hit.z());
-                    source.sendSuccess(() -> Component.translatable("command.fts_geology.nearest_s_d_d_d_about_d_blocks_away", what, hit.x(), y, hit.z(), hit.distance()).withStyle(ChatFormatting.GREEN), false);
-                    if (teleport && source.getEntity() instanceof net.minecraft.server.level.ServerPlayer p) {
-                        p.teleportTo(level, hit.x() + 0.5, y + 1, hit.z() + 0.5, p.getYRot(), p.getXRot());
-                    }
+                    Hit hit = found.hit();
+                    // Also to the log, for a console over RCON, which never sees the reply.
+                    GeysersMod.LOGGER.info("Nearest {}: {} {} {}, {} blocks away", what, hit.x(), found.y(), hit.z(),
+                            hit.distance());
+                    source.sendSuccess(() -> Component.translatable("command.fts_geology.nearest_s_d_d_d_about_d_blocks_away", what, hit.x(), found.y(), hit.z(), hit.distance()).withStyle(ChatFormatting.GREEN), false);
+                    if (teleport) SiteTeleport.request(source, level, hit.x(), hit.z());
                 }, level.getServer())
                 .exceptionally(t -> {
                     source.sendFailure(Component.translatable("command.fts_geology.search_failed_s", t));
@@ -73,6 +71,16 @@ public final class FindCommands {
 
     /** A located setting: where it is and roughly how far away. */
     record Hit(int x, int z, int distance) {}
+
+    /** A located setting and the generator's surface height there. */
+    record Located(Hit hit, int y) {}
+
+    /** The generator's surface at a column, without loading or building its chunk. Safe off the server thread. */
+    static int surfaceY(ServerLevel level, int x, int z) {
+        return level.getChunkSource().getGenerator().getBaseHeight(x, z,
+                net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, level,
+                level.getChunkSource().randomState());
+    }
 
     /** Spirals outward looking for the requested setting. Pure maths - runs off the server thread. */
     static Hit search(ServerLevel level, BlockPos at, String what) {
@@ -130,12 +138,6 @@ public final class FindCommands {
         CompletableFuture
                 .supplyAsync(() -> VolcanoField.nearest(level, at.getX(), at.getZ(), rings, only),
                         Util.backgroundExecutor())
-                // With tp, the chunk beside the summit is generated on the workers first; see find.
-                .thenComposeAsync(found -> !teleport || found.site() == null
-                        ? CompletableFuture.completedFuture(found)
-                        : level.getChunkSource().getChunkFuture((found.site().x() + 40) >> 4, found.site().z() >> 4,
-                                net.minecraft.world.level.chunk.ChunkStatus.FULL, true).thenApply(loaded -> found),
-                        Util.backgroundExecutor())
                 .thenAcceptAsync(found -> {
                     // What the search turned down, as water / relief / structure / other per type, so a
                     // type that never turns up can be told from one that is only rare.
@@ -167,14 +169,8 @@ public final class FindCommands {
                             s.type().name().toLowerCase(Locale.ROOT), s.x(), s.z(), s.baseY(), s.summitY(),
                             distance, found.count()).withStyle(ChatFormatting.GREEN), false);
                     source.sendSuccess(() -> refusedLine, false);
-                    if (teleport && source.getEntity() instanceof net.minecraft.server.level.ServerPlayer p) {
-                        // Beside the summit rather than on it: the crater is cut once the area loads.
-                        int tx = s.x() + 40, tz = s.z();
-                        level.getChunk(tx >> 4, tz >> 4);
-                        int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE,
-                                tx, tz);
-                        p.teleportTo(level, tx + 0.5, y + 1, tz + 0.5, p.getYRot(), p.getXRot());
-                    }
+                    // Beside the summit rather than on it: the crater is cut once the area loads.
+                    if (teleport) SiteTeleport.request(source, level, s.x() + 40, s.z());
                 }, level.getServer())
                 .exceptionally(t -> {
                     source.sendFailure(Component.translatable("command.fts_geology.search_failed_s", t));
