@@ -195,7 +195,7 @@ public final class VolcanoBuilder {
 
     /**
      * How far a large volcano planned from this seed would write anything, how far its mountain goes,
-     * and where its summit would stand; null if it cannot stand on this base at all.
+     * where its summit would stand and its crater radius; null if it cannot stand on this base at all.
      */
     public static int[] largeFootprint(ServerLevel level, int x, int baseY, int z, int magnitude,
                                        VolcanoType type, long seed) {
@@ -207,7 +207,7 @@ public final class VolcanoBuilder {
             case FISSURE -> c.fissureHalf + 4;
             default -> coneReach(c);
         };
-        return new int[] {c.clearReach, edifice, c.summitY};
+        return new int[] {c.clearReach, edifice, c.summitY, c.craterR};
     }
 
     /**

@@ -128,18 +128,27 @@ public final class VolcanoEdifice {
         int ground = TerrainProbe.groundY(level, gx, gz);
         if (ground == Integer.MIN_VALUE) return;
         int water = 0;
-        while (water < 16 && !level.getBlockState(new BlockPos(gx, ground + 1 + water, gz)).getFluidState().isEmpty()) {
+        while (water < 32 && !level.getBlockState(new BlockPos(gx, ground + 1 + water, gz)).getFluidState().isEmpty()) {
             water++;
         }
 
         int target = coneTargetY(c, gx, gz, ground, dist, ang);
         if (target == Integer.MIN_VALUE) return;
-        // A river or lake low on the flank keeps its water: its bed is raised to a block under the surface
-        // instead of the channel being filled flat with rock.
-        boolean underWater = water > 0 && target <= ground + water + 3;
-        if (underWater) target = ground + water - 1;
-        // Higher up, a live build stops at the shore rather than walling a lake in.
-        else if (water > 0 && !worldgen) return;
+        int surface = ground + water;
+        boolean underWater;
+        if (water >= 4 && worldgen) {
+            // A lake or the sea: the flank carries on under the water on its own profile and turns to land only
+            // where the profile rises above the surface, so the shore slopes instead of standing as a wall.
+            underWater = target <= surface + 1;
+            if (underWater) target = Math.min(target - 1, surface - 1);
+        } else {
+            // A stream or pond low on the flank keeps its water: its bed is raised to a block under the surface
+            // instead of the channel being filled flat with rock.
+            underWater = water > 0 && target <= surface + 3;
+            if (underWater) target = surface - 1;
+            // Higher up, a live build stops at the shore rather than walling a lake in.
+            else if (water > 0 && !worldgen) return;
+        }
         // Ground already above the mountain's profile is left alone.
         if (ground >= target) return;
 
@@ -261,20 +270,47 @@ public final class VolcanoEdifice {
     }
 
     /**
-     * The skin of a shield column by age: fresh dark basalt up high, weathered smooth basalt and tuff with
-     * scree on the middle flank, and low down islands of soil and grass among the old flows, where the
-     * vegetation step grows trees, like the kipukas on Hawaii's shields.
+     * The skin of a shield column. Old flows weather to soil long before a shield stops growing, so most of
+     * one is green: grass, where the vegetation step grows forest, below a ragged tree line half way up,
+     * scree and weathered basalt above it, fresh basalt near the summit, and on a medium or large shield dark
+     * tongues of younger lava winding down through the forest.
      */
     static BlockState shieldSurface(RandomSource rng, Ctx c, int gx, int y, int gz, BlockState rock) {
         double h = (y - c.baseY) / (double) Math.max(1, c.coneHeight);
-        if (h > 0.6) return rock;
-        double patch = com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + 977, gz - 977, 50.0);
-        if (h < 0.3 && patch > 0.05) return Blocks.GRASS_BLOCK.defaultBlockState();
-        int r = rng.nextInt(10);
-        if (patch > -0.2) {
-            return (r < 5 ? Blocks.COARSE_DIRT : r < 8 ? Blocks.SMOOTH_BASALT : Blocks.TUFF).defaultBlockState();
+        if (c.size != VolcanoSize.SMALL && shieldTongue(c, gx, gz) > 0.42) {
+            int r = rng.nextInt(10);
+            return (r < 6 ? Blocks.BASALT : r < 9 ? Blocks.SMOOTH_BASALT : Blocks.BLACKSTONE).defaultBlockState();
         }
-        return (r < 6 ? Blocks.SMOOTH_BASALT : Blocks.BASALT).defaultBlockState();
+        double line = 0.5 + 0.1 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + 311, gz - 311, 45.0);
+        if (h > line + 0.22) {
+            int r = rng.nextInt(10);
+            return (r < 5 ? Blocks.BASALT : r < 8 ? Blocks.SMOOTH_BASALT : Blocks.BLACKSTONE).defaultBlockState();
+        }
+        // Fine noise rather than a dice roll decides the mix, so grass and scree break up in small patches.
+        double jitter = 0.5 + 0.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx - 97, gz + 97, 4.0);
+        double grass = Mth.clamp(1.0 - (h - line + 0.06) / 0.14, 0.0, 1.0);
+        if (jitter < grass) return Blocks.GRASS_BLOCK.defaultBlockState();
+        double scree = Mth.clamp(1.0 - (h - line) / 0.22, 0.0, 1.0);
+        if (jitter < scree) {
+            int r = rng.nextInt(10);
+            return (r < 4 ? Blocks.COARSE_DIRT : r < 7 ? Blocks.SMOOTH_BASALT : r < 9 ? Blocks.TUFF : Blocks.GRAVEL)
+                    .defaultBlockState();
+        }
+        return (rng.nextInt(3) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT).defaultBlockState();
+    }
+
+    /**
+     * Younger lava tongues down a shield, in -1..1: long down the slope, a few blocks to twenty across. Read at a
+     * position pushed about by a coarse field, so a tongue winds down the flank instead of running out as a
+     * straight spoke; the idea of warping where ridge noise is read comes from Tectonic's mountain ridges.
+     */
+    static double shieldTongue(Ctx c, int gx, int gz) {
+        int ox = (int) (c.phaseB * 4096), oz = (int) (c.phaseC * 4096);
+        int wx = gx + (int) Math.round(24.0 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + ox, gz - oz, 90.0));
+        int wz = gz + (int) Math.round(24.0 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx - oz, gz + ox, 90.0));
+        int dx = wx - c.x, dz = wz - c.z;
+        return polarNoise(Math.atan2(dz, dx), Math.sqrt((double) dx * dx + (double) dz * dz),
+                c.coneBaseR * 0.7, (int) (c.phaseA * 4096) + 4271, 4.0, 16.0);
     }
 
     /**
@@ -544,6 +580,13 @@ public final class VolcanoEdifice {
             return;
         }
 
+        // Low ground by the sea stays low, so the skirt does not end on a step where the shore meets the water.
+        int aboveSea = ground - level.getSeaLevel();
+        if (aboveSea < 3 && lift == 0) {
+            thickness = (int) Math.round(thickness * Mth.clamp(aboveSea / 3.0, 0.0, 1.0));
+            top = thickness;
+            if (top == 0 && !flow && rng.nextDouble() > Mth.clamp(t * 1.7, 0.0, 1.0)) return;
+        }
         if (!worldgen) TerrainProbe.clearVegetation(level, gx, ground, gz, 2);
         BlockState native0 = level.getBlockState(new BlockPos(gx, ground, gz));
         for (int h = 0; h <= top; h++) {

@@ -425,6 +425,24 @@ public final class VolcanoField {
 
         int[] plan = VolcanoBuilder.largeFootprint(level, x, baseY, z, magnitude, type, seed);
         if (plan == null) return refuse(refused, type, OTHER, x, z, "no plan at base " + baseY);
+        // A cone's summit has to stand clear of the land round it, or its lake is cut into a hill and runs out on
+        // the low side. Where the ground near the centre rises past the planned summit, the mountain is raised.
+        if (type == VolcanoType.SHIELD || type == VolcanoType.STRATOVOLCANO) {
+            double around = Math.max(8.0, plan[3] * 1.6);
+            int top = Integer.MIN_VALUE;
+            for (int i = 0; i <= 8; i++) {
+                int px = x + (i == 0 ? 0 : (int) Math.round(Math.cos(Math.PI * i / 4) * around));
+                int pz = z + (i == 0 ? 0 : (int) Math.round(Math.sin(Math.PI * i / 4) * around));
+                top = Math.max(top, gen.getBaseHeight(px, pz, Heightmap.Types.OCEAN_FLOOR_WG, level, rs) - 1);
+            }
+            int lift = top + 2 - plan[2];
+            if (lift > 40) return refuse(refused, type, RELIEF, x, z, "hills " + lift + " over the summit");
+            if (lift > 0) {
+                baseY += lift;
+                plan = VolcanoBuilder.largeFootprint(level, x, baseY, z, magnitude, type, seed);
+                if (plan == null) return refuse(refused, type, OTHER, x, z, "no plan at raised base " + baseY);
+            }
+        }
         // Structures are placed before the mountain and would end up inside it, so none may stand on the
         // edifice itself; one out on the apron keeps its buildings, which the apron will not cover.
         if (structureInTheWay(level, gen, rs, x, z, plan[1] + 8, structures)) {

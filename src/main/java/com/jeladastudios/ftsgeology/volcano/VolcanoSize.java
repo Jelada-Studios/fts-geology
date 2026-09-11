@@ -10,7 +10,7 @@ import net.minecraft.util.RandomSource;
  * Every small figure below is the formula the builder used before sizes existed, so a small volcano
  * comes out exactly as one used to. Medium roughly doubles the edifice and is still built into a
  * loaded world from the retrogen queue. Large is mountain-range sized - a stratocone about 150 blocks
- * tall, a shield about 70 tall and 400 out, a caldera 400 across - and is only ever raised while new
+ * tall, a shield about 70 tall and 300 out, a caldera 400 across - and is only ever raised while new
  * terrain is being generated, because building one into a live world means rewriting a few hundred
  * chunks that players may be standing in.
  */
@@ -60,10 +60,10 @@ public enum VolcanoSize {
     /**
      * Width against height. A shield keeps most of its breadth as it grows but not all of it: at the
      * small shield's 1:7 a large one would run 500 blocks out, and a medium one would be too wide to
-     * build after generation at all.
+     * build after generation at all. A large one at 1:3.4 is some 250 blocks to its foot.
      */
     double coneSlope(VolcanoType type) {
-        if (type == VolcanoType.SHIELD && this != SMALL) return this == MEDIUM ? 5.0 : 4.5;
+        if (type == VolcanoType.SHIELD && this != SMALL) return this == MEDIUM ? 5.0 : 3.4;
         // A big stratocone twice as wide as it is tall, so its flanks are not a spike.
         if (type == VolcanoType.STRATOVOLCANO && this == LARGE) return 2.0;
         return type.coneSlope();
