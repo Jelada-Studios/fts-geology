@@ -45,14 +45,18 @@ public final class FindCommands {
         // over the seed, so it runs on a worker and only the answer comes back.
         CompletableFuture
                 .supplyAsync(() -> search(level, at, what), Util.backgroundExecutor())
+                // The destination chunk, so the column has a real surface instead of the bottom of the world.
+                // Asked for off the server thread, so it is generated on the workers while the game keeps
+                // ticking; from the server thread the whole generation would run inside the tick.
+                .thenComposeAsync(hit -> hit == null ? CompletableFuture.completedFuture((Hit) null)
+                        : level.getChunkSource().getChunkFuture(hit.x() >> 4, hit.z() >> 4,
+                                net.minecraft.world.level.chunk.ChunkStatus.FULL, true).thenApply(loaded -> hit),
+                        Util.backgroundExecutor())
                 .thenAcceptAsync(hit -> {
                     if (hit == null) {
                         source.sendFailure(Component.translatable("command.fts_geology.no_s_found_within_about_21000_blocks_try", what));
                         return;
                     }
-                    // Only now, on the server thread: generate the one destination chunk so the
-                    // column has a real surface instead of answering with the bottom of the world.
-                    level.getChunk(hit.x() >> 4, hit.z() >> 4);
                     int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE,
                             hit.x(), hit.z());
                     source.sendSuccess(() -> Component.translatable("command.fts_geology.nearest_s_d_d_d_about_d_blocks_away", what, hit.x(), y, hit.z(), hit.distance()).withStyle(ChatFormatting.GREEN), false);
@@ -125,6 +129,12 @@ public final class FindCommands {
         // which is slow; like find, it runs on a worker and only the answer comes back.
         CompletableFuture
                 .supplyAsync(() -> VolcanoField.nearest(level, at.getX(), at.getZ(), rings, only),
+                        Util.backgroundExecutor())
+                // With tp, the chunk beside the summit is generated on the workers first; see find.
+                .thenComposeAsync(found -> !teleport || found.site() == null
+                        ? CompletableFuture.completedFuture(found)
+                        : level.getChunkSource().getChunkFuture((found.site().x() + 40) >> 4, found.site().z() >> 4,
+                                net.minecraft.world.level.chunk.ChunkStatus.FULL, true).thenApply(loaded -> found),
                         Util.backgroundExecutor())
                 .thenAcceptAsync(found -> {
                     // What the search turned down, as water / relief / structure / other per type, so a
