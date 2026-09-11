@@ -81,6 +81,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue VOLCANO_CRATER_RADIUS;     // summit crater/lava-pool radius
     public static final ForgeConfigSpec.IntValue VOLCANO_LAVA_BUDGET;       // lava cells per eruption
     public static final ForgeConfigSpec.BooleanValue VOLCANIC_ASHFALL;      // default ON
+    public static final ForgeConfigSpec.BooleanValue ASHFALL_BURIES_CROPS;  // default ON
     public static final ForgeConfigSpec.BooleanValue SOIL_FROM_BEDROCK;     // default ON
 
     // --- Cooldown / recharge cycle -----------------------------------------
@@ -341,6 +342,11 @@ public final class GeyserConfig {
                         "and turns to basalt behind its own front, which is both what happens and",
                         "what actually looks like an eruption.")
                 .defineInRange("volcanoLavaBudget", 24, 0, 400);
+        ASHFALL_BURIES_CROPS = b
+                .comment("Let falling ash bury crops. A field downwind of an eruption loses its crop under",
+                        "the ash, and under three layers or more its tilled soil goes back to dirt. Shovel",
+                        "the ash off, till and sow again. Off, ash never settles on farmland.")
+                .define("ashfallBuriesCrops", true);
         VOLCANIC_ASHFALL = b
                 .comment("Let an eruption lay ash on the ground downwind of the volcano.",
                         "The eruption column is the thing you see from a distance, and what comes",

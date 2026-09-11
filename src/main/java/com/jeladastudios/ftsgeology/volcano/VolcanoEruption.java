@@ -108,18 +108,28 @@ public final class VolcanoEruption {
             // Not onto a live flow.
             if (under.is(Blocks.LAVA) || under.is(Blocks.MAGMA_BLOCK)) continue;
 
-            settle(level, ground.above());
+            // Ash already lying here reads as the ground, so the fall deepens that layer rather than the cell
+            // above it, where a thin layer cannot hold more.
+            settle(level, under.is(com.jeladastudios.ftsgeology.registry.ModBlocks.VOLCANIC_ASH.get())
+                    ? ground : ground.above());
         }
     }
 
     /**
      * Adds one layer of ash to a column, up to a full block. It settles on the ground rather than
      * replacing it, so grass lives, the cone stays basalt and repeated eruptions deepen the deposit.
+     *
+     * <p>A field under the fall is lost, as farms downwind of Pinatubo and Mount St. Helens were: the crop is
+     * buried, and once the ash is a few layers deep the tilled soil under it goes back to dirt. Shovelled off,
+     * the ground can be tilled and sown again.</p>
      */
     private static void settle(ServerLevel level, BlockPos at) {
         BlockState here = level.getBlockState(at);
         BlockState ash = com.jeladastudios.ftsgeology.registry.ModBlocks.VOLCANIC_ASH.get()
                 .defaultBlockState();
+        BlockState below = level.getBlockState(at.below());
+        boolean field = below.getBlock() instanceof net.minecraft.world.level.block.FarmBlock;
+        if (field && !GeyserConfig.ASHFALL_BURIES_CROPS.get()) return;
 
         if (here.is(ash.getBlock())) {
             int layers = here.getValue(
@@ -127,13 +137,19 @@ public final class VolcanoEruption {
             if (layers >= 8) return;                       // as deep as it goes
             level.setBlock(at, here.setValue(
                     com.jeladastudios.ftsgeology.block.VolcanicAshBlock.LAYERS, layers + 1), 2);
+            if (field && layers + 1 >= FIELD_LOST_LAYERS) {
+                net.minecraft.world.level.block.FarmBlock.turnToDirt(null, below, level, at.below());
+            }
             return;
         }
-        // Ash falls through a tuft of grass and buries it; it does not stack on top of it.
+        // Ash falls through a tuft of grass, or a crop, and buries it; it does not stack on top of it.
         if (!here.isAir() && !com.jeladastudios.ftsgeology.worldgen.TerrainProbe.isVegetation(here)) return;
         if (!ash.canSurvive(level, at)) return;
         level.setBlock(at, ash, 2);
     }
+
+    /** Layers of ash over a field at which its tilled soil is lost. */
+    private static final int FIELD_LOST_LAYERS = 3;
 
     /** This mountain's prevailing wind as a unit vector, derived from its position so it never changes. */
     public static double[] wind(BlockPos summit) {

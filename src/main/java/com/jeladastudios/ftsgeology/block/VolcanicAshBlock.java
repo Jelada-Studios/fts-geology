@@ -101,6 +101,8 @@ public class VolcanicAshBlock extends Block {
         if (below.is(Blocks.ICE) || below.is(Blocks.PACKED_ICE) || below.is(Blocks.BARRIER)) return false;
         if (below.isAir()) return false;
         return below.isFaceSturdy(level, pos.below(), Direction.UP)
+                // Tilled soil stands a little short of a full block; ash settles on a field all the same.
+                || below.getBlock() instanceof net.minecraft.world.level.block.FarmBlock
                 || (below.is(this) && below.getValue(LAYERS) == 8);
     }
 
