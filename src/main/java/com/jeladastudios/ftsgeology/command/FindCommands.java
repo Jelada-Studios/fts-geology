@@ -136,6 +136,12 @@ public final class FindCommands {
             case "guyot" -> com.jeladastudios.ftsgeology.volcano.VolcanoSetting.GUYOT;
             default -> null;
         };
+        final com.jeladastudios.ftsgeology.volcano.VolcanoActivity onlyActivity = typeName == null ? null : switch (typeName) {
+            case "active" -> com.jeladastudios.ftsgeology.volcano.VolcanoActivity.ACTIVE;
+            case "dormant" -> com.jeladastudios.ftsgeology.volcano.VolcanoActivity.DORMANT;
+            case "extinct" -> com.jeladastudios.ftsgeology.volcano.VolcanoActivity.EXTINCT;
+            default -> null;
+        };
         CommandSourceStack source = ctx.getSource();
         ServerLevel level = source.getLevel();
         BlockPos at = BlockPos.containing(source.getPosition());
@@ -145,7 +151,7 @@ public final class FindCommands {
         // A cell is worked out from the generator's own terrain the first time it is asked about,
         // which is slow; like find, it runs on a worker and only the answer comes back.
         CompletableFuture
-                .supplyAsync(() -> VolcanoField.nearest(level, at.getX(), at.getZ(), rings, only, onlySetting),
+                .supplyAsync(() -> VolcanoField.nearest(level, at.getX(), at.getZ(), rings, only, onlySetting, onlyActivity),
                         Util.backgroundExecutor())
                 .thenAcceptAsync(found -> {
                     // What the search turned down, as water / relief / structure / other per type, so a
@@ -171,12 +177,13 @@ public final class FindCommands {
                     int distance = (int) Math.round(Math.hypot(s.x() - at.getX(), s.z() - at.getZ()));
                     // Also to the log: the reply arrives after the command has returned, which a
                     // console connected over RCON never sees.
-                    GeysersMod.LOGGER.info("Nearest large volcano: {} at {} {} base {} summit {} reach {}, {} blocks away, {} in the search {}, setting {} {}",
+                    GeysersMod.LOGGER.info("Nearest large volcano: {} at {} {} base {} summit {} reach {}, {} blocks away, {} in the search {}, setting {} {}, {}, activity on land and live islands {}",
                             s.type(), s.x(), s.z(), s.baseY(), s.summitY(), s.reach(), distance, found.count(),
                             java.util.Arrays.toString(found.byType()), s.setting(),
-                            java.util.Arrays.toString(found.bySetting()));
+                            java.util.Arrays.toString(found.bySetting()), s.activity(),
+                            java.util.Arrays.toString(found.byActivity()));
                     source.sendSuccess(() -> Component.translatable("command.fts_geology.field.found",
-                            Component.translatable("volcano.fts_geology.kind." + s.kindKey()), s.x(), s.z(),
+                            kindName(s), s.x(), s.z(),
                             s.baseY(), s.summitY(), distance, found.count()).withStyle(ChatFormatting.GREEN), false);
                     source.sendSuccess(() -> refusedLine, false);
                     // Beside the summit rather than on it: the crater is cut once the area loads.
@@ -187,6 +194,17 @@ public final class FindCommands {
                     return null;
                 });
         return 1;
+    }
+
+    /** What a site is, for chat: its kind, and on land or a live island how alive it is. */
+    static Component kindName(VolcanoField.Site site) {
+        Component kind = Component.translatable("volcano.fts_geology.kind." + site.kindKey());
+        com.jeladastudios.ftsgeology.volcano.VolcanoActivity a = site.activity();
+        boolean shown = site.setting() == com.jeladastudios.ftsgeology.volcano.VolcanoSetting.LAND
+                || site.setting() == com.jeladastudios.ftsgeology.volcano.VolcanoSetting.ISLAND;
+        return shown && a != com.jeladastudios.ftsgeology.volcano.VolcanoActivity.ACTIVE
+                ? Component.translatable("volcano.fts_geology.activity." + a.name().toLowerCase(Locale.ROOT), kind)
+                : kind;
     }
 
     /**
@@ -245,7 +263,7 @@ public final class FindCommands {
         final String sum = Long.toHexString(digest);
         final int measured = columns;
         source.sendSuccess(() -> Component.translatable("command.fts_geology.field.seams",
-                Component.translatable("volcano.fts_geology.kind." + s.kindKey()), s.x(), s.z(),
+                kindName(s), s.x(), s.z(),
                 inside[0], dec((double) inside[1] / inside[0], 2), dec(1000.0 * inside[2] / inside[0], 1),
                 border[0], dec((double) border[1] / border[0], 2), dec(1000.0 * border[2] / border[0], 1),
                 sum, measured), false);

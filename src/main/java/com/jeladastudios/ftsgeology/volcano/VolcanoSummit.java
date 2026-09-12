@@ -217,6 +217,43 @@ public final class VolcanoSummit {
         c.coreCraterR = c.size != VolcanoSize.SMALL ? (int) Math.ceil(c.lakeR) : Math.max(2, c.craterR / 3);
     }
 
+    /**
+     * A dormant volcano's crater: its lake has crusted over and only the vent keeps magma, under a plug, so there is
+     * no open lava until it wakes. Steam and sulfur come up through the floor. The crusted cells are kept, so the core
+     * can open them again when it erupts.
+     */
+    static void sealCrater(ServerLevel level, Ctx c) {
+        if (c.activity != VolcanoActivity.DORMANT || c.vent == null) return;
+        for (BlockPos p : c.molten) {
+            if (p.equals(c.vent)) continue;
+            BlockState s = level.getBlockState(p);
+            if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) continue;
+            setRock(level, p, crust(level.random));
+            c.seal.add(p);
+        }
+        c.molten.clear();
+        c.molten.add(c.vent);
+        setRock(level, c.vent, Blocks.LAVA.defaultBlockState());
+        setRock(level, c.vent.above(), Blocks.BLACKSTONE.defaultBlockState());
+        // Fumaroles through the crater floor, crusted with sulfur.
+        for (int i = 0, vents = 0; i < 24 && vents < 3 && !c.seal.isEmpty(); i++) {
+            BlockPos floor = c.seal.get(level.random.nextInt(c.seal.size()));
+            if (!level.getBlockState(floor.above()).isAir()) continue;
+            com.jeladastudios.ftsgeology.worldgen.HotspotSigns.chimney(level, floor, level.random);
+            if (!level.getBlockState(floor).is(ModBlocks.STEAM_VENT.get())) continue;
+            c.fumaroles.add(floor);
+            com.jeladastudios.ftsgeology.eruption.SulfurDeposits.depositAround(level, floor.above());
+            vents++;
+        }
+    }
+
+    /** A crater floor gone cold: dark lava crust, scoria and ash. */
+    private static BlockState crust(net.minecraft.util.RandomSource rng) {
+        int roll = rng.nextInt(10);
+        return (roll < 4 ? Blocks.BLACKSTONE : roll < 7 ? Blocks.BASALT : roll < 9 ? Blocks.TUFF : Blocks.GRAVEL)
+                .defaultBlockState();
+    }
+
     /** A rift volcano: no cone, a line of ponds along the fault strike stepping sideways in en-echelon segments. */
     static void carveFissureLine(ServerLevel level, Ctx c) {
         int half = c.fissureHalf;
@@ -286,6 +323,8 @@ public final class VolcanoSummit {
             core.setMagnitude(c.magnitude);
             core.setCraterRadius(c.coreCraterR);
             core.setMoltenCells(c.molten);
+            // A dormant volcano's core sleeps under its sealed crater.
+            if (c.activity == VolcanoActivity.DORMANT) core.setSealed(c.seal, level);
             // What the mountain was, so it can be raised again after a quake: from the original base,
             // or a rebuild would stack a new cone on the ruins. A large volcano records none.
             if (c.size != VolcanoSize.LARGE) {
@@ -637,16 +676,19 @@ public final class VolcanoSummit {
      */
     static void placeField(ServerLevel level, Ctx c) {
         boolean ring = c.type.excavates();
+        // A flooded caldera's springs rise on its young cone's own flanks and shore, as at Palea Kameni: round it is sea.
+        boolean isle = c.isle != null;
         // Inner edge of the field: outside the cone, or outside the ring-fault scarp.
-        double inner = ring ? c.craterR * 1.05 : c.coneBaseR * 1.15 + 4;
-        double outer = inner + 26 + c.magnitude;
+        double inner = isle ? c.isle.coneR * 0.35 : ring ? c.craterR * 1.05 : c.coneBaseR * 1.15 + 4;
+        double outer = isle ? c.isle.coneR * 0.95 : inner + 26 + c.magnitude;
 
         int springs = 0;
-        for (int attempt = 0; attempt < 120 && springs < (ring ? 7 : 5); attempt++) {
+        for (int attempt = 0; attempt < 120 && springs < (isle ? 3 : ring ? 7 : 5); attempt++) {
             int[] p = ringSite(level, c, inner, outer);
-            if (standsOnVolcanicRock(level, p[0], p[1])) continue;
+            if (!isle && standsOnVolcanicRock(level, p[0], p[1])) continue;
             if (HotSpringSites.placeHotSpringAt(level, p[0], p[1])) springs++;
         }
+        if (isle) return;
 
         int deepest = level.getMinBuildHeight() + 2;
         int highest = GeyserConfig.RETROGEN_MAX_Y.get() - GeyserConfig.CHAMBER_TARGET_HEIGHT.get() - 3;

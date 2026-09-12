@@ -193,7 +193,7 @@ public final class VolcanoBuilder {
         return plan(level, site.x(), site.baseY(), site.z(), site.magnitude(), site.type(),
                 VolcanoSize.LARGE, RandomSource.create(site.seed()),
                 TectonicMap.sampleCached(level, site.x(), site.z()), site.setting(), site.age(), level.getSeaLevel(),
-                site.setting().ocean() ? VolcanoField.seaTemperature(level, site.x(), site.z()) : 0.0);
+                site.setting().ocean() ? VolcanoField.seaTemperature(level, site.x(), site.z()) : 0.0, site.activity());
     }
 
     /**
@@ -209,7 +209,8 @@ public final class VolcanoBuilder {
     static Ctx largePlan(ServerLevel level, int x, int baseY, int z, int magnitude, VolcanoType type, long seed,
                          VolcanoSetting setting, double age, double seaTemp) {
         return plan(level, x, baseY, z, magnitude, type, VolcanoSize.LARGE, RandomSource.create(seed),
-                TectonicMap.sampleCached(level, x, z), setting, age, level.getSeaLevel(), seaTemp);
+                TectonicMap.sampleCached(level, x, z), setting, age, level.getSeaLevel(), seaTemp,
+                VolcanoActivity.of(seed, x, z, type, setting));
     }
 
     /** {@link #largeFootprint} for a setting; in the sea {@code baseY} is the sea floor. */
@@ -261,8 +262,8 @@ public final class VolcanoBuilder {
         }
         // An ocean biome grows nothing on dry land, so the island plants its own, once all its columns here stand.
         if (c.isle != null) OceanEdifice.plant(level, generator, c, cp, site.seed());
-        // An extinct island has no core to finish.
-        if (site.setting().active()
+        // An extinct volcano, on land or an old island, has no core to finish.
+        if (site.setting().active() && site.activity() != VolcanoActivity.EXTINCT
                 && cp.x == SectionPos.blockToSectionCoord(c.x) && cp.z == SectionPos.blockToSectionCoord(c.z)) {
             placeMarker(level, c);
         }
@@ -315,24 +316,31 @@ public final class VolcanoBuilder {
         if (c.type.excavates()) job.add(lvl -> collectCalderaLake(lvl, c));
         addSummit(job, c);
         addCraterClearing(job, c);
+        // A dormant volcano's lake has crusted over its vent.
+        job.add(lvl -> sealCrater(lvl, c));
         addLavaDisc(job, c);
         job.add(lvl -> plantCore(lvl, c));
         job.add(lvl -> carveConduit(lvl, c));
         job.add(lvl -> growLavaBranches(lvl, c));
-        job.add(lvl -> chooseVents(lvl, c));
-        for (int i = 0; i < c.ventCount; i++) {
-            final int idx = i;
-            job.add(lvl -> cutVent(lvl, c, idx));
+        // Only a live volcano leaks lava from its flank vents.
+        if (c.activity == VolcanoActivity.ACTIVE) {
+            job.add(lvl -> chooseVents(lvl, c));
+            for (int i = 0; i < c.ventCount; i++) {
+                final int idx = i;
+                job.add(lvl -> cutVent(lvl, c, idx));
+            }
         }
         job.add(lvl -> cutFumaroles(lvl, c));
         job.add(lvl -> recordVents(lvl, c));
+        // Hot springs round a sleeping caldera's vent, fed by the heat still under it.
+        if (c.activity == VolcanoActivity.DORMANT && c.type == VolcanoType.CALDERA) job.add(lvl -> placeField(lvl, c));
         job.add(lvl -> sealExposedLava(lvl, c));
         job.add(lvl -> verifyContainment(lvl, c));
         job.add(lvl -> FINISHING.remove(key));
         if (VolcanoJob.enqueue(job)) {
             FINISHING.put(key, level.getGameTime());
-            GeysersMod.LOGGER.info("Large {} at {}, {}: finishing its summit (base Y {}, summit Y {})",
-                    c.type, c.x, c.z, c.baseY, c.summitY);
+            GeysersMod.LOGGER.info("Large {} at {}, {}: finishing its summit (base Y {}, summit Y {}, {})",
+                    c.type, c.x, c.z, c.baseY, c.summitY, c.activity);
         }
     }
 
@@ -344,7 +352,10 @@ public final class VolcanoBuilder {
             for (int dz = -r; dz <= r; dz++) {
                 if (!inLake(c, lx + dx, lz + dz)) continue;
                 BlockPos p = new BlockPos(lx + dx, c.calderaFloorY - 1, lz + dz);
-                if (level.getBlockState(p).getFluidState().is(FluidTags.LAVA)) c.molten.add(p);
+                // A dormant lake was laid as crust, so it is listed by its shape for the seal.
+                if (c.activity == VolcanoActivity.DORMANT || level.getBlockState(p).getFluidState().is(FluidTags.LAVA)) {
+                    c.molten.add(p);
+                }
             }
         }
     }

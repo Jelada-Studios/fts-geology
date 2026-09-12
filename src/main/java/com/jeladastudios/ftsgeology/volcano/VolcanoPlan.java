@@ -87,6 +87,10 @@ public final class VolcanoPlan {
         final List<BlockPos> molten = new ArrayList<>();
         /** The ocean half of the plan, for a volcano rising from the sea floor; null on land. */
         OceanEdifice.Isle isle;
+        /** How alive it is: a dormant volcano's crater is sealed, an extinct one has no core at all. */
+        VolcanoActivity activity = VolcanoActivity.ACTIVE;
+        /** The crater cells a dormant volcano keeps crusted over, which turn to lava only while it erupts. */
+        final List<BlockPos> seal = new ArrayList<>();
     }
 
     static Ctx layout(ServerLevel level, BlockPos base, int magnitude, VolcanoType type,
@@ -105,7 +109,14 @@ public final class VolcanoPlan {
      */
     static Ctx plan(LevelHeightAccessor level, int x, int baseY, int z, int magnitude,
                             VolcanoType type, VolcanoSize size, RandomSource rng, PlateSample plate) {
+        return plan(level, x, baseY, z, magnitude, type, size, rng, plate, VolcanoActivity.ACTIVE);
+    }
+
+    /** {@link #plan} for a volcano of a given activity: an extinct one is worn lower, gullied deeper, and has no flows. */
+    static Ctx plan(LevelHeightAccessor level, int x, int baseY, int z, int magnitude, VolcanoType type,
+                    VolcanoSize size, RandomSource rng, PlateSample plate, VolcanoActivity activity) {
         Ctx c = new Ctx();
+        c.activity = activity;
         c.type = type;
         c.size = size;
         c.magnitude = magnitude;
@@ -115,6 +126,8 @@ public final class VolcanoPlan {
 
         c.craterR = size.craterRadius(type, magnitude, rng);
         c.coneHeight = size.coneHeight(type, magnitude, rng);
+        // Rain and ice have taken the top off a mountain that stopped growing.
+        if (activity == VolcanoActivity.EXTINCT) c.coneHeight = (int) Math.round(c.coneHeight * 0.85);
         c.coneSlope = size.coneSlope(type);
         int ceiling = level.getMaxBuildHeight() - 12;
         if (c.baseY + c.coneHeight >= ceiling) {
@@ -131,6 +144,7 @@ public final class VolcanoPlan {
                 ? 1.5 : type.flankExponent();
         c.ridgeHeight = type == VolcanoType.STRATOVOLCANO && size != VolcanoSize.SMALL
                 ? Math.min(5.0, c.coneHeight * 0.04) : 0.0;
+        if (activity == VolcanoActivity.EXTINCT) c.ridgeHeight *= 2.0;
 
         c.coneBaseR = c.coneHeight > 0
                 ? (int) Math.round(c.craterR + c.coneHeight * c.coneSlope)
@@ -197,6 +211,8 @@ public final class VolcanoPlan {
         // Flows are thin tongues, not bands that widen with the mountain; a shield's are many but narrow.
         c.flowWidth = type == VolcanoType.FISSURE || type == VolcanoType.STRATOVOLCANO ? 0.8
                 : type == VolcanoType.SHIELD ? 1.1 : Math.max(1.0, c.coneBaseR / 34.0);
+        // An extinct mountain's flows weathered into its soil long ago.
+        if (activity == VolcanoActivity.EXTINCT) c.flows = 0;
 
         // A small caldera is a pit; a big one's floor lies at the level of the land around it, and its
         // depth comes from the plateau rising round it rather than from digging.
@@ -238,8 +254,8 @@ public final class VolcanoPlan {
      */
     static Ctx plan(LevelHeightAccessor level, int x, int baseY, int z, int magnitude, VolcanoType type,
                     VolcanoSize size, RandomSource rng, PlateSample plate, VolcanoSetting setting, double age,
-                    int seaY, double seaTemp) {
-        Ctx c = plan(level, x, baseY, z, magnitude, type, size, rng, plate);
+                    int seaY, double seaTemp, VolcanoActivity activity) {
+        Ctx c = plan(level, x, baseY, z, magnitude, type, size, rng, plate, activity);
         if (c == null || !setting.ocean()) return c;
         OceanEdifice.plan(c, rng, setting, age, seaY, seaTemp);
         return c;

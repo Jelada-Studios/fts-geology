@@ -84,6 +84,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue QUAKE_ERUPTION_CHANCE;
     public static final ForgeConfigSpec.IntValue QUAKE_ERUPTION_DELAY_MIN_TICKS;
     public static final ForgeConfigSpec.IntValue QUAKE_ERUPTION_DELAY_MAX_TICKS;
+    public static final ForgeConfigSpec.DoubleValue DORMANT_VOLCANO_QUIET_FACTOR; // how much longer a dormant one sleeps
     public static final ForgeConfigSpec.BooleanValue VOLCANIC_ASHFALL;      // default ON
     public static final ForgeConfigSpec.BooleanValue ASHFALL_BURIES_CROPS;  // default ON
     public static final ForgeConfigSpec.BooleanValue SOIL_FROM_BEDROCK;     // default ON
@@ -363,6 +364,10 @@ public final class GeyserConfig {
         QUAKE_ERUPTION_DELAY_MAX_TICKS = b
                 .comment("Longest time from the quiet zone's release to the volcano starting to rumble (6000 = 5 min).")
                 .defineInRange("quakeEruptionDelayMaxTicks", 6000, 20, 720000);
+        DORMANT_VOLCANO_QUIET_FACTOR = b
+                .comment("How many times longer a dormant large volcano sleeps between eruptions than a live one. Its",
+                        "crater is crusted over; it wakes on this long cycle, or after a big earthquake nearby.")
+                .defineInRange("dormantVolcanoQuietFactor", 6.0, 1.0, 100.0);
         ASHFALL_BURIES_CROPS = b
                 .comment("Let falling ash bury crops. A field downwind of an eruption loses its crop under",
                         "the ash, and under three layers or more its tilled soil goes back to dirt. Shovel",

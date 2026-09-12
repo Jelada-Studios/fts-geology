@@ -36,9 +36,14 @@ public final class VolcanoEdifice {
     static int coneTargetY(Ctx c, int gx, int gz, int localGround, double dist, double ang) {
         if (c.coneHeight <= 0) return Integer.MIN_VALUE;
         double baseR = coneRadius(c, ang);
-        double innerR = c.craterR * (1.0 + 0.10 * Math.sin(2 * ang + c.phaseB));
+        double innerR = craterEdge(c, ang);
         if (dist >= baseR) return Integer.MIN_VALUE;
-        if (dist <= innerR) return c.summitY;
+        if (dist <= innerR) {
+            // An extinct cone's crater has weathered into a bowl; a live one's is carved when its summit is finished.
+            if (c.activity != VolcanoActivity.EXTINCT) return c.summitY;
+            double s = dist / Math.max(1.0, innerR);
+            return c.summitY - (int) Math.round(craterBowlDepth(c) * (1.0 - s * s));
+        }
         double t = (dist - innerR) / Math.max(1.0, baseR - innerR);
         double frac = Math.pow(1.0 - t, c.flankExponent);
         // Roughness fades out at the rim so the edge still meets the apron cleanly.
@@ -49,6 +54,24 @@ public final class VolcanoEdifice {
         double seam = seamHeight(c);
         double span = Math.max(0.0, c.baseY - localGround + c.coneHeight - seam);
         return localGround + (int) Math.round(span * frac + seam + rough + ridges);
+    }
+
+    /** How far the crater reaches on this bearing: its rim wanders a tenth either way. */
+    static double craterEdge(Ctx c, double ang) {
+        return c.craterR * (1.0 + 0.10 * Math.sin(2 * ang + c.phaseB));
+    }
+
+    /** How deep an extinct cone's weathered crater bowl is at its middle: deep enough to hold a lake. */
+    static double craterBowlDepth(Ctx c) {
+        return c.type == VolcanoType.STRATOVOLCANO ? Math.max(7.0, c.craterR * 0.5) : 7.0;
+    }
+
+    /**
+     * Where rain stands in an extinct crater's bowl: four under the summit, below any dip the rim's roughness can make,
+     * so the lake is held on every side.
+     */
+    static int craterLakeY(Ctx c) {
+        return c.summitY - 4;
     }
 
     /**
@@ -150,8 +173,11 @@ public final class VolcanoEdifice {
             // Higher up, a live build stops at the shore rather than walling a lake in.
             else if (water > 0 && !worldgen) return;
         }
-        // Ground already above the mountain's profile is left alone.
-        if (ground >= target) return;
+        // Ground already above the mountain's profile is left alone, save for rain standing over it in a dead crater.
+        if (ground >= target) {
+            if (worldgen && !underWater) craterLake(level, c, gx, gz, ground, dist, ang);
+            return;
+        }
 
         if (!worldgen && !underWater) TerrainProbe.clearVegetation(level, gx, ground, gz, 3);
         // A flow is a skin: only the top course is crust.
@@ -160,13 +186,28 @@ public final class VolcanoEdifice {
             BlockState rock = coneRock(rng, c, gx, y, gz);
             if (y == target) {
                 if (underWater) rock = seaBed(rng, surface - target, 1.0, rock);
-                else if (flow) rock = flowRock();
+                else if (flow) rock = flowRock(c);
                 else if (c.type == VolcanoType.STRATOVOLCANO) rock = shoreSkin(level, rng, gx, y, gz, stratoSurface(rng, c, gx, y, gz, rock));
                 else if (c.type == VolcanoType.SHIELD) rock = shoreSkin(level, rng, gx, y, gz, shieldSurface(rng, c, gx, y, gz, rock));
             }
             setRock(level, new BlockPos(gx, y, gz), rock);
         }
-        if (worldgen && !underWater) clearCover(level, gx, target, gz);
+        if (worldgen && !underWater) {
+            clearCover(level, gx, target, gz);
+            craterLake(level, c, gx, gz, target, dist, ang);
+        }
+    }
+
+    /**
+     * Rain standing in an extinct cone's crater over this column's top. The bowl deepens steadily to its middle and its
+     * rim stands at the summit, so the columns round the lake are at or over its level and hold it in.
+     */
+    private static void craterLake(LevelAccessor level, Ctx c, int gx, int gz, int top, double dist, double ang) {
+        if (c.activity != VolcanoActivity.EXTINCT || dist > craterEdge(c, ang) || top >= craterLakeY(c)) return;
+        clearCover(level, gx, top, gz);
+        for (int y = top + 1; y <= craterLakeY(c); y++) {
+            setRock(level, new BlockPos(gx, y, gz), Blocks.WATER.defaultBlockState());
+        }
     }
 
     /**
@@ -256,6 +297,11 @@ public final class VolcanoEdifice {
                 .defaultBlockState();
     }
 
+    /** A flow's skin by how long ago it ran: still warm on a live volcano, cold basalt on a sleeping or dead one. */
+    static BlockState flowRock(Ctx c) {
+        return c.activity == VolcanoActivity.ACTIVE ? flowRock() : Blocks.BASALT.defaultBlockState();
+    }
+
     /** The edifice rock: andesite and tuff on a stratocone, basalt on a shield, welded tuff in a caldera. */
     static BlockState coneRock(RandomSource rng, Ctx c, int gx, int y, int gz) {
         return switch (c.type) {
@@ -298,8 +344,10 @@ public final class VolcanoEdifice {
 
     /** {@link #stratoSurface} at a share {@code h} of the way up the cone: 0 at its foot, 1 at the summit. */
     static BlockState stratoSkin(RandomSource rng, Ctx c, int gx, int gz, double h, BlockState rock) {
-        double line = 0.24 + 0.10 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx, gz, 40.0);
-        if (h > line && c.size != VolcanoSize.SMALL
+        // An extinct cone has grown over far up its flanks, and its old flows have weathered into its soil.
+        boolean extinct = c.activity == VolcanoActivity.EXTINCT;
+        double line = (extinct ? 0.55 : 0.24) + 0.10 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx, gz, 40.0);
+        if (!extinct && h > line && c.size != VolcanoSize.SMALL
                 && oldLava(c, gx, gz) > 0.38 - 0.12 * rng.nextDouble()) {
             int r = rng.nextInt(10);
             return (r < 5 ? Blocks.BASALT : r < 8 ? Blocks.BLACKSTONE : Blocks.SMOOTH_BASALT).defaultBlockState();
@@ -311,6 +359,10 @@ public final class VolcanoEdifice {
         double scree = Mth.clamp(1.0 - (h - line) / 0.20, 0.0, 1.0);
         if (jitter < scree) {
             return (rng.nextInt(3) == 0 ? Blocks.GRAVEL : Blocks.COARSE_DIRT).defaultBlockState();
+        }
+        // Weathered rock and scree to the top of a dead cone, not the bare fresh rock of a live one.
+        if (extinct && rng.nextBoolean()) {
+            return (rng.nextBoolean() ? Blocks.GRAVEL : Blocks.COARSE_DIRT).defaultBlockState();
         }
         return rock;
     }
@@ -327,11 +379,13 @@ public final class VolcanoEdifice {
 
     /** {@link #shieldSurface} at a share {@code h} of the way up the shield: 0 at its foot, 1 at the summit. */
     static BlockState shieldSkin(RandomSource rng, Ctx c, int gx, int gz, double h, BlockState rock) {
-        if (c.size != VolcanoSize.SMALL && shieldTongue(c, gx, gz) > 0.5) {
+        // An extinct shield is forest nearly to its top, with no young lava left bare.
+        boolean extinct = c.activity == VolcanoActivity.EXTINCT;
+        if (!extinct && c.size != VolcanoSize.SMALL && shieldTongue(c, gx, gz) > 0.5) {
             int r = rng.nextInt(10);
             return (r < 6 ? Blocks.BASALT : r < 9 ? Blocks.SMOOTH_BASALT : Blocks.BLACKSTONE).defaultBlockState();
         }
-        double line = 0.62 + 0.1 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + 311, gz - 311, 45.0);
+        double line = (extinct ? 0.82 : 0.62) + 0.1 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + 311, gz - 311, 45.0);
         if (h > line + 0.18) {
             int r = rng.nextInt(10);
             return (r < 5 ? Blocks.BASALT : r < 8 ? Blocks.SMOOTH_BASALT : Blocks.BLACKSTONE).defaultBlockState();
@@ -521,12 +575,18 @@ public final class VolcanoEdifice {
             setRock(level, new BlockPos(gx, y, gz), y == target ? calderaSurface(rng, gx, gz, rock) : rock);
         }
         if (lake) {
-            // Recessed one block: the lake is the lowest point of its basin.
+            // Recessed one block: the lake is the lowest point of its basin. Lava on a live caldera, a crust over the
+            // vent on a sleeping one, and rainwater in a dead one.
             BlockPos molten = new BlockPos(gx, target - 1, gz);
-            setRock(level, molten, Blocks.LAVA.defaultBlockState());
+            BlockState fill = switch (c.activity) {
+                case ACTIVE -> Blocks.LAVA.defaultBlockState();
+                case DORMANT -> (rng.nextBoolean() ? Blocks.BLACKSTONE : Blocks.TUFF).defaultBlockState();
+                case EXTINCT -> Blocks.WATER.defaultBlockState();
+            };
+            setRock(level, molten, fill);
             clearNatural(level, new BlockPos(gx, target, gz));
             // Meant to stay lava; a generated lake is listed later, by collectCalderaLake.
-            if (!worldgen) c.molten.add(molten);
+            if (!worldgen && c.activity == VolcanoActivity.ACTIVE) c.molten.add(molten);
         }
         if (worldgen) clearCover(level, gx, target, gz);
     }
@@ -642,7 +702,7 @@ public final class VolcanoEdifice {
         for (int h = 0; h <= top; h++) {
             int y = ground + h;
             BlockState b;
-            if (flow && h == top) b = flowRock();
+            if (flow && h == top) b = flowRock(c);
             // A foothill is soil over rock, so the vegetation step grows grass and trees on it.
             else if (lift > 0 && h == top) b = Blocks.GRASS_BLOCK.defaultBlockState();
             else if (lift > 0 && h >= top - 2) b = Blocks.DIRT.defaultBlockState();
@@ -712,7 +772,7 @@ public final class VolcanoEdifice {
             // The crack: its top course gone and freshly skinned lava glowing one block down.
             TerrainProbe.clearVegetation(level, gx, ground, gz, 2);
             clearNatural(level, new BlockPos(gx, ground, gz));
-            setRock(level, new BlockPos(gx, ground - 1, gz), flowRock());
+            setRock(level, new BlockPos(gx, ground - 1, gz), flowRock(c));
             return;
         }
         int lift = (int) Math.round((off < 2.25 ? 3.0 : 1.5) * tip);
@@ -732,6 +792,8 @@ public final class VolcanoEdifice {
      * the generator's own terrain, so every chunk a pond crosses agrees on it and the lava stays walled in.
      */
     static boolean pondColumn(WorldGenLevel level, Ctx c, int gx, int gz, double along, double across) {
+        // A dead fissure's ponds froze long ago; its line is only crack and ramparts.
+        if (c.activity == VolcanoActivity.EXTINCT) return false;
         int side = along < 0 ? -1 : 1;
         long key = Double.doubleToLongBits(c.phaseA) * 31 + Double.doubleToLongBits(c.phaseB);
         int k = 0;

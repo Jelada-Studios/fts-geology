@@ -47,6 +47,60 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
     private long[] moltenCells = new long[0];
     private int craterR = 3;
 
+    /**
+     * A dormant volcano: its crater crusted over and its vent plugged. The crater cells turn to lava when it wakes and
+     * crust over again when the eruption ends; between times it sleeps far longer than a live one.
+     */
+    private boolean sealed;
+    private long[] sealCells = new long[0];
+
+    /** Seals the core of a dormant volcano over these crater cells and puts it to sleep. */
+    public void setSealed(List<BlockPos> cells, ServerLevel level) {
+        sealed = true;
+        sealCells = new long[cells.size()];
+        for (int i = 0; i < sealCells.length; i++) sealCells[i] = cells.get(i).asLong();
+        timer = sealedRoll(level);
+        setChanged();
+    }
+
+    private static int sealedRoll(ServerLevel level) {
+        return (int) Math.min(Integer.MAX_VALUE / 2, dormantRoll(level) * GeyserConfig.DORMANT_VOLCANO_QUIET_FACTOR.get());
+    }
+
+    /** Wakes a sealed volcano: the plug over its vent goes and its crater fills with lava. */
+    private void unseal(ServerLevel level, BlockPos pos) {
+        BlockPos plug = pos.above(2);
+        BlockState ps = level.getBlockState(plug);
+        if (!ps.is(Blocks.BEDROCK) && !ps.hasBlockEntity() && !EruptionHandler.isPlayerPlaced(ps)) {
+            level.setBlock(plug, Blocks.AIR.defaultBlockState(), 3);
+        }
+        for (long cell : sealCells) {
+            BlockPos p = BlockPos.of(cell);
+            BlockState s = level.getBlockState(p);
+            if (s.is(Blocks.BEDROCK) || s.hasBlockEntity() || EruptionHandler.isPlayerPlaced(s)) continue;
+            level.setBlock(p, Blocks.LAVA.defaultBlockState(), 3);
+        }
+        GeysersMod.LOGGER.info("Dormant volcano at {} wakes: its crater opens ({} cells)", pos, sealCells.length);
+    }
+
+    /** After an eruption a sealed volcano crusts over again: its crater cools and its vent is plugged. */
+    private void reseal(ServerLevel level, BlockPos pos) {
+        for (long cell : sealCells) {
+            BlockPos p = BlockPos.of(cell);
+            BlockState s = level.getBlockState(p);
+            if (s.isAir() || s.getFluidState().is(FluidTags.LAVA)) {
+                level.setBlock(p, com.jeladastudios.ftsgeology.registry.ModBlocks.COOLING_LAVA_CRUST.get()
+                        .defaultBlockState(), 3);
+            }
+        }
+        BlockPos plug = pos.above(2);
+        BlockState ps = level.getBlockState(plug);
+        if (ps.isAir() || ps.getFluidState().is(FluidTags.LAVA)) {
+            level.setBlock(plug, Blocks.BLACKSTONE.defaultBlockState(), 3);
+        }
+        GeysersMod.LOGGER.info("Dormant volcano at {} crusts over again", pos);
+    }
+
     public VolcanoCoreBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.VOLCANO_CORE.get(), pos, state);
     }
@@ -78,6 +132,9 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         double chance = GeyserConfig.QUAKE_ERUPTION_CHANCE.get()
                 * Mth.clamp((q.magnitude() - 6.5) / 2.5, 0.0, 1.0)
                 * Mth.clamp(1.0 - q.distance() / q.reach(), 0.0, 1.0);
+        GeysersMod.LOGGER.debug("Volcano at {} felt an M{} quake {} blocks away: chance {}, quiet left {} ticks", pos,
+                String.format(java.util.Locale.ROOT, "%.1f", q.magnitude()), (int) Math.round(q.distance()),
+                String.format(java.util.Locale.ROOT, "%.2f", chance), timer);
         if (level.random.nextDouble() >= chance) return;
         int min = GeyserConfig.QUAKE_ERUPTION_DELAY_MIN_TICKS.get();
         int max = Math.max(min + 1, GeyserConfig.QUAKE_ERUPTION_DELAY_MAX_TICKS.get());
@@ -345,6 +402,8 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                 be.answerQuake(server, pos);
                 be.idleSmoke(server, summit, 0.4f, true); // lazy smoke off the crater + a vent or two
                 if ((be.timer -= 20) <= 0) {
+                    GeysersMod.LOGGER.debug("Volcano at {} begins to rumble", pos);
+                    if (be.sealed) be.unseal(server, pos);
                     be.phase = Phase.RUMBLING;
                     be.timer = GeyserConfig.VOLCANO_RUMBLE_TICKS.get();
                     be.broadcastEruption(server, summit);
@@ -380,16 +439,23 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                             BlockPos.of(be.surfaceVents[server.random.nextInt(be.surfaceVents.length)]).above());
                 }
                 if ((be.timer -= 20) <= 0) {
-                    VolcanoEruption.formCrater(server, summit, be.craterR, be.moltenCells);
-                    // Everything spilled OUTSIDE the crater cools to basalt/tuff; the crater lake
-                    // stays molten, and the outlet trickles cool too.
-                    VolcanoEruption.coolScatteredLava(server, summit, be.craterR, 20 + be.magnitude,
-                            be.surfaceVents, be.moltenCells);
+                    if (be.sealed) {
+                        // A sleeping volcano's crater does not stay a lake: all of it cools but the vent, which is plugged.
+                        VolcanoEruption.coolScatteredLava(server, summit, 0, 20 + be.magnitude,
+                                be.surfaceVents, be.moltenCells);
+                        be.reseal(server, pos);
+                    } else {
+                        VolcanoEruption.formCrater(server, summit, be.craterR, be.moltenCells);
+                        // Everything spilled OUTSIDE the crater cools to basalt/tuff; the crater lake
+                        // stays molten, and the outlet trickles cool too.
+                        VolcanoEruption.coolScatteredLava(server, summit, be.craterR, 20 + be.magnitude,
+                                be.surfaceVents, be.moltenCells);
+                    }
                     for (long v : be.surfaceVents) {
                         VolcanoEruption.dryVent(server, BlockPos.of(v).above());
                     }
                     be.phase = Phase.DORMANT;
-                    be.timer = dormantRoll(server);
+                    be.timer = be.sealed ? sealedRoll(server) : dormantRoll(server);
                     be.broadcastEruption(server, summit);   // tells the client it is over
                 }
             }
@@ -462,6 +528,8 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         tag.putLong("RechargedFor", rechargedFor);
         tag.putLong("RebuiltFor", rebuiltFor);
         tag.putLong("TriggeredFor", triggeredFor);
+        if (sealed) tag.putBoolean("Sealed", true);
+        if (sealCells.length > 0) tag.putLongArray("SealCells", sealCells);
         if (type != null) tag.putString("Type", type.name());
         if (originalBase != null) tag.putLong("OriginalBase", originalBase.asLong());
         tag.putInt("OriginalSummitY", originalSummitY);
@@ -484,6 +552,8 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         rechargedFor = tag.contains("RechargedFor") ? tag.getLong("RechargedFor") : Long.MIN_VALUE;
         rebuiltFor = tag.contains("RebuiltFor") ? tag.getLong("RebuiltFor") : Long.MIN_VALUE;
         triggeredFor = tag.contains("TriggeredFor") ? tag.getLong("TriggeredFor") : Long.MIN_VALUE;
+        sealed = tag.getBoolean("Sealed");
+        sealCells = tag.contains("SealCells") ? tag.getLongArray("SealCells") : new long[0];
         type = readType(tag);
         originalBase = tag.contains("OriginalBase") ? BlockPos.of(tag.getLong("OriginalBase")) : null;
         originalSummitY = tag.contains("OriginalSummitY")

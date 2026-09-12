@@ -261,6 +261,8 @@
   "volcano.fts_geology.kind.eroded": "eroded volcanic island",
   "volcano.fts_geology.kind.atoll": "atoll",
   "volcano.fts_geology.kind.guyot": "guyot",
+  "volcano.fts_geology.activity.dormant": "dormant %s",
+  "volcano.fts_geology.activity.extinct": "extinct %s",
   "command.fts_geology.field.found": "Nearest large volcano: %s at %s, %s. Base Y %s, summit Y %s, about %s blocks away (%s in the search area).",
   "command.fts_geology.field.seams": "%s at %s, %s. Inside chunks: %s column pairs, mean step %s, steps of 4 or more %s per thousand. Across chunk borders: %s pairs, mean step %s, steps of 4 or more %s per thousand. Height digest %s over %s columns.",
   "command.fts_geology.field.no_seams": "No generated large volcano near you to measure.",

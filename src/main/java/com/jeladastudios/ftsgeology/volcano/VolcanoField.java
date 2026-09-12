@@ -65,6 +65,11 @@ public final class VolcanoField {
                     && (!setting.ocean() || GeyserConfig.OCEAN_VOLCANOES.get());
         }
 
+        /** How alive it is, from its seed and place alone; see {@link VolcanoActivity#of}. */
+        public VolcanoActivity activity() {
+            return VolcanoActivity.of(seed, x, z, type, setting);
+        }
+
         /** The language key naming what this is: a stratovolcano, a shield island, an atoll. */
         public String kindKey() {
             String t = type.name().toLowerCase(java.util.Locale.ROOT);
@@ -79,9 +84,10 @@ public final class VolcanoField {
     /**
      * A search result: the nearest chosen site or null, how many chosen sites the search passed, how many
      * of those were of each type, by {@link VolcanoType} ordinal, and how many candidates were turned
-     * down, at type ordinal times {@link #REASONS} plus the reason; and how many were in each setting.
+     * down, at type ordinal times {@link #REASONS} plus the reason; how many were in each setting; and how alive those
+     * on land and live islands were.
      */
-    public record Found(Site site, int count, int[] byType, int[] refused, int[] bySetting) {}
+    public record Found(Site site, int count, int[] byType, int[] refused, int[] bySetting, int[] byActivity) {}
 
     /** Why a candidate was turned down: water under it, broken ground, a structure due, anything else. */
     public static final int WATER = 0, RELIEF = 1, STRUCTURE = 2, OTHER = 3, REASONS = 4;
@@ -189,12 +195,22 @@ public final class VolcanoField {
     /** {@link #nearest}, also limited to one setting when {@code onlySetting} is not null. */
     public static Found nearest(ServerLevel level, int x, int z, int rings, VolcanoType only,
                                 VolcanoSetting onlySetting) {
+        return nearest(level, x, z, rings, only, onlySetting, null);
+    }
+
+    /**
+     * {@link #nearest}, also limited to one activity when {@code onlyActivity} is not null. An activity is asked of
+     * volcanoes on land and live islands, where it shows; an old island is extinct by what it is.
+     */
+    public static Found nearest(ServerLevel level, int x, int z, int rings, VolcanoType only,
+                                VolcanoSetting onlySetting, VolcanoActivity onlyActivity) {
         int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
         Site best = null;
         double bestD = Double.MAX_VALUE;
         int count = 0;
         int[] byType = new int[VolcanoType.values().length];
         int[] bySetting = new int[VolcanoSetting.values().length];
+        int[] byActivity = new int[VolcanoActivity.values().length];
         int[] refused = new int[VolcanoType.values().length * REASONS];
         int side = 2 * rings + 1;
         Cell[] cells = new Cell[side * side];
@@ -227,13 +243,16 @@ public final class VolcanoField {
                 count++;
                 byType[s.type().ordinal()]++;
                 bySetting[s.setting().ordinal()]++;
+                if (s.setting() == VolcanoSetting.LAND || s.setting() == VolcanoSetting.ISLAND) byActivity[s.activity().ordinal()]++;
                 if (only != null && s.type() != only) continue;
                 if (onlySetting != null && s.setting() != onlySetting) continue;
+                if (onlyActivity != null && (s.activity() != onlyActivity
+                        || (s.setting() != VolcanoSetting.LAND && s.setting() != VolcanoSetting.ISLAND))) continue;
                 double d = Math.hypot(x - s.x(), z - s.z());
                 if (d < bestD) { bestD = d; best = s; }
             }
         }
-        return new Found(best, count, byType, refused, bySetting);
+        return new Found(best, count, byType, refused, bySetting, byActivity);
     }
 
     public static void clearCache() {

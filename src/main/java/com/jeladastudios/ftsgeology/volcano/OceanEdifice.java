@@ -324,7 +324,8 @@ public final class OceanEdifice {
 
     /**
      * A caldera the sea has flooded, as at Santorini: a ring of island round a drowned floor, broken by straits,
-     * its cliffs facing inward, and in the middle the young cone the vent has built since, with lava in its top.
+     * its cliffs facing inward, and in the middle the young cone the vent has built since, its crater crusted over
+     * between eruptions, as Nea Kameni's is.
      */
     private static double flooded(Ctx c, Isle k, int gx, int gz, Probe p, int water) {
         double r = p.r, ang = p.ang;
@@ -658,9 +659,12 @@ public final class OceanEdifice {
             VolcanoSummit.setRock(level, new BlockPos(gx, y, gz), b);
         }
         if ((bits & POND) != 0) {
-            // The young cone's pond, on a basalt floor, where the summit step will seat the core.
+            // The young cone's crater, on a basalt floor, where the summit step will seat the core: molten on a live
+            // cone, crusted over on a sleeping one.
             VolcanoSummit.setRock(level, new BlockPos(gx, target - 1, gz), Blocks.BASALT.defaultBlockState());
-            VolcanoSummit.setRock(level, new BlockPos(gx, target, gz), Blocks.LAVA.defaultBlockState());
+            VolcanoSummit.setRock(level, new BlockPos(gx, target, gz), c.activity == VolcanoActivity.DORMANT
+                    ? (rng.nextBoolean() ? Blocks.BLACKSTONE : Blocks.BASALT).defaultBlockState()
+                    : Blocks.LAVA.defaultBlockState());
         }
         if ((bits & (REEF | RIM)) != 0 && target < water && rng.nextInt(4) == 0) {
             BlockPos above = new BlockPos(gx, target + 1, gz);
@@ -859,7 +863,7 @@ public final class OceanEdifice {
         if ((bits & KAMENI) != 0) {
             int roll = rng.nextInt(10);
             return roll < 6 ? Blocks.BLACKSTONE.defaultBlockState()
-                    : roll < 9 ? Blocks.BASALT.defaultBlockState() : VolcanoEdifice.flowRock();
+                    : roll < 9 ? Blocks.BASALT.defaultBlockState() : VolcanoEdifice.flowRock(c);
         }
         if (c.type == VolcanoType.CALDERA && (bits & LAGOON) != 0) {
             // The drowned caldera floor: ash, pumice gravel and black sand.
@@ -867,7 +871,7 @@ public final class OceanEdifice {
             return roll < 4 ? Blocks.TUFF.defaultBlockState()
                     : roll < 7 ? Blocks.GRAVEL.defaultBlockState() : ModBlocks.VOLCANIC_BLACK_SAND.get().defaultBlockState();
         }
-        if ((bits & DELTA) != 0) return rng.nextInt(5) < 3 ? VolcanoEdifice.flowRock() : Blocks.BASALT.defaultBlockState();
+        if ((bits & DELTA) != 0) return rng.nextInt(5) < 3 ? VolcanoEdifice.flowRock(c) : Blocks.BASALT.defaultBlockState();
         if ((bits & CONE) != 0) {
             return rng.nextInt(3) == 0 ? ModBlocks.VOLCANIC_BLACK_SAND.get().defaultBlockState() : Blocks.TUFF.defaultBlockState();
         }
@@ -954,7 +958,7 @@ public final class OceanEdifice {
         double h = (y - (k.seaY - 1)) / (double) Math.max(1, k.h0);
         if (c.type == VolcanoType.STRATOVOLCANO) return VolcanoEdifice.stratoSkin(rng, c, gx, gz, h, rock);
         if (k.setting == VolcanoSetting.ISLAND) {
-            if (VolcanoEdifice.flowAt(c, p.ang, p.r)) return VolcanoEdifice.flowRock();
+            if (VolcanoEdifice.flowAt(c, p.ang, p.r)) return VolcanoEdifice.flowRock(c);
             return VolcanoEdifice.shieldSkin(rng, c, gx, gz, h, rock);
         }
         if (slope >= 1.0 && rng.nextInt(3) == 0) return rock;
