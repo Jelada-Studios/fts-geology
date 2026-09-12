@@ -433,7 +433,7 @@ public final class Weathering {
             BlockState s = level.getBlockState(m.set(x, y, z));
             if (!s.is(BlockTags.LEAVES)) continue;
             if (s.hasProperty(LeavesBlock.PERSISTENT) && s.getValue(LeavesBlock.PERSISTENT)) continue;
-            if (hasLogNear(level, x, y, z)) continue;
+            if (TerrainProbe.hasLogNear(level, x, y, z, LEAF_SUPPORT_RANGE)) continue;
             level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2);
             changed = true;
         }
@@ -474,27 +474,6 @@ public final class Weathering {
             y = top;
         }
         return changed;
-    }
-
-    /** Is there a log within {@link #LEAF_SUPPORT_RANGE}? Searched in rings, nearest first. */
-    private static boolean hasLogNear(ServerLevel level, int x, int y, int z) {
-        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-        int floor = level.getMinBuildHeight(), roof = level.getMaxBuildHeight() - 1;
-        for (int r = 1; r <= LEAF_SUPPORT_RANGE; r++) {
-            for (int dy = -r; dy <= r; dy++) {
-                int wy = y + dy;
-                if (wy < floor || wy > roof) continue;
-                for (int dx = -r; dx <= r; dx++) {
-                    for (int dz = -r; dz <= r; dz++) {
-                        // Only the shell of this ring; the inside was covered by a smaller r.
-                        if (Math.max(Math.abs(dx), Math.max(Math.abs(dy), Math.abs(dz))) != r) continue;
-                        if (!level.hasChunkAt(m.set(x + dx, wy, z + dz))) continue;
-                        if (level.getBlockState(m).is(BlockTags.LOGS)) return true;
-                    }
-                }
-            }
-        }
-        return false;
     }
 
     /**

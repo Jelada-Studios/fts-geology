@@ -175,7 +175,7 @@ public final class VolcanoEdifice {
             BlockPos p = new BlockPos(x, y, z);
             BlockState s = level.getBlockState(p);
             if (s.isAir()) continue;
-            if (!(s.is(BlockTags.LOGS) || s.is(BlockTags.LEAVES) || TerrainProbe.isVegetation(s))) return;
+            if (!(TerrainProbe.isTreePart(s) || TerrainProbe.isVegetation(s))) return;
             level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
         }
     }
@@ -802,30 +802,82 @@ public final class VolcanoEdifice {
      */
     static void clearSiteRow(ServerLevel level, Ctx c, int dx) {
         int radius = c.clearReach;
-        double solid = Math.max(c.coneBaseR, c.craterR) * 0.9;
         for (int dz = -radius; dz <= radius; dz++) {
-            double dist = Math.sqrt((double) dx * dx + (double) dz * dz);
-            if (dist > radius) continue;
+            if (!stripped(c, dx, dz)) continue;
             int g = TerrainProbe.groundY(level, c.x + dx, c.z + dz);
             if (g == Integer.MIN_VALUE) continue;
 
-            // Spared by the surface noise, not a per-column roll, so a tree is kept or cleared whole.
-            double out = Mth.clamp((dist - solid) / Math.max(1.0, radius - solid), 0.0, 1.0);
-            double spare = (surfaceNoise(c, c.x + dx, c.z + dz) + 1.0) / 2.0;
-            if (dist > solid && spare < out) continue;
-
-            // Walk only as high as something stands in this column.
-            int top = Math.min(g + 24,
+            // Walk only as high as something stands in this column; a huge mushroom or a dark oak counts.
+            int top = Math.min(g + 40,
                     level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE,
                             c.x + dx, c.z + dz));
             for (int y = g + 1; y <= top; y++) {
                 BlockPos p = new BlockPos(c.x + dx, y, c.z + dz);
                 BlockState s = level.getBlockState(p);
                 if (s.isAir()) continue;
-                boolean tree = s.is(BlockTags.LOGS) || s.is(BlockTags.LEAVES);
-                if (!tree && !TerrainProbe.isVegetation(s)) break;
+                if (!TerrainProbe.isTreePart(s) && !TerrainProbe.isVegetation(s)) break;
                 level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
             }
         }
+    }
+
+    /**
+     * Whether the site clearing strips this column. Past the edifice more and more is spared, by the surface
+     * noise rather than a per-column roll, so a tree is mostly kept or cleared whole.
+     */
+    static boolean stripped(Ctx c, int dx, int dz) {
+        int radius = c.clearReach;
+        double dist = Math.sqrt((double) dx * dx + (double) dz * dz);
+        if (dist > radius) return false;
+        double solid = Math.max(c.coneBaseR, c.craterR) * 0.9;
+        if (dist <= solid) return true;
+        double out = Mth.clamp((dist - solid) / Math.max(1.0, radius - solid), 0.0, 1.0);
+        double spare = (surfaceNoise(c, c.x + dx, c.z + dz) + 1.0) / 2.0;
+        return spare >= out;
+    }
+
+    /** How far a crown reaches past its trunk, and a huge mushroom's cap past its stem. */
+    private static final int CROWN_REACH = 5, CAP_REACH = 4;
+
+    /**
+     * Takes the crowns the clearing cut from their trunks: leaves with no log near them and mushroom caps with no
+     * stem, in the columns it spared beside ones it stripped. Written without neighbour updates, leaves would
+     * otherwise hang there for good.
+     */
+    static void dropLooseCrownsRow(ServerLevel level, Ctx c, int dx) {
+        int reach = c.clearReach + CROWN_REACH;
+        for (int dz = -reach; dz <= reach; dz++) {
+            if (dx * dx + dz * dz > reach * reach || stripped(c, dx, dz) || !besideStripped(c, dx, dz)) continue;
+            int x = c.x + dx, z = c.z + dz;
+            if (!level.hasChunk(x >> 4, z >> 4)) continue;
+            int g = TerrainProbe.groundY(level, x, z);
+            if (g == Integer.MIN_VALUE) continue;
+            int top = Math.min(g + 40,
+                    level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x, z));
+            for (int y = g + 1; y <= top; y++) {
+                BlockState s = level.getBlockState(new BlockPos(x, y, z));
+                boolean loose;
+                if (s.is(BlockTags.LEAVES)) {
+                    loose = !(s.hasProperty(net.minecraft.world.level.block.LeavesBlock.PERSISTENT)
+                            && s.getValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT))
+                            && !TerrainProbe.hasLogNear(level, x, y, z, CROWN_REACH);
+                } else if (s.is(Blocks.RED_MUSHROOM_BLOCK) || s.is(Blocks.BROWN_MUSHROOM_BLOCK)) {
+                    loose = !TerrainProbe.hasNear(level, x, y, z, CAP_REACH, b -> b.is(Blocks.MUSHROOM_STEM));
+                } else {
+                    continue;
+                }
+                if (loose) level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2);
+            }
+        }
+    }
+
+    /** True when a column the clearing strips lies within a crown's reach of this one. */
+    private static boolean besideStripped(Ctx c, int dx, int dz) {
+        for (int ox = -CROWN_REACH; ox <= CROWN_REACH; ox++) {
+            for (int oz = -CROWN_REACH; oz <= CROWN_REACH; oz++) {
+                if (stripped(c, dx + ox, dz + oz)) return true;
+            }
+        }
+        return false;
     }
 }

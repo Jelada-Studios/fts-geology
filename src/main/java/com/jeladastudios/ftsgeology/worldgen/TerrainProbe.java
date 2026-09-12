@@ -47,13 +47,41 @@ public final class TerrainProbe {
     }
 
     /**
-     * Tree material, huge mushrooms and bee nests included: skipped when hunting for ground, but never
-     * treated as clearable. A mushroom cap read as ground made a step of several blocks.
+     * Tree material, huge mushrooms and bee nests included: skipped when hunting for ground. Not cleared as
+     * cover, since a cabin is made of logs; only a volcano's own site clearing takes it. A mushroom cap read
+     * as ground made a step of several blocks.
      */
-    private static boolean isTreePart(BlockState s) {
+    public static boolean isTreePart(BlockState s) {
         return s.is(BlockTags.LEAVES) || s.is(BlockTags.LOGS) || s.is(Blocks.MANGROVE_ROOTS)
                 || s.is(Blocks.RED_MUSHROOM_BLOCK) || s.is(Blocks.BROWN_MUSHROOM_BLOCK)
                 || s.is(Blocks.MUSHROOM_STEM) || s.is(Blocks.BEE_NEST);
+    }
+
+    /** Is there a log within {@code range}? Searched in shells, nearest first, never into an unloaded chunk. */
+    public static boolean hasLogNear(ServerLevel level, int x, int y, int z, int range) {
+        return hasNear(level, x, y, z, range, s -> s.is(BlockTags.LOGS));
+    }
+
+    /** Is a block matching {@code what} within {@code range}? Searched like {@link #hasLogNear}. */
+    public static boolean hasNear(ServerLevel level, int x, int y, int z, int range,
+                                  java.util.function.Predicate<BlockState> what) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int floor = level.getMinBuildHeight(), roof = level.getMaxBuildHeight() - 1;
+        for (int r = 1; r <= range; r++) {
+            for (int dy = -r; dy <= r; dy++) {
+                int wy = y + dy;
+                if (wy < floor || wy > roof) continue;
+                for (int dx = -r; dx <= r; dx++) {
+                    for (int dz = -r; dz <= r; dz++) {
+                        // Only the shell of this ring; the inside was covered by a smaller r.
+                        if (Math.max(Math.abs(dx), Math.max(Math.abs(dy), Math.abs(dz))) != r) continue;
+                        if (!level.hasChunkAt(m.set(x + dx, wy, z + dz))) continue;
+                        if (what.test(level.getBlockState(m))) return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /**

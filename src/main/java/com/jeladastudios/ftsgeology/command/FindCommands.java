@@ -128,6 +128,8 @@ public final class FindCommands {
             default -> null;
         };
         final com.jeladastudios.ftsgeology.volcano.VolcanoSetting onlySetting = typeName == null ? null : switch (typeName) {
+            // A type on its own means the mountain on land; the islands have their own words.
+            case "strato", "shield", "fissure", "caldera" -> com.jeladastudios.ftsgeology.volcano.VolcanoSetting.LAND;
             case "island", "flooded" -> com.jeladastudios.ftsgeology.volcano.VolcanoSetting.ISLAND;
             case "eroded" -> com.jeladastudios.ftsgeology.volcano.VolcanoSetting.ERODED;
             case "atoll" -> com.jeladastudios.ftsgeology.volcano.VolcanoSetting.ATOLL;

@@ -147,6 +147,8 @@ public final class VolcanoBuilder {
     static void queueEdifice(VolcanoJob job, Ctx c, boolean ramparts) {
         // Strip the canopy off the whole footprint before anything is raised.
         forEachRow(job, c.clearReach, dx -> lvl -> clearSiteRow(lvl, c, dx));
+        // And the crowns that clearing cut off their trunks, in the ring round it.
+        forEachRow(job, c.clearReach + 5, dx -> lvl -> dropLooseCrownsRow(lvl, c, dx));
         // The edifice, in rows reaching as far as the lobed foot can swing.
         if (c.coneHeight > 0) {
             forEachRow(job, coneReach(c), dx -> lvl -> buildConeRow(lvl, c, dx));
