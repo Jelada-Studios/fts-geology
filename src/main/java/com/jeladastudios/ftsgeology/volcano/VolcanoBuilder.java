@@ -205,11 +205,17 @@ public final class VolcanoBuilder {
         return largeFootprint(level, x, baseY, z, magnitude, type, seed, VolcanoSetting.LAND, 0.0, 0.0);
     }
 
+    /** The whole plan of a large volcano from its field seed; null if it cannot stand on this base at all. */
+    static Ctx largePlan(ServerLevel level, int x, int baseY, int z, int magnitude, VolcanoType type, long seed,
+                         VolcanoSetting setting, double age, double seaTemp) {
+        return plan(level, x, baseY, z, magnitude, type, VolcanoSize.LARGE, RandomSource.create(seed),
+                TectonicMap.sampleCached(level, x, z), setting, age, level.getSeaLevel(), seaTemp);
+    }
+
     /** {@link #largeFootprint} for a setting; in the sea {@code baseY} is the sea floor. */
     public static int[] largeFootprint(ServerLevel level, int x, int baseY, int z, int magnitude, VolcanoType type,
                                        long seed, VolcanoSetting setting, double age, double seaTemp) {
-        Ctx c = plan(level, x, baseY, z, magnitude, type, VolcanoSize.LARGE, RandomSource.create(seed),
-                TectonicMap.sampleCached(level, x, z), setting, age, level.getSeaLevel(), seaTemp);
+        Ctx c = largePlan(level, x, baseY, z, magnitude, type, seed, setting, age, seaTemp);
         if (c == null) return null;
         if (c.isle != null) {
             return new int[] {c.clearReach, c.isle.edifice, c.summitY, c.craterR, (int) Math.round(c.isle.footR)};

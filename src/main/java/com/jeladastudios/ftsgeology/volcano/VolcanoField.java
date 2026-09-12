@@ -526,18 +526,43 @@ public final class VolcanoField {
         // It stands on the deeper part of the floor under it.
         int baseY = sorted[4];
         if (sea - 1 - baseY < depth) return refuse(refused, type, WATER, x, z, "sea too shallow");
-        int[] plan = VolcanoBuilder.largeFootprint(level, x, baseY, z, magnitude, type, seed, setting, age, warmth);
-        if (plan == null) return refuse(refused, type, OTHER, x, z, "no island plan on floor " + baseY);
-        if (plan[2] <= baseY + 4) return refuse(refused, type, WATER, x, z, "sea too shallow for its top");
+        VolcanoPlan.Ctx plan = VolcanoBuilder.largePlan(level, x, baseY, z, magnitude, type, seed, setting, age, warmth);
+        if (plan == null || plan.isle == null) return refuse(refused, type, OTHER, x, z, "no island plan on floor " + baseY);
+        if (plan.summitY <= baseY + 4) return refuse(refused, type, WATER, x, z, "sea too shallow for its top");
+        // Open sea just past the coast: land all round would join the island to the shore. A live island may lie off
+        // a coast on one side, as arc islands do; an old island or an atoll stands in the open ocean.
+        int landOff = landOffCoast(level, gen, rs, plan, x, z, sea);
+        if (landOff > (setting == VolcanoSetting.ISLAND ? 3 : 1)) {
+            return refuse(refused, type, WATER, x, z, "land off the coast, " + landOff + " of 16");
+        }
         // Only a monument is in the way: a wreck or a ruin is built first and ends up inside the island.
-        if (structureInTheWay(level, gen, rs, x, z, plan[1] + 16, structures, true)) {
-            return refuse(refused, type, STRUCTURE, x, z, "monument within " + (plan[1] + 16));
+        if (structureInTheWay(level, gen, rs, x, z, plan.isle.edifice + 16, structures, true)) {
+            return refuse(refused, type, STRUCTURE, x, z, "monument within " + (plan.isle.edifice + 16));
         }
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("Ocean {} {} at {},{}: floor {}, top {}, reach {}, age {}, sea {}",
-                setting, type, x, z, baseY, plan[2], plan[0], String.format(java.util.Locale.ROOT, "%.2f", age),
+                setting, type, x, z, baseY, plan.summitY, plan.clearReach, String.format(java.util.Locale.ROOT, "%.2f", age),
                 String.format(java.util.Locale.ROOT, "%.2f", warmth));
-        return new Site(x, z, baseY, plan[2], type, magnitude, seed, plan[0], plan[1],
+        return new Site(x, z, baseY, plan.summitY, type, magnitude, seed, plan.clearReach, plan.isle.edifice,
                 rand01(hash(seed, x, z, 0xC40L)), setting, age);
+    }
+
+    /** How far past an island's coast the sea has to stay open, in blocks. */
+    private static final int COAST_CLEARANCE = 48;
+
+    /** How many of sixteen points just off an island's coast the generator makes land. A guyot has no coast. */
+    private static int landOffCoast(ServerLevel level, ChunkGenerator gen, RandomState rs, VolcanoPlan.Ctx plan,
+                                    int x, int z, int sea) {
+        if (plan.isle.setting == VolcanoSetting.GUYOT) return 0;
+        int dry = 0;
+        for (int i = 0; i < 16; i++) {
+            double a = Math.PI * 2 * i / 16 + 0.2;
+            double r = OceanEdifice.coastAt(plan, a) + COAST_CLEARANCE;
+            int px = x + (int) Math.round(Math.cos(a) * r), pz = z + (int) Math.round(Math.sin(a) * r);
+            int surface = gen.getBaseHeight(px, pz, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
+            int floor = gen.getBaseHeight(px, pz, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
+            if (surface <= floor || floor >= sea) dry++;
+        }
+        return dry;
     }
 
     /** The magnitude of a large volcano planned at this point. */
