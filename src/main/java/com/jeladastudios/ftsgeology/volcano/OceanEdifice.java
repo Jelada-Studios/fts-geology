@@ -986,11 +986,12 @@ public final class OceanEdifice {
             return Blocks.GRASS_BLOCK.defaultBlockState();
         }
         double h = (y - (k.seaY - 1)) / (double) Math.max(1, k.h0);
-        if (c.type == VolcanoType.STRATOVOLCANO) return VolcanoEdifice.stratoSkin(rng, c, gx, gz, h, rock);
         if (k.setting == VolcanoSetting.ISLAND) {
+            if (c.type == VolcanoType.STRATOVOLCANO) return VolcanoEdifice.stratoSkin(rng, c, gx, gz, h, rock);
             if (VolcanoEdifice.flowAt(c, p.ang, p.r)) return VolcanoEdifice.flowRock(c);
             return VolcanoEdifice.shieldSkin(rng, c, gx, gz, h, rock);
         }
+        // An old island, cone or shield, has weathered to soil to its top.
         if (slope >= 1.0 && rng.nextInt(3) == 0) return rock;
         double n = ValueNoise.noise(gx + 7 * k.noise, gz, 30.0);
         if (n < -0.55) return Blocks.COARSE_DIRT.defaultBlockState();

@@ -21,9 +21,10 @@ public enum VolcanoActivity {
             case ERODED, ATOLL, GUYOT -> EXTINCT;
             // The shield over its plume is the live one; a flooded caldera's young cone sleeps between eruptions.
             case ISLAND -> type == VolcanoType.SHIELD ? ACTIVE : type == VolcanoType.CALDERA ? DORMANT
-                    : roll(seed, x, z, 0.5, 0.3);
+                    : roll(seed, x, z, 0.4, 0.3);
             case LAND -> switch (type) {
-                case STRATOVOLCANO -> roll(seed, x, z, 0.5, 0.3);
+                // Most of an arc's cones are quiet: the Cascades have erupted from two in a century.
+                case STRATOVOLCANO -> roll(seed, x, z, 0.4, 0.3);
                 case SHIELD -> roll(seed, x, z, 0.6, 0.2);
                 case CALDERA -> roll(seed, x, z, 0.4, 0.45);
                 // A fissure has no vent to seal: it is still erupting or long over.

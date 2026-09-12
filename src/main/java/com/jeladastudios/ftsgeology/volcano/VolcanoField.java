@@ -392,10 +392,16 @@ public final class VolcanoField {
             // Rifts run long and largely over land, so left alone they out-numbered the arcs four to
             // one in testing. A flood-basalt fissure this size is the rarer sight in the real world.
             if (type == VolcanoType.FISSURE && rand01(hash(seed, i, 3, 0xF155L)) < 0.6) continue;
-            // An arc out in the sea is a string of volcanic islands, as the Aleutians are.
+            // An arc out in the sea is a string of volcanic islands, as the Aleutians are; the cones that died long
+            // ago are worn down to old islands, valleyed and cliffed, with a reef in a warm sea.
             if (ocean && type != VolcanoType.FISSURE && type != VolcanoType.SHIELD
                     && oceanDepth(level, x, z) >= ISLAND_DEPTH) {
-                Site island = checkOcean(level, x, z, type, VolcanoSetting.ISLAND, 0.0, seed, refused, structures);
+                boolean dead = type == VolcanoType.STRATOVOLCANO
+                        && VolcanoActivity.of(seed, x, z, type, VolcanoSetting.ISLAND) == VolcanoActivity.EXTINCT;
+                double age = 0.2 + 0.4 * rand01(hash(seed, x, z, 0xA6EDL));
+                Site island = dead
+                        ? checkOcean(level, x, z, type, VolcanoSetting.ERODED, age, seed, refused, structures)
+                        : checkOcean(level, x, z, type, VolcanoSetting.ISLAND, 0.0, seed, refused, structures);
                 if (island != null) return new Cell(island, refused);
             }
             Site site = checkNear(level, x, z, type, seed, refused, s.faultType(), minX, minZ, maxX, maxZ,
@@ -464,11 +470,11 @@ public final class VolcanoField {
         for (HotspotMap.Trail t : HotspotMap.oceanTrails(level, minX, minZ, maxX, maxZ, length)) {
             double[] span = clip(t, minX, minZ, maxX, maxZ, length);
             if (span == null) continue;
-            // A plume under the open sea; one under land leaves no island chain.
-            if (oceanDepth(level, (int) Math.floor(t.x()), (int) Math.floor(t.z())) < ISLAND_DEPTH) continue;
             // A few points along the stretch in the cell, from a seeded start: the track crosses islands and shoals,
             // and the first open sea along it takes the old volcano. Only the sea is asked about: the world's plates are
-            // far smaller than the Pacific, and their crust type is read from a handful of biome probes.
+            // far smaller than the Pacific, and their crust type is read from a handful of biome probes. The plume
+            // itself may be under land: a track that runs out to sea from the coast still leaves islands, as the
+            // Cameroon line does.
             double start = rand01(hash(seed, (int) t.x(), (int) t.z(), 0x7A11L));
             int[] uncounted = new int[refused.length];
             for (int i = 0; i < 5; i++) {
