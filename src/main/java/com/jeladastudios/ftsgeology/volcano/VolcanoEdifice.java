@@ -143,9 +143,10 @@ public final class VolcanoEdifice {
             if (underWater) target = Math.min(target - 1, surface - 1);
         } else {
             // A stream or pond low on the flank keeps its water: its bed is raised to a block under the surface
-            // instead of the channel being filled flat with rock.
+            // instead of the channel being filled flat with rock. Where the profile is lower still, it is followed:
+            // raising every shallow column to the surface laid a flat shelf round a volcano at the sea.
             underWater = water > 0 && target <= surface + 3;
-            if (underWater) target = surface - 1;
+            if (underWater) target = Math.min(target, surface - 1);
             // Higher up, a live build stops at the shore rather than walling a lake in.
             else if (water > 0 && !worldgen) return;
         }
@@ -158,14 +159,47 @@ public final class VolcanoEdifice {
         for (int y = ground + 1; y <= target; y++) {
             BlockState rock = coneRock(rng, c, gx, y, gz);
             if (y == target) {
-                if (underWater) rock = ModBlocks.VOLCANIC_BLACK_SAND.get().defaultBlockState();
+                if (underWater) rock = seaBed(rng, surface - target, 1.0, rock);
                 else if (flow) rock = flowRock();
-                else if (c.type == VolcanoType.STRATOVOLCANO) rock = stratoSurface(rng, c, gx, y, gz, rock);
-                else if (c.type == VolcanoType.SHIELD) rock = shieldSurface(rng, c, gx, y, gz, rock);
+                else if (c.type == VolcanoType.STRATOVOLCANO) rock = shoreSkin(level, rng, gx, y, gz, stratoSurface(rng, c, gx, y, gz, rock));
+                else if (c.type == VolcanoType.SHIELD) rock = shoreSkin(level, rng, gx, y, gz, shieldSurface(rng, c, gx, y, gz, rock));
             }
             setRock(level, new BlockPos(gx, y, gz), rock);
         }
         if (worldgen && !underWater) clearCover(level, gx, target, gz);
+    }
+
+    /**
+     * The top of a volcano's flank or apron under the sea: black sand in the shallows the waves work, thinning out
+     * away from the mountain, and its own rock and shingle deeper down.
+     *
+     * @param depth water over this top, in blocks
+     * @param t     1 at the edifice, falling to 0 at the apron's outer edge
+     */
+    static BlockState seaBed(RandomSource rng, int depth, double t, BlockState rock) {
+        double black = depth <= 2 ? 0.25 + 0.6 * t : depth <= 4 ? 0.4 * t : 0.0;
+        if (rng.nextDouble() < black) return ModBlocks.VOLCANIC_BLACK_SAND.get().defaultBlockState();
+        return rng.nextInt(4) == 0 ? Blocks.GRAVEL.defaultBlockState() : rock;
+    }
+
+    /**
+     * The strand where a volcano's flank meets the sea: black sand and shingle at the water, giving way to soil and
+     * then the flank's own skin over a few blocks along a ragged line. A real black sand beach is bare where the
+     * waves reach and grows over behind, first with dune grass and scrub.
+     */
+    static BlockState shoreSkin(LevelAccessor level, RandomSource rng, int gx, int y, int gz, BlockState skin) {
+        int sea = level.getSeaLevel();
+        if (y < sea - 1 || y > sea + 6) return skin;
+        double edge = sea + 1.5 + 1.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + 101, gz - 101, 9.0);
+        if (y <= edge) {
+            int roll = rng.nextInt(10);
+            return (roll < 6 ? ModBlocks.VOLCANIC_BLACK_SAND.get() : roll < 9 ? Blocks.GRAVEL : Blocks.COARSE_DIRT)
+                    .defaultBlockState();
+        }
+        if (rng.nextDouble() < (edge + 3.0 - y) / 3.0) {
+            return (rng.nextBoolean() ? Blocks.COARSE_DIRT : ModBlocks.VOLCANIC_BLACK_SAND.get()).defaultBlockState();
+        }
+        return skin;
     }
 
     /** Clears plants and neighbouring trees' crowns left above a column's new top during generation. */
@@ -586,12 +620,12 @@ public final class VolcanoEdifice {
 
         if (water > 0) {
             // A thin skin down the shore instead of the edifice ending on a step into the water, never
-            // built up to the surface, with black sand where the water is shallow.
+            // built up to the surface, with black sand in the shallows near the mountain.
             int skin = Math.min(thickness, Math.max(0, water - 2));
+            BlockState bed0 = level.getBlockState(new BlockPos(gx, ground, gz));
             for (int h = 0; h <= skin; h++) {
-                setRock(level, new BlockPos(gx, ground + h, gz), h == skin && water <= 3
-                        ? ModBlocks.VOLCANIC_BLACK_SAND.get().defaultBlockState()
-                        : apronBody(rng, c, gx, ground + h, gz, t, null, nativeBand));
+                BlockState rock = apronBody(rng, c, gx, ground + h, gz, t, h == 0 ? bed0 : null, nativeBand);
+                setRock(level, new BlockPos(gx, ground + h, gz), h == skin ? seaBed(rng, water - skin, t, rock) : rock);
             }
             return;
         }
@@ -615,8 +649,9 @@ public final class VolcanoEdifice {
             else {
                 // Only the surface cell may keep the native block; above it the block would float.
                 b = apronBody(rng, c, gx, y, gz, t, h == 0 ? native0 : null, nativeBand);
-                // The top carries on the flank's own skin, so there is no second ring at the foot.
-                if (h == top && b != native0) b = apronSurface(rng, c, gx, y, gz, b);
+                // The top carries on the flank's own skin, so there is no second ring at the foot, and at the sea
+                // the strand.
+                if (h == top && b != native0) b = shoreSkin(level, rng, gx, y, gz, apronSurface(rng, c, gx, y, gz, b));
             }
             setRock(level, new BlockPos(gx, y, gz), b);
         }
