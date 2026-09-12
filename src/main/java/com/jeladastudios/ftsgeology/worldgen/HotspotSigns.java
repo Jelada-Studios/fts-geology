@@ -53,9 +53,10 @@ public final class HotspotSigns {
     public static void generate(WorldGenLevel level, ChunkPos cp) {
         ServerLevel model = level.getLevel();
         // Not on or around a large volcano: its flanks are its own ground, and a chimney near the
-        // summit ends up hanging over the crater once it is carved. A caldera's floor is the exception.
+        // summit ends up hanging over the crater once it is carved. A caldera's floor is the exception. The
+        // volcano's edge is asked about cell by cell in paint; only a chunk well inside it is skipped whole.
         int mx = cp.getMiddleBlockX(), mz = cp.getMiddleBlockZ();
-        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.nearLarge(model, mx, mz, 8)
+        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.largeMargin(model, mx, mz) < -GeothermalBasin.VOLCANO_FADE - 16
                 && !com.jeladastudios.ftsgeology.volcano.VolcanoField.onCalderaFloor(model, mx, mz)) return;
         long seed = level.getSeed();
         for (int ox = -REACH_CHUNKS; ox <= REACH_CHUNKS; ox++) {
@@ -143,6 +144,8 @@ public final class HotspotSigns {
         if (here.is(Blocks.BEDROCK)) return;
         if (EruptionHandler.isPlayerPlaced(here)) return;
         if (volcanic(here)) return;                               // a volcano's own rock
+        // A field runs out along a large volcano's circle, not along the chunk grid.
+        if (rng.nextDouble() >= GeothermalBasin.volcanoClearance(level.getLevel(), x, z)) return;
 
         TerrainProbe.clearVegetation(level, x, g, z, 1);
 

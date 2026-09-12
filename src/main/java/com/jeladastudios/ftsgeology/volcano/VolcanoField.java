@@ -135,15 +135,25 @@ public final class VolcanoField {
 
     /** True when a chosen large volcano's mountain stands within {@code margin} blocks of here. */
     public static boolean nearLarge(ServerLevel level, int x, int z, int margin) {
+        return largeMargin(level, x, z) <= margin;
+    }
+
+    /**
+     * How far outside the nearest chosen large volcano's mountain this column lies, in blocks: negative inside it,
+     * huge where there is none. Cheap enough to ask for every column, so ground painted round a volcano can fade
+     * out along its circle instead of stopping on a chunk edge.
+     */
+    public static double largeMargin(ServerLevel level, int x, int z) {
         int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
+        double best = Double.MAX_VALUE;
         for (int ox = -1; ox <= 1; ox++) {
             for (int oz = -1; oz <= 1; oz++) {
                 Site s = site(level, cx0 + ox, cz0 + oz);
                 if (s == null || !s.chosen()) continue;
-                if (Math.hypot(x - s.x(), z - s.z()) <= s.reach() + margin) return true;
+                best = Math.min(best, Math.hypot(x - s.x(), z - s.z()) - s.reach());
             }
         }
-        return false;
+        return best;
     }
 
     /** The chosen large volcanoes whose mountain reaches into this box of blocks. */

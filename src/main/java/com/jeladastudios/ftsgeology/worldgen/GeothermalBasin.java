@@ -61,9 +61,10 @@ public final class GeothermalBasin {
         if (!GeyserConfig.HOTSPOTS_ENABLED.get()) return;
 
         ServerLevel model = level.getLevel();
-        // A large volcano's footprint is its own ground, not a basin floor, except a caldera's floor.
+        // A large volcano's footprint is its own ground, not a basin floor, except a caldera's floor. The edge of that
+        // ground is asked about column by column below; only a chunk well inside it is skipped whole.
         int mx = cp.getMiddleBlockX(), mz = cp.getMiddleBlockZ();
-        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.nearLarge(model, mx, mz, 8)
+        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.largeMargin(model, mx, mz) < -VOLCANO_FADE - 16
                 && !com.jeladastudios.ftsgeology.volcano.VolcanoField.onCalderaFloor(model, mx, mz)) return;
         int x0 = cp.getMinBlockX(), z0 = cp.getMinBlockZ();
         // Four corners, not 256 columns and not one centre. See the class note.
@@ -94,6 +95,8 @@ public final class GeothermalBasin {
                 // Thins out towards the rim instead of ending on a line, the way the sterile halo
                 // around a single spring already does.
                 double keep = (s - FLOOR_MIN) / (FLOOR_FULL - FLOOR_MIN);
+                // And out along a large volcano's circle, so the floor does not end on a chunk edge there.
+                keep *= volcanoClearance(model, x, z);
                 if (keep < 1.0 && rng.nextDouble() > keep) continue;
                 if (!isFloor(ground, dx, dz)) continue;
                 if (paint(level, x, z, ground[dx * 16 + dz], s, rng)) painted++;
@@ -102,6 +105,20 @@ public final class GeothermalBasin {
         if (painted > 0) {
             GeysersMod.LOGGER.debug("Geothermal basin floor at {},{}: {} columns", x0, z0, painted);
         }
+    }
+
+    /** How far past a large volcano's mountain the painted ground reaches its full share. */
+    static final int VOLCANO_FADE = 24;
+
+    /**
+     * 0 on a large volcano's own ground, 1 from {@link #VOLCANO_FADE} blocks past its mountain, a ramp between; a
+     * caldera's floor is painted like any basin.
+     */
+    static double volcanoClearance(ServerLevel level, int x, int z) {
+        double margin = com.jeladastudios.ftsgeology.volcano.VolcanoField.largeMargin(level, x, z);
+        if (margin >= VOLCANO_FADE + 8) return 1.0;
+        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.onCalderaFloor(level, x, z)) return 1.0;
+        return Mth.clamp((margin - 8) / VOLCANO_FADE, 0.0, 1.0);
     }
 
     /**
