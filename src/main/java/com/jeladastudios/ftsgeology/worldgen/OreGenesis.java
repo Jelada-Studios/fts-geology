@@ -176,6 +176,7 @@ public final class OreGenesis {
                 if (ground == Integer.MIN_VALUE) continue;
                 if (perColumn && TectonicMap.sampleCached(d.world, x, z).stress()
                         > 0.62 + 0.16 * noise(x + 1301, z - 1301, 48.0)) continue;
+                if (!coalBasin(d, x, z)) continue;
 
                 // The upper seam: a buried delta swamp around Y=32, under a shale roof.
                 if (noise(x, z, 80.0) > -0.25) {
@@ -201,6 +202,24 @@ public final class OreGenesis {
                 }
             }
         }
+    }
+
+    /**
+     * True where coal could form: on continental crust, in a basin that sank and filled with swamp and delta mud.
+     * In front of a mountain belt the crust is pressed down into a foreland basin, as under the Ruhr, the
+     * Appalachians and Zonguldak; a rift fills its graben; a few broad sags inside a plate fill slowly. Old
+     * shields and the ocean floor have none.
+     */
+    private static boolean coalBasin(Deposit d, int x, int z) {
+        PlateSample s = TectonicMap.sampleCached(d.world, x, z);
+        if (s.plateKind().isOceanic()) return false;
+        double width = GeyserConfig.FAULT_WIDTH.get();
+        // A ragged margin rather than a line at a fixed distance.
+        double dist = s.faultDistance() + 0.25 * width * noise(x + 211, z - 211, 60.0);
+        boolean headOn = Math.abs(s.convergence()) >= s.shear();
+        if (headOn && s.convergence() > 0 && dist > width && dist < 3.0 * width) return true;
+        if (headOn && s.convergence() < 0 && dist < 1.5 * width) return true;
+        return noise(x - 7717, z + 7717, 1500.0) > 0.3;
     }
 
     // === Veins =================================================================
