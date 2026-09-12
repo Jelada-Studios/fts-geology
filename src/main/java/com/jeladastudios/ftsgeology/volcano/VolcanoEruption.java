@@ -272,9 +272,9 @@ public final class VolcanoEruption {
     }
 
     /**
-     * After an eruption, hardens spilled lava outside the crater into basalt or tuff while the crater
-     * lake stays molten. The volcano never grows: lava above the original summit, or resting on rock
-     * the volcano laid down, is drained instead, and lava over air is left alone. Bounded scan.
+     * After an eruption, hardens spilled lava outside the crater while the crater lake stays molten. A flow becomes
+     * a skin on the ground it ran over: the volcano never grows, lava above the original summit is drained, and
+     * lava over air is left alone. Bounded scan.
      */
     public static void coolScatteredLava(ServerLevel level, BlockPos summit, int craterR, int reach,
                                          long[] keepVents, long[] molten) {
@@ -304,16 +304,44 @@ public final class VolcanoEruption {
             if (level.random.nextInt(3) == 0) steamIfWet(level, p);
             BlockState below = level.getBlockState(p.below());
             if (below.isAir() || !below.getFluidState().isEmpty()) continue;   // must rest on solid ground
-            boolean aboveSummit = p.getY() > summit.getY();
-            boolean onOwnRock = below.is(Blocks.BASALT) || below.is(Blocks.TUFF)
-                    || below.is(Blocks.MAGMA_BLOCK);
-            if (aboveSummit || onOwnRock) {
+            if (p.getY() > summit.getY()) {
                 level.setBlock(p, Blocks.AIR.defaultBlockState(), 2); // drain it: never stack upward
-            } else {
+                continue;
+            }
+            // Lava that pooled in a hollow freezes where it lies.
+            if (walledSides(level, p) >= 3) {
                 level.setBlock(p, (level.random.nextInt(3) == 0
                         ? Blocks.TUFF : Blocks.BASALT).defaultBlockState(), 2);
+                continue;
             }
+            // A stream over the surface leaves a skin, never a course laid on top: cooling in place combed a flank
+            // with ridges one block high along every finger the flow split into. The ground it ran over turns to
+            // rock; the volcano's own rock takes a fresh crust.
+            level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+            if (below.is(Blocks.BEDROCK) || below.hasBlockEntity()
+                    || com.jeladastudios.ftsgeology.eruption.EruptionHandler.isPlayerPlaced(below)) continue;
+            BlockState skin = ownRock(below)
+                    ? com.jeladastudios.ftsgeology.registry.ModBlocks.COOLING_LAVA_CRUST.get().defaultBlockState()
+                    : (level.random.nextInt(3) == 0 ? Blocks.TUFF : Blocks.BASALT).defaultBlockState();
+            level.setBlock(p.below(), skin, 2);
         }
+    }
+
+    /** How many of the four horizontal neighbours are solid: three or more and the cell is a hollow. */
+    private static int walledSides(ServerLevel level, BlockPos p) {
+        int n = 0;
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            BlockState s = level.getBlockState(p.relative(d));
+            if (!s.isAir() && s.getFluidState().isEmpty()) n++;
+        }
+        return n;
+    }
+
+    /** Rock a volcano lays down itself, which a fresh flow crusts over rather than turning to more of it. */
+    private static boolean ownRock(BlockState s) {
+        return s.is(Blocks.BASALT) || s.is(Blocks.SMOOTH_BASALT) || s.is(Blocks.BLACKSTONE) || s.is(Blocks.TUFF)
+                || s.is(Blocks.MAGMA_BLOCK)
+                || s.is(com.jeladastudios.ftsgeology.registry.ModBlocks.COOLING_LAVA_CRUST.get());
     }
 
     /** Is this one of the volcano's own recorded outlets? */
