@@ -194,18 +194,26 @@ public final class VolcanoEdifice {
         // The channel winds as it runs downhill. The wander is in blocks, not in angle, so a flow far
         // down the flank bends a few blocks either way instead of swinging round the mountain.
         // Growing with distance, so a flow leaves the vent nearly straight and meanders lower down.
-        double amp = 2.0 + Math.min(16.0, dist * 0.08);
         for (int i = 0; i < c.flows; i++) {
-            double phase = c.flowPhase[i];
-            double wave = 60.0 + 30.0 * (phase / (Math.PI * 2));
-            double wander = amp * (Math.sin(dist * Math.PI * 2 / wave + phase)
-                    + 0.35 * Math.sin(dist * Math.PI * 2 / (wave * 0.43) - phase));
+            double wander = flowWander(c, i, dist);
             // Wrapped to -PI..PI so a flow near due west is not cut in two.
             double delta = Math.atan2(Math.sin(ang - c.flowAim[i]), Math.cos(ang - c.flowAim[i]));
             double across = Math.abs(delta * dist - wander);  // blocks measured across the flow
             if (across <= (0.9 + 2.0 * t * t) * c.flowWidth) return true;
         }
         return false;
+    }
+
+    /**
+     * How far flow {@code i} has wandered sideways at a distance from the vent, in blocks. Growing with distance, so a
+     * flow leaves the vent nearly straight and meanders lower down.
+     */
+    static double flowWander(Ctx c, int i, double dist) {
+        double amp = 2.0 + Math.min(16.0, dist * 0.08);
+        double phase = c.flowPhase[i];
+        double wave = 60.0 + 30.0 * (phase / (Math.PI * 2));
+        return amp * (Math.sin(dist * Math.PI * 2 / wave + phase)
+                + 0.35 * Math.sin(dist * Math.PI * 2 / (wave * 0.43) - phase));
     }
 
     /** The skin of a flow: dark, and still warm enough to show at night. */
@@ -251,7 +259,11 @@ public final class VolcanoEdifice {
      * medium or large cone dark tongues of old lava down the middle and upper flank.
      */
     static BlockState stratoSurface(RandomSource rng, Ctx c, int gx, int y, int gz, BlockState rock) {
-        double h = (y - c.baseY) / (double) Math.max(1, c.coneHeight);
+        return stratoSkin(rng, c, gx, gz, (y - c.baseY) / (double) Math.max(1, c.coneHeight), rock);
+    }
+
+    /** {@link #stratoSurface} at a share {@code h} of the way up the cone: 0 at its foot, 1 at the summit. */
+    static BlockState stratoSkin(RandomSource rng, Ctx c, int gx, int gz, double h, BlockState rock) {
         double line = 0.24 + 0.10 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx, gz, 40.0);
         if (h > line && c.size != VolcanoSize.SMALL
                 && oldLava(c, gx, gz) > 0.38 - 0.12 * rng.nextDouble()) {
@@ -276,7 +288,11 @@ public final class VolcanoEdifice {
      * tongues of younger lava winding down through the forest.
      */
     static BlockState shieldSurface(RandomSource rng, Ctx c, int gx, int y, int gz, BlockState rock) {
-        double h = (y - c.baseY) / (double) Math.max(1, c.coneHeight);
+        return shieldSkin(rng, c, gx, gz, (y - c.baseY) / (double) Math.max(1, c.coneHeight), rock);
+    }
+
+    /** {@link #shieldSurface} at a share {@code h} of the way up the shield: 0 at its foot, 1 at the summit. */
+    static BlockState shieldSkin(RandomSource rng, Ctx c, int gx, int gz, double h, BlockState rock) {
         if (c.size != VolcanoSize.SMALL && shieldTongue(c, gx, gz) > 0.5) {
             int r = rng.nextInt(10);
             return (r < 6 ? Blocks.BASALT : r < 9 ? Blocks.SMOOTH_BASALT : Blocks.BLACKSTONE).defaultBlockState();

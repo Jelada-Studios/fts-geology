@@ -121,6 +121,8 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue VOLCANO_SPAWN_CHANCE;  // per-chunk, before suitability
     public static final ForgeConfigSpec.BooleanValue LARGE_VOLCANOES;      // raised with new terrain
     public static final ForgeConfigSpec.DoubleValue LARGE_VOLCANO_CHANCE;  // share of suitable sites
+    public static final ForgeConfigSpec.BooleanValue OCEAN_VOLCANOES;      // islands, atolls, guyots
+    public static final ForgeConfigSpec.DoubleValue OCEAN_TRAIL_LENGTH;    // a plume's track through the sea, blocks
     public static final ForgeConfigSpec.BooleanValue DEEP_STRUCTURE_ENABLED;
     public static final ForgeConfigSpec.BooleanValue DEEP_SURFACE_OUTCROP;  // boundary rock reaches daylight
     public static final ForgeConfigSpec.IntValue DEEP_SOIL_DEPTH;           // topsoil left untouched
@@ -624,6 +626,16 @@ public final class GeyserConfig {
                 .comment("Share of the suitable sites that get a large volcano. Set it before exploring, not",
                         "after: a volcano straddling explored and new ground is only built on the new side.")
                 .defineInRange("largeVolcanoChance", 1.0D, 0.0D, 1.0D);
+        OCEAN_VOLCANOES = b
+                .comment("Raise large volcanoes from the sea floor too: islands over mantle plumes and on island arcs,",
+                        "and along a plume's track through the sea older islands, atolls and guyots. Like",
+                        "largeVolcanoes, only terrain generated from now on gets them.")
+                .define("oceanVolcanoes", true);
+        OCEAN_TRAIL_LENGTH = b
+                .comment("How far a plume's track runs through the sea, in blocks. The plate carries its islands off the",
+                        "plume, so along the track they are older, lower and more worn, then reefs round lagoons in warm",
+                        "water and drowned flat tops in cold. 0 leaves only the live island over the plume.")
+                .defineInRange("oceanTrailLength", 6000.0D, 0.0D, 60000.0D);
         b.pop();
 
         b.push("quakes");

@@ -59,18 +59,29 @@ public final class VolcanoField {
      *                     change to the setting is not stuck behind the cache
      */
     public record Site(int x, int z, int baseY, int summitY, VolcanoType type, int magnitude,
-                       long seed, int reach, int edificeReach, double roll) {
+                       long seed, int reach, int edificeReach, double roll, VolcanoSetting setting, double age) {
         public boolean chosen() {
-            return GeyserConfig.LARGE_VOLCANOES.get() && roll < GeyserConfig.LARGE_VOLCANO_CHANCE.get();
+            return GeyserConfig.LARGE_VOLCANOES.get() && roll < GeyserConfig.LARGE_VOLCANO_CHANCE.get()
+                    && (!setting.ocean() || GeyserConfig.OCEAN_VOLCANOES.get());
+        }
+
+        /** The language key naming what this is: a stratovolcano, a shield island, an atoll. */
+        public String kindKey() {
+            String t = type.name().toLowerCase(java.util.Locale.ROOT);
+            return switch (setting) {
+                case LAND -> t;
+                case ISLAND -> t + "_island";
+                default -> setting.name().toLowerCase(java.util.Locale.ROOT);
+            };
         }
     }
 
     /**
      * A search result: the nearest chosen site or null, how many chosen sites the search passed, how many
      * of those were of each type, by {@link VolcanoType} ordinal, and how many candidates were turned
-     * down, at type ordinal times {@link #REASONS} plus the reason.
+     * down, at type ordinal times {@link #REASONS} plus the reason; and how many were in each setting.
      */
-    public record Found(Site site, int count, int[] byType, int[] refused) {}
+    public record Found(Site site, int count, int[] byType, int[] refused, int[] bySetting) {}
 
     /** Why a candidate was turned down: water under it, broken ground, a structure due, anything else. */
     public static final int WATER = 0, RELIEF = 1, STRUCTURE = 2, OTHER = 3, REASONS = 4;
@@ -172,11 +183,18 @@ public final class VolcanoField {
      * {@code only} is null. Safe off the server thread.
      */
     public static Found nearest(ServerLevel level, int x, int z, int rings, VolcanoType only) {
+        return nearest(level, x, z, rings, only, null);
+    }
+
+    /** {@link #nearest}, also limited to one setting when {@code onlySetting} is not null. */
+    public static Found nearest(ServerLevel level, int x, int z, int rings, VolcanoType only,
+                                VolcanoSetting onlySetting) {
         int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
         Site best = null;
         double bestD = Double.MAX_VALUE;
         int count = 0;
         int[] byType = new int[VolcanoType.values().length];
+        int[] bySetting = new int[VolcanoSetting.values().length];
         int[] refused = new int[VolcanoType.values().length * REASONS];
         int side = 2 * rings + 1;
         Cell[] cells = new Cell[side * side];
@@ -208,12 +226,14 @@ public final class VolcanoField {
                 if (s == null || !s.chosen()) continue;
                 count++;
                 byType[s.type().ordinal()]++;
+                bySetting[s.setting().ordinal()]++;
                 if (only != null && s.type() != only) continue;
+                if (onlySetting != null && s.setting() != onlySetting) continue;
                 double d = Math.hypot(x - s.x(), z - s.z());
                 if (d < bestD) { bestD = d; best = s; }
             }
         }
-        return new Found(best, count, byType, refused);
+        return new Found(best, count, byType, refused, bySetting);
     }
 
     public static void clearCache() {
@@ -262,16 +282,40 @@ public final class VolcanoField {
         // Nearby candidates ask after the same structure starts over and over; each is worked out once.
         Map<StructureKey, Boolean> structures = new HashMap<>();
 
+        boolean ocean = GeyserConfig.OCEAN_VOLCANOES.get();
         // A plume first: fewer of them, and the grander sight. A centre just outside the usable part
         // of the cell is pulled in.
         for (int[] p : HotspotMap.plumeCentres(level, minX - PLUME_PULL, minZ - PLUME_PULL,
                 maxX + PLUME_PULL, maxZ + PLUME_PULL)) {
             int x = Mth.clamp(p[0], minX, maxX), z = Mth.clamp(p[1], minZ, maxZ);
             if (HotspotMap.plumeStrength(level, x, z) < 0.4) continue;
+            // Under the open sea a plume builds an island up from the sea floor, as at Hawaii.
+            if (ocean && oceanDepth(level, x, z) >= ISLAND_DEPTH) {
+                Site s = checkOcean(level, x, z, VolcanoType.SHIELD, VolcanoSetting.ISLAND, 0.0, seed, refused,
+                        structures);
+                // An island needs open sea round it as well; the plume's dome is wide, so the sea round it is tried.
+                int[] uncounted = new int[refused.length];
+                for (int i = 0; s == null && i < 8; i++) {
+                    double a = rand01(hash(seed, x, z, 0x15A1L)) * Math.PI * 2 + Math.PI * 0.25 * i;
+                    double r = 180.0 * (1 + i % 2);
+                    int sx = x + (int) Math.round(Math.cos(a) * r), sz = z + (int) Math.round(Math.sin(a) * r);
+                    if (sx < minX || sx > maxX || sz < minZ || sz > maxZ) continue;
+                    if (HotspotMap.plumeStrength(level, sx, sz) < 0.4 || oceanDepth(level, sx, sz) < ISLAND_DEPTH) continue;
+                    s = checkOcean(level, sx, sz, VolcanoType.SHIELD, VolcanoSetting.ISLAND, 0.0, seed, uncounted,
+                            structures);
+                }
+                if (s != null) return new Cell(s, refused);
+            }
             // A really large hotspot volcano has often emptied its chamber and fallen in.
             VolcanoType type = rand01(hash(seed, 0, 0, 0xCA1DL)) < 0.34
                     ? VolcanoType.CALDERA : VolcanoType.SHIELD;
             Site s = checkNear(level, x, z, type, seed, refused, null, minX, minZ, maxX, maxZ, structures);
+            if (s != null) return new Cell(s, refused);
+        }
+
+        // Then the islands a plume left behind as the plate carried them off it.
+        if (ocean) {
+            Site s = trailSite(level, seed, refused, minX, minZ, maxX, maxZ, structures);
             if (s != null) return new Cell(s, refused);
         }
 
@@ -293,6 +337,12 @@ public final class VolcanoField {
             // Rifts run long and largely over land, so left alone they out-numbered the arcs four to
             // one in testing. A flood-basalt fissure this size is the rarer sight in the real world.
             if (type == VolcanoType.FISSURE && rand01(hash(seed, i, 3, 0xF155L)) < 0.6) continue;
+            // An arc out in the sea is a string of volcanic islands, as the Aleutians are.
+            if (ocean && type != VolcanoType.FISSURE && type != VolcanoType.SHIELD
+                    && oceanDepth(level, x, z) >= ISLAND_DEPTH) {
+                Site island = checkOcean(level, x, z, type, VolcanoSetting.ISLAND, 0.0, seed, refused, structures);
+                if (island != null) return new Cell(island, refused);
+            }
             Site site = checkNear(level, x, z, type, seed, refused, s.faultType(), minX, minZ, maxX, maxZ,
                     structures);
             if (site != null) return new Cell(site, refused);
@@ -342,6 +392,152 @@ public final class VolcanoField {
             if (moved != null) return moved;
         }
         return null;
+    }
+
+    /** Water over the sea floor a live island needs at its centre, and a sunken one. */
+    private static final int ISLAND_DEPTH = 8, SUNKEN_DEPTH = 12;
+    /** How far along a plume's track its old islands begin; nearer the plume the live island stands. */
+    private static final double TRAIL_START = 1000.0;
+
+    /**
+     * Where a plume's track through the sea crosses this cell: by how far along it is, an old island, then an atoll
+     * in warm water or a guyot in cold.
+     */
+    private static Site trailSite(ServerLevel level, long seed, int[] refused, int minX, int minZ, int maxX, int maxZ,
+                                  Map<StructureKey, Boolean> structures) {
+        double length = GeyserConfig.OCEAN_TRAIL_LENGTH.get();
+        for (HotspotMap.Trail t : HotspotMap.oceanTrails(level, minX, minZ, maxX, maxZ, length)) {
+            double[] span = clip(t, minX, minZ, maxX, maxZ, length);
+            if (span == null) continue;
+            // A plume under the open sea; one under land leaves no island chain.
+            if (oceanDepth(level, (int) Math.floor(t.x()), (int) Math.floor(t.z())) < ISLAND_DEPTH) continue;
+            // A few points along the stretch in the cell, from a seeded start: the track crosses islands and shoals,
+            // and the first open sea along it takes the old volcano. Only the sea is asked about: the world's plates are
+            // far smaller than the Pacific, and their crust type is read from a handful of biome probes.
+            double start = rand01(hash(seed, (int) t.x(), (int) t.z(), 0x7A11L));
+            int[] uncounted = new int[refused.length];
+            for (int i = 0; i < 5; i++) {
+                double along = span[0] + (span[1] - span[0]) * ((start + i * 0.2) % 1.0);
+                if (along < TRAIL_START) continue;
+                int x = (int) Math.round(t.x() + t.dirX() * along), z = (int) Math.round(t.z() + t.dirZ() * along);
+                double age = along / length;
+                VolcanoSetting setting = age < 0.55 ? VolcanoSetting.ERODED
+                        : seaTemperature(level, x, z) > OceanEdifice.REEF_TEMPERATURE ? VolcanoSetting.ATOLL
+                        : VolcanoSetting.GUYOT;
+                int depth = oceanDepth(level, x, z);
+                if (depth < (setting == VolcanoSetting.ERODED ? ISLAND_DEPTH : SUNKEN_DEPTH)) {
+                    com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("Plume track at {},{} ({}, age {}) has {} of sea",
+                            x, z, setting, String.format(java.util.Locale.ROOT, "%.2f", age), depth);
+                    continue;
+                }
+                // Only the first try is counted, so the counts stay a count of candidates.
+                Site s = checkOcean(level, x, z, VolcanoType.SHIELD, setting, age, seed, i == 0 ? refused : uncounted,
+                        structures);
+                if (s != null) return s;
+            }
+        }
+        return null;
+    }
+
+    /** The stretch of a track inside a box, as distances along it from the plume; null where it misses the box. */
+    static double[] clip(HotspotMap.Trail t, int minX, int minZ, int maxX, int maxZ, double length) {
+        double lo = 0.0, hi = length;
+        double[][] axes = {{t.x(), t.dirX(), minX, maxX}, {t.z(), t.dirZ(), minZ, maxZ}};
+        for (double[] a : axes) {
+            if (Math.abs(a[1]) < 1.0e-9) {
+                if (a[0] < a[2] || a[0] > a[3]) return null;
+                continue;
+            }
+            double t1 = (a[2] - a[0]) / a[1], t2 = (a[3] - a[0]) / a[1];
+            lo = Math.max(lo, Math.min(t1, t2));
+            hi = Math.min(hi, Math.max(t1, t2));
+        }
+        return lo <= hi ? new double[] {lo, hi} : null;
+    }
+
+    /** Water over the generator's sea floor at a column, or -1 where the column is dry. */
+    public static int oceanDepth(ServerLevel level, int x, int z) {
+        ChunkGenerator gen = level.getChunkSource().getGenerator();
+        RandomState rs = level.getChunkSource().randomState();
+        int surface = gen.getBaseHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
+        int floor = gen.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
+        return surface > floor ? gen.getSeaLevel() - floor : -1;
+    }
+
+    /**
+     * The climate temperature at a column at sea level: the parameter that picks vanilla's frozen, cold, temperate,
+     * lukewarm and warm seas, and the same under any biome mod that keeps the climate noise.
+     */
+    public static double seaTemperature(ServerLevel level, int x, int z) {
+        net.minecraft.world.level.biome.Climate.TargetPoint p = level.getChunkSource().randomState().sampler()
+                .sample(QuartPos.fromBlock(x), QuartPos.fromBlock(level.getSeaLevel()), QuartPos.fromBlock(z));
+        return net.minecraft.world.level.biome.Climate.unquantizeCoord(p.temperature());
+    }
+
+    /**
+     * Whether a volcano can rise from the sea floor here, from the generator's own terrain: open sea over the centre,
+     * little land under the body, a floor without a cliff in it, and no ocean monument in the way.
+     */
+    private static Site checkOcean(ServerLevel level, int x, int z, VolcanoType type, VolcanoSetting setting, double age,
+                                   long seed, int[] refused, Map<StructureKey, Boolean> structures) {
+        int magnitude = magnitudeAt(seed, x, z);
+        ChunkGenerator gen = level.getChunkSource().getGenerator();
+        RandomState rs = level.getChunkSource().randomState();
+        int sea = gen.getSeaLevel();
+        boolean sunken = setting == VolcanoSetting.ATOLL || setting == VolcanoSetting.GUYOT;
+        int depth = sunken ? SUNKEN_DEPTH : ISLAND_DEPTH;
+        double warmth = seaTemperature(level, x, z);
+        // Planned once on a provisional floor, only to learn how wide a ring to sample.
+        int[] probe = VolcanoBuilder.largeFootprint(level, x, sea - 30, z, magnitude, type, seed, setting, age, warmth);
+        if (probe == null) return refuse(refused, type, OTHER, x, z, "no island plan");
+        int foot = probe[4];
+
+        int[] floors = new int[17];
+        int dryMid = 0, dryFoot = 0, n = 0;
+        for (int ring = 0; ring <= 2; ring++) {
+            int count = ring == 0 ? 1 : 8;
+            for (int i = 0; i < count; i++) {
+                double a = Math.PI * 2 * i / 8 + ring * 0.39;
+                double r = foot * ring / 2.0;
+                int px = x + (int) Math.round(Math.cos(a) * r);
+                int pz = z + (int) Math.round(Math.sin(a) * r);
+                int surface = gen.getBaseHeight(px, pz, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
+                int floor = gen.getBaseHeight(px, pz, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
+                boolean wet = surface > floor && floor < sea;
+                if (ring == 0 && (!wet || sea - floor < depth)) {
+                    return refuse(refused, type, WATER, x, z, "centre not over open sea");
+                }
+                if (!wet) {
+                    if (ring == 1) dryMid++;
+                    else dryFoot++;
+                }
+                floors[n++] = floor - 1;
+            }
+        }
+        // An island may reach a shore at its foot. One whose body stands on land is a volcano on land.
+        if (dryMid > (sunken ? 1 : 2) || dryFoot > (sunken ? 3 : 5)) {
+            return refuse(refused, type, WATER, x, z, "land under the island, " + dryMid + " mid " + dryFoot + " foot");
+        }
+        int[] sorted = floors.clone();
+        Arrays.sort(sorted);
+        if (sorted[12] - sorted[4] > 40) {
+            return refuse(refused, type, RELIEF, x, z, "sea floor relief " + (sorted[12] - sorted[4]));
+        }
+        // It stands on the deeper part of the floor under it.
+        int baseY = sorted[4];
+        if (sea - 1 - baseY < depth) return refuse(refused, type, WATER, x, z, "sea too shallow");
+        int[] plan = VolcanoBuilder.largeFootprint(level, x, baseY, z, magnitude, type, seed, setting, age, warmth);
+        if (plan == null) return refuse(refused, type, OTHER, x, z, "no island plan on floor " + baseY);
+        if (plan[2] <= baseY + 4) return refuse(refused, type, WATER, x, z, "sea too shallow for its top");
+        // Only a monument is in the way: a wreck or a ruin is built first and ends up inside the island.
+        if (structureInTheWay(level, gen, rs, x, z, plan[1] + 16, structures, true)) {
+            return refuse(refused, type, STRUCTURE, x, z, "monument within " + (plan[1] + 16));
+        }
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("Ocean {} {} at {},{}: floor {}, top {}, reach {}, age {}, sea {}",
+                setting, type, x, z, baseY, plan[2], plan[0], String.format(java.util.Locale.ROOT, "%.2f", age),
+                String.format(java.util.Locale.ROOT, "%.2f", warmth));
+        return new Site(x, z, baseY, plan[2], type, magnitude, seed, plan[0], plan[1],
+                rand01(hash(seed, x, z, 0xC40L)), setting, age);
     }
 
     /** The magnitude of a large volcano planned at this point. */
@@ -445,11 +641,11 @@ public final class VolcanoField {
         }
         // Structures are placed before the mountain and would end up inside it, so none may stand on the
         // edifice itself; one out on the apron keeps its buildings, which the apron will not cover.
-        if (structureInTheWay(level, gen, rs, x, z, plan[1] + 8, structures)) {
+        if (structureInTheWay(level, gen, rs, x, z, plan[1] + 8, structures, false)) {
             return refuse(refused, type, STRUCTURE, x, z, "structure within " + (plan[1] + 8));
         }
         return new Site(x, z, baseY, plan[2], type, magnitude, seed, plan[0], plan[1],
-                rand01(hash(seed, x, z, 0xC40L)));
+                rand01(hash(seed, x, z, 0xC40L)), VolcanoSetting.LAND, 0.0);
     }
 
     /** Counts and logs why a candidate site was turned down, at debug level, and refuses it. */
@@ -464,10 +660,12 @@ public final class VolcanoField {
      * placement itself so it works for ungenerated chunks. Errs towards refusing; ruined portals are
      * ignored.
      *
-     * @param due answers already worked out for this cell, by structure set and start chunk
+     * @param due          answers already worked out for this cell, by structure set and start chunk
+     * @param monumentOnly only an ocean monument counts, for an island rising round what the sea floor holds
      */
     private static boolean structureInTheWay(ServerLevel level, ChunkGenerator gen, RandomState rs,
-                                             int x, int z, int radius, Map<StructureKey, Boolean> due) {
+                                             int x, int z, int radius, Map<StructureKey, Boolean> due,
+                                             boolean monumentOnly) {
         ChunkGeneratorStructureState state = level.getChunkSource().getGeneratorState();
         long seed = state.getLevelSeed();
         int minCX = (x - radius) >> 4, maxCX = (x + radius) >> 4;
@@ -480,10 +678,10 @@ public final class VolcanoField {
             List<Structure> surface = new ArrayList<>();
             for (StructureSet.StructureSelectionEntry e : set.value().structures()) {
                 Structure s = e.structure().value();
-                if (s.step() == GenerationStep.Decoration.SURFACE_STRUCTURES
-                        && s.type() != StructureType.RUINED_PORTAL) {
-                    surface.add(s);
-                }
+                boolean counts = monumentOnly ? s.type() == StructureType.OCEAN_MONUMENT
+                        : s.step() == GenerationStep.Decoration.SURFACE_STRUCTURES
+                                && s.type() != StructureType.RUINED_PORTAL;
+                if (counts) surface.add(s);
             }
             if (surface.isEmpty()) continue;
             int spacing = spread.spacing();

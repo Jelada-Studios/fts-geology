@@ -85,6 +85,8 @@ public final class VolcanoPlan {
          * a fissure swarm. Listed because a radius is the wrong shape for most of them.
          */
         final List<BlockPos> molten = new ArrayList<>();
+        /** The ocean half of the plan, for a volcano rising from the sea floor; null on land. */
+        OceanEdifice.Isle isle;
     }
 
     static Ctx layout(ServerLevel level, BlockPos base, int magnitude, VolcanoType type,
@@ -227,6 +229,19 @@ public final class VolcanoPlan {
 
         c.ventCount = Math.max(3, (int) Math.round(
                 Mth.clamp(magnitude, 8, 22) * type.ventScale()));
+        return c;
+    }
+
+    /**
+     * {@link #plan}, and for a volcano rising from the sea floor its island: how high it stood, how far it has sunk,
+     * its rift zones, reef and shore. {@code baseY} is then the sea floor.
+     */
+    static Ctx plan(LevelHeightAccessor level, int x, int baseY, int z, int magnitude, VolcanoType type,
+                    VolcanoSize size, RandomSource rng, PlateSample plate, VolcanoSetting setting, double age,
+                    int seaY, double seaTemp) {
+        Ctx c = plan(level, x, baseY, z, magnitude, type, size, rng, plate);
+        if (c == null || !setting.ocean()) return c;
+        OceanEdifice.plan(c, rng, setting, age, seaY, seaTemp);
         return c;
     }
 

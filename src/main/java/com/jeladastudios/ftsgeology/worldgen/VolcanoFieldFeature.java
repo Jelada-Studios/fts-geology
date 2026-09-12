@@ -36,8 +36,9 @@ public class VolcanoFieldFeature extends Feature<NoneFeatureConfiguration> {
             if (!GeyserConfig.LARGE_VOLCANOES.get()) return false;
             boolean any = false;
             for (VolcanoField.Site site : VolcanoField.sitesTouching(level.getLevel(), cp)) {
-                any |= VolcanoBuilder.generateFieldChunk(level, cp, site) > 0;
+                any |= VolcanoBuilder.generateFieldChunk(level, context.chunkGenerator(), cp, site) > 0;
             }
+            if (GeyserConfig.OCEAN_VOLCANOES.get()) any |= SeamountField.generate(level, cp) > 0;
             return any;
         } catch (RuntimeException e) {
             // Never take world generation down with it; the chunk just goes without its slope.

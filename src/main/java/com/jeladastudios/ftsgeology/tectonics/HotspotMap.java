@@ -209,6 +209,40 @@ public final class HotspotMap {
         return out;
     }
 
+    /**
+     * A plume under an oceanic plate and the way its islands are carried off it.
+     *
+     * @param dirX    unit direction the plate moves, X part: older islands lie further along it
+     * @param plateId the plate over the plume
+     */
+    public record Trail(double x, double z, double dirX, double dirZ, long plateId) {}
+
+    /**
+     * The plumes under oceanic plates whose track of {@code length} blocks can reach into this box of blocks. The
+     * track runs from the plume in the direction the plate moves, as the Hawaiian-Emperor chain does.
+     */
+    public static java.util.List<Trail> oceanTrails(ServerLevel level, int minX, int minZ, int maxX, int maxZ,
+                                                    double length) {
+        java.util.List<Trail> out = new java.util.ArrayList<>();
+        if (!GeyserConfig.HOTSPOTS_ENABLED.get() || length <= 0.0) return out;
+        double scale = GeyserConfig.HOTSPOT_SCALE.get();
+        double density = GeyserConfig.HOTSPOT_DENSITY.get();
+        long seed = level.getSeed();
+        for (int cx = Mth.floor((minX - length) / scale) - 1; cx <= Mth.floor((maxX + length) / scale) + 1; cx++) {
+            for (int cz = Mth.floor((minZ - length) / scale) - 1; cz <= Mth.floor((maxZ + length) / scale) + 1; cz++) {
+                if (!cellHasPlume(seed, cx, cz, density)) continue;
+                double px = plumeX(seed, cx, cz, scale), pz = plumeZ(seed, cx, cz, scale);
+                if (px < minX - length || px > maxX + length || pz < minZ - length || pz > maxZ + length) continue;
+                PlateSample plate = TectonicMap.sampleCached(level, (int) Math.floor(px), (int) Math.floor(pz));
+                double[] v = plumeDrift(level, seed, cx, cz, px, pz);
+                double len = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
+                if (len < 1.0e-6) continue;
+                out.add(new Trail(px, pz, v[0] / len, v[1] / len, plate.plateId()));
+            }
+        }
+        return out;
+    }
+
     // === Layout =============================================================
 
     /** Only a fraction of grid cells host a plume, which is what keeps hotspots rare. */

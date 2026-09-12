@@ -190,24 +190,34 @@ public final class VolcanoBuilder {
     static Ctx fieldCtx(ServerLevel level, VolcanoField.Site site) {
         return plan(level, site.x(), site.baseY(), site.z(), site.magnitude(), site.type(),
                 VolcanoSize.LARGE, RandomSource.create(site.seed()),
-                TectonicMap.sampleCached(level, site.x(), site.z()));
+                TectonicMap.sampleCached(level, site.x(), site.z()), site.setting(), site.age(), level.getSeaLevel(),
+                site.setting().ocean() ? VolcanoField.seaTemperature(level, site.x(), site.z()) : 0.0);
     }
 
     /**
      * How far a large volcano planned from this seed would write anything, how far its mountain goes,
-     * where its summit would stand and its crater radius; null if it cannot stand on this base at all.
+     * where its summit would stand, its crater radius and its foot; null if it cannot stand on this base at all.
      */
     public static int[] largeFootprint(ServerLevel level, int x, int baseY, int z, int magnitude,
                                        VolcanoType type, long seed) {
+        return largeFootprint(level, x, baseY, z, magnitude, type, seed, VolcanoSetting.LAND, 0.0, 0.0);
+    }
+
+    /** {@link #largeFootprint} for a setting; in the sea {@code baseY} is the sea floor. */
+    public static int[] largeFootprint(ServerLevel level, int x, int baseY, int z, int magnitude, VolcanoType type,
+                                       long seed, VolcanoSetting setting, double age, double seaTemp) {
         Ctx c = plan(level, x, baseY, z, magnitude, type, VolcanoSize.LARGE, RandomSource.create(seed),
-                TectonicMap.sampleCached(level, x, z));
+                TectonicMap.sampleCached(level, x, z), setting, age, level.getSeaLevel(), seaTemp);
         if (c == null) return null;
+        if (c.isle != null) {
+            return new int[] {c.clearReach, c.isle.edifice, c.summitY, c.craterR, (int) Math.round(c.isle.footR)};
+        }
         int edifice = switch (type) {
             case CALDERA -> calderaRingReach(c);
             case FISSURE -> c.fissureHalf + 4;
             default -> coneReach(c);
         };
-        return new int[] {c.clearReach, edifice, c.summitY, c.craterR};
+        return new int[] {c.clearReach, edifice, c.summitY, c.craterR, c.coneBaseR};
     }
 
     /**
@@ -216,7 +226,8 @@ public final class VolcanoBuilder {
      *
      * @return how many columns of the volcano fell in this chunk
      */
-    public static int generateFieldChunk(WorldGenLevel level, ChunkPos cp, VolcanoField.Site site) {
+    public static int generateFieldChunk(WorldGenLevel level, net.minecraft.world.level.chunk.ChunkGenerator generator,
+                                         ChunkPos cp, VolcanoField.Site site) {
         Ctx c = fieldCtx(level.getLevel(), site);
         if (c == null) return 0;
         RandomSource rng = RandomSource.create(0L);
@@ -229,14 +240,22 @@ public final class VolcanoBuilder {
                 if (dx * dx + dz * dz > reach2) continue;
                 // Seeded by the column alone, so its dice fall the same whichever chunk came first.
                 rng.setSeed(com.jeladastudios.ftsgeology.util.SeedHash.columnSeed(site.seed(), gx, gz));
+                columns++;
+                if (c.isle != null) {
+                    OceanEdifice.column(level, c, gx, gz, rng);
+                    continue;
+                }
                 if (c.coneHeight > 0) coneColumn(level, c, gx, gz, rng, true);
                 if (c.type.excavates()) calderaColumn(level, c, gx, gz, rng, true);
                 apronColumn(level, c, gx, gz, rng, true);
                 if (hasRamparts(c)) fissureRampartColumn(level, c, gx, gz, true);
-                columns++;
             }
         }
-        if (cp.x == SectionPos.blockToSectionCoord(c.x) && cp.z == SectionPos.blockToSectionCoord(c.z)) {
+        // An ocean biome grows nothing on dry land, so the island plants its own, once all its columns here stand.
+        if (c.isle != null) OceanEdifice.plant(level, generator, c, cp, site.seed());
+        // An extinct island has no core to finish.
+        if (site.setting().active()
+                && cp.x == SectionPos.blockToSectionCoord(c.x) && cp.z == SectionPos.blockToSectionCoord(c.z)) {
             placeMarker(level, c);
         }
         return columns;

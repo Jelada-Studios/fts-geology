@@ -119,7 +119,7 @@ public final class TectonicCommands {
 
     static final String[] SETTINGS = {"subduction", "rift", "collision", "transform", "hotspot"};
     static final String[] FAULTS = {"subduction", "rift", "collision", "transform"};
-    static final String[] VOLCANO_TYPES = {"strato", "shield", "fissure", "caldera"};
+    static final String[] VOLCANO_TYPES = {"strato", "shield", "fissure", "caldera", "island", "flooded", "eroded", "atoll", "guyot"};
     static final String[] FEATURES = {"geyser", "hotspring", "volcano",
             "shield", "strato", "fissure", "caldera"};
 

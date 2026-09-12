@@ -124,7 +124,14 @@ public final class FindCommands {
             case "strato" -> VolcanoType.STRATOVOLCANO;
             case "shield" -> VolcanoType.SHIELD;
             case "fissure" -> VolcanoType.FISSURE;
-            case "caldera" -> VolcanoType.CALDERA;
+            case "caldera", "flooded" -> VolcanoType.CALDERA;
+            default -> null;
+        };
+        final com.jeladastudios.ftsgeology.volcano.VolcanoSetting onlySetting = typeName == null ? null : switch (typeName) {
+            case "island", "flooded" -> com.jeladastudios.ftsgeology.volcano.VolcanoSetting.ISLAND;
+            case "eroded" -> com.jeladastudios.ftsgeology.volcano.VolcanoSetting.ERODED;
+            case "atoll" -> com.jeladastudios.ftsgeology.volcano.VolcanoSetting.ATOLL;
+            case "guyot" -> com.jeladastudios.ftsgeology.volcano.VolcanoSetting.GUYOT;
             default -> null;
         };
         CommandSourceStack source = ctx.getSource();
@@ -136,7 +143,7 @@ public final class FindCommands {
         // A cell is worked out from the generator's own terrain the first time it is asked about,
         // which is slow; like find, it runs on a worker and only the answer comes back.
         CompletableFuture
-                .supplyAsync(() -> VolcanoField.nearest(level, at.getX(), at.getZ(), rings, only),
+                .supplyAsync(() -> VolcanoField.nearest(level, at.getX(), at.getZ(), rings, only, onlySetting),
                         Util.backgroundExecutor())
                 .thenAcceptAsync(found -> {
                     // What the search turned down, as water / relief / structure / other per type, so a
@@ -162,12 +169,13 @@ public final class FindCommands {
                     int distance = (int) Math.round(Math.hypot(s.x() - at.getX(), s.z() - at.getZ()));
                     // Also to the log: the reply arrives after the command has returned, which a
                     // console connected over RCON never sees.
-                    GeysersMod.LOGGER.info("Nearest large volcano: {} at {} {} base {} summit {} reach {}, {} blocks away, {} in the search {}",
+                    GeysersMod.LOGGER.info("Nearest large volcano: {} at {} {} base {} summit {} reach {}, {} blocks away, {} in the search {}, setting {} {}",
                             s.type(), s.x(), s.z(), s.baseY(), s.summitY(), s.reach(), distance, found.count(),
-                            java.util.Arrays.toString(found.byType()));
+                            java.util.Arrays.toString(found.byType()), s.setting(),
+                            java.util.Arrays.toString(found.bySetting()));
                     source.sendSuccess(() -> Component.translatable("command.fts_geology.field.found",
-                            s.type().name().toLowerCase(Locale.ROOT), s.x(), s.z(), s.baseY(), s.summitY(),
-                            distance, found.count()).withStyle(ChatFormatting.GREEN), false);
+                            Component.translatable("volcano.fts_geology.kind." + s.kindKey()), s.x(), s.z(),
+                            s.baseY(), s.summitY(), distance, found.count()).withStyle(ChatFormatting.GREEN), false);
                     source.sendSuccess(() -> refusedLine, false);
                     // Beside the summit rather than on it: the crater is cut once the area loads.
                     if (teleport) SiteTeleport.request(source, level, s.x() + 40, s.z());
@@ -235,7 +243,7 @@ public final class FindCommands {
         final String sum = Long.toHexString(digest);
         final int measured = columns;
         source.sendSuccess(() -> Component.translatable("command.fts_geology.field.seams",
-                s.type().name().toLowerCase(Locale.ROOT), s.x(), s.z(),
+                Component.translatable("volcano.fts_geology.kind." + s.kindKey()), s.x(), s.z(),
                 inside[0], dec((double) inside[1] / inside[0], 2), dec(1000.0 * inside[2] / inside[0], 1),
                 border[0], dec((double) border[1] / border[0], 2), dec(1000.0 * border[2] / border[0], 1),
                 sum, measured), false);
