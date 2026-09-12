@@ -871,45 +871,23 @@ public final class VolcanoEdifice {
         return spare >= out;
     }
 
-    /** How far a crown reaches past its trunk, and a huge mushroom's cap past its stem. */
-    private static final int CROWN_REACH = 5, CAP_REACH = 4;
-
     /**
-     * Takes the crowns the clearing cut from their trunks: leaves with no log near them and mushroom caps with no
-     * stem, in the columns it spared beside ones it stripped. Written without neighbour updates, leaves would
-     * otherwise hang there for good.
+     * Takes the crowns the clearing cut from their trunks, in the columns it spared beside ones it stripped and just
+     * past its edge. See {@link TerrainProbe#dropLooseCrowns}.
      */
     static void dropLooseCrownsRow(ServerLevel level, Ctx c, int dx) {
-        int reach = c.clearReach + CROWN_REACH;
+        int reach = c.clearReach + TerrainProbe.LEAF_REACH + 2;
         for (int dz = -reach; dz <= reach; dz++) {
             if (dx * dx + dz * dz > reach * reach || stripped(c, dx, dz) || !besideStripped(c, dx, dz)) continue;
-            int x = c.x + dx, z = c.z + dz;
-            if (!level.hasChunk(x >> 4, z >> 4)) continue;
-            int g = TerrainProbe.groundY(level, x, z);
-            if (g == Integer.MIN_VALUE) continue;
-            int top = Math.min(g + 40,
-                    level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x, z));
-            for (int y = g + 1; y <= top; y++) {
-                BlockState s = level.getBlockState(new BlockPos(x, y, z));
-                boolean loose;
-                if (s.is(BlockTags.LEAVES)) {
-                    loose = !(s.hasProperty(net.minecraft.world.level.block.LeavesBlock.PERSISTENT)
-                            && s.getValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT))
-                            && !TerrainProbe.hasLogNear(level, x, y, z, CROWN_REACH);
-                } else if (s.is(Blocks.RED_MUSHROOM_BLOCK) || s.is(Blocks.BROWN_MUSHROOM_BLOCK)) {
-                    loose = !TerrainProbe.hasNear(level, x, y, z, CAP_REACH, b -> b.is(Blocks.MUSHROOM_STEM));
-                } else {
-                    continue;
-                }
-                if (loose) level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2);
-            }
+            TerrainProbe.dropLooseCrowns(level, c.x + dx, c.z + dz);
         }
     }
 
     /** True when a column the clearing strips lies within a crown's reach of this one. */
     private static boolean besideStripped(Ctx c, int dx, int dz) {
-        for (int ox = -CROWN_REACH; ox <= CROWN_REACH; ox++) {
-            for (int oz = -CROWN_REACH; oz <= CROWN_REACH; oz++) {
+        int r = TerrainProbe.LEAF_REACH;
+        for (int ox = -r; ox <= r; ox++) {
+            for (int oz = -r; oz <= r; oz++) {
                 if (stripped(c, dx + ox, dz + oz)) return true;
             }
         }

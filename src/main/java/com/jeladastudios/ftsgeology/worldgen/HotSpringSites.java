@@ -231,6 +231,8 @@ public final class HotSpringSites {
      */
     public static void clearCanopy(ServerLevel level, int cx, int cz, int radius) {
         double solid = radius * 0.5;
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet stripped = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet trunks = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
                 double dist = Math.sqrt((double) dx * dx + (double) dz * dz);
@@ -242,20 +244,37 @@ public final class HotSpringSites {
                 // The further out, the likelier a whole tree survives.
                 double out = Mth.clamp((dist - solid) / Math.max(1.0, radius - solid), 0.0, 1.0);
                 if (dist > solid && spareField(gx, gz) < out) continue;
+                stripped.add(columnKey(gx, gz));
 
-                // Walk only as high as something stands here.
-                int top = Math.min(g + 24, level.getHeight(Heightmap.Types.WORLD_SURFACE, gx, gz));
+                // Walk only as high as something stands here; a huge mushroom counts.
+                int top = Math.min(g + 40, level.getHeight(Heightmap.Types.WORLD_SURFACE, gx, gz));
                 for (int y = g + 1; y <= top; y++) {
                     BlockPos p = new BlockPos(gx, y, gz);
                     BlockState s = level.getBlockState(p);
                     if (s.isAir()) continue;
-                    boolean tree = s.is(net.minecraft.tags.BlockTags.LOGS)
-                            || s.is(net.minecraft.tags.BlockTags.LEAVES);
-                    if (!tree && !TerrainProbe.isVegetation(s)) break;   // something real: stop
+                    if (!TerrainProbe.isTreePart(s) && !TerrainProbe.isVegetation(s)) break;   // something real: stop
+                    if (s.is(net.minecraft.tags.BlockTags.LOGS) || s.is(Blocks.MUSHROOM_STEM)) trunks.add(columnKey(gx, gz));
                     level.setBlock(p, Blocks.AIR.defaultBlockState(), FLAGS);
                 }
             }
         }
+        // The crowns of the trees cut here, over the columns left standing round them.
+        int reach = TerrainProbe.LEAF_REACH;
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet looked = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+        for (long t : trunks) {
+            int tx = (int) (t >> 32), tz = (int) t;
+            for (int ox = -reach; ox <= reach; ox++) {
+                for (int oz = -reach; oz <= reach; oz++) {
+                    long k = columnKey(tx + ox, tz + oz);
+                    if (stripped.contains(k) || !looked.add(k)) continue;
+                    TerrainProbe.dropLooseCrowns(level, tx + ox, tz + oz);
+                }
+            }
+        }
+    }
+
+    private static long columnKey(int x, int z) {
+        return ((long) x << 32) | (z & 0xFFFFFFFFL);
     }
 
     /**

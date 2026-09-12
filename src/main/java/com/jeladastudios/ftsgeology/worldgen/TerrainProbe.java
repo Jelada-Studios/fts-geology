@@ -57,6 +57,39 @@ public final class TerrainProbe {
                 || s.is(Blocks.MUSHROOM_STEM) || s.is(Blocks.BEE_NEST);
     }
 
+    /** How far a leaf may be from a log before vanilla would rot it, and a huge mushroom's cap from its stem. */
+    public static final int LEAF_REACH = 6, CAP_REACH = 4;
+
+    /**
+     * Takes what a clearing cut off its trunk from one column: leaves with no log within {@link #LEAF_REACH} and huge
+     * mushroom caps with no stem within {@link #CAP_REACH}. Clearing writes without neighbour updates, so the leaves
+     * would never rot on their own.
+     */
+    public static void dropLooseCrowns(ServerLevel level, int x, int z) {
+        if (!level.hasChunk(x >> 4, z >> 4)) return;
+        int g = groundY(level, x, z);
+        if (g == Integer.MIN_VALUE) return;
+        int top = Math.min(g + 40, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z));
+        for (int y = g + 1; y <= top; y++) {
+            BlockPos p = new BlockPos(x, y, z);
+            BlockState s = level.getBlockState(p);
+            boolean loose;
+            if (s.is(BlockTags.LEAVES)) {
+                loose = !(s.hasProperty(net.minecraft.world.level.block.LeavesBlock.PERSISTENT)
+                        && s.getValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT))
+                        && !hasLogNear(level, x, y, z, LEAF_REACH);
+            } else if (s.is(Blocks.RED_MUSHROOM_BLOCK) || s.is(Blocks.BROWN_MUSHROOM_BLOCK)) {
+                loose = !hasNear(level, x, y, z, CAP_REACH, b -> b.is(Blocks.MUSHROOM_STEM));
+            } else {
+                continue;
+            }
+            if (loose) {
+                level.setBlock(p, Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS
+                        | net.minecraft.world.level.block.Block.UPDATE_KNOWN_SHAPE);
+            }
+        }
+    }
+
     /** Is there a log within {@code range}? Searched in shells, nearest first, never into an unloaded chunk. */
     public static boolean hasLogNear(ServerLevel level, int x, int y, int z, int range) {
         return hasNear(level, x, y, z, range, s -> s.is(BlockTags.LOGS));
