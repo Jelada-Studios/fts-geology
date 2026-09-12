@@ -914,6 +914,13 @@ public final class VolcanoEdifice {
                 if (s.isAir()) continue;
                 if (!TerrainProbe.isTreePart(s) && !TerrainProbe.isVegetation(s)) break;
                 level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                // A two-by-two trunk goes whole: half a dark oak's trunk left at the edge still held its crown.
+                if (s.is(BlockTags.LOGS)) {
+                    for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                        BlockPos q = p.relative(d);
+                        if (level.getBlockState(q).is(BlockTags.LOGS)) level.setBlock(q, Blocks.AIR.defaultBlockState(), 2);
+                    }
+                }
             }
         }
     }

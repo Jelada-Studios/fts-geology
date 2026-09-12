@@ -16,7 +16,6 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayDeque;
@@ -53,11 +52,8 @@ public final class Weathering {
     /** Tallest hanging stack brought down. Separate from {@link #GAP_SEARCH} so a big tree fits after a deep drop. */
     private static final int STACK_LIMIT = 48;
 
-    /** How far a tree may ride the ground down before it counts as a landslide. Zero: undermined trees fall. */
-    private static final int RIDE_LIMIT = 0;
-
-    /** How far from a log a leaf still counts as attached. Vanilla's own limit. */
-    private static final int LEAF_SUPPORT_RANGE = 6;
+    /** How far from a trunk that came down a crown block still belongs to it, in blocks across. */
+    private static final int CROWN_REACH = TerrainProbe.LEAF_REACH;
 
     /** How far the corridor is widened before settling, so a wide canopy's outer leaves are visited too. */
     private static final int CORRIDOR_DILATION = 12;
@@ -77,6 +73,8 @@ public final class Weathering {
         final long[] columns;
         /** Per column, the highest Y the quake turned to air: the anchor {@link #reseat} measures ground from. */
         final Long2IntMap excavated;
+        /** Per trunk column, how far its tree came down, so the crown round it can come down the same. */
+        final Long2IntOpenHashMap trunkDrop = new Long2IntOpenHashMap();
         int cursor;
         int pass;
         int moved;
@@ -239,9 +237,11 @@ public final class Weathering {
                     && GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get();
             boolean moved;
             if (fallPass) {
-                moved = reseat(level, cx, cz, job.excavated.get(k));
-                // Last pass, after reseat: canopy that lost its tree, spires, hanging water.
+                moved = reseat(level, cx, cz, job.excavated.get(k), job);
+                // Last pass, after reseat: crowns follow their trunks down, spires, canopy that lost its tree,
+                // hanging water.
                 if (job.pass == PASSES - 1) {
+                    moved |= lowerCrowns(level, cx, cz, job);
                     moved |= topple(level, cx, cz, job.excavated.get(k));
                     moved |= dropOrphanedLeaves(level, cx, cz);
                     moved |= dropUnsupportedWater(level, cx, cz);
@@ -255,8 +255,9 @@ public final class Weathering {
 
     /**
      * Brings down whatever the quake left hanging over this column, as one stack, keeping every block
-     * and its state. Plants whose ground fell past {@link #RIDE_LIMIT} are cleared instead, like a fresh
-     * landslide scarp. A gap holding fluid is left alone so a lake is never drained.
+     * and its state. A tree rides its ground down: its trunk comes down here and its crown follows in
+     * {@link #lowerCrowns}, so a crown column on its own is left for that. A gap holding fluid is left
+     * alone so a lake is never drained.
      *
      * <p>Ground is found from {@code excavatedTop}, the highest cell the quake emptied, not from
      * {@link TerrainProbe#groundY}, which takes a floating raft for the ground. Nothing below the
@@ -265,7 +266,7 @@ public final class Weathering {
      * @param excavatedTop highest Y the quake emptied here, or {@link Integer#MIN_VALUE} if none
      * @return true if this column changed
      */
-    private static boolean reseat(ServerLevel level, int x, int z, int excavatedTop) {
+    private static boolean reseat(ServerLevel level, int x, int z, int excavatedTop, Job job) {
         int g = excavatedTop == Integer.MIN_VALUE
                 ? TerrainProbe.groundY(level, x, z)
                 : solidAtOrBelow(level, x, excavatedTop, z);
@@ -286,7 +287,7 @@ public final class Weathering {
 
         // Read the hanging stack. Only fluid stops it: dropping through water would drain a lake.
         int top = base;
-        boolean allPlant = true;
+        boolean allPlant = true, trunk = false;
         while (top < limit) {
             BlockState s = level.getBlockState(m.set(x, top, z));
             if (s.isAir()) break;
@@ -294,18 +295,14 @@ public final class Weathering {
             // Trees are checked first, so they fall even when builds may not move.
             if (!mayMoveBuilds && !isPlant(s) && EruptionHandler.isPlayerPlaced(s)) return false;
             if (!isPlant(s)) allPlant = false;
+            if (isTrunk(s)) trunk = true;
             top++;
         }
         int height = top - base;
         if (height <= 0) return false;
-
-        if (allPlant && drop > RIDE_LIMIT) {
-            // Too far to have ridden it down: the vegetation goes, as on a fresh landslide scarp.
-            for (int i = 0; i < height; i++) {
-                level.setBlock(new BlockPos(x, base + i, z), Blocks.AIR.defaultBlockState(), 2);
-            }
-            return true;
-        }
+        // A crown with no trunk under it in this column is part of a tree standing in another: it follows that
+        // trunk down in lowerCrowns, or goes as an orphan. Dropped on its own it fell to the ground as a heap.
+        if (allPlant && !trunk) return false;
 
         // The whole stack comes down together, in order, so it lands the same way up.
         BlockState[] stack = new BlockState[height];
@@ -316,6 +313,7 @@ public final class Weathering {
         for (int i = 0; i < height; i++) {
             level.setBlock(new BlockPos(x, g + 1 + i, z), stack[i], 2);
         }
+        if (trunk) job.trunkDrop.put(key(x, z), drop);
         // A puff of dust where a stack lands, for a drop worth seeing and only sometimes.
         if (drop >= 2 && level.random.nextInt(24) == 0) {
             level.sendParticles(
@@ -355,7 +353,9 @@ public final class Weathering {
             BlockState s = level.getBlockState(m.set(x, top + 1, z));
             if (s.isAir() || !s.getFluidState().isEmpty()) break;
             if (s.is(Blocks.BEDROCK)) return false;
-            if (!mayMoveBuilds && !isPlant(s) && EruptionHandler.isPlayerPlaced(s)) return false;
+            // A trunk is not a spire: brought down as one, it lay about the corridor as loose logs.
+            if (isPlant(s)) return false;
+            if (!mayMoveBuilds && EruptionHandler.isPlayerPlaced(s)) return false;
             top++;
             if (bracing(level, x, top, z) < BRACED_NEIGHBOURS) lonely++;
         }
@@ -417,8 +417,46 @@ public final class Weathering {
     }
 
     /**
-     * Clears leaves with no log within {@link #LEAF_SUPPORT_RANGE}. Vanilla would never rot them: the
-     * quake writes without neighbour updates, so their distance property is never recomputed.
+     * Brings this column's crown blocks down as far as the nearest trunk that came down, so a tree lands whole
+     * on its new ground instead of leaving its crown where it was.
+     *
+     * @return true if this column changed
+     */
+    private static boolean lowerCrowns(ServerLevel level, int x, int z, Job job) {
+        if (job.trunkDrop.isEmpty()) return false;
+        int drop = 0;
+        double best = Double.MAX_VALUE;
+        for (int dx = -CROWN_REACH; dx <= CROWN_REACH; dx++) {
+            for (int dz = -CROWN_REACH; dz <= CROWN_REACH; dz++) {
+                int d = job.trunkDrop.get(key(x + dx, z + dz));
+                if (d <= 0) continue;
+                double dist = dx * dx + dz * dz;
+                if (dist < best) { best = dist; drop = d; }
+            }
+        }
+        if (drop <= 0) return false;
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE) return false;
+
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int top = Math.min(g + 1 + GAP_SEARCH + STACK_LIMIT, level.getMaxBuildHeight() - 1);
+        boolean changed = false;
+        // From the bottom up, so a block lands in the cell the one under it has just left.
+        for (int y = g + 1; y <= top; y++) {
+            BlockState s = level.getBlockState(m.set(x, y, z));
+            if (!TerrainProbe.isCrown(s)) continue;
+            int to = y - drop;
+            if (to <= g || !level.getBlockState(m.set(x, to, z)).isAir()) continue;
+            level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2);
+            level.setBlock(new BlockPos(x, to, z), s, 2);
+            changed = true;
+        }
+        return changed;
+    }
+
+    /**
+     * Clears leaves and mushroom caps no trunk holds, by {@link TerrainProbe#crownHeld}. Vanilla would never
+     * rot them: the quake writes without neighbour updates, so their distance property is never recomputed.
      *
      * @return true if this column changed
      */
@@ -431,10 +469,10 @@ public final class Weathering {
         boolean changed = false;
         for (int y = g + 1; y <= top; y++) {
             BlockState s = level.getBlockState(m.set(x, y, z));
-            if (!s.is(BlockTags.LEAVES)) continue;
-            if (s.hasProperty(LeavesBlock.PERSISTENT) && s.getValue(LeavesBlock.PERSISTENT)) continue;
-            if (TerrainProbe.hasLogNear(level, x, y, z, LEAF_SUPPORT_RANGE)) continue;
-            level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2);
+            if (!TerrainProbe.isCrown(s)) continue;
+            BlockPos p = new BlockPos(x, y, z);
+            if (TerrainProbe.crownHeld(level, p, s)) continue;
+            level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
             changed = true;
         }
         return changed;
@@ -494,6 +532,11 @@ public final class Weathering {
             return y;
         }
         return Integer.MIN_VALUE;
+    }
+
+    /** What holds a tree or a huge mushroom up. */
+    private static boolean isTrunk(BlockState s) {
+        return s.is(BlockTags.LOGS) || s.is(Blocks.MUSHROOM_STEM);
     }
 
     /** Everything a tree or a plant is made of, and nothing else. */

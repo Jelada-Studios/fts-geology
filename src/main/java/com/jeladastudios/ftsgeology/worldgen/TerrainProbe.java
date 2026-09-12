@@ -61,9 +61,9 @@ public final class TerrainProbe {
     public static final int LEAF_REACH = 6, CAP_REACH = 4;
 
     /**
-     * Takes what a clearing cut off its trunk from one column: leaves with no log within {@link #LEAF_REACH} and huge
-     * mushroom caps with no stem within {@link #CAP_REACH}. Clearing writes without neighbour updates, so the leaves
-     * would never rot on their own.
+     * Takes what a clearing cut off its trunk from one column: leaves no log holds and huge mushroom caps no stem
+     * holds, by {@link #crownHeld}. Clearing writes without neighbour updates, so the leaves would never rot on
+     * their own.
      */
     public static void dropLooseCrowns(ServerLevel level, int x, int z) {
         if (!level.hasChunk(x >> 4, z >> 4)) return;
@@ -73,44 +73,47 @@ public final class TerrainProbe {
         for (int y = g + 1; y <= top; y++) {
             BlockPos p = new BlockPos(x, y, z);
             BlockState s = level.getBlockState(p);
-            boolean loose;
-            if (s.is(BlockTags.LEAVES)) {
-                loose = !(s.hasProperty(net.minecraft.world.level.block.LeavesBlock.PERSISTENT)
-                        && s.getValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT))
-                        && !hasLogNear(level, x, y, z, LEAF_REACH);
-            } else if (s.is(Blocks.RED_MUSHROOM_BLOCK) || s.is(Blocks.BROWN_MUSHROOM_BLOCK)) {
-                loose = !hasNear(level, x, y, z, CAP_REACH, b -> b.is(Blocks.MUSHROOM_STEM));
-            } else {
-                continue;
-            }
-            if (loose) {
-                level.setBlock(p, Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS
-                        | net.minecraft.world.level.block.Block.UPDATE_KNOWN_SHAPE);
-            }
+            if (!isCrown(s) || crownHeld(level, p, s)) continue;
+            level.setBlock(p, Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS
+                    | net.minecraft.world.level.block.Block.UPDATE_KNOWN_SHAPE);
         }
     }
 
-    /** Is there a log within {@code range}? Searched in shells, nearest first, never into an unloaded chunk. */
-    public static boolean hasLogNear(ServerLevel level, int x, int y, int z, int range) {
-        return hasNear(level, x, y, z, range, s -> s.is(BlockTags.LOGS));
+    /** A block of a tree's or a huge mushroom's crown that has to be held up by a trunk: leaves that rot, caps. */
+    public static boolean isCrown(BlockState s) {
+        if (s.is(BlockTags.LEAVES)) {
+            return !(s.hasProperty(net.minecraft.world.level.block.LeavesBlock.PERSISTENT)
+                    && s.getValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT));
+        }
+        return s.is(Blocks.RED_MUSHROOM_BLOCK) || s.is(Blocks.BROWN_MUSHROOM_BLOCK);
     }
 
-    /** Is a block matching {@code what} within {@code range}? Searched like {@link #hasLogNear}. */
-    public static boolean hasNear(ServerLevel level, int x, int y, int z, int range,
-                                  java.util.function.Predicate<BlockState> what) {
-        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+    /**
+     * Whether a crown block still hangs from a trunk: a log within {@link #LEAF_REACH} steps through leaves, which is
+     * vanilla's own distance rule, or a stem within {@link #CAP_REACH} steps through cap. Any log within reach is not
+     * enough: in a dark forest the next tree's trunk is always that close, and a cut crown was left hanging by it.
+     */
+    public static boolean crownHeld(ServerLevel level, BlockPos start, BlockState state) {
+        boolean leaf = state.is(BlockTags.LEAVES);
+        int reach = leaf ? LEAF_REACH : CAP_REACH;
+        java.util.function.Predicate<BlockState> trunk = leaf ? s -> s.is(BlockTags.LOGS) : s -> s.is(Blocks.MUSHROOM_STEM);
+        java.util.function.Predicate<BlockState> crown = leaf ? s -> s.is(BlockTags.LEAVES)
+                : s -> s.is(Blocks.RED_MUSHROOM_BLOCK) || s.is(Blocks.BROWN_MUSHROOM_BLOCK);
+        java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet seen = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+        queue.add(start);
+        seen.add(start.asLong());
         int floor = level.getMinBuildHeight(), roof = level.getMaxBuildHeight() - 1;
-        for (int r = 1; r <= range; r++) {
-            for (int dy = -r; dy <= r; dy++) {
-                int wy = y + dy;
-                if (wy < floor || wy > roof) continue;
-                for (int dx = -r; dx <= r; dx++) {
-                    for (int dz = -r; dz <= r; dz++) {
-                        // Only the shell of this ring; the inside was covered by a smaller r.
-                        if (Math.max(Math.abs(dx), Math.max(Math.abs(dy), Math.abs(dz))) != r) continue;
-                        if (!level.hasChunkAt(m.set(x + dx, wy, z + dz))) continue;
-                        if (what.test(level.getBlockState(m))) return true;
-                    }
+        for (int step = 0; step < reach && !queue.isEmpty(); step++) {
+            for (int n = queue.size(); n > 0; n--) {
+                BlockPos p = queue.poll();
+                for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+                    BlockPos q = p.relative(d);
+                    if (q.getY() < floor || q.getY() > roof || !seen.add(q.asLong())) continue;
+                    if (!level.hasChunkAt(q)) continue;
+                    BlockState s = level.getBlockState(q);
+                    if (trunk.test(s)) return true;
+                    if (crown.test(s)) queue.add(q);
                 }
             }
         }
