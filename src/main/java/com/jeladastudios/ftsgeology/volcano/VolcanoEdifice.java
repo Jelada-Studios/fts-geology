@@ -229,15 +229,23 @@ public final class VolcanoEdifice {
      * waves reach and grows over behind, first with dune grass and scrub.
      */
     static BlockState shoreSkin(LevelAccessor level, RandomSource rng, int gx, int y, int gz, BlockState skin) {
-        int sea = level.getSeaLevel();
-        if (y < sea - 1 || y > sea + 6) return skin;
-        double edge = sea + 1.5 + 1.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + 101, gz - 101, 9.0);
+        return shoreSkin(level.getSeaLevel(), rng, gx, y, gz, skin, 1.5, 1.5, 3.0);
+    }
+
+    /**
+     * {@link #shoreSkin} with the strand's height set: bare to {@code lift} blocks over the sea, give or take
+     * {@code wobble}, and grown over across the {@code fade} blocks above that. An island's strand runs higher.
+     */
+    static BlockState shoreSkin(int sea, RandomSource rng, int gx, int y, int gz, BlockState skin,
+                                double lift, double wobble, double fade) {
+        if (y < sea - 1 || y > sea + lift + wobble + fade) return skin;
+        double edge = sea + lift + wobble * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + 101, gz - 101, 9.0);
         if (y <= edge) {
             int roll = rng.nextInt(10);
             return (roll < 6 ? ModBlocks.VOLCANIC_BLACK_SAND.get() : roll < 9 ? Blocks.GRAVEL : Blocks.COARSE_DIRT)
                     .defaultBlockState();
         }
-        if (rng.nextDouble() < (edge + 3.0 - y) / 3.0) {
+        if (rng.nextDouble() < (edge + fade - y) / fade) {
             return (rng.nextBoolean() ? Blocks.COARSE_DIRT : ModBlocks.VOLCANIC_BLACK_SAND.get()).defaultBlockState();
         }
         return skin;

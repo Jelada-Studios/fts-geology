@@ -190,10 +190,12 @@ public final class VolcanoBuilder {
 
     /** Plans a large volcano from its field seed. The same site gives the same mountain on any thread. */
     static Ctx fieldCtx(ServerLevel level, VolcanoField.Site site) {
-        return plan(level, site.x(), site.baseY(), site.z(), site.magnitude(), site.type(),
+        Ctx c = plan(level, site.x(), site.baseY(), site.z(), site.magnitude(), site.type(),
                 VolcanoSize.LARGE, RandomSource.create(site.seed()),
                 TectonicMap.sampleCached(level, site.x(), site.z()), site.setting(), site.age(), level.getSeaLevel(),
                 site.setting().ocean() ? VolcanoField.seaTemperature(level, site.x(), site.z()) : 0.0, site.activity());
+        if (c != null && c.isle != null) c.isle.coastLand = VolcanoField.coastLand(level, c);
+        return c;
     }
 
     /**

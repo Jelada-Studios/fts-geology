@@ -267,6 +267,32 @@ public final class VolcanoField {
 
     public static void clearCache() {
         CACHE.clear();
+        COAST_LAND.clear();
+    }
+
+    /** Per island, {@link OceanEdifice.Isle#coastLand}: the generator is asked once, not once a chunk. */
+    private static final Map<Long, Long> COAST_LAND = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Where the generator's own land meets an island's coast, a bit a bearing; see {@link OceanEdifice#landAtCoast}. */
+    public static long coastLand(ServerLevel level, VolcanoPlan.Ctx c) {
+        if (c.isle == null || c.isle.setting == VolcanoSetting.GUYOT) return 0L;
+        long key = ((long) c.x << 32) ^ (c.z & 0xFFFFFFFFL);
+        Long hit = COAST_LAND.get(key);
+        if (hit != null) return hit;
+        ChunkGenerator gen = level.getChunkSource().getGenerator();
+        RandomState rs = level.getChunkSource().randomState();
+        int sea = gen.getSeaLevel();
+        long bits = 0L;
+        for (int i = 0; i < OceanEdifice.COAST_BEARINGS; i++) {
+            double a = Math.PI * 2 * i / OceanEdifice.COAST_BEARINGS;
+            double r = OceanEdifice.coastAt(c, a) + 4;
+            int px = c.x + (int) Math.round(Math.cos(a) * r), pz = c.z + (int) Math.round(Math.sin(a) * r);
+            int surface = gen.getBaseHeight(px, pz, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
+            int floor = gen.getBaseHeight(px, pz, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
+            if (surface <= floor || floor >= sea) bits |= 1L << i;
+        }
+        COAST_LAND.put(key, bits);
+        return bits;
     }
 
     private static Site site(ServerLevel level, int cx, int cz) {

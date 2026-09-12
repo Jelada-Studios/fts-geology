@@ -95,6 +95,8 @@ public final class OceanEdifice {
         double coneR, coneH;
         int noise;
         int edifice, reach;
+        /** One bit a bearing, {@link #COAST_BEARINGS} round: set where the generator's own land meets the coast. */
+        long coastLand;
 
         boolean warm() {
             return seaTemp > REEF_TEMPERATURE;
@@ -299,6 +301,22 @@ public final class OceanEdifice {
             default -> k.shoreR0 + (c.type == VolcanoType.SHIELD ? DELTA_LEN : 0.0);
         };
         return r * stretch(k, ang);
+    }
+
+    /** How many bearings {@link Isle#coastLand} covers. */
+    static final int COAST_BEARINGS = 32;
+
+    /**
+     * Whether the generator's own land stands at the coast on this bearing or the one either side of it, so the
+     * strand keeps off it and the natural shore stays the shore there.
+     */
+    static boolean landAtCoast(Isle k, double ang) {
+        if (k.coastLand == 0) return false;
+        int i = (int) Math.floor((ang < 0 ? ang + Math.PI * 2 : ang) / (Math.PI * 2) * COAST_BEARINGS);
+        for (int o = -1; o <= 1; o++) {
+            if ((k.coastLand >>> Math.floorMod(i + o, COAST_BEARINGS) & 1L) != 0) return true;
+        }
+        return false;
     }
 
     /** How far the waves have cut an old island's shore back at a bearing. */
@@ -639,6 +657,12 @@ public final class OceanEdifice {
             VolcanoSummit.setRock(level, new BlockPos(gx, target, gz), surface(c, k, rng, gx, target, gz, p.bits, 0.0, p));
             return;
         }
+        // The strand is laid only over deep sea floor, and not where the island touches a coast: there the coast keeps
+        // its own shore, since a strand filled up to it ended on the bank in a step.
+        if (target >= water - 1 && target <= water + 1 && bed < target && (bed >= water - 3 || landAtCoast(k, p.ang))
+                && (p.bits & (LAGOON | REEF | RIM | MOTU | KAMENI | POND | CLIFF | DELTA | CONE | RING | TOP)) == 0) {
+            return;
+        }
         double spread = apron(k, p), rubble = debris(k, gx, gz, p);
         double laid = Math.max(spread, rubble);
         boolean onBed = bed + (int) Math.round(laid) > target;
@@ -896,7 +920,13 @@ public final class OceanEdifice {
             if (roll < 6) return Blocks.CALCITE.defaultBlockState();
             return roll < 9 ? deadCoral(gx, gz) : Blocks.GRAVEL.defaultBlockState();
         }
-        if (y >= water + 2) return land(c, k, rng, gx, y, gz, slope, p);
+        if (y >= water + 2) {
+            BlockState dry = land(c, k, rng, gx, y, gz, slope, p);
+            // A young island's black sand runs well up behind the strand and grows over along a ragged line, as at
+            // Reynisfjara: bare at the waves, dune grass and scrub behind.
+            return young && c.type != VolcanoType.CALDERA && slope < 1.6
+                    ? VolcanoEdifice.shoreSkin(k.seaY, rng, gx, y, gz, dry, 3.5, 2.0, 4.0) : dry;
+        }
         // A caldera's island is mostly pumice and ash, pale down to the water and under it.
         boolean pumice = c.type == VolcanoType.CALDERA;
         if (y >= water - 1) {
