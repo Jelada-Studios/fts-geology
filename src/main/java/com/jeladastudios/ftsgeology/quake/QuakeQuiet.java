@@ -60,6 +60,8 @@ public final class QuakeQuiet {
         final int z;
         final int radius;
         final long radiusSq;
+        /** The quake itself, for volcanoes deciding whether it set them off. */
+        final double magnitude, ruptureLength;
         Phase phase = Phase.RUPTURING;
         /** Game time the grace period ends, and then the time the zone was released. */
         long graceEnds;
@@ -67,13 +69,16 @@ public final class QuakeQuiet {
         /** Game time this zone must release by, no matter what. See MAX_QUIET_TICKS. */
         long mustReleaseBy = Long.MAX_VALUE;
 
-        Zone(long sequence, ResourceKey<Level> dimension, int x, int z, int radius) {
+        Zone(long sequence, ResourceKey<Level> dimension, int x, int z, int radius, double magnitude,
+             double ruptureLength) {
             this.sequence = sequence;
             this.dimension = dimension;
             this.x = x;
             this.z = z;
             this.radius = radius;
             this.radiusSq = (long) radius * radius;
+            this.magnitude = magnitude;
+            this.ruptureLength = ruptureLength;
         }
 
         boolean covers(ResourceKey<Level> dim, int px, int pz) {
@@ -87,10 +92,36 @@ public final class QuakeQuiet {
     private static long nextSequence = 1L;
 
     /** Opens a zone as a quake begins. Held until the ground and its debris are both still. */
-    public static synchronized void open(ServerLevel level, BlockPos epicentre, double ruptureLength) {
+    public static synchronized void open(ServerLevel level, BlockPos epicentre, double ruptureLength, double magnitude) {
         int radius = (int) Math.round(ruptureLength / 2.0) + MARGIN;
         ZONES.add(new Zone(nextSequence++, level.dimension(),
-                epicentre.getX(), epicentre.getZ(), radius));
+                epicentre.getX(), epicentre.getZ(), radius, magnitude, ruptureLength));
+    }
+
+    /** A released quake as a volcano sees it: how strong, how far, and how far out it could set one off. */
+    public record Trigger(long sequence, double magnitude, double distance, double reach) {}
+
+    /**
+     * The newest released quake within reach of setting off a volcano at this column, or null. Reaches well past the
+     * quiet zone, twice the rupture's length and more: big quakes wake volcanoes a long way off.
+     */
+    public static synchronized Trigger trigger(ServerLevel level, int x, int z) {
+        Zone best = null;
+        double bestD = 0.0;
+        for (Zone zone : ZONES) {
+            if (zone.phase != Phase.RELEASED || !zone.dimension.equals(level.dimension())) continue;
+            double d = Math.hypot(x - zone.x, z - zone.z);
+            if (d > triggerReach(zone)) continue;
+            if (best == null || zone.sequence > best.sequence) {
+                best = zone;
+                bestD = d;
+            }
+        }
+        return best == null ? null : new Trigger(best.sequence, best.magnitude, bestD, triggerReach(best));
+    }
+
+    private static double triggerReach(Zone zone) {
+        return zone.ruptureLength * 2.0 + 200.0;
     }
 
     /** The rupture has finished applying. The zone now waits on the debris. */

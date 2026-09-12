@@ -61,6 +61,33 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
     /** Sequence number of the last quake this volcano has already recharged for. */
     private long rechargedFor = Long.MIN_VALUE;
 
+    /** Sequence number of the last quake this volcano has already rolled against for an eruption. */
+    private long triggeredFor = Long.MIN_VALUE;
+
+    /**
+     * A large quake nearby can set a volcano off: the shaking lets gas out of the magma, as the 1960 Chile quake did
+     * at Cordón Caulle a day and a half later. Asked once per quake; if it takes, the quiet left is cut to minutes.
+     */
+    private void answerQuake(ServerLevel level, BlockPos pos) {
+        if (!GeyserConfig.QUAKE_TRIGGERS_ERUPTIONS.get()) return;
+        com.jeladastudios.ftsgeology.quake.QuakeQuiet.Trigger q =
+                com.jeladastudios.ftsgeology.quake.QuakeQuiet.trigger(level, pos.getX(), pos.getZ());
+        if (q == null || q.sequence() <= triggeredFor) return;
+        triggeredFor = q.sequence();
+        setChanged();
+        double chance = GeyserConfig.QUAKE_ERUPTION_CHANCE.get()
+                * Mth.clamp((q.magnitude() - 6.5) / 2.5, 0.0, 1.0)
+                * Mth.clamp(1.0 - q.distance() / q.reach(), 0.0, 1.0);
+        if (level.random.nextDouble() >= chance) return;
+        int min = GeyserConfig.QUAKE_ERUPTION_DELAY_MIN_TICKS.get();
+        int max = Math.max(min + 1, GeyserConfig.QUAKE_ERUPTION_DELAY_MAX_TICKS.get());
+        int delay = min + level.random.nextInt(max - min);
+        if (delay >= timer) return;
+        timer = delay;
+        GeysersMod.LOGGER.info("Volcano at {} woken by an M{} quake {} blocks away, erupting in {} s", pos,
+                String.format(java.util.Locale.ROOT, "%.1f", q.magnitude()), (int) Math.round(q.distance()), delay / 20);
+    }
+
     /** What this mountain was before anything happened to it, so it can be raised again. */
     private com.jeladastudios.ftsgeology.volcano.VolcanoType type;
     private BlockPos originalBase;
@@ -315,6 +342,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                 if (quake != 0L && quake > be.rebuiltFor) be.rebuildAfterQuake(server, pos, quake);
                 be.refillAfterQuake(server, pos);
                 if (!hasLava(server, pos)) return; // dead until it has lava again
+                be.answerQuake(server, pos);
                 be.idleSmoke(server, summit, 0.4f, true); // lazy smoke off the crater + a vent or two
                 if ((be.timer -= 20) <= 0) {
                     be.phase = Phase.RUMBLING;
@@ -433,6 +461,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         if (moltenCells.length > 0) tag.putLongArray("MoltenCells", moltenCells);
         tag.putLong("RechargedFor", rechargedFor);
         tag.putLong("RebuiltFor", rebuiltFor);
+        tag.putLong("TriggeredFor", triggeredFor);
         if (type != null) tag.putString("Type", type.name());
         if (originalBase != null) tag.putLong("OriginalBase", originalBase.asLong());
         tag.putInt("OriginalSummitY", originalSummitY);
@@ -454,6 +483,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         moltenCells = tag.contains("MoltenCells") ? tag.getLongArray("MoltenCells") : new long[0];
         rechargedFor = tag.contains("RechargedFor") ? tag.getLong("RechargedFor") : Long.MIN_VALUE;
         rebuiltFor = tag.contains("RebuiltFor") ? tag.getLong("RebuiltFor") : Long.MIN_VALUE;
+        triggeredFor = tag.contains("TriggeredFor") ? tag.getLong("TriggeredFor") : Long.MIN_VALUE;
         type = readType(tag);
         originalBase = tag.contains("OriginalBase") ? BlockPos.of(tag.getLong("OriginalBase")) : null;
         originalSummitY = tag.contains("OriginalSummitY")

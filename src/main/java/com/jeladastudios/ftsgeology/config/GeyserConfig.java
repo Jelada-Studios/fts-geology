@@ -80,6 +80,10 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue VOLCANO_RESERVOIR_RADIUS;  // deep magma-chamber radius
     public static final ForgeConfigSpec.IntValue VOLCANO_CRATER_RADIUS;     // summit crater/lava-pool radius
     public static final ForgeConfigSpec.IntValue VOLCANO_LAVA_BUDGET;       // lava cells per eruption
+    public static final ForgeConfigSpec.BooleanValue QUAKE_TRIGGERS_ERUPTIONS; // big quakes set nearby volcanoes off
+    public static final ForgeConfigSpec.DoubleValue QUAKE_ERUPTION_CHANCE;
+    public static final ForgeConfigSpec.IntValue QUAKE_ERUPTION_DELAY_MIN_TICKS;
+    public static final ForgeConfigSpec.IntValue QUAKE_ERUPTION_DELAY_MAX_TICKS;
     public static final ForgeConfigSpec.BooleanValue VOLCANIC_ASHFALL;      // default ON
     public static final ForgeConfigSpec.BooleanValue ASHFALL_BURIES_CROPS;  // default ON
     public static final ForgeConfigSpec.BooleanValue SOIL_FROM_BEDROCK;     // default ON
@@ -345,6 +349,20 @@ public final class GeyserConfig {
                         "and turns to basalt behind its own front, which is both what happens and",
                         "what actually looks like an eruption.")
                 .defineInRange("volcanoLavaBudget", 24, 0, 400);
+        QUAKE_TRIGGERS_ERUPTIONS = b
+                .comment("A large earthquake can set off volcanoes around it once the ground has settled, as the",
+                        "1960 Chile earthquake did at Cordón Caulle. Only a volcano with magma to draw on erupts.")
+                .define("quakeTriggersEruptions", true);
+        QUAKE_ERUPTION_CHANCE = b
+                .comment("Chance a volcano at the epicentre erupts after a magnitude 9 quake. Less for a smaller",
+                        "quake (none under 6.5) and further away (none past twice the rupture length plus 200 blocks).")
+                .defineInRange("quakeEruptionChance", 0.6, 0.0, 1.0);
+        QUAKE_ERUPTION_DELAY_MIN_TICKS = b
+                .comment("Shortest time from the quiet zone's release to the volcano starting to rumble (1200 = 1 min).")
+                .defineInRange("quakeEruptionDelayMinTicks", 1200, 20, 720000);
+        QUAKE_ERUPTION_DELAY_MAX_TICKS = b
+                .comment("Longest time from the quiet zone's release to the volcano starting to rumble (6000 = 5 min).")
+                .defineInRange("quakeEruptionDelayMaxTicks", 6000, 20, 720000);
         ASHFALL_BURIES_CROPS = b
                 .comment("Let falling ash bury crops. A field downwind of an eruption loses its crop under",
                         "the ash, and under three layers or more its tilled soil goes back to dirt. Shovel",

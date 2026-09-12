@@ -177,7 +177,7 @@ public final class Earthquake {
                     ACTIVE.add(new Running(dim, plan, startAt));
                     // Everything geothermal in the corridor stands down until the ground has
                     // stopped moving AND the debris has landed. See QuakeQuiet.
-                    QuakeQuiet.open(level, plan.epicentre(), plan.ruptureLength());
+                    QuakeQuiet.open(level, plan.epicentre(), plan.ruptureLength(), plan.magnitude());
                     GeysersMod.LOGGER.info("quake apply starting: {} edits queued", plan.edits().size());
                 }, level.getServer())
                 .exceptionally(t -> {
