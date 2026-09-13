@@ -205,6 +205,19 @@ public final class QuakePlanner {
      */
     private static void forEachCorridorColumn(TracePoint tp, TracePoint next, int band,
                                               boolean bodyOnly, ColumnVisitor v) {
+        forEachCorridorColumn(tp, next, band, bodyOnly, null, v);
+    }
+
+    /** How far past a chunk's edge a clipped walk still looks, so the columns on its border see their neighbours. */
+    static final int CLIP_MARGIN = 10;
+
+    /**
+     * As above, clipped to one chunk and a margin when {@code clip} is given: replaying a parked rupture
+     * walked the whole corridor's lattice for every chunk it came to, two hundred thousand cells to keep a
+     * few hundred.
+     */
+    private static void forEachCorridorColumn(TracePoint tp, TracePoint next, int band,
+                                              boolean bodyOnly, ChunkPos clip, ColumnVisitor v) {
         double sx = tp.strikeX(), sz = tp.strikeZ();
         double len = Math.sqrt(sx * sx + sz * sz);
         if (len < 1.0e-6) return;
@@ -218,6 +231,12 @@ public final class QuakePlanner {
         int hiX = (int) Math.ceil(Math.max(ax, bx)) + band + 2;
         int loZ = (int) Math.floor(Math.min(az, bz)) - band - 2;
         int hiZ = (int) Math.ceil(Math.max(az, bz)) + band + 2;
+        if (clip != null) {
+            loX = Math.max(loX, clip.getMinBlockX() - CLIP_MARGIN);
+            hiX = Math.min(hiX, clip.getMaxBlockX() + CLIP_MARGIN);
+            loZ = Math.max(loZ, clip.getMinBlockZ() - CLIP_MARGIN);
+            hiZ = Math.min(hiZ, clip.getMaxBlockZ() + CLIP_MARGIN);
+        }
 
         for (int x = loX; x <= hiX; x++) {
             for (int z = loZ; z <= hiZ; z++) {
@@ -355,9 +374,7 @@ public final class QuakePlanner {
             if (snap.size() >= MAX_SNAPSHOT_COLUMNS) break;
             TracePoint tp = trace.get(i);
             TracePoint next = i + 1 < trace.size() ? trace.get(i + 1) : null;
-            forEachCorridorColumn(tp, next, band, false, (cx, cz, across, lsx, lsz, slip) -> {
-                if (clip != null && (cx < clip.getMinBlockX() - 10 || cx > clip.getMaxBlockX() + 10
-                        || cz < clip.getMinBlockZ() - 10 || cz > clip.getMaxBlockZ() + 10)) return;
+            forEachCorridorColumn(tp, next, band, false, clip, (cx, cz, across, lsx, lsz, slip) -> {
                 if (snap.has(cx, cz)) return;
                 if (!level.hasChunkAt(new BlockPos(cx, 0, cz))) return;
 
@@ -431,6 +448,13 @@ public final class QuakePlanner {
     public static Plan plan(Snapshot snap, List<TracePoint> trace, BlockPos epicentre, FaultType type,
                             double magnitude, double depthMetres, RandomGenerator rng,
                             boolean mayBreakBuilds) {
+        return plan(snap, trace, epicentre, type, magnitude, depthMetres, rng, mayBreakBuilds, null);
+    }
+
+    /** As above, walking only the lattice round one chunk: for a parked rupture replayed there. */
+    public static Plan plan(Snapshot snap, List<TracePoint> trace, BlockPos epicentre, FaultType type,
+                            double magnitude, double depthMetres, RandomGenerator rng,
+                            boolean mayBreakBuilds, ChunkPos clip) {
         int cap = GeyserConfig.QUAKE_MAX_EDITS.get();
         int band = deformationHalfWidth(type, magnitude);
 
@@ -463,7 +487,7 @@ public final class QuakePlanner {
                 TracePoint next = i + 1 < trace.size() ? trace.get(i + 1) : null;
                 if (bodyOnly) length += TRACE_STEP;
 
-                forEachCorridorColumn(tp, next, band, bodyOnly, (x, z, across, lsx, lsz, slip) -> {
+                forEachCorridorColumn(tp, next, band, bodyOnly, clip, (x, z, across, lsx, lsz, slip) -> {
                     if (!claimed.add(Snapshot.key(x, z))) return;
                     if (!snap.has(x, z)) return;
                     ColumnPlan cp = columnPlan(snap, type, x, z, across, lsx, lsz, slip,

@@ -596,6 +596,9 @@ public final class EruptionHandler {
                 || s.is(Blocks.MAGMA_BLOCK) || s.is(Blocks.OBSIDIAN)
                 || s.is(Blocks.BLACKSTONE) || s.is(Blocks.BASALT) || s.is(Blocks.SMOOTH_BASALT)
                 || s.is(Blocks.DRIPSTONE_BLOCK) || s.is(Blocks.POINTED_DRIPSTONE)
+                || s.is(Blocks.AMETHYST_BLOCK) || s.is(Blocks.BUDDING_AMETHYST) || s.is(Blocks.AMETHYST_CLUSTER)
+                || s.is(Blocks.LARGE_AMETHYST_BUD) || s.is(Blocks.MEDIUM_AMETHYST_BUD) || s.is(Blocks.SMALL_AMETHYST_BUD)
+                || s.is(Blocks.MUDDY_MANGROVE_ROOTS) || s.is(Blocks.BONE_BLOCK)
                 || s.is(Blocks.SCULK) || s.is(Blocks.SCULK_VEIN) || s.is(Blocks.SCULK_CATALYST)
                 || s.is(Blocks.POWDER_SNOW) || s.is(Blocks.PACKED_ICE) || s.is(Blocks.BLUE_ICE);
     }

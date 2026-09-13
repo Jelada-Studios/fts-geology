@@ -717,7 +717,7 @@ public final class GeyserConfig {
                         "kilometres per second and a large quake lasts tens of seconds, so letting the",
                         "deformation spread over a few seconds is more accurate than an instant snap.",
                         "The tick budget (tickBudgetMs) is the real brake; this only caps a fast machine.")
-                .defineInRange("quakeBlocksPerTick", 1500, 8, 20000);
+                .defineInRange("quakeBlocksPerTick", 400, 8, 20000);
         QUAKE_WARNING_TICKS = b
                 .comment("Ticks between a quake being detected and the ground actually starting to",
                         "move. A seismograph is told the instant the rupture is triggered and sounds",

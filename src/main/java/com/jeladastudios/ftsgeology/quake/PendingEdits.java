@@ -159,7 +159,7 @@ public final class PendingEdits {
                 QuakePlanner.Snapshot snap = QuakePlanner.snapshot(level, r.trace(), r.type(),
                         r.magnitude(), cp);
                 QuakePlanner.Plan plan = QuakePlanner.plan(snap, r.trace(), r.epicentre(), r.type(),
-                        r.magnitude(), r.depthMetres(), new Random(r.seed()), r.mayBreakBuilds());
+                        r.magnitude(), r.depthMetres(), new Random(r.seed()), r.mayBreakBuilds(), cp);
                 for (QuakePlanner.Edit e : plan.edits()) {
                     if ((e.pos().getX() >> 4) != cp.x || (e.pos().getZ() >> 4) != cp.z) continue;
                     level.setBlock(e.pos(), e.state(), Earthquake.FLAGS);

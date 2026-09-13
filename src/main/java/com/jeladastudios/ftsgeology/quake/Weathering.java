@@ -321,19 +321,27 @@ public final class Weathering {
         int height = top - base;
         if (height <= 0) return false;
         if (allPlant && trunk == Integer.MIN_VALUE) {
-            // Grass or a fern left in the air: gone, as a shape update would have had it. A crown with no
-            // trunk under it belongs to a tree in another column and goes with that tree.
-            if (!allCover || height > 2) return false;
+            // Grass, a fern or leaves left in the air: gone, as a shape update would have had them. A crown
+            // whose tree was felled went with it; what is still here belongs to nothing.
             for (int y = base; y < top; y++) {
                 level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
             }
             return true;
         }
-        // The tree goes; whatever it stood on still comes down.
+        // The tree goes; whatever it stood on still comes down, unless that is only its own leaves, as under
+        // an acacia's branch: those go too, not into a heap on the ground.
         if (trunk != Integer.MIN_VALUE) {
             fell(level, x, trunk, z, job, true);
             height = trunk - base;
             if (height <= 0) return true;
+            boolean leavesOnly = true;
+            for (int i = 0; i < height && leavesOnly; i++) leavesOnly = isPlant(level.getBlockState(m.set(x, base + i, z)));
+            if (leavesOnly) {
+                for (int i = 0; i < height; i++) {
+                    level.setBlock(new BlockPos(x, base + i, z), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
+                }
+                return true;
+            }
         }
 
         // The whole stack comes down together, in order, so it lands the same way up.
