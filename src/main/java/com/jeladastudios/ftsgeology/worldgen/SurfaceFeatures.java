@@ -43,6 +43,8 @@ public final class SurfaceFeatures {
     static final int APRON_SPRINGS = 250;
     /** The hot-spring fit on a large volcano's lower flank: a few pools, not a field. */
     static final double BODY_SPRINGS = 0.15;
+    /** The chance of a spring in a chunk inside a foot cluster; four or so come of a cluster's fourteen chunks. */
+    static final double FOOT_CLUSTER_CHANCE = 0.35;
 
     /** Springs the surface pass expected since the last report: the sum of its per-chunk chances. */
     static final java.util.concurrent.atomic.DoubleAdder EXPECTED_SPRINGS = new java.util.concurrent.atomic.DoubleAdder();
@@ -135,6 +137,11 @@ public final class SurfaceFeatures {
             springFit = Math.max(springFit, 0.6 * (1.0 - margin / APRON_SPRINGS));
         }
         double springChance = GeyserConfig.HOT_SPRING_SPAWN_CHANCE.get() * springFit * springBoost;
+        // At a big mountain's foot the springs come in groups: inside a cluster most chunks get one.
+        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.footCluster(level, centreX, centreZ)
+                <= com.jeladastudios.ftsgeology.volcano.VolcanoField.FOOT_CLUSTER_R) {
+            springChance = Math.max(springChance, FOOT_CLUSTER_CHANCE);
+        }
         EXPECTED_SPRINGS.add(Math.min(1.0, springChance));
         if (rng.nextDouble() < springChance) {
             generateHotSpring(level, cp, rng);

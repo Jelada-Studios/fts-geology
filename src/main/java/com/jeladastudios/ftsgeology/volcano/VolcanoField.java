@@ -1,6 +1,7 @@
 package com.jeladastudios.ftsgeology.volcano;
 
 import static com.jeladastudios.ftsgeology.util.SeedHash.hash;
+import static com.jeladastudios.ftsgeology.util.SeedHash.mix;
 import static com.jeladastudios.ftsgeology.util.SeedHash.rand01;
 
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
@@ -131,6 +132,34 @@ public final class VolcanoField {
             }
         }
         return out;
+    }
+
+    /** Radius of a foot spring cluster: the springs of one group lie within this of its centre. */
+    public static final int FOOT_CLUSTER_R = 30;
+
+    /**
+     * How far this column is from the nearest spring cluster at the foot of a chosen large land volcano, in blocks;
+     * huge where there is none. A big mountain's springs come up in a few groups on the fan below its slopes
+     * (Beppu, Hakone, Kusatsu): three centres a third of a circle apart, set from the site's seed between the outer
+     * apron and sixty blocks past it. The chunk pass fills each group as the ground there loads.
+     */
+    public static double footCluster(ServerLevel level, int x, int z) {
+        int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
+        double best = Double.MAX_VALUE;
+        for (int ox = -1; ox <= 1; ox++) {
+            for (int oz = -1; oz <= 1; oz++) {
+                Site s = site(level, cx0 + ox, cz0 + oz);
+                if (s == null || !s.chosen() || s.setting() != VolcanoSetting.LAND || s.type() == VolcanoType.CALDERA) continue;
+                double a0 = rand01(mix(s.seed() ^ 0x5F00D5L)) * Math.PI * 2;
+                for (int k = 0; k < 3; k++) {
+                    long h = mix(s.seed() ^ (0xC1A5L + k * 0x9E37L));
+                    double a = a0 + k * Math.PI * 2 / 3 + (rand01(h) - 0.5) * Math.PI / 3;
+                    double r = s.reach() * 0.8 + rand01(mix(h)) * (s.reach() * 0.2 + 60);
+                    best = Math.min(best, Math.hypot(x - (s.x() + Math.cos(a) * r), z - (s.z() + Math.sin(a) * r)));
+                }
+            }
+        }
+        return best;
     }
 
     /** True when a chosen large volcano's mountain stands within {@code margin} blocks of here. */

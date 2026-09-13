@@ -75,9 +75,10 @@ public final class HotSpringSites {
             }
         }
         int relief = hi - lo;
-        // Up to 12 blocks of relief is allowed; broken ground gets a terrace chain. The foot of a big volcano is
-        // all slope and foothill, and its springs sit on that slope in terraces (Hakone), so more is allowed there.
-        int reliefCap = com.jeladastudios.ftsgeology.volcano.VolcanoField.largeMargin(level, x, z) < 0 ? 18 : 12;
+        // Up to 12 blocks of relief is allowed; broken ground gets a terrace chain. The foot of a big volcano and
+        // the fan below it are all slope and foothill, and springs sit on that in terraces (Hakone), so more is
+        // allowed out to a hundred blocks past the mountain.
+        int reliefCap = com.jeladastudios.ftsgeology.volcano.VolcanoField.largeMargin(level, x, z) < 100 ? 18 : 12;
         if (relief > reliefCap) return refused(x, z, "relief " + relief);
         // Not beside a lava lake or over one: the water would be steam.
         if (lavaNear(level, x, centre, z, LAVA_CLEARANCE)) return refused(x, z, "lava near");
