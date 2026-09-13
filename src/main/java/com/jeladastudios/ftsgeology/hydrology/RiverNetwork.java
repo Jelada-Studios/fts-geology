@@ -49,7 +49,7 @@ public final class RiverNetwork {
      * One river cell: distance to the mouth along the river, cells upstream of it, its distance to the bank, and
      * whether it is part of a lake (wide water, or its shore).
      */
-    public record Node(int dist, int upstream, int halfWidth, boolean lake) {
+    public record Node(int dist, int upstream, int halfWidth, boolean lake, long river) {
         public boolean directed() { return dist >= 0; }
     }
 
@@ -94,6 +94,13 @@ public final class RiverNetwork {
             }
         }, Util.backgroundExecutor());
         return null;
+    }
+
+    /** The node of a cell whose river has already been read, or null. Never starts a read; for the debug view. */
+    public static Node peek(int blockX, int blockZ) {
+        long k = key(QuartPos.fromBlock(blockX), QuartPos.fromBlock(blockZ));
+        Long2ObjectOpenHashMap<Node> river = BY_CELL.get(k);
+        return river == null ? null : river.get(k);
     }
 
     /** True when the cell's river is known, whether or not the cell is in one. */
@@ -230,7 +237,7 @@ public final class RiverNetwork {
         for (long c : river) {
             int[] d = dist.get(c), u = up.get(c), h = half.get(c), l = lake.get(c);
             out.put(c, new Node(d == null ? -1 : d[0], u == null ? 0 : u[0], h == null ? 1 : h[0],
-                    l != null && l[0] <= LAKE_SHORE));
+                    l != null && l[0] <= LAKE_SHORE, key(qx0, qz0)));
         }
         GeysersMod.LOGGER.info("river network from {},{}: {} cells{}, {} mouths, {} biome samples, {} ms",
                 qx0 * 4, qz0 * 4, river.size(), cut ? " (cut short)" : "", mouths.size(), samples,

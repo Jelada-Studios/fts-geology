@@ -63,6 +63,8 @@ public final class RiverSurvey extends SavedData {
         int surveyed = -1;
         boolean planned;
         final List<Bend> bends = new ArrayList<>();
+        /** The channel's centre line through this chunk, as (lx, lz) pairs; null until planned. For the debug view. */
+        byte[] centre;
 
         boolean river() { return yW != Integer.MIN_VALUE; }
         boolean current() { return surveyed == ver; }
@@ -79,6 +81,8 @@ public final class RiverSurvey extends SavedData {
         float speed = 1.0f;
         long next;
         boolean dead;
+        /** Why the last step could not move, for the debug view; not saved. */
+        String why = "";
 
         boolean live() { return !dead && done < steps; }
     }
@@ -233,6 +237,14 @@ public final class RiverSurvey extends SavedData {
         }
         int[][] dist = distance(water);
         boolean[][] skel = thin(water);
+        // The centre line through this chunk, kept for the debug view.
+        java.io.ByteArrayOutputStream centre = new java.io.ByteArrayOutputStream();
+        for (int wz = 16; wz < 32; wz++) {
+            for (int wx = 16; wx < 32; wx++) {
+                if (skel[wx][wz]) { centre.write(wx - 16); centre.write(wz - 16); }
+            }
+        }
+        r.centre = centre.toByteArray();
         double scale = GeyserConfig.RIVER_MIGRATION_SCALE.get();
         int x0 = (cx - 1) * 16, z0 = (cz - 1) * 16;
         List<double[]> found = new ArrayList<>();   // wx, wz, curvature, width, nx, nz, speed
@@ -240,7 +252,7 @@ public final class RiverSurvey extends SavedData {
             for (int wx = 16; wx < 32; wx++) {
                 if (!skel[wx][wz]) continue;
                 int width = Math.min(MAX_WIDTH, 2 * dist[wx][wz] - 1);
-                if (width < 3 || width > BIG_RIVER) continue;
+                if (width < 3) continue;
                 // A lake, or the delta at the mouth: the water stands still, the banks stay.
                 RiverNetwork.Node node = RiverNetwork.at(level, x0 + wx, z0 + wz);
                 if (node != null && (node.lake() || (node.directed() && node.dist() < RiverNetwork.MOUTH_ZONE))) continue;
@@ -260,7 +272,8 @@ public final class RiverSurvey extends SavedData {
                 double lm = Math.hypot(mx, mz);
                 if (lm < 0.5) continue;
                 double speed = speed(node);
-                double shift = scale * speed * curvature * width * width;
+                // A big river's bends are kilometres long and out of this scale: it shifts, but by half.
+                double shift = scale * speed * curvature * width * width * (width > BIG_RIVER ? 0.5 : 1.0);
                 if (shift < 1.0) continue;
                 // The bank is cut hardest a little downstream of the apex, not at it: the work is set out there.
                 int px = wx, pz = wz;
@@ -290,7 +303,8 @@ public final class RiverSurvey extends SavedData {
             int bank = bankAlong(water, rel, wx, wz, nx, nz, width + 4);
             if (bank == Integer.MIN_VALUE || bank > MAX_BANK) continue;
             if (bankAlong(water, rel, wx, wz, -nx, -nz, width + 4) == Integer.MIN_VALUE) continue;
-            int steps = (int) Math.min(Math.floor(MAX_SHIFT * width), Math.round(scale * f[6] * f[2] * width * width));
+            int steps = (int) Math.min(Math.floor(MAX_SHIFT * width),
+                    Math.round(scale * f[6] * f[2] * width * width * (width > BIG_RIVER ? 0.5 : 1.0)));
             if (steps < 1) continue;
             Bend b = new Bend();
             b.x = x0 + wx;

@@ -114,7 +114,41 @@ public final class TectonicCommands {
                                                         IntegerArgumentType.integer(1, HotSpringShape.MAX_STAGE))
                                                 .executes(ctx -> place(ctx,
                                                         StringArgumentType.getString(ctx, "feature"),
-                                                        IntegerArgumentType.getInteger(ctx, "stage")))))));
+                                                        IntegerArgumentType.getInteger(ctx, "stage"))))))
+                        // The river debug view: what the survey knows around a player, drawn on their screen.
+                        .then(Commands.literal("debug")
+                                .then(Commands.literal("river")
+                                        .then(Commands.literal("on").executes(ctx -> riverDebug(ctx, 1)))
+                                        .then(Commands.literal("off").executes(ctx -> riverDebug(ctx, 0)))
+                                        .then(Commands.literal("dump").executes(ctx -> riverDebug(ctx, 2))))));
+    }
+
+    /** /geology debug river on|off|dump: mode 1 on, 0 off, 2 a one-off listing to chat and the log. */
+    static int riverDebug(CommandContext<CommandSourceStack> ctx, int mode) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        if (mode == 2) {
+            var packet = com.jeladastudios.ftsgeology.hydrology.RiverDebug.collect(level, at.getX(), at.getZ());
+            java.util.List<String> lines = com.jeladastudios.ftsgeology.hydrology.RiverDebug.lines(packet);
+            for (String line : lines) {
+                GeysersMod.LOGGER.info("river debug: {}", line);
+                source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GRAY), false);
+            }
+            source.sendSuccess(() -> Component.translatable("command.fts_geology.debug.river_dump", lines.size())
+                    .withStyle(ChatFormatting.GREEN), false);
+            return 1;
+        }
+        net.minecraft.server.level.ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            source.sendFailure(Component.translatable("command.fts_geology.debug.river_player"));
+            return 0;
+        }
+        com.jeladastudios.ftsgeology.hydrology.RiverDebug.set(player, mode == 1);
+        source.sendSuccess(() -> Component.translatable(mode == 1
+                ? "command.fts_geology.debug.river_on" : "command.fts_geology.debug.river_off")
+                .withStyle(ChatFormatting.GREEN), false);
+        return 1;
     }
 
     static final String[] SETTINGS = {"subduction", "rift", "collision", "transform", "hotspot"};

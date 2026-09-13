@@ -98,6 +98,7 @@ public final class MeanderScheduler {
             surveySome(server, deadline);
             planSome(server, deadline);
             stepSome(server, deadline);
+            RiverDebug.tick(server);
         } catch (RuntimeException e) {
             GeysersMod.LOGGER.warn("River meanders: {}", e.toString());
         }
@@ -105,6 +106,7 @@ public final class MeanderScheduler {
 
     /** Drops the in-memory queues; the survey itself lives in the world save. */
     public static void clear() {
+        RiverDebug.clear();
         RiverNetwork.clear();
         TO_SURVEY.clear();
         TO_PLAN.clear();
@@ -263,6 +265,7 @@ public final class MeanderScheduler {
     /** Ends a bend and says why, at debug level. */
     private static int dead(RiverSurvey.Bend b, String why) {
         GeysersMod.LOGGER.debug("river bend at {},{} died: {}", b.x, b.z, why);
+        b.why = why;
         return STEP_DEAD;
     }
 
