@@ -317,8 +317,10 @@ public final class VolcanoField {
                     mine.completeExceptionally(e);
                     throw e;
                 }
+                long took = System.nanoTime() - started;
+                com.jeladastudios.ftsgeology.worldgen.GenCost.cell(took);
                 com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("Large volcano cell {},{} worked out in {} ms",
-                        cx, cz, (System.nanoTime() - started) / 1_000_000);
+                        cx, cz, took / 1_000_000);
                 hit = mine;
             }
         }
@@ -402,7 +404,7 @@ public final class VolcanoField {
                 // Younger than a plume's track: an old arc island is worn and cliffed but still stands well out of the sea.
                 double age = 0.1 + 0.3 * ageRoll;
                 // The oldest, in a warm sea, have sunk under their reef: Darwin's atoll, on an arc as on a plume.
-                VolcanoSetting old = ageRoll >= 0.6 && seaTemperature(level, x, z) > OceanEdifice.REEF_TEMPERATURE
+                VolcanoSetting old = ageRoll >= 0.45 && seaTemperature(level, x, z) > OceanEdifice.ATOLL_TEMPERATURE
                         ? VolcanoSetting.ATOLL : VolcanoSetting.ERODED;
                 Site island = dead
                         ? checkOcean(level, x, z, type, old, old == VolcanoSetting.ATOLL ? 0.4 + age : age, seed,
@@ -493,8 +495,8 @@ public final class VolcanoField {
                 if (along < TRAIL_START) continue;
                 int x = (int) Math.round(t.x() + t.dirX() * along), z = (int) Math.round(t.z() + t.dirZ() * along);
                 double age = along / length;
-                VolcanoSetting setting = age < 0.55 ? VolcanoSetting.ERODED
-                        : seaTemperature(level, x, z) > OceanEdifice.REEF_TEMPERATURE ? VolcanoSetting.ATOLL
+                VolcanoSetting setting = age < 0.4 ? VolcanoSetting.ERODED
+                        : seaTemperature(level, x, z) > OceanEdifice.ATOLL_TEMPERATURE ? VolcanoSetting.ATOLL
                         : VolcanoSetting.GUYOT;
                 int depth = oceanDepth(level, x, z);
                 if (depth < (setting == VolcanoSetting.ERODED ? ISLAND_DEPTH : SUNKEN_DEPTH)) {

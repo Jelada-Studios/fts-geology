@@ -37,6 +37,8 @@ public final class OceanEdifice {
 
     /** Above this climate temperature the sea is warm enough for reefs: vanilla's lukewarm and warm ocean bands. */
     static final double REEF_TEMPERATURE = 0.2;
+    /** The coolest sea an atoll grows in: the lukewarm band too, as Bermuda's reefs do at 32 degrees north. */
+    static final double ATOLL_TEMPERATURE = -0.15;
 
     /** How far the thin apron of debris runs over the sea floor past the foot. */
     static final int APRON = 30;
@@ -439,7 +441,7 @@ public final class OceanEdifice {
         if (k.setting == VolcanoSetting.ERODED) {
             double now = shoreNow(c, k);
             if (y > water) y = Math.max(water - 2, y - valley(c, k, ang, r));
-            y -= slide(c, k, ang, r);
+            y = slide(c, k, ang, r, y, water);
             if (r >= now - retreat(k, ang) && y > water - 2) {
                 // Cut back by the waves: a cliff, and a platform at its foot.
                 y = water - 2 + 0.6 * ValueNoise.noise(gx - k.noise, gz + k.noise, 5.0);
@@ -466,7 +468,7 @@ public final class OceanEdifice {
                 }
             }
         } else {
-            y -= slide(c, k, ang, r);
+            y = slide(c, k, ang, r, y, water);
             if (c.type == VolcanoType.SHIELD && y < water + 3 && r > k.shoreR0 * 0.8 && r < k.shoreR0 + DELTA_LEN
                     && VolcanoEdifice.flowAt(c, ang, r)) {
                 // A flow that reached the sea: a bench of new land over its own shattered glass.
@@ -509,19 +511,32 @@ public final class OceanEdifice {
         return depth * Math.pow(cut, 0.7) * head;
     }
 
-    /** How much of the flank a collapse took away here: an amphitheatre with a steep headwall, fading down the slope. */
-    static double slide(Ctx c, Isle k, double ang, double r) {
-        if (k.slideHalf <= 0) return 0.0;
+    /**
+     * The flank a collapse took away: an amphitheatre open to the sea, as the Nuʻuanu Pali is. A steep headwall
+     * under the summit, a floor that runs from its foot down to the sea at the coast, and walls either side
+     * that spread as the slide did. Returns the ground with the scar cut into it.
+     */
+    static double slide(Ctx c, Isle k, double ang, double r, double y, int water) {
+        if (k.slideHalf <= 0) return y;
+        // Measured against the shore as it is now: on a sunken island the shore it grew to is out under the sea,
+        // and a scar set out from that began at the coast and never showed.
+        double shore = k.setting == VolcanoSetting.ERODED ? shoreNow(c, k) : k.shoreR0;
+        double head = c.craterR + (shore - c.craterR) * 0.3;
+        if (r <= head) return y;
+        double along = Mth.clamp((r - head) / Math.max(1.0, shore - head), 0.0, 1.0);
+        double half = k.slideHalf * (1.0 + 0.6 * along);
         double d = Math.abs(Math.atan2(Math.sin(ang - k.slideAim), Math.cos(ang - k.slideAim)));
-        double side = Mth.clamp((k.slideHalf - d) / (k.slideHalf * 0.3), 0.0, 1.0);
-        if (side <= 0) return 0.0;
-        double head = c.craterR + (k.shoreR0 - c.craterR) * 0.3;
-        if (r <= head) return 0.0;
-        double wall = Mth.clamp((r - head) / 10.0, 0.0, 1.0);
-        double out = r <= k.shoreR0 ? 1.0
-                : Mth.clamp(1.0 - (r - k.shoreR0) / Math.max(1.0, k.footR - k.shoreR0), 0.0, 1.0);
-        double depth = k.h0 * (k.setting == VolcanoSetting.ISLAND ? 0.35 : 0.6);
-        return depth * smooth(wall) * smooth(side) * out;
+        double side = Mth.clamp((half - d) / (half * 0.3), 0.0, 1.0);
+        if (side <= 0) return y;
+        // Half of what stands over the sea today, so the floor starts a few blocks up and runs down to the water.
+        double depth = k.setting == VolcanoSetting.ISLAND ? k.h0 * 0.35 : Math.max(6.0, (k.h0 - k.sunk) * 0.5);
+        double headwall = smooth(Mth.clamp((r - head) / 6.0, 0.0, 1.0));
+        // The scar floor: under the headwall, then down to the sea at the coast; never above the old ground.
+        double top = Math.max(water - 1.0, grown(c, k, head) - k.sunk - depth);
+        double floor = r <= shore ? Mth.lerp(along, top, water - 1.0)
+                : Mth.lerp(Mth.clamp((r - shore) / Math.max(1.0, k.footR - shore), 0.0, 1.0), water - 1.0, k.floorY);
+        double scar = Math.min(y, floor);
+        return y - (y - scar) * headwall * smooth(side);
     }
 
     /** How far into a strait through a caldera's ring a point is, 0..1, across a half-width of {@code half} blocks. */
@@ -659,6 +674,12 @@ public final class OceanEdifice {
         Probe p = new Probe();
         double shaped = shape(c, gx, gz, p);
         int water = k.seaY - 1;
+        if (p.r > k.shoreR0 && bed < k.floorY) {
+            // The flank under the sea runs down to the floor the plan was made on. Where the real floor lies
+            // deeper, the flank follows it down instead of ending on a shelf with a wall under it.
+            double u = Mth.clamp((p.r - k.shoreR0) / Math.max(1.0, k.footR - k.shoreR0), 0.0, 1.0);
+            shaped += (bed - k.floorY) * smooth(u);
+        }
         int target = (int) Math.round(shaped);
         // Pillow lava piles up in lumps on a young flank.
         if (k.setting == VolcanoSetting.ISLAND && target < water - 12 && pillow(k, gx, gz)) target++;
