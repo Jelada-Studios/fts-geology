@@ -52,8 +52,8 @@ public final class Weathering {
     /** Tallest hanging stack brought down. Separate from {@link #GAP_SEARCH} so a big tree fits after a deep drop. */
     private static final int STACK_LIMIT = 48;
 
-    /** How far from a trunk that came down a crown block still belongs to it, in blocks across. */
-    private static final int CROWN_REACH = TerrainProbe.LEAF_REACH;
+    /** How far across from a felled trunk its crown is taken: a canopy's reach, and a little of the next tree's. */
+    private static final int CROWN_REACH = 6;
 
     /** How far the corridor is widened before settling, so a wide canopy's outer leaves are visited too. */
     private static final int CORRIDOR_DILATION = 12;
@@ -73,8 +73,10 @@ public final class Weathering {
         final long[] columns;
         /** Per column, the highest Y the quake turned to air: the anchor {@link #reseat} measures ground from. */
         final Long2IntMap excavated;
-        /** Per trunk column, how far its tree came down, so the crown round it can come down the same. */
-        final Long2IntOpenHashMap trunkDrop = new Long2IntOpenHashMap();
+        /** Per felled trunk column, the Y its trunk stood on and the Y it reached, so its crown can be taken too. */
+        final Long2IntOpenHashMap felledBase = new Long2IntOpenHashMap(), felledTop = new Long2IntOpenHashMap();
+        /** Time spent, and the longest slice, so a slow corridor shows in the log. */
+        long nanos, worstNanos;
         int cursor;
         int pass;
         int moved;
@@ -205,12 +207,15 @@ public final class Weathering {
         if (level == null) { QUEUE.poll(); return; }
 
         int done = 0;
+        long started = System.nanoTime();
+        try {
         while (done < COLUMNS_PER_TICK && System.nanoTime() < deadline) {
             if (job.cursor >= job.columns.length) {
                 job.cursor = 0;
                 if (++job.pass >= PASSES) {
-                    GeysersMod.LOGGER.info("weathering finished: {} blocks moved over {} columns",
-                            job.moved, job.columns.length);
+                    GeysersMod.LOGGER.info("weathering finished: {} blocks moved over {} columns, {} trees felled, {} ms, longest tick {} ms",
+                            job.moved, job.columns.length, job.felledBase.size(), job.nanos / 1_000_000,
+                            job.worstNanos / 1_000_000);
                     QUEUE.poll();
                     return;
                 }
@@ -238,12 +243,10 @@ public final class Weathering {
             boolean moved;
             if (fallPass) {
                 moved = reseat(level, cx, cz, job.excavated.get(k), job);
-                // Last pass, after reseat: crowns follow their trunks down, spires, canopy that lost its tree,
-                // hanging water.
+                // Last pass, after reseat: the crowns of felled trees, spires, hanging water.
                 if (job.pass == PASSES - 1) {
-                    moved |= lowerCrowns(level, cx, cz, job);
+                    moved |= fellCrowns(level, cx, cz, job);
                     moved |= topple(level, cx, cz, job.excavated.get(k));
-                    moved |= dropOrphanedLeaves(level, cx, cz);
                     moved |= dropUnsupportedWater(level, cx, cz);
                 }
             } else {
@@ -251,13 +254,18 @@ public final class Weathering {
             }
             if (moved) job.moved++;
         }
+        } finally {
+            long spent = System.nanoTime() - started;
+            job.nanos += spent;
+            job.worstNanos = Math.max(job.worstNanos, spent);
+        }
     }
 
     /**
      * Brings down whatever the quake left hanging over this column, as one stack, keeping every block
-     * and its state. A tree rides its ground down: its trunk comes down here and its crown follows in
-     * {@link #lowerCrowns}, so a crown column on its own is left for that. A gap holding fluid is left
-     * alone so a lake is never drained.
+     * and its state. A tree whose ground went is felled instead: its trunk goes here and its crown in
+     * {@link #fellCrowns}, so a crown column on its own is left for that. Moving trees whole was dear and
+     * still left them over rivers. A gap holding fluid is otherwise left alone so a lake is never drained.
      *
      * <p>Ground is found from {@code excavatedTop}, the highest cell the quake emptied, not from
      * {@link TerrainProbe#groundY}, which takes a floating raft for the ground. Nothing below the
@@ -282,12 +290,19 @@ public final class Weathering {
         int base = g + 1;
         while (base < gapLimit && level.getBlockState(m.set(x, base, z)).isAir()) base++;
         int drop = base - (g + 1);
+        // A tree left over water, on a bank the quake took into the river, is felled like one over air.
+        int over = base;
+        while (over < gapLimit && !level.getBlockState(m.set(x, over, z)).getFluidState().isEmpty()) over++;
+        if (over > base && over < gapLimit && isTrunk(level.getBlockState(m.set(x, over, z)))) {
+            return fell(level, x, over, z, job);
+        }
         if (drop <= 0 || base >= gapLimit) return false;
         int limit = Math.min(base + STACK_LIMIT, roof);
 
         // Read the hanging stack. Only fluid stops it: dropping through water would drain a lake.
         int top = base;
-        boolean allPlant = true, trunk = false;
+        boolean allPlant = true;
+        int trunk = Integer.MIN_VALUE;
         while (top < limit) {
             BlockState s = level.getBlockState(m.set(x, top, z));
             if (s.isAir()) break;
@@ -295,14 +310,20 @@ public final class Weathering {
             // Trees are checked first, so they fall even when builds may not move.
             if (!mayMoveBuilds && !isPlant(s) && EruptionHandler.isPlayerPlaced(s)) return false;
             if (!isPlant(s)) allPlant = false;
-            if (isTrunk(s)) trunk = true;
+            if (trunk == Integer.MIN_VALUE && isTrunk(s)) trunk = top;
             top++;
         }
         int height = top - base;
         if (height <= 0) return false;
-        // A crown with no trunk under it in this column is part of a tree standing in another: it follows that
-        // trunk down in lowerCrowns, or goes as an orphan. Dropped on its own it fell to the ground as a heap.
-        if (allPlant && !trunk) return false;
+        // A crown with no trunk under it in this column is part of a tree standing in another and goes with
+        // it in fellCrowns. Dropped on its own it fell to the ground as a heap.
+        if (allPlant && trunk == Integer.MIN_VALUE) return false;
+        // The tree goes; whatever it stood on still comes down.
+        if (trunk != Integer.MIN_VALUE) {
+            fell(level, x, trunk, z, job);
+            height = trunk - base;
+            if (height <= 0) return true;
+        }
 
         // The whole stack comes down together, in order, so it lands the same way up.
         BlockState[] stack = new BlockState[height];
@@ -313,7 +334,6 @@ public final class Weathering {
         for (int i = 0; i < height; i++) {
             level.setBlock(new BlockPos(x, g + 1 + i, z), stack[i], 2);
         }
-        if (trunk) job.trunkDrop.put(key(x, z), drop);
         // A puff of dust where a stack lands, for a drop worth seeing and only sometimes.
         if (drop >= 2 && level.random.nextInt(24) == 0) {
             level.sendParticles(
@@ -417,62 +437,48 @@ public final class Weathering {
     }
 
     /**
-     * Brings this column's crown blocks down as far as the nearest trunk that came down, so a tree lands whole
-     * on its new ground instead of leaving its crown where it was.
-     *
-     * @return true if this column changed
+     * Fells the tree whose trunk starts at {@code from} in this column: the trunk and whatever tree stands on it
+     * go, and the column is noted so {@link #fellCrowns} takes the crown round it on the last pass.
      */
-    private static boolean lowerCrowns(ServerLevel level, int x, int z, Job job) {
-        if (job.trunkDrop.isEmpty()) return false;
-        int drop = 0;
-        double best = Double.MAX_VALUE;
-        for (int dx = -CROWN_REACH; dx <= CROWN_REACH; dx++) {
-            for (int dz = -CROWN_REACH; dz <= CROWN_REACH; dz++) {
-                int d = job.trunkDrop.get(key(x + dx, z + dz));
-                if (d <= 0) continue;
-                double dist = dx * dx + dz * dz;
-                if (dist < best) { best = dist; drop = d; }
-            }
-        }
-        if (drop <= 0) return false;
-        int g = TerrainProbe.groundY(level, x, z);
-        if (g == Integer.MIN_VALUE) return false;
-
+    private static boolean fell(ServerLevel level, int x, int from, int z, Job job) {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-        int top = Math.min(g + 1 + GAP_SEARCH + STACK_LIMIT, level.getMaxBuildHeight() - 1);
-        boolean changed = false;
-        // From the bottom up, so a block lands in the cell the one under it has just left.
-        for (int y = g + 1; y <= top; y++) {
-            BlockState s = level.getBlockState(m.set(x, y, z));
-            if (!TerrainProbe.isCrown(s)) continue;
-            int to = y - drop;
-            if (to <= g || !level.getBlockState(m.set(x, to, z)).isAir()) continue;
-            level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2);
-            level.setBlock(new BlockPos(x, to, z), s, 2);
-            changed = true;
+        int roof = Math.min(from + STACK_LIMIT, level.getMaxBuildHeight() - 1);
+        int top = from;
+        while (top <= roof && isPlant(level.getBlockState(m.set(x, top, z)))) {
+            level.setBlock(new BlockPos(x, top, z), Blocks.AIR.defaultBlockState(), 2);
+            top++;
         }
-        return changed;
+        long k = key(x, z);
+        job.felledBase.put(k, from);
+        job.felledTop.put(k, top - 1);
+        return true;
     }
 
     /**
-     * Clears leaves and mushroom caps no trunk holds, by {@link TerrainProbe#crownHeld}. Vanilla would never
-     * rot them: the quake writes without neighbour updates, so their distance property is never recomputed.
+     * Takes the crown of every felled tree within {@link #CROWN_REACH} of this column: leaves and mushroom caps
+     * between the trunk's foot and a little over its top. A neighbouring tree may lose a few overlapping leaves;
+     * finding each leaf's own trunk cost more than the quake itself.
      *
      * @return true if this column changed
      */
-    private static boolean dropOrphanedLeaves(ServerLevel level, int x, int z) {
-        int g = TerrainProbe.groundY(level, x, z);
-        if (g == Integer.MIN_VALUE) return false;
-
+    private static boolean fellCrowns(ServerLevel level, int x, int z, Job job) {
+        if (job.felledBase.isEmpty()) return false;
+        int lo = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
+        for (int dx = -CROWN_REACH; dx <= CROWN_REACH; dx++) {
+            for (int dz = -CROWN_REACH; dz <= CROWN_REACH; dz++) {
+                long k = key(x + dx, z + dz);
+                if (!job.felledBase.containsKey(k)) continue;
+                lo = Math.min(lo, job.felledBase.get(k) - 1);
+                hi = Math.max(hi, job.felledTop.get(k) + 8);
+            }
+        }
+        if (lo > hi) return false;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-        int top = Math.min(g + 1 + GAP_SEARCH + STACK_LIMIT, level.getMaxBuildHeight() - 1);
+        int floor = level.getMinBuildHeight(), roof = level.getMaxBuildHeight() - 1;
         boolean changed = false;
-        for (int y = g + 1; y <= top; y++) {
-            BlockState s = level.getBlockState(m.set(x, y, z));
-            if (!TerrainProbe.isCrown(s)) continue;
-            BlockPos p = new BlockPos(x, y, z);
-            if (TerrainProbe.crownHeld(level, p, s)) continue;
-            level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+        for (int y = Math.max(lo, floor); y <= Math.min(hi, roof); y++) {
+            if (!TerrainProbe.isCrown(level.getBlockState(m.set(x, y, z)))) continue;
+            level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2);
             changed = true;
         }
         return changed;
