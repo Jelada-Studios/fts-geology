@@ -357,6 +357,7 @@ public final class VolcanoField {
         Map<StructureKey, Boolean> structures = new HashMap<>();
 
         boolean ocean = GeyserConfig.OCEAN_VOLCANOES.get();
+        boolean calderas = GeyserConfig.LARGE_CALDERAS.get();
         // A plume first: fewer of them, and the grander sight. A centre just outside the usable part
         // of the cell is pulled in.
         for (int[] p : HotspotMap.plumeCentres(level, minX - PLUME_PULL, minZ - PLUME_PULL,
@@ -381,7 +382,7 @@ public final class VolcanoField {
                 if (s != null) return new Cell(s, refused);
             }
             // A really large hotspot volcano has often emptied its chamber and fallen in.
-            VolcanoType type = rand01(hash(seed, 0, 0, 0xCA1DL)) < 0.34
+            VolcanoType type = calderas && rand01(hash(seed, 0, 0, 0xCA1DL)) < 0.34
                     ? VolcanoType.CALDERA : VolcanoType.SHIELD;
             Site s = checkNear(level, x, z, type, seed, refused, null, minX, minZ, maxX, maxZ, structures);
             if (s != null) return new Cell(s, refused);
@@ -400,7 +401,7 @@ public final class VolcanoField {
             if (s.stress() < MIN_STRESS) continue;
             VolcanoType type = switch (s.faultType()) {
                 // A quarter of the arc volcanoes have blown their tops off, as at Crater Lake or Aso.
-                case CONVERGENT_SUBDUCTION -> rand01(hash(seed, i, 4, 0xCA2DL)) < 0.25
+                case CONVERGENT_SUBDUCTION -> calderas && rand01(hash(seed, i, 4, 0xCA2DL)) < 0.25
                         ? VolcanoType.CALDERA : VolcanoType.STRATOVOLCANO;
                 // A third of the rift volcanoes have built a broad basalt shield, as many in Iceland have.
                 case DIVERGENT -> rand01(hash(seed, i, 5, 0x5E1DL)) < 0.35

@@ -39,6 +39,8 @@ public final class SurfaceFeatures {
      * above this the colour bands of neighbouring pools run into one another.
      */
     static final double BASIN_SPRING_BOOST = 2.25;
+    /** How far past a large volcano's body its heat still floors the hot-spring fit, in blocks. */
+    static final int APRON_SPRINGS = 250;
 
     /** Springs the surface pass expected since the last report: the sum of its per-chunk chances. */
     static final java.util.concurrent.atomic.DoubleAdder EXPECTED_SPRINGS = new java.util.concurrent.atomic.DoubleAdder();
@@ -113,13 +115,18 @@ public final class SurfaceFeatures {
         double floor = net.minecraft.util.Mth.clamp(
                 (GeothermalBasin.basin(level, centreX, centreZ) - 0.30) / 0.30, 0.0, 1.0);
         springBoost = Math.max(springBoost, 1.0 + (BASIN_SPRING_BOOST - 1.0) * floor);
-        double springChance = GeyserConfig.HOT_SPRING_SPAWN_CHANCE.get() * fit.hotSpring() * springBoost;
+        double springFit = fit.hotSpring();
         // A large volcano's body is its own ground; its summit builds any springs it gets. A caldera's floor is a
-        // basin, and the apron round the body is ordinary country, where springs belong as they do round Fuji.
-        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.bodyMargin(level, centreX, centreZ) < 0
-                && !com.jeladastudios.ftsgeology.volcano.VolcanoField.onCalderaFloor(level, centreX, centreZ)) {
-            springChance = 0.0;
+        // basin. The apron and the country out to APRON_SPRINGS blocks past the body is where springs cluster, as
+        // they do round Fuji, Hakone or Beppu: the mountain's own heat carries them there whatever the arc's stress
+        // says, so the fit is floored and fades out with distance.
+        double margin = com.jeladastudios.ftsgeology.volcano.VolcanoField.bodyMargin(level, centreX, centreZ);
+        if (margin < 0) {
+            if (!com.jeladastudios.ftsgeology.volcano.VolcanoField.onCalderaFloor(level, centreX, centreZ)) springFit = 0.0;
+        } else if (margin < APRON_SPRINGS) {
+            springFit = Math.max(springFit, 0.6 * (1.0 - margin / APRON_SPRINGS));
         }
+        double springChance = GeyserConfig.HOT_SPRING_SPAWN_CHANCE.get() * springFit * springBoost;
         EXPECTED_SPRINGS.add(Math.min(1.0, springChance));
         if (rng.nextDouble() < springChance) {
             generateHotSpring(level, cp, rng);

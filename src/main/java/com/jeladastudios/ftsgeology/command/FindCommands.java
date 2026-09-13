@@ -2,6 +2,7 @@ package com.jeladastudios.ftsgeology.command;
 
 import com.mojang.brigadier.context.CommandContext;
 import com.jeladastudios.ftsgeology.GeysersMod;
+import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.tectonics.FaultType;
 import com.jeladastudios.ftsgeology.tectonics.HotspotMap;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
@@ -127,6 +128,10 @@ public final class FindCommands {
             case "caldera", "flooded" -> VolcanoType.CALDERA;
             default -> null;
         };
+        if ("caldera".equals(typeName) && !GeyserConfig.LARGE_CALDERAS.get()) {
+            ctx.getSource().sendFailure(Component.translatable("command.fts_geology.field.calderas_off"));
+            return 0;
+        }
         final com.jeladastudios.ftsgeology.volcano.VolcanoSetting onlySetting = typeName == null ? null : switch (typeName) {
             // A type on its own means the mountain on land; the islands have their own words.
             case "strato", "shield", "fissure", "caldera" -> com.jeladastudios.ftsgeology.volcano.VolcanoSetting.LAND;
