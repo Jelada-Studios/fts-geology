@@ -398,10 +398,21 @@ public final class VolcanoField {
                     && oceanDepth(level, x, z) >= ISLAND_DEPTH) {
                 boolean dead = type == VolcanoType.STRATOVOLCANO
                         && VolcanoActivity.of(seed, x, z, type, VolcanoSetting.ISLAND) == VolcanoActivity.EXTINCT;
-                double age = 0.2 + 0.4 * rand01(hash(seed, x, z, 0xA6EDL));
+                double ageRoll = rand01(hash(seed, x, z, 0xA6EDL));
+                // Younger than a plume's track: an old arc island is worn and cliffed but still stands well out of the sea.
+                double age = 0.1 + 0.3 * ageRoll;
+                // The oldest, in a warm sea, have sunk under their reef: Darwin's atoll, on an arc as on a plume.
+                VolcanoSetting old = ageRoll >= 0.6 && seaTemperature(level, x, z) > OceanEdifice.REEF_TEMPERATURE
+                        ? VolcanoSetting.ATOLL : VolcanoSetting.ERODED;
                 Site island = dead
-                        ? checkOcean(level, x, z, type, VolcanoSetting.ERODED, age, seed, refused, structures)
+                        ? checkOcean(level, x, z, type, old, old == VolcanoSetting.ATOLL ? 0.4 + age : age, seed,
+                                refused, structures)
                         : checkOcean(level, x, z, type, VolcanoSetting.ISLAND, 0.0, seed, refused, structures);
+                // A sea too shallow for an atoll still holds the old island itself.
+                if (island == null && dead && old == VolcanoSetting.ATOLL) {
+                    island = checkOcean(level, x, z, type, VolcanoSetting.ERODED, age, seed, new int[refused.length],
+                            structures);
+                }
                 if (island != null) return new Cell(island, refused);
             }
             Site site = checkNear(level, x, z, type, seed, refused, s.faultType(), minX, minZ, maxX, maxZ,
@@ -477,8 +488,8 @@ public final class VolcanoField {
             // Cameroon line does.
             double start = rand01(hash(seed, (int) t.x(), (int) t.z(), 0x7A11L));
             int[] uncounted = new int[refused.length];
-            for (int i = 0; i < 5; i++) {
-                double along = span[0] + (span[1] - span[0]) * ((start + i * 0.2) % 1.0);
+            for (int i = 0; i < 8; i++) {
+                double along = span[0] + (span[1] - span[0]) * ((start + i * 0.125) % 1.0);
                 if (along < TRAIL_START) continue;
                 int x = (int) Math.round(t.x() + t.dirX() * along), z = (int) Math.round(t.z() + t.dirZ() * along);
                 double age = along / length;

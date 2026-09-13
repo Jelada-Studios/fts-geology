@@ -40,6 +40,10 @@ public final class OceanEdifice {
 
     /** How far the thin apron of debris runs over the sea floor past the foot. */
     static final int APRON = 30;
+    /** The flank under the sea: steepest just under the shore, easing to the floor. Under 1.6 it stood as a wall. */
+    static final double SUBMARINE_EXP = 1.25;
+    /** How far anything of an island may reach from its centre, inside the field's cell margin. */
+    static final int MAX_REACH = 596;
 
     /** How far a lava delta may build out past the shoreline. */
     private static final double DELTA_LEN = 8.0;
@@ -123,12 +127,20 @@ public final class OceanEdifice {
         double calderaRing = Mth.clamp(c.craterR * 0.6, 100.0, 140.0);
         // The land-sized cone the plan rolled, less of it above the sea: the rest is under water. A caldera's rim
         // stands higher the bigger the eruption that emptied it.
+        // An old cone is worn low and round, not the sharp peak it was.
+        boolean worn = cone && setting == VolcanoSetting.ERODED;
         k.h0 = caldera ? 18 + (int) Math.round(2.5 * Math.max(0, c.magnitude - 22))
-                : Math.max(24, (int) Math.round(c.coneHeight * (cone ? 0.6 : 0.8)));
+                : Math.max(24, (int) Math.round(c.coneHeight * (worn ? 0.5 : cone ? 0.6 : 0.8)));
         k.subaerial = caldera ? 3.0 : cone ? 2.0 : 3.6;
-        k.submarine = cone || caldera ? 1.8 : 2.2;
+        // Submarine flanks run out gently, some 1:2.5 on a cone and 1:3 on a shield.
+        k.submarine = cone || caldera ? 2.5 : 3.0;
         k.shoreR0 = caldera ? calderaRing + 8 + k.h0 * k.subaerial : c.craterR + k.h0 * k.subaerial;
-        k.footR = k.shoreR0 + Math.max(6, seaY - c.baseY) * k.submarine;
+        double depth = Math.max(6, seaY - c.baseY);
+        double stretchMax = (cone || caldera ? 1.0 : 1.36) * 1.11;
+        // Kept inside the cell margin: a deep floor would otherwise push the foot past what a chunk may write.
+        double footMax = (MAX_REACH - APRON - 4) / stretchMax;
+        k.submarine = Math.min(k.submarine, Math.max(1.5, (footMax - k.shoreR0) / depth));
+        k.footR = k.shoreR0 + depth * k.submarine;
         k.noise = rng.nextInt(1 << 16);
 
         // Two rift zones roughly opposite, or three roughly a third apart; a stratocone and a caldera have none.
@@ -175,10 +187,9 @@ public final class OceanEdifice {
             k.coneH = 10 + 8 * coneHeightRoll;
         }
 
-        double stretchMax = (arms > 0 ? 1.36 : 1.0) * 1.11;
         k.edifice = (int) Math.ceil(k.footR * stretchMax) + 4;
         // Inside the field's cell margin, so neighbouring volcanoes never meet.
-        k.debrisLen = k.slideHalf > 0 ? Math.max(0, Math.min(150, 596 - k.edifice - APRON)) : 0;
+        k.debrisLen = k.slideHalf > 0 ? Math.max(0, Math.min(150, MAX_REACH - k.edifice - APRON)) : 0;
         k.reach = k.edifice + APRON + k.debrisLen;
 
         c.summitY = switch (setting) {
@@ -257,12 +268,13 @@ public final class OceanEdifice {
         if (r <= c.craterR) return k.seaY + k.h0;
         if (r <= k.shoreR0) {
             double s = (r - c.craterR) / Math.max(1.0, k.shoreR0 - c.craterR);
+            // A live cone is steep; an old one has been rounded off.
             return c.type == VolcanoType.STRATOVOLCANO
-                    ? k.seaY + k.h0 * Math.pow(1.0 - s, 1.5)
+                    ? k.seaY + k.h0 * Math.pow(1.0 - s, k.setting == VolcanoSetting.ERODED ? 1.15 : 1.5)
                     : k.seaY + k.h0 * (1.0 - Math.pow(s, 1.3));
         }
         double u = Math.min(1.0, (r - k.shoreR0) / Math.max(1.0, k.footR - k.shoreR0));
-        return k.seaY - (k.seaY - k.floorY) * (1.0 - Math.pow(1.0 - u, 1.6));
+        return k.seaY - (k.seaY - k.floorY) * (1.0 - Math.pow(1.0 - u, SUBMARINE_EXP));
     }
 
     /** Where a sunken shield's shore is now, as a radius. */
@@ -280,7 +292,7 @@ public final class OceanEdifice {
         if (k.sunk <= 0) return k.footR;
         double depth = k.seaY - k.floorY;
         if (k.sunk < depth) {
-            return k.shoreR0 + (1.0 - Math.pow(k.sunk / depth, 1.0 / 1.6)) * (k.footR - k.shoreR0);
+            return k.shoreR0 + (1.0 - Math.pow(k.sunk / depth, 1.0 / SUBMARINE_EXP)) * (k.footR - k.shoreR0);
         }
         // Sunk further than the sea is deep: what was dry flank now meets the floor.
         double above = k.sunk - depth;
@@ -375,7 +387,7 @@ public final class OceanEdifice {
             y = k.seaY + h * (1.0 - smooth(s));
         } else {
             double u = Math.min(1.0, (r - k.shoreR0) / Math.max(1.0, k.footR - k.shoreR0));
-            y = k.seaY - (k.seaY - k.floorY) * (1.0 - Math.pow(1.0 - u, 1.6));
+            y = k.seaY - (k.seaY - k.floorY) * (1.0 - Math.pow(1.0 - u, SUBMARINE_EXP));
         }
         if (r >= k.ringR - 2) y += VolcanoEdifice.surfaceNoise(c, gx, gz) * 1.8 * Mth.clamp((y - water) / 6.0, 0.0, 1.0);
         // The strait itself: a channel with sloping sides, deepest in its middle.
@@ -403,7 +415,8 @@ public final class OceanEdifice {
                 return top;
             }
         }
-        if ((p.bits & (CLIFF | LAGOON)) == 0) y = beach(y, water);
+        // No broad strand where the island meets a coast: the profile crosses the sea level and the coast keeps its shore.
+        if ((p.bits & (CLIFF | LAGOON)) == 0 && !landAtCoast(k, ang)) y = beach(y, water);
         return y;
     }
 
@@ -467,7 +480,9 @@ public final class OceanEdifice {
                 p.bits |= CONE;
             }
         }
-        if ((p.bits & (REEF | RIM | MOTU | DELTA | CONE | RING | CLIFF | LAGOON)) == 0) y = beach(y, water);
+        if ((p.bits & (REEF | RIM | MOTU | DELTA | CONE | RING | CLIFF | LAGOON)) == 0 && !landAtCoast(k, ang)) {
+            y = beach(y, water);
+        }
         return y;
     }
 
@@ -489,6 +504,8 @@ public final class OceanEdifice {
         double head = smooth(Mth.clamp((s - 0.15) / 0.2, 0.0, 1.0));
         double wind = 1.0 + 0.6 * Math.max(0.0, Math.cos(ang - k.windAim));
         double depth = (8.0 + 10.0 * Mth.clamp(k.age * 2.5, 0.0, 1.0)) * wind;
+        // An old cone's flanks are cut deeper still: a stratocone's ash gullies faster than a shield's lava.
+        if (c.type == VolcanoType.STRATOVOLCANO) depth *= 1.4;
         return depth * Math.pow(cut, 0.7) * head;
     }
 
@@ -655,12 +672,6 @@ public final class OceanEdifice {
                 level.setBlock(pos, Blocks.WATER.defaultBlockState(), Block.UPDATE_CLIENTS);
             }
             VolcanoSummit.setRock(level, new BlockPos(gx, target, gz), surface(c, k, rng, gx, target, gz, p.bits, 0.0, p));
-            return;
-        }
-        // The strand is laid only over deep sea floor, and not where the island touches a coast: there the coast keeps
-        // its own shore, since a strand filled up to it ended on the bank in a step.
-        if (target >= water - 1 && target <= water + 1 && bed < target && (bed >= water - 3 || landAtCoast(k, p.ang))
-                && (p.bits & (LAGOON | REEF | RIM | MOTU | KAMENI | POND | CLIFF | DELTA | CONE | RING | TOP)) == 0) {
             return;
         }
         double spread = apron(k, p), rubble = debris(k, gx, gz, p);
@@ -971,8 +982,8 @@ public final class OceanEdifice {
     /** Dry ground: a live shield's skin and flows, a stratocone's, or an old island weathered to soil to its top. */
     static BlockState land(Ctx c, Isle k, RandomSource rng, int gx, int y, int gz, double slope, Probe p) {
         BlockState rock = body(c, k, rng, gx, y, gz, 0);
-        // Cliffs and valley walls show the lava beds they were cut through.
-        if (slope >= 1.6) return rock;
+        // Cliffs and valley walls show the lava beds they were cut through; an old island is soil to a steeper pitch.
+        if (slope >= (k.setting == VolcanoSetting.ISLAND ? 1.6 : 2.0)) return rock;
         if (c.type == VolcanoType.CALDERA) {
             // The ring's outer slopes: grass on weathered ash, and here and there pale pumice where the cover is thin,
             // in small ragged patches with ash and scree round them.
