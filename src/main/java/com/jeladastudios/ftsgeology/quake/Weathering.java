@@ -453,6 +453,7 @@ public final class Weathering {
             top++;
         }
         job.felledBase.put(key(x, z), from);
+        int reach = CROWN_REACH;
         if (withNeighbours) {
             // The rest of a two-by-two trunk: a log beside this one at its foot, or a block either side of it.
             for (int dx = -1; dx <= 1; dx++) {
@@ -466,25 +467,28 @@ public final class Weathering {
                         int foot = y;
                         while (foot - 1 > level.getMinBuildHeight() && isTrunk(level.getBlockState(m.set(nx, foot - 1, nz)))) foot--;
                         fell(level, nx, foot, nz, job, false);
+                        // A big tree's crown spreads further than a single trunk's: a dark oak's outer leaves
+                        // sit seven blocks out, and left behind they rot one by one into items.
+                        reach = CROWN_REACH + 2;
                         break;
                     }
                 }
             }
         }
-        takeCrown(level, x, from - 1, top + 8, z);
+        takeCrown(level, x, from - 1, top + 8, z, reach);
         return true;
     }
 
     /**
-     * Takes the crown round a felled trunk: leaves and mushroom caps within {@link #CROWN_REACH} of it, between
+     * Takes the crown round a felled trunk: leaves and mushroom caps within {@code reach} of it, between
      * the trunk's foot and a little over its top. A neighbouring tree may lose a few overlapping leaves;
      * finding each leaf's own trunk cost more than the quake itself.
      */
-    private static void takeCrown(ServerLevel level, int x, int lo, int hi, int z) {
+    private static void takeCrown(ServerLevel level, int x, int lo, int hi, int z, int reach) {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         int floor = Math.max(lo, level.getMinBuildHeight()), roof = Math.min(hi, level.getMaxBuildHeight() - 1);
-        for (int dx = -CROWN_REACH; dx <= CROWN_REACH; dx++) {
-            for (int dz = -CROWN_REACH; dz <= CROWN_REACH; dz++) {
+        for (int dx = -reach; dx <= reach; dx++) {
+            for (int dz = -reach; dz <= reach; dz++) {
                 int cx = x + dx, cz = z + dz;
                 if (!level.hasChunkAt(m.set(cx, floor, cz))) continue;
                 for (int y = floor; y <= roof; y++) {

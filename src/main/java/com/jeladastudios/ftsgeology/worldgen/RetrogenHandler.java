@@ -98,15 +98,16 @@ public final class RetrogenHandler {
 
     @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
-        if (!GeyserConfig.RETROGEN_ENABLED.get()) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         if (!(event.getChunk() instanceof LevelChunk chunk)) return;
 
         // Any earthquake deformation that was waiting on this chunk lands now. Chunk-local and
-        // cheap, so it is safe to do inline.
+        // cheap, so it is safe to do inline. Before the retrogen gate: a quake's far ends are owed
+        // whether or not old chunks get geology.
         com.jeladastudios.ftsgeology.quake.PendingEdits.onChunkLoaded(level, chunk.getPos());
         com.jeladastudios.ftsgeology.quake.Weathering.onChunkLoaded(level, chunk.getPos());
         com.jeladastudios.ftsgeology.quake.CaveCollapse.onChunkLoaded(level, chunk.getPos());
+        if (!GeyserConfig.RETROGEN_ENABLED.get()) return;
 
         String key = keyOf(level, chunk);
         boolean surfaceDone = PROCESSED.contains(key);

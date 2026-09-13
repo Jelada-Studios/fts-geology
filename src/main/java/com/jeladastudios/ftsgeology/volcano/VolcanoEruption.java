@@ -316,13 +316,14 @@ public final class VolcanoEruption {
             }
             // A stream over the surface leaves a skin, never a course laid on top: cooling in place combed a flank
             // with ridges one block high along every finger the flow split into. The ground it ran over turns to
-            // rock; the volcano's own rock takes a fresh crust.
+            // rock, mostly tuff so the trace reads as baked ground rather than a black stripe; the volcano's own
+            // rock takes a fresh crust.
             level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
             if (below.is(Blocks.BEDROCK) || below.hasBlockEntity()
                     || com.jeladastudios.ftsgeology.eruption.EruptionHandler.isPlayerPlaced(below)) continue;
             BlockState skin = ownRock(below)
                     ? com.jeladastudios.ftsgeology.registry.ModBlocks.COOLING_LAVA_CRUST.get().defaultBlockState()
-                    : (level.random.nextInt(3) == 0 ? Blocks.TUFF : Blocks.BASALT).defaultBlockState();
+                    : (level.random.nextInt(100) < 65 ? Blocks.TUFF : Blocks.BASALT).defaultBlockState();
             level.setBlock(p.below(), skin, 2);
         }
     }

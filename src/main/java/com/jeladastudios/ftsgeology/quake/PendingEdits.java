@@ -154,6 +154,9 @@ public final class PendingEdits {
         List<PendingRupture> ruptures = WAITING.remove(key(level.dimension(), cp.x, cp.z));
         if (ruptures == null || ruptures.isEmpty()) return;
 
+        // Everything written here is weathered afterwards, exactly as a live rupture's corridor is:
+        // a replayed chunk left as written keeps its trees and vines standing over the cut.
+        List<QuakePlanner.Edit> applied = new ArrayList<>();
         for (PendingRupture r : ruptures) {
             try {
                 QuakePlanner.Snapshot snap = QuakePlanner.snapshot(level, r.trace(), r.type(),
@@ -163,12 +166,14 @@ public final class PendingEdits {
                 for (QuakePlanner.Edit e : plan.edits()) {
                     if ((e.pos().getX() >> 4) != cp.x || (e.pos().getZ() >> 4) != cp.z) continue;
                     level.setBlock(e.pos(), e.state(), Earthquake.FLAGS);
+                    applied.add(e);
                 }
             } catch (Exception ex) {
                 com.jeladastudios.ftsgeology.GeysersMod.LOGGER.warn(
                         "quake replay failed for chunk {}: {}", cp, ex.toString());
             }
         }
+        if (!applied.isEmpty()) Weathering.enqueue(level, applied);
     }
 
     /** Drops everything; called when a server stops, and by the cancel command. */

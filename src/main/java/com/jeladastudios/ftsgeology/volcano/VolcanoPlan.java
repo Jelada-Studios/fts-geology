@@ -189,9 +189,10 @@ public final class VolcanoPlan {
         // Where this mountain's flows went. Two to four of them, spread around the circle with
         // enough jitter that they are not symmetrical, each running a little past the foot of the
         // cone so the tongue carries on over the apron instead of stopping at a contour.
-        // A stratocone keeps to a few flows; a shield is covered in them.
+        // A stratocone keeps to a few flows; a shield carries a few more, but not so many that a big one is
+        // combed with evenly spaced radial stripes.
         int moreFlows = rng.nextInt(3);
-        c.flows = type == VolcanoType.STRATOVOLCANO ? 2 + moreFlows : 2 + moreFlows + c.coneBaseR / 30;
+        c.flows = type == VolcanoType.STRATOVOLCANO ? 2 + moreFlows : 2 + moreFlows + c.coneBaseR / 80;
         c.flowAim = new double[c.flows];
         c.flowPhase = new double[c.flows];
         double spin = rng.nextDouble() * Math.PI * 2;
@@ -208,9 +209,11 @@ public final class VolcanoPlan {
         }
         // Flow width scales with the cone, so a big mountain is not threaded with thin lines. Many
         // narrow flows cover about a tenth of the flank without breaking a centreline.
-        // Flows are thin tongues, not bands that widen with the mountain; a shield's are many but narrow.
+        // Flows are thin tongues, not bands that widen with the mountain; a big shield's are broad sheets
+        // rather than threads.
         c.flowWidth = type == VolcanoType.FISSURE || type == VolcanoType.STRATOVOLCANO ? 0.8
-                : type == VolcanoType.SHIELD ? 1.1 : Math.max(1.0, c.coneBaseR / 34.0);
+                : type == VolcanoType.SHIELD ? (size == VolcanoSize.LARGE ? 2.4 : 1.1)
+                : Math.max(1.0, c.coneBaseR / 34.0);
         // An extinct mountain's flows weathered into its soil long ago.
         if (activity == VolcanoActivity.EXTINCT) c.flows = 0;
 
