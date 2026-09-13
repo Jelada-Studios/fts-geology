@@ -37,12 +37,19 @@ public final class RiverNetwork {
     private static final int MAX_CELLS = 20_000;
     /** Half a channel this wide, in cells, is a lake: sixteen blocks either side of the centre. */
     static final int LAKE_HALF = 4;
+    /**
+     * How far out from a lake's core its shores still count as lake, in cells. The cells round an island in a
+     * lake are narrow, and without this they passed for a channel and had bends planned on the island's shore.
+     */
+    static final int LAKE_SHORE = 6;
     /** Cells from the mouth that are the delta, where a bend is never planned. */
     static final int MOUTH_ZONE = 8;
 
-    /** One river cell: distance to the mouth along the river, cells upstream of it, and its distance to the bank. */
-    public record Node(int dist, int upstream, int halfWidth) {
-        public boolean lake() { return halfWidth >= LAKE_HALF; }
+    /**
+     * One river cell: distance to the mouth along the river, cells upstream of it, its distance to the bank, and
+     * whether it is part of a lake (wide water, or its shore).
+     */
+    public record Node(int dist, int upstream, int halfWidth, boolean lake) {
         public boolean directed() { return dist >= 0; }
     }
 
@@ -210,10 +217,20 @@ public final class RiverNetwork {
             }
         }
 
+        // Lakes: the wide water, and its shores out to LAKE_SHORE cells, islands' shores included.
+        Long2ObjectOpenHashMap<int[]> lake = new Long2ObjectOpenHashMap<>();
+        bfs.clear();
+        for (long c : river) {
+            int[] h = half.get(c);
+            if (h != null && h[0] >= LAKE_HALF) { lake.put(c, new int[] {0}); bfs.add(c); }
+        }
+        spread(river, lake, bfs);
+
         Long2ObjectOpenHashMap<Node> out = new Long2ObjectOpenHashMap<>(river.size());
         for (long c : river) {
-            int[] d = dist.get(c), u = up.get(c), h = half.get(c);
-            out.put(c, new Node(d == null ? -1 : d[0], u == null ? 0 : u[0], h == null ? 1 : h[0]));
+            int[] d = dist.get(c), u = up.get(c), h = half.get(c), l = lake.get(c);
+            out.put(c, new Node(d == null ? -1 : d[0], u == null ? 0 : u[0], h == null ? 1 : h[0],
+                    l != null && l[0] <= LAKE_SHORE));
         }
         GeysersMod.LOGGER.info("river network from {},{}: {} cells{}, {} mouths, {} biome samples, {} ms",
                 qx0 * 4, qz0 * 4, river.size(), cut ? " (cut short)" : "", mouths.size(), samples,

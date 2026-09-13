@@ -36,6 +36,11 @@ public final class RiverSurvey extends SavedData {
 
     /** Widest channel handled as one river; a braided Terralith river is treated as this wide. */
     static final int MAX_WIDTH = 24;
+    /**
+     * Widest channel that meanders here. A river wider than this is a big river, whose bends are kilometres long
+     * and outside the scale of a survey window; cut and filled at this scale it only looked bitten.
+     */
+    static final int BIG_RIVER = 16;
     /** Highest bank, over the water, a bend may still cut into. A canyon does not meander. */
     static final int MAX_BANK = 4;
     /** Furthest a bend may shift, as a share of the channel width. */
@@ -235,7 +240,7 @@ public final class RiverSurvey extends SavedData {
             for (int wx = 16; wx < 32; wx++) {
                 if (!skel[wx][wz]) continue;
                 int width = Math.min(MAX_WIDTH, 2 * dist[wx][wz] - 1);
-                if (width < 3) continue;
+                if (width < 3 || width > BIG_RIVER) continue;
                 // A lake, or the delta at the mouth: the water stands still, the banks stay.
                 RiverNetwork.Node node = RiverNetwork.at(level, x0 + wx, z0 + wz);
                 if (node != null && (node.lake() || (node.directed() && node.dist() < RiverNetwork.MOUTH_ZONE))) continue;

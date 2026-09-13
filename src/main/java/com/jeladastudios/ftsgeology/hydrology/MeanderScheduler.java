@@ -276,6 +276,10 @@ public final class MeanderScheduler {
         double tx = -b.nz, tz = b.nx;
         boolean done = false, wait = false;
         for (int j = -m; j <= m; j++) {
+            // The band tapers: a transect towards its end is allowed fewer of the bend's steps, so the bite and the
+            // bar are deepest in the middle and shallow out to nothing, a crescent rather than a rectangle.
+            double f = (double) j / (m + 1);
+            if (b.done >= (int) Math.round(b.steps * (1.0 - f * f))) continue;
             int res = transect(level, r, b, b.x + 0.5 + tx * j, b.z + 0.5 + tz * j);
             if (res == STEP_DONE) done = true;
             else if (res == STEP_WAIT) wait = true;
@@ -355,13 +359,33 @@ public final class MeanderScheduler {
             if (s.is(Blocks.BEDROCK) || (EruptionHandler.isPlayerPlaced(s) && !s.isAir())) break;
             level.setBlock(new BlockPos(ox, y, oz), Blocks.WATER.defaultBlockState(), FLAGS);
         }
+        // The bank behind slumps: where it stands two or more over the water its top block comes down onto the new
+        // bed, so the cut edge is a collapsed slope a block lower with the bed a block shallower under it, not a
+        // wall dropping straight to the channel's floor. Not from under a tree, and not a build.
+        if (cut >= 2) {
+            int gb = TerrainProbe.groundY(level, bx, bz);
+            if (gb != Integer.MIN_VALUE && gb - yW >= 2) {
+                BlockState top = level.getBlockState(m.set(bx, gb, bz));
+                BlockState over = level.getBlockState(m.set(bx, gb + 1, bz));
+                if (!EruptionHandler.isPlayerPlaced(top) && top.getFluidState().isEmpty() && !top.hasBlockEntity()
+                        && RockTypes.erodibility(top) >= 0.5 && (over.isAir() || TerrainProbe.isVegetation(over))) {
+                    if (!over.isAir()) level.setBlock(new BlockPos(bx, gb + 1, bz), Blocks.AIR.defaultBlockState(), FLAGS);
+                    level.setBlock(new BlockPos(bx, gb, bz), Blocks.AIR.defaultBlockState(), FLAGS);
+                    BlockState fallen = top.is(Blocks.GRASS_BLOCK) || top.is(Blocks.PODZOL) || top.is(Blocks.MYCELIUM)
+                            || top.is(Blocks.DIRT_PATH) ? Blocks.DIRT.defaultBlockState() : top;
+                    level.setBlock(new BlockPos(ox, yW - cut + 1, oz), fallen, FLAGS);
+                }
+            }
+        }
 
-        // Fill: the bar, a wedge rising towards the inner bank, a cell longer and a block higher every step, its
-        // face one in one under the water and a dry crescent of sand at the water line. Only where the water is
-        // shallow: in deep water a bar would be a pillar, and what a river drops in a lake is a delta, not a bar.
+        // Fill: the bar, a wedge rising towards the inner bank, a cell longer and a block higher every step, but
+        // never steeper than one in three under the water, with a dry crescent of sand at the water line, and never
+        // further out than a third of the channel. Only where the water is shallow: in deep water a bar would be a
+        // pillar, and what a river drops in a lake is a delta, not a bar.
         if (ix != Integer.MIN_VALUE) {
             int grown = b.done + 1;
-            for (int i = 0; i < Math.min(grown, tIn); i++) {
+            int wide = Math.max(2, b.width / 3);
+            for (int i = 0; i < Math.min(Math.min(grown, tIn), wide); i++) {
                 int t = tIn - i;
                 int x = (int) Math.floor(ax - b.nx * t), z = (int) Math.floor(az - b.nz * t);
                 if (!level.hasChunkAt(m.set(x, yW, z))) break;
@@ -370,7 +394,7 @@ public final class MeanderScheduler {
                         && level.getBlockState(m.set(x, bottom - 1, z)).getFluidState().is(FluidTags.WATER)) bottom--;
                 if (yW - bottom + 1 > BAR_DEPTH) continue;
                 if (!holds(level.getBlockState(m.set(x, bottom - 1, z)))) continue;   // nothing under it to rest on
-                int target = Math.min(yW, bottom - 1 + grown - i);
+                int target = Math.min(yW - i / 3, bottom - 1 + grown - i);
                 for (int y = bottom; y <= target; y++) {
                     BlockState s = level.getBlockState(m.set(x, y, z));
                     if (!s.getFluidState().is(FluidTags.WATER)) continue;
