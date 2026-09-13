@@ -38,9 +38,11 @@ public final class SurfaceFeatures {
      * How much denser they get deep on a painted basin floor. It comes on top of the plume's own boost, and
      * above this the colour bands of neighbouring pools run into one another.
      */
-    static final double BASIN_SPRING_BOOST = 2.25;
+    static final double BASIN_SPRING_BOOST = 1.7;
     /** How far past a large volcano's body its heat still floors the hot-spring fit, in blocks. */
     static final int APRON_SPRINGS = 250;
+    /** The hot-spring fit on a large volcano's lower flank: a few pools, not a field. */
+    static final double BODY_SPRINGS = 0.15;
 
     /** Springs the surface pass expected since the last report: the sum of its per-chunk chances. */
     static final java.util.concurrent.atomic.DoubleAdder EXPECTED_SPRINGS = new java.util.concurrent.atomic.DoubleAdder();
@@ -122,7 +124,13 @@ public final class SurfaceFeatures {
         // says, so the fit is floored and fades out with distance.
         double margin = com.jeladastudios.ftsgeology.volcano.VolcanoField.bodyMargin(level, centreX, centreZ);
         if (margin < 0) {
-            if (!com.jeladastudios.ftsgeology.volcano.VolcanoField.onCalderaFloor(level, centreX, centreZ)) springFit = 0.0;
+            if (com.jeladastudios.ftsgeology.volcano.VolcanoField.onCalderaFloor(level, centreX, centreZ)) {
+                // a basin: as it is
+            } else if (com.jeladastudios.ftsgeology.volcano.VolcanoField.bodyShare(level, centreX, centreZ) >= 0.5) {
+                springFit = BODY_SPRINGS;   // the lower flank: a few, where the heat is nearest the surface
+            } else {
+                springFit = 0.0;
+            }
         } else if (margin < APRON_SPRINGS) {
             springFit = Math.max(springFit, 0.6 * (1.0 - margin / APRON_SPRINGS));
         }

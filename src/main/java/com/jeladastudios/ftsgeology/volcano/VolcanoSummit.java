@@ -678,14 +678,17 @@ public final class VolcanoSummit {
         boolean ring = c.type.excavates();
         // A flooded caldera's springs rise on its young cone's own flanks and shore, as at Palea Kameni: round it is sea.
         boolean isle = c.isle != null;
+        // A big mountain's foot is all its own rock, and that is where its springs are (Beppu, Hakone): only a
+        // fresh flow is refused there. Round a small cone the rock is the cone, and springs keep off it.
+        boolean large = !isle && c.size == VolcanoSize.LARGE;
         // Inner edge of the field: outside the cone, or outside the ring-fault scarp.
         double inner = isle ? c.isle.coneR * 0.6 : ring ? c.craterR * 1.05 : c.coneBaseR * 1.15 + 4;
-        double outer = isle ? c.isle.coneR * 0.95 : inner + 26 + c.magnitude;
+        double outer = isle ? c.isle.coneR * 0.95 : inner + (large ? 40 : 26) + c.magnitude;
 
         int springs = 0;
-        for (int attempt = 0; attempt < 120 && springs < (isle ? 2 : ring ? 7 : 5); attempt++) {
+        for (int attempt = 0; attempt < 120 && springs < (isle ? 2 : ring ? 7 : large ? 8 : 5); attempt++) {
             int[] p = ringSite(level, c, inner, outer);
-            if (!isle && standsOnVolcanicRock(level, p[0], p[1])) continue;
+            if (!isle && standsOnVolcanicRock(level, p[0], p[1]) && !(large && !onFreshLava(c, p[0], p[1]))) continue;
             // On the young cone the pools stay small and low on its flank: a mature one cut the cone away.
             boolean placed = isle ? HotSpringSites.placeHotSpringAt(level, p[0], p[1], 2)
                     : HotSpringSites.placeHotSpringAt(level, p[0], p[1]);
@@ -704,6 +707,14 @@ public final class VolcanoSummit {
                     8 + level.random.nextInt(6), level.random);
             geysers++;
         }
+    }
+
+    /** Is this column on one of the mountain's young flows or tongues, where no spring belongs? */
+    static boolean onFreshLava(Ctx c, int x, int z) {
+        double dx = x - c.x, dz = z - c.z;
+        if (VolcanoEdifice.flowAt(c, Math.atan2(dz, dx), Math.hypot(dx, dz))) return true;
+        return c.type == VolcanoType.SHIELD ? VolcanoEdifice.shieldTongue(c, x, z) > 0.55
+                : VolcanoEdifice.oldLava(c, x, z) > 0.38;
     }
 
     /** A random point in the annulus around the volcano. */

@@ -49,30 +49,38 @@ public final class HotSpringSites {
         return placeHotSpringAt(level, x, z, HotSpringShape.MAX_STAGE);
     }
 
+    /** Says at debug level why a site was turned down, so a country with no springs can be read from the log. */
+    private static boolean refused(int x, int z, String why) {
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("Hot spring site at {},{} refused: {}", x, z, why);
+        return false;
+    }
+
     /** @param stage how old the springs come out; the generator always asks for a finished one. */
     public static boolean placeHotSpringAt(ServerLevel level, int x, int z, int stage) {
         // Refuse unsuitable ground outright: shorelines, open water, cliff edges.
         int centre = TerrainProbe.groundY(level, x, z);
-        if (centre == Integer.MIN_VALUE) return false;
-        if (centre <= level.getSeaLevel() + 2) return false;      // no beaches, no sea floor
-        if (centre <= level.getMinBuildHeight() + 8) return false;
+        if (centre == Integer.MIN_VALUE) return refused(x, z, "no ground");
+        if (centre <= level.getSeaLevel() + 2) return refused(x, z, "at sea level");   // no beaches, no sea floor
+        if (centre <= level.getMinBuildHeight() + 8) return refused(x, z, "at the world floor");
 
         int scan = 8;
         int lo = centre, hi = centre;
         for (int dx = -scan; dx <= scan; dx++) {
             for (int dz = -scan; dz <= scan; dz++) {
                 int g = TerrainProbe.groundY(level, x + dx, z + dz);
-                if (g == Integer.MIN_VALUE) return false;          // a cliff edge or open air
-                if (TerrainProbe.hasFluidAbove(level, x + dx, z + dz)) return false;  // lake or sea
+                if (g == Integer.MIN_VALUE) return refused(x, z, "a cliff edge or open air");
+                if (TerrainProbe.hasFluidAbove(level, x + dx, z + dz)) return refused(x, z, "a lake or the sea");
                 lo = Math.min(lo, g);
                 hi = Math.max(hi, g);
             }
         }
         int relief = hi - lo;
-        // Up to 12 blocks of relief is allowed; broken ground gets a terrace chain.
-        if (relief > 12) return false;
+        // Up to 12 blocks of relief is allowed; broken ground gets a terrace chain. The foot of a big volcano is
+        // all slope and foothill, and its springs sit on that slope in terraces (Hakone), so more is allowed there.
+        int reliefCap = com.jeladastudios.ftsgeology.volcano.VolcanoField.largeMargin(level, x, z) < 0 ? 18 : 12;
+        if (relief > reliefCap) return refused(x, z, "relief " + relief);
         // Not beside a lava lake or over one: the water would be steam.
-        if (lavaNear(level, x, centre, z, LAVA_CLEARANCE)) return false;
+        if (lavaNear(level, x, centre, z, LAVA_CLEARANCE)) return refused(x, z, "lava near");
 
         // Layout: one broad pool on the flat or anywhere in a geothermal basin, a chain of smaller
         // terraces on a slope (Pamukkale), each a little lower than the one above.
@@ -101,10 +109,11 @@ public final class HotSpringSites {
         int chainStage = terraced ? Math.min(3, stage) : stage;
         int matureR = HotSpringShape.radiusFor(chainStage);
 
+        String why = "no pool could be built";
         for (int i = 0; i < terraces; i++) {
             // A pool that would reach into an unloaded chunk ends the chain rather than loading it.
             if (!areaLoaded(level, (px - POOL_REACH) >> 4, (pz - POOL_REACH) >> 4,
-                    (px + POOL_REACH) >> 4, (pz + POOL_REACH) >> 4)) break;
+                    (px + POOL_REACH) >> 4, (pz + POOL_REACH) >> 4)) { why = "an unloaded chunk within pool reach"; break; }
             // Every pool is a mineral water line run to maturity: the same builder as after a quake.
             if (openSpring(level, px, pz, chainStage, stage)) placed++;
             // Step downhill clear of this pool's widest wobbled edge, with bearing and stride varied so
@@ -121,7 +130,7 @@ public final class HotSpringSites {
             waterY = nextGround - 1;
             if (waterY <= lo - 6) break;
         }
-        if (placed == 0) return false;
+        if (placed == 0) return refused(x, z, why);
         // Logged so the stage distribution can be counted.
         GeysersMod.LOGGER.info(
                 "Hot spring at {},{}: {} pool(s), stage {}, relief {}, basin {}",
@@ -146,17 +155,18 @@ public final class HotSpringSites {
     /** Seats a mineral water line and runs it up to a spring. The only way a hot spring is built. */
     static boolean openSpring(ServerLevel level, int x, int z, int maxStage, int stage) {
         int ground = TerrainProbe.groundY(level, x, z);
-        if (ground == Integer.MIN_VALUE) return false;
-        if (ground <= level.getSeaLevel() + 2) return false;
+        if (ground == Integer.MIN_VALUE) return refused(x, z, "no ground for the pool");
+        if (ground <= level.getSeaLevel() + 2) return refused(x, z, "pool at sea level");
 
         BlockPos source = place(level, new BlockPos(x, ground, z), ground, maxStage);
-        if (source == null) return false;
-        if (!(level.getBlockEntity(source) instanceof SpringSourceBlockEntity be)) return false;
+        if (source == null) return refused(x, z, "nowhere to seat the source");
+        if (!(level.getBlockEntity(source) instanceof SpringSourceBlockEntity be)) return refused(x, z, "source did not seat");
 
         BlockPos vent = new BlockPos(x, ground, z);
         be.setVent(vent);
         boolean built = be.growTo(level, stage);
         if (built) boreConduit(level, source, ground);
+        else refused(x, z, "the pool would not grow");
         return built;
     }
 

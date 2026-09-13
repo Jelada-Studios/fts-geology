@@ -173,6 +173,23 @@ public final class VolcanoField {
         return best;
     }
 
+    /**
+     * How far up the nearest chosen large volcano's body this column lies, as a share of the body's reach: 0 at the
+     * centre, 1 at its foot, more outside it, huge where there is none.
+     */
+    public static double bodyShare(ServerLevel level, int x, int z) {
+        int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
+        double best = Double.MAX_VALUE;
+        for (int ox = -1; ox <= 1; ox++) {
+            for (int oz = -1; oz <= 1; oz++) {
+                Site s = site(level, cx0 + ox, cz0 + oz);
+                if (s == null || !s.chosen() || s.edificeReach() <= 0) continue;
+                best = Math.min(best, Math.hypot(x - s.x(), z - s.z()) / s.edificeReach());
+            }
+        }
+        return best;
+    }
+
     /** The chosen large volcanoes whose mountain reaches into this box of blocks. */
     public static List<Site> sitesInBox(ServerLevel level, int minX, int minZ, int maxX, int maxZ) {
         List<Site> out = new ArrayList<>(1);
