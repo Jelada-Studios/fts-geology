@@ -42,14 +42,22 @@ public class GeologyFeature extends Feature<NoneFeatureConfiguration> {
         int placed = 0, ore = 0;
         try {
             if (!GeyserConfig.GEOLOGY_AT_GENERATION.get()) return false;
+            long t0 = System.nanoTime();
             DeepStructure.Report report = new DeepStructure.Report();
             DeepStructure.generate(level, cp, report);
             placed = report.blocks;
+            long t1 = System.nanoTime();
             // The seed retrogen uses, so a ridge comes out the same whichever path built it.
             RandomSource rng = RandomSource.create(
                     level.getSeed() ^ (((long) cp.x) << 32 | (cp.z & 0xFFFFFFFFL)));
             OceanicRidge.generate(level, cp, rng);
+            long t2 = System.nanoTime();
             ore = OreGenesis.generate(level, cp);
+            long t3 = System.nanoTime();
+            GenCost.add(GenCost.DEEP, t1 - t0);
+            GenCost.add(GenCost.RIDGE, t2 - t1);
+            GenCost.add(GenCost.ORE, t3 - t2);
+            GenCost.chunkDone();
         } catch (RuntimeException e) {
             // Never take world generation down with it. Left unmarked, the chunk simply gets its
             // geology from retrogen once it has loaded.

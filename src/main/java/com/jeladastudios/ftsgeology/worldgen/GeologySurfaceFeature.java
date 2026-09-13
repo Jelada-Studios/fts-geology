@@ -29,9 +29,16 @@ public class GeologySurfaceFeature extends Feature<NoneFeatureConfiguration> {
         WorldGenLevel level = context.level();
         ChunkPos cp = new ChunkPos(context.origin());
         try {
+            long t0 = System.nanoTime();
             HotspotSigns.generate(level, cp);
+            long t1 = System.nanoTime();
             GeothermalBasin.generate(level, cp);
+            long t2 = System.nanoTime();
             SoilProfile.generate(level, cp);
+            long t3 = System.nanoTime();
+            GenCost.add(GenCost.SIGNS, t1 - t0);
+            GenCost.add(GenCost.BASIN, t2 - t1);
+            GenCost.add(GenCost.SOIL, t3 - t2);
         } catch (RuntimeException e) {
             // Left unmarked, the chunk is painted by retrogen once it has loaded.
             GeysersMod.LOGGER.warn("Surface paint at generation failed for chunk {}: {}", cp, e.toString());

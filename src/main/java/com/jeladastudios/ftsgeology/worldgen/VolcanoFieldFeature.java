@@ -35,10 +35,14 @@ public class VolcanoFieldFeature extends Feature<NoneFeatureConfiguration> {
         try {
             if (!GeyserConfig.LARGE_VOLCANOES.get()) return false;
             boolean any = false;
+            long t0 = System.nanoTime();
             for (VolcanoField.Site site : VolcanoField.sitesTouching(level.getLevel(), cp)) {
                 any |= VolcanoBuilder.generateFieldChunk(level, context.chunkGenerator(), cp, site) > 0;
             }
+            long t1 = System.nanoTime();
             if (GeyserConfig.OCEAN_VOLCANOES.get()) any |= SeamountField.generate(level, cp) > 0;
+            GenCost.add(GenCost.VOLCANO, t1 - t0);
+            GenCost.add(GenCost.SEAMOUNT, System.nanoTime() - t1);
             return any;
         } catch (RuntimeException e) {
             // Never take world generation down with it; the chunk just goes without its slope.
