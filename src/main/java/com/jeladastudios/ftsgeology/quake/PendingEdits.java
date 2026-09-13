@@ -55,10 +55,29 @@ public final class PendingEdits {
         int limit = GeyserConfig.QUAKE_PENDING_LIMIT.get();
         if (limit <= 0) return;
 
-        // The planner's full corridor, not the slipped core, or the rupture stops at the loaded edge.
-        int band = QuakePlanner.deformationHalfWidth(type, magnitude) + 2;
+        Map<Long, List<QuakePlanner.TracePoint>> byChunk = segmentsByChunk(type, magnitude, trace);
+        int registered = 0;
+        for (Map.Entry<Long, List<QuakePlanner.TracePoint>> e : byChunk.entrySet()) {
+            int cx = ChunkPos.getX(e.getKey());
+            int cz = ChunkPos.getZ(e.getKey());
+            if (level.getChunkSource().getChunkNow(cx, cz) != null) continue;   // handled already
+            if (WAITING.size() >= limit) break;
+            WAITING.computeIfAbsent(key(level.dimension(), cx, cz), k -> new ArrayList<>())
+                    .add(new PendingRupture(type, magnitude, depthMetres, seed, mayBreakBuilds,
+                            epicentre, e.getValue()));
+            registered++;
+        }
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(
+                "quake register: {} chunks parked ({} corridor chunks total)", registered, byChunk.size());
+    }
 
-        // Grouped by chunk first, so each chunk keeps only the trace points that reach it.
+    /**
+     * The trace points that reach each chunk of the corridor, by chunk. The planner's full corridor,
+     * not the slipped core, or the rupture would stop at the loaded edge.
+     */
+    public static Map<Long, List<QuakePlanner.TracePoint>> segmentsByChunk(FaultType type, double magnitude,
+                                                                          List<QuakePlanner.TracePoint> trace) {
+        int band = QuakePlanner.deformationHalfWidth(type, magnitude) + 2;
         Map<Long, List<QuakePlanner.TracePoint>> byChunk = new HashMap<>();
         for (int i = 0; i < trace.size(); i++) {
             QuakePlanner.TracePoint tp = trace.get(i);
@@ -75,20 +94,27 @@ public final class PendingEdits {
                 if (i + 1 < trace.size()) seg.add(trace.get(i + 1));
             }
         }
-
-        int registered = 0;
         for (Map.Entry<Long, List<QuakePlanner.TracePoint>> e : byChunk.entrySet()) {
-            int cx = ChunkPos.getX(e.getKey());
-            int cz = ChunkPos.getZ(e.getKey());
-            if (level.getChunkSource().getChunkNow(cx, cz) != null) continue;   // handled already
-            if (WAITING.size() >= limit) break;
-            WAITING.computeIfAbsent(key(level.dimension(), cx, cz), k -> new ArrayList<>())
-                    .add(new PendingRupture(type, magnitude, depthMetres, seed, mayBreakBuilds,
-                            epicentre, List.copyOf(e.getValue())));
-            registered++;
+            e.setValue(List.copyOf(e.getValue()));
         }
-        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(
-                "quake register: {} chunks parked ({} corridor chunks total)", registered, byChunk.size());
+        return byChunk;
+    }
+
+    /**
+     * Parks one chunk of a rupture that was being applied when the chunk went away, so its edits are
+     * replayed when it comes back instead of being lost. Once per chunk and rupture.
+     */
+    public static void park(ServerLevel level, int cx, int cz, BlockPos epicentre, FaultType type,
+                            double magnitude, double depthMetres, long seed, boolean mayBreakBuilds,
+                            List<QuakePlanner.TracePoint> segment) {
+        int limit = GeyserConfig.QUAKE_PENDING_LIMIT.get();
+        if (limit <= 0 || segment == null || segment.isEmpty()) return;
+        List<PendingRupture> here = WAITING.computeIfAbsent(key(level.dimension(), cx, cz), k -> new ArrayList<>());
+        for (PendingRupture r : here) {
+            if (r.seed() == seed) return;
+        }
+        if (WAITING.size() > limit) return;
+        here.add(new PendingRupture(type, magnitude, depthMetres, seed, mayBreakBuilds, epicentre, segment));
     }
 
     /**
@@ -136,7 +162,7 @@ public final class PendingEdits {
                         r.magnitude(), r.depthMetres(), new Random(r.seed()), r.mayBreakBuilds());
                 for (QuakePlanner.Edit e : plan.edits()) {
                     if ((e.pos().getX() >> 4) != cp.x || (e.pos().getZ() >> 4) != cp.z) continue;
-                    level.setBlock(e.pos(), e.state(), 2);
+                    level.setBlock(e.pos(), e.state(), Earthquake.FLAGS);
                 }
             } catch (Exception ex) {
                 com.jeladastudios.ftsgeology.GeysersMod.LOGGER.warn(

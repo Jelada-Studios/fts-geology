@@ -42,12 +42,29 @@ public final class Earthquake {
 
     private Earthquake() {}
 
+    /**
+     * How every quake write goes: to the clients, without neighbour shape updates. A shape update ran
+     * on six neighbours per block, cost more than the deformation itself, dropped every plant it
+     * undermined as an item, and loaded the chunk next door on the server thread when the neighbour
+     * lay in one that was not loaded. The settling passes clear what a shape update would have.
+     */
+    static final int FLAGS = net.minecraft.world.level.block.Block.UPDATE_CLIENTS
+            | net.minecraft.world.level.block.Block.UPDATE_KNOWN_SHAPE;
+
     /** A quake whose plan is ready and whose edits are being applied a few per tick. */
     private static final class Running {
         final ResourceKey<Level> dimension;
         final BlockPos epicentre;
         final QuakePlanner.Plan plan;
         final Deque<QuakePlanner.Edit> pending;
+        /** The rupture itself, so a chunk that unloads mid-way can be parked and replayed later. */
+        final FaultType type;
+        final double depthMetres;
+        final long seed;
+        final boolean mayBreak;
+        final List<QuakePlanner.TracePoint> trace;
+        /** The corridor by chunk, worked out the first time a chunk is found unloaded. */
+        java.util.Map<Long, List<QuakePlanner.TracePoint>> byChunk;
         /** When the ground may start moving: the warning window lets seismographs sound first. */
         long startAt;
         int shakeTicks;
@@ -59,11 +76,17 @@ public final class Earthquake {
         int applied;
         int ticks;
 
-        Running(ResourceKey<Level> dimension, QuakePlanner.Plan plan, long startAt) {
+        Running(ResourceKey<Level> dimension, QuakePlanner.Plan plan, long startAt, FaultType type,
+                double depthMetres, long seed, boolean mayBreak, List<QuakePlanner.TracePoint> trace) {
             this.dimension = dimension;
             this.epicentre = plan.epicentre();
             this.plan = plan;
             this.startAt = startAt;
+            this.type = type;
+            this.depthMetres = depthMetres;
+            this.seed = seed;
+            this.mayBreak = mayBreak;
+            this.trace = trace;
             this.pending = new ArrayDeque<>(plan.edits());
             // The camera shake is capped even when the edits run for minutes: real strong motion
             // lasts tens of seconds.
@@ -174,7 +197,7 @@ public final class Earthquake {
                     return plan;
                 }, Util.backgroundExecutor())
                 .thenAcceptAsync(plan -> {
-                    ACTIVE.add(new Running(dim, plan, startAt));
+                    ACTIVE.add(new Running(dim, plan, startAt, type, depthM, seed, mayBreak, trace));
                     // Everything geothermal in the corridor stands down until the ground has
                     // stopped moving AND the debris has landed. See QuakeQuiet.
                     QuakeQuiet.open(level, plan.epicentre(), plan.ruptureLength(), plan.magnitude());
@@ -248,8 +271,18 @@ public final class Earthquake {
                 QuakePlanner.Edit e = run.pending.poll();
                 examined++;
                 if (level.hasChunkAt(e.pos())) {
-                    level.setBlock(e.pos(), e.state(), 2);
+                    level.setBlock(e.pos(), e.state(), FLAGS);
                     placed++;
+                } else {
+                    // The chunk went away since the snapshot: parked, not dropped, so the rupture is
+                    // replayed there when it comes back.
+                    if (run.byChunk == null) {
+                        run.byChunk = PendingEdits.segmentsByChunk(run.type, run.plan.magnitude(), run.trace);
+                    }
+                    int cx = e.pos().getX() >> 4, cz = e.pos().getZ() >> 4;
+                    PendingEdits.park(level, cx, cz, run.epicentre, run.type, run.plan.magnitude(),
+                            run.depthMetres, run.seed, run.mayBreak,
+                            run.byChunk.get(net.minecraft.world.level.ChunkPos.asLong(cx, cz)));
                 }
             }
             run.applied += placed;

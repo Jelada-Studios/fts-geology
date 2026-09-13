@@ -34,7 +34,9 @@ import java.util.List;
  * </ul>
  *
  * <p>Only columns the quake edited are visited. {@code unsupportedBlocksFall} turns falling off and
- * {@code fallingIncludesPlayerBlocks} leaves builds where they are.</p>
+ * {@code fallingIncludesPlayerBlocks} leaves builds where they are. Every write goes without neighbour
+ * shape updates ({@link Earthquake#FLAGS}): those cost more than the quake, dropped every plant they
+ * undermined as an item, and loaded the chunk next door on the server thread.</p>
  */
 public final class Weathering {
 
@@ -42,9 +44,9 @@ public final class Weathering {
 
     /**
      * How many passes the corridor gets. The first and the last reseat what was growing on the
-     * ground; the ones between take the raw edges off the rock.
+     * ground; the one between takes the raw edges off the rock.
      */
-    private static final int PASSES = 5;
+    private static final int PASSES = 3;
 
     /** How far above the new ground to look for the underside of a hanging stack; covers the deepest cut. */
     private static final int GAP_SEARCH = 40;
@@ -58,8 +60,8 @@ public final class Weathering {
     /** How far the corridor is widened before settling, so a wide canopy's outer leaves are visited too. */
     private static final int CORRIDOR_DILATION = 12;
 
-    /** Columns examined per tick. Low on purpose: this is meant to be watched, not to happen. */
-    private static final int COLUMNS_PER_TICK = 250;
+    /** Columns examined per tick at most; the wall-clock budget is the real brake. */
+    private static final int COLUMNS_PER_TICK = 1000;
 
     /** Ground must stand at least this far above ALL neighbours before it counts as a spike. */
     private static final int SPIKE = 3;
@@ -73,8 +75,8 @@ public final class Weathering {
         final long[] columns;
         /** Per column, the highest Y the quake turned to air: the anchor {@link #reseat} measures ground from. */
         final Long2IntMap excavated;
-        /** Per felled trunk column, the Y its trunk stood on and the Y it reached, so its crown can be taken too. */
-        final Long2IntOpenHashMap felledBase = new Long2IntOpenHashMap(), felledTop = new Long2IntOpenHashMap();
+        /** Per felled trunk column, the Y its trunk stood on, so the log can count trees. */
+        final Long2IntOpenHashMap felledBase = new Long2IntOpenHashMap();
         /** Time spent, and the longest slice, so a slow corridor shows in the log. */
         long nanos, worstNanos;
         int cursor;
@@ -237,16 +239,15 @@ public final class Weathering {
                 park.put(k, job.excavated.get(k));   // the floor hint has to survive the wait too
                 continue;
             }
-            // Passes 0 and the last bring down what hangs; the ones between relax the rock.
+            // The first and the last pass bring down what hangs; the one between relaxes the rock.
             boolean fallPass = (job.pass == 0 || job.pass == PASSES - 1)
                     && GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get();
             boolean moved;
             if (fallPass) {
                 moved = reseat(level, cx, cz, job.excavated.get(k), job);
-                // Last pass, after reseat: the crowns of felled trees, spires, hanging water.
+                // Last pass, after reseat: spires, hanging water.
                 if (job.pass == PASSES - 1) {
-                    moved |= fellCrowns(level, cx, cz, job);
-                    moved |= topple(level, cx, cz, job.excavated.get(k));
+                    moved |= topple(level, cx, cz);
                     moved |= dropUnsupportedWater(level, cx, cz);
                 }
             } else {
@@ -263,9 +264,9 @@ public final class Weathering {
 
     /**
      * Brings down whatever the quake left hanging over this column, as one stack, keeping every block
-     * and its state. A tree whose ground went is felled instead: its trunk goes here and its crown in
-     * {@link #fellCrowns}, so a crown column on its own is left for that. Moving trees whole was dear and
-     * still left them over rivers. A gap holding fluid is otherwise left alone so a lake is never drained.
+     * and its state. A tree whose ground went is felled instead, trunk and crown, in {@link #fell}. Ground
+     * cover left over air is cleared, since without shape updates nothing else would take it. A gap
+     * holding fluid is otherwise left alone so a lake is never drained.
      *
      * <p>Ground is found from {@code excavatedTop}, the highest cell the quake emptied, not from
      * {@link TerrainProbe#groundY}, which takes a floating raft for the ground. Nothing below the
@@ -294,14 +295,14 @@ public final class Weathering {
         int over = base;
         while (over < gapLimit && !level.getBlockState(m.set(x, over, z)).getFluidState().isEmpty()) over++;
         if (over > base && over < gapLimit && isTrunk(level.getBlockState(m.set(x, over, z)))) {
-            return fell(level, x, over, z, job);
+            return fell(level, x, over, z, job, true);
         }
         if (drop <= 0 || base >= gapLimit) return false;
         int limit = Math.min(base + STACK_LIMIT, roof);
 
         // Read the hanging stack. Only fluid stops it: dropping through water would drain a lake.
         int top = base;
-        boolean allPlant = true;
+        boolean allPlant = true, allCover = true;
         int trunk = Integer.MIN_VALUE;
         while (top < limit) {
             BlockState s = level.getBlockState(m.set(x, top, z));
@@ -310,17 +311,24 @@ public final class Weathering {
             // Trees are checked first, so they fall even when builds may not move.
             if (!mayMoveBuilds && !isPlant(s) && EruptionHandler.isPlayerPlaced(s)) return false;
             if (!isPlant(s)) allPlant = false;
+            if (!TerrainProbe.isVegetation(s)) allCover = false;
             if (trunk == Integer.MIN_VALUE && isTrunk(s)) trunk = top;
             top++;
         }
         int height = top - base;
         if (height <= 0) return false;
-        // A crown with no trunk under it in this column is part of a tree standing in another and goes with
-        // it in fellCrowns. Dropped on its own it fell to the ground as a heap.
-        if (allPlant && trunk == Integer.MIN_VALUE) return false;
+        if (allPlant && trunk == Integer.MIN_VALUE) {
+            // Grass or a fern left in the air: gone, as a shape update would have had it. A crown with no
+            // trunk under it belongs to a tree in another column and goes with that tree.
+            if (!allCover || height > 2) return false;
+            for (int y = base; y < top; y++) {
+                level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
+            }
+            return true;
+        }
         // The tree goes; whatever it stood on still comes down.
         if (trunk != Integer.MIN_VALUE) {
-            fell(level, x, trunk, z, job);
+            fell(level, x, trunk, z, job, true);
             height = trunk - base;
             if (height <= 0) return true;
         }
@@ -329,10 +337,10 @@ public final class Weathering {
         BlockState[] stack = new BlockState[height];
         for (int i = 0; i < height; i++) stack[i] = level.getBlockState(m.set(x, base + i, z));
         for (int i = 0; i < height; i++) {
-            level.setBlock(new BlockPos(x, base + i, z), Blocks.AIR.defaultBlockState(), 2);
+            level.setBlock(new BlockPos(x, base + i, z), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
         }
         for (int i = 0; i < height; i++) {
-            level.setBlock(new BlockPos(x, g + 1 + i, z), stack[i], 2);
+            level.setBlock(new BlockPos(x, g + 1 + i, z), stack[i], Earthquake.FLAGS);
         }
         // A puff of dust where a stack lands, for a drop worth seeing and only sometimes.
         if (drop >= 2 && level.random.nextInt(24) == 0) {
@@ -348,53 +356,48 @@ public final class Weathering {
     /** A column this thin cannot stand this tall in ground a quake has just shaken. */
     private static final int SLENDER_HEIGHT = 4;
 
-    /** Horizontal neighbours at a given height, above which the stack counts as braced. */
-    private static final int BRACED_NEIGHBOURS = 2;
-
     /**
-     * Brings down one-block spires a rupture left standing in its trench. Only on ground the quake
-     * moved, so natural hoodoos are never touched, and the blocks are lowered onto the foot, not deleted.
+     * Brings down the spires a rupture left standing in its trench: a column of rock standing
+     * {@link #SLENDER_HEIGHT} or more above the ground on all four sides. Its blocks are lowered onto the
+     * lowest neighbour, top first, and a two-block stump is left, the way a broken spire is. Only on
+     * ground the quake moved, so natural hoodoos are never touched.
      */
-    private static boolean topple(ServerLevel level, int x, int z, int excavatedTop) {
-        int floor = excavatedTop == Integer.MIN_VALUE
-                ? TerrainProbe.groundY(level, x, z)
-                : solidAtOrBelow(level, x, excavatedTop, z);
-        if (floor == Integer.MIN_VALUE) return false;
-        if (!level.hasChunkAt(new BlockPos(x, floor, z))) return false;
+    private static boolean topple(ServerLevel level, int x, int z) {
+        if (!level.hasChunkAt(new BlockPos(x, 0, z))) return false;
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE) return false;
 
-        boolean mayMoveBuilds = GeyserConfig.FALLING_INCLUDES_BUILDS.get();
+        // The ground round it: the spire stands above the highest of the four.
+        int around = Integer.MIN_VALUE;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-
-        // How high the stack runs, and how much of it stands on its own.
-        int top = floor;
-        int lonely = 0;
-        int ceiling = Math.min(floor + STACK_LIMIT, level.getMaxBuildHeight() - 1);
-        while (top + 1 <= ceiling) {
-            BlockState s = level.getBlockState(m.set(x, top + 1, z));
-            if (s.isAir() || !s.getFluidState().isEmpty()) break;
-            if (s.is(Blocks.BEDROCK)) return false;
-            // A trunk is not a spire: brought down as one, it lay about the corridor as loose logs.
-            if (isPlant(s)) return false;
-            if (!mayMoveBuilds && EruptionHandler.isPlayerPlaced(s)) return false;
-            top++;
-            if (bracing(level, x, top, z) < BRACED_NEIGHBOURS) lonely++;
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            int nx = x + d.getStepX(), nz = z + d.getStepZ();
+            if (!level.hasChunkAt(m.set(nx, g, nz))) return false;
+            int n = TerrainProbe.groundY(level, nx, nz);
+            if (n == Integer.MIN_VALUE) return false;
+            around = Math.max(around, n);
         }
-
-        int height = top - floor;
+        int height = g - around;
         if (height < SLENDER_HEIGHT) return false;
-        // Braced for most of its height: a shoulder of rock, not a spire. Leave it.
-        if (lonely * 2 < height) return false;
+
+        // Rock all the way: a tree, a fluid or bedrock in the stack makes it something else.
+        boolean mayMoveBuilds = GeyserConfig.FALLING_INCLUDES_BUILDS.get();
+        for (int y = around + 1; y <= g; y++) {
+            BlockState s = level.getBlockState(m.set(x, y, z));
+            if (s.isAir() || !s.getFluidState().isEmpty() || s.is(Blocks.BEDROCK) || isPlant(s)) return false;
+            if (!mayMoveBuilds && EruptionHandler.isPlayerPlaced(s)) return false;
+        }
 
         // Each block goes to the lowest of the eight neighbours, strictly lower than it was, so it ends.
         boolean moved = false;
-        int keep = floor + SLENDER_HEIGHT / 2;      // a stump is left, the way a broken spire is
-        for (int y = top; y > keep; y--) {
+        int keep = around + 2;
+        for (int y = g; y > keep; y--) {
             BlockState s = level.getBlockState(m.set(x, y, z));
             if (s.isAir()) continue;
             BlockPos rest = lowestNeighbourTop(level, x, y, z);
-            if (rest == null) continue;             // nowhere lower to go; it stays
-            level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2);
-            level.setBlock(rest, s, 2);
+            if (rest == null) break;                // nowhere lower to go; the rest stays
+            level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
+            level.setBlock(rest, s, Earthquake.FLAGS);
             moved = true;
         }
         return moved;
@@ -425,63 +428,60 @@ public final class Weathering {
         return best;
     }
 
-    /** How many of the four horizontal neighbours are solid at this height. */
-    private static int bracing(ServerLevel level, int x, int y, int z) {
-        int n = 0;
-        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-        for (Direction d : Direction.Plane.HORIZONTAL) {
-            BlockState s = level.getBlockState(m.set(x + d.getStepX(), y, z + d.getStepZ()));
-            if (!s.isAir() && s.getFluidState().isEmpty() && !isPlant(s)) n++;
-        }
-        return n;
-    }
-
     /**
-     * Fells the tree whose trunk starts at {@code from} in this column: the trunk and whatever tree stands on it
-     * go, and the column is noted so {@link #fellCrowns} takes the crown round it on the last pass.
+     * Fells the tree whose trunk starts at {@code from} in this column: the trunk, the other three columns of a
+     * two-by-two trunk standing beside it, and the crown round them all, at once. Taken whole, no leaf is left
+     * to rot on its own and drop an item, and no half of a big pine is left standing bare.
      */
-    private static boolean fell(ServerLevel level, int x, int from, int z, Job job) {
+    private static boolean fell(ServerLevel level, int x, int from, int z, Job job, boolean withNeighbours) {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         int roof = Math.min(from + STACK_LIMIT, level.getMaxBuildHeight() - 1);
         int top = from;
         while (top <= roof && isPlant(level.getBlockState(m.set(x, top, z)))) {
-            level.setBlock(new BlockPos(x, top, z), Blocks.AIR.defaultBlockState(), 2);
+            level.setBlock(new BlockPos(x, top, z), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
             top++;
         }
-        long k = key(x, z);
-        job.felledBase.put(k, from);
-        job.felledTop.put(k, top - 1);
+        job.felledBase.put(key(x, z), from);
+        if (withNeighbours) {
+            // The rest of a two-by-two trunk: a log beside this one at its foot, or a block either side of it.
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dz == 0) continue;
+                    int nx = x + dx, nz = z + dz;
+                    if (!level.hasChunkAt(m.set(nx, from, nz))) continue;
+                    for (int y = from - 1; y <= from + 1; y++) {
+                        if (!isTrunk(level.getBlockState(m.set(nx, y, nz)))) continue;
+                        // Down to its own foot first, so no stump of it is left standing.
+                        int foot = y;
+                        while (foot - 1 > level.getMinBuildHeight() && isTrunk(level.getBlockState(m.set(nx, foot - 1, nz)))) foot--;
+                        fell(level, nx, foot, nz, job, false);
+                        break;
+                    }
+                }
+            }
+        }
+        takeCrown(level, x, from - 1, top + 8, z);
         return true;
     }
 
     /**
-     * Takes the crown of every felled tree within {@link #CROWN_REACH} of this column: leaves and mushroom caps
-     * between the trunk's foot and a little over its top. A neighbouring tree may lose a few overlapping leaves;
+     * Takes the crown round a felled trunk: leaves and mushroom caps within {@link #CROWN_REACH} of it, between
+     * the trunk's foot and a little over its top. A neighbouring tree may lose a few overlapping leaves;
      * finding each leaf's own trunk cost more than the quake itself.
-     *
-     * @return true if this column changed
      */
-    private static boolean fellCrowns(ServerLevel level, int x, int z, Job job) {
-        if (job.felledBase.isEmpty()) return false;
-        int lo = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
+    private static void takeCrown(ServerLevel level, int x, int lo, int hi, int z) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int floor = Math.max(lo, level.getMinBuildHeight()), roof = Math.min(hi, level.getMaxBuildHeight() - 1);
         for (int dx = -CROWN_REACH; dx <= CROWN_REACH; dx++) {
             for (int dz = -CROWN_REACH; dz <= CROWN_REACH; dz++) {
-                long k = key(x + dx, z + dz);
-                if (!job.felledBase.containsKey(k)) continue;
-                lo = Math.min(lo, job.felledBase.get(k) - 1);
-                hi = Math.max(hi, job.felledTop.get(k) + 8);
+                int cx = x + dx, cz = z + dz;
+                if (!level.hasChunkAt(m.set(cx, floor, cz))) continue;
+                for (int y = floor; y <= roof; y++) {
+                    if (!TerrainProbe.isCrown(level.getBlockState(m.set(cx, y, cz)))) continue;
+                    level.setBlock(new BlockPos(cx, y, cz), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
+                }
             }
         }
-        if (lo > hi) return false;
-        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-        int floor = level.getMinBuildHeight(), roof = level.getMaxBuildHeight() - 1;
-        boolean changed = false;
-        for (int y = Math.max(lo, floor); y <= Math.min(hi, roof); y++) {
-            if (!TerrainProbe.isCrown(level.getBlockState(m.set(x, y, z)))) continue;
-            level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), 2);
-            changed = true;
-        }
-        return changed;
     }
 
     /**
@@ -512,7 +512,7 @@ public final class Weathering {
                 top++;
             }
             for (int c = base; c < top; c++) {
-                level.setBlock(new BlockPos(x, c, z), Blocks.AIR.defaultBlockState(), 2);
+                level.setBlock(new BlockPos(x, c, z), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
             }
             changed = true;
             y = top;
@@ -570,8 +570,12 @@ public final class Weathering {
         int highest = Integer.MIN_VALUE;
         int lowest = Integer.MAX_VALUE;
         BlockPos foot = null;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         for (Direction d : Direction.Plane.HORIZONTAL) {
             int nx = x + d.getStepX(), nz = z + d.getStepZ();
+            // A neighbour in a chunk that is not loaded is never read: that would load it here, on the
+            // server thread. The column waits for its next pass.
+            if (!level.hasChunkAt(m.set(nx, g, nz))) return false;
             int n = TerrainProbe.groundY(level, nx, nz);
             // A neighbour with no ground at all is a cliff edge or a cave mouth. Leave the column
             // alone rather than shovelling it into a hole.
@@ -582,7 +586,7 @@ public final class Weathering {
 
         if (g - highest >= SPIKE) {
             // Nothing holds it up on any side.
-            level.setBlock(crest, Blocks.AIR.defaultBlockState(), 2);
+            level.setBlock(crest, Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
             return true;
         }
         if (g - lowest >= SCARP && foot != null) {
@@ -590,8 +594,8 @@ public final class Weathering {
             BlockState at = level.getBlockState(foot);
             if (!at.isAir() && !TerrainProbe.isVegetation(at)) return false;
             if (EruptionHandler.isPlayerPlaced(at)) return false;
-            level.setBlock(crest, Blocks.AIR.defaultBlockState(), 2);
-            level.setBlock(foot, top, 2);
+            level.setBlock(crest, Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
+            level.setBlock(foot, top, Earthquake.FLAGS);
             return true;
         }
         return false;

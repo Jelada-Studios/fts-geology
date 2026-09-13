@@ -580,6 +580,9 @@ public final class EruptionHandler {
                 || s.is(BlockTags.STONE_ORE_REPLACEABLES)
                 || s.is(BlockTags.DEEPSLATE_ORE_REPLACEABLES)
                 || s.is(Tags.Blocks.STONE)            // Forge stone tag (broad modded coverage)
+                || s.is(Tags.Blocks.COBBLESTONE)      // the boulders of an old-growth taiga
+                || s.is(Tags.Blocks.GRAVEL)
+                || s.is(Tags.Blocks.SAND)
                 || s.is(Tags.Blocks.ORES)) {
             return true;
         }
@@ -589,7 +592,8 @@ public final class EruptionHandler {
                 || s.is(Blocks.MYCELIUM)
                 || s.is(Blocks.SANDSTONE) || s.is(Blocks.RED_SANDSTONE)
                 || s.is(Blocks.CALCITE) || s.is(Blocks.TUFF) || s.is(Blocks.COBBLED_DEEPSLATE)
-                || s.is(Blocks.COBBLESTONE) || s.is(Blocks.MAGMA_BLOCK) || s.is(Blocks.OBSIDIAN)
+                || s.is(Blocks.COBBLESTONE) || s.is(Blocks.MOSSY_COBBLESTONE)
+                || s.is(Blocks.MAGMA_BLOCK) || s.is(Blocks.OBSIDIAN)
                 || s.is(Blocks.BLACKSTONE) || s.is(Blocks.BASALT) || s.is(Blocks.SMOOTH_BASALT)
                 || s.is(Blocks.DRIPSTONE_BLOCK) || s.is(Blocks.POINTED_DRIPSTONE)
                 || s.is(Blocks.SCULK) || s.is(Blocks.SCULK_VEIN) || s.is(Blocks.SCULK_CATALYST)
