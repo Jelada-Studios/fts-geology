@@ -315,10 +315,13 @@ public final class VolcanoEruption {
                 continue;
             }
             // A stream over the surface leaves a skin, never a course laid on top: cooling in place combed a flank
-            // with ridges one block high along every finger the flow split into. The ground it ran over turns to
-            // rock, mostly tuff so the trace reads as baked ground rather than a black stripe; the volcano's own
-            // rock takes a fresh crust.
+            // with ridges one block high along every finger the flow split into. Only a sheet of lava leaves one:
+            // a thread one block wide, which is what a flow splits into on the way down, scorches the ground and
+            // is gone, or every eruption combed the flank again in tuff. The ground under a sheet turns to rock,
+            // mostly tuff so the trace reads as baked ground rather than a black stripe; the volcano's own rock
+            // takes a fresh crust.
             level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+            if (flowSides(level, p) < 2) continue;
             if (below.is(Blocks.BEDROCK) || below.hasBlockEntity()
                     || com.jeladastudios.ftsgeology.eruption.EruptionHandler.isPlayerPlaced(below)) continue;
             BlockState skin = ownRock(below)
@@ -334,6 +337,20 @@ public final class VolcanoEruption {
         for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
             BlockState s = level.getBlockState(p.relative(d));
             if (!s.isAir() && s.getFluidState().isEmpty()) n++;
+        }
+        return n;
+    }
+
+    /**
+     * How many of the four horizontal neighbours are part of the flow: lava, or a skin already left this sweep. Two
+     * or more and the cell is inside a sheet; fewer and it is a thread.
+     */
+    private static int flowSides(ServerLevel level, BlockPos p) {
+        int n = 0;
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            BlockPos q = p.relative(d);
+            if (level.getBlockState(q).getFluidState().is(net.minecraft.tags.FluidTags.LAVA)
+                    || ownRock(level.getBlockState(q.below()))) n++;
         }
         return n;
     }

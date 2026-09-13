@@ -26,6 +26,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -232,11 +233,18 @@ public final class CaveCollapse {
         double weak = RockTypes.erodibility(level.getBlockState(new BlockPos(x, cave.top() + 1, z)));
         if (level.random.nextDouble() >= CHANCE * shaking * arch * (0.4 + 0.6 * weak)) return;
 
+        // A thick roof over a really tall void is an arch too deep to fail: without this every column over a big
+        // cave dropped its roof as a pillar and opened a well to the surface.
+        if (cave.top() - cave.floor() >= DEEP_VOID && cave.roof() > DEEP_VOID_ROOF) return;
+
         boolean throughRoof = cave.roof() <= THIN_ROOF;
         int fall = throughRoof ? cave.roof() : Math.min(cave.roof() - 2, 2 + level.random.nextInt(3));
-        int radius = Mth.clamp(span / 3, 1, 4);
-        int movedHere = 0;
+        int radius = throughRoof ? Mth.clamp(span / 3, 2, 5) : Mth.clamp(span / 3, 1, 4);
+        // The roof that comes down is pooled and heaped on the floor below the middle of the fall, as a slab
+        // that breaks up does; dropped column by column it stood on the floor as a field of pillars.
+        List<BlockState> pool = new ArrayList<>();
         boolean surfaced = false;
+        int floor = cave.floor();
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
                 if (dx * dx + dz * dz > radius * radius + radius) continue;
@@ -244,19 +252,28 @@ public final class CaveCollapse {
                 if (!level.hasChunk(cx >> 4, cz >> 4)) continue;
                 Cave c = caveUnder(level, cx, cz);
                 if (c == null || Math.abs(c.top() - cave.top()) > 4) continue;   // the same cave only
-                int n = dropRoof(level, cx, cz, c, throughRoof ? c.roof() : Math.min(fall, c.roof() - 2));
-                if (n < 0) {
+                int n;
+                if (throughRoof) {
+                    // A funnel: the whole roof in the middle, thinning to the rim, so a sinkhole is a bowl and not a well.
+                    double d = Math.sqrt(dx * dx + dz * dz);
+                    n = (int) Math.round(c.roof() * (1.0 - d / (radius + 1.0)));
+                } else {
+                    n = Math.min(fall, c.roof() - 2);
+                }
+                int took = takeRoof(level, cx, cz, c, n, pool);
+                if (took < 0) {
                     job.refused++;
                     continue;
                 }
-                movedHere += n;
-                if (n >= c.roof()) surfaced = true;
+                if (took >= c.roof()) surfaced = true;
+                floor = Math.min(floor, c.floor());
             }
         }
-        if (movedHere == 0) return;
+        if (pool.isEmpty()) return;
         job.collapses++;
-        job.moved += movedHere;
+        job.moved += pool.size();
         if (surfaced) job.sinkholes++;
+        heap(level, x, z, floor, pool);
 
         int y = surfaced ? cave.ground() + 1 : cave.floor() + 1;
         level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, level.getBlockState(new BlockPos(x, y - 1, z))),
@@ -299,11 +316,11 @@ public final class CaveCollapse {
     }
 
     /**
-     * Drops the bottom {@code n} blocks of a roof onto the cave floor, so the void rises by {@code n}.
+     * Takes the bottom {@code n} blocks off a roof into {@code pool}, so the void rises by {@code n}.
      *
-     * @return blocks moved, or -1 where this column refused to collapse at all
+     * @return blocks taken, or -1 where this column refused to collapse at all
      */
-    private static int dropRoof(ServerLevel level, int x, int z, Cave c, int n) {
+    private static int takeRoof(ServerLevel level, int x, int z, Cave c, int n, List<BlockState> pool) {
         if (n <= 0) return 0;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         // Rubble lands only in open air: water, a torch or a rail in the void stops it.
@@ -330,14 +347,52 @@ public final class CaveCollapse {
             slab[i] = s;
         }
         if (n >= c.roof()) TerrainProbe.clearVegetation(level, x, c.ground(), z, 2);
-        int drop = c.top() - c.floor() + 1;
         for (int i = 0; i < n; i++) {
             level.setBlock(m.set(x, c.top() + 1 + i, z), Blocks.AIR.defaultBlockState(), FLAGS);
-        }
-        for (int i = 0; i < n; i++) {
-            level.setBlock(m.set(x, c.top() + 1 + i - drop, z), rubble(slab[i], level.random), FLAGS);
+            pool.add(rubble(slab[i], level.random));
         }
         return n;
+    }
+
+    /** A void this tall is a big cave, whose roof holds unless it is thin. */
+    private static final int DEEP_VOID = 24;
+    private static final int DEEP_VOID_ROOF = 8;
+    /** Tallest a rubble heap stands. */
+    private static final int HEAP_HEIGHT = 4;
+
+    /**
+     * Heaps the fallen roof on the cave floor under the middle of the fall: a low cone, tallest in the middle and
+     * running out to nothing at its rim, laid only into open air. Rubble packs, so what does not fit is lost.
+     */
+    private static void heap(ServerLevel level, int x, int z, int floorY, List<BlockState> pool) {
+        int total = pool.size();
+        int radius = Math.max(1, (int) Math.ceil(Math.sqrt(total / 1.5)));
+        double area = Math.PI * radius * radius;
+        int peak = Mth.clamp((int) Math.round(2.0 * total / area), 1, HEAP_HEIGHT);
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int next = 0;
+        // Middle first, so the rubble runs out at the rim rather than the middle.
+        for (int ring = 0; ring <= radius && next < total; ring++) {
+            for (int dx = -ring; dx <= ring && next < total; dx++) {
+                for (int dz = -ring; dz <= ring && next < total; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != ring) continue;
+                    double d = Math.sqrt(dx * dx + dz * dz);
+                    if (d > radius) continue;
+                    int h = (int) Math.round(peak * (1.0 - d / (radius + 1.0)));
+                    if (h <= 0) continue;
+                    int cx = x + dx, cz = z + dz;
+                    if (!level.hasChunk(cx >> 4, cz >> 4)) continue;
+                    // The floor under this column: down from the fall's floor to the first solid, a little way only.
+                    int y = floorY;
+                    while (y - 1 > level.getMinBuildHeight() && y > floorY - 6 && level.getBlockState(m.set(cx, y - 1, cz)).isAir()) y--;
+                    if (!level.getBlockState(m.set(cx, y - 1, cz)).isAir() && !level.getBlockState(m.set(cx, y - 1, cz)).getFluidState().isEmpty()) continue;
+                    for (int i = 0; i < h && next < total; i++) {
+                        if (!level.getBlockState(m.set(cx, y + i, cz)).isAir()) break;
+                        level.setBlock(m.set(cx, y + i, cz), pool.get(next++), FLAGS);
+                    }
+                }
+            }
+        }
     }
 
     /** What a block becomes on the way down: bedrock breaks up, soil loses its turf. */

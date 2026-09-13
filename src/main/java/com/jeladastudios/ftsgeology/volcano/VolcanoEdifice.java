@@ -98,11 +98,14 @@ public final class VolcanoEdifice {
         return Mth.lerp(wrap / 0.5, a, b);
     }
 
-    /** Old lava tongues on a stratocone's flank, in -1..1: a few blocks to twenty wide, long down the slope. */
+    /**
+     * Old lava tongues on a stratocone's flank, in -1..1: a handful round the mountain, each tens of blocks wide
+     * and long down the slope. Few noise cells round the circle, or the flank is combed with thin spokes.
+     */
     static double oldLava(Ctx c, int gx, int gz) {
         int dx = gx - c.x, dz = gz - c.z;
         return polarNoise(Math.atan2(dz, dx), Math.sqrt((double) dx * dx + (double) dz * dz),
-                c.coneBaseR * 0.8, (int) (c.phaseA * 4096) + 7919, 4.0, 14.0);
+                c.coneBaseR * 0.25, (int) (c.phaseA * 4096) + 7919, 4.0, 14.0);
     }
 
     /** Radius of the cone's lobed foot at one bearing. The cone and the apron both use it, so they meet. */
@@ -389,7 +392,7 @@ public final class VolcanoEdifice {
     static BlockState shieldSkin(RandomSource rng, Ctx c, int gx, int gz, double h, BlockState rock) {
         // An extinct shield is forest nearly to its top, with no young lava left bare.
         boolean extinct = c.activity == VolcanoActivity.EXTINCT;
-        if (!extinct && c.size != VolcanoSize.SMALL && shieldTongue(c, gx, gz) > 0.5) {
+        if (!extinct && c.size != VolcanoSize.SMALL && shieldTongue(c, gx, gz) > 0.55) {
             int r = rng.nextInt(10);
             return (r < 6 ? Blocks.BASALT : r < 9 ? Blocks.SMOOTH_BASALT : Blocks.BLACKSTONE).defaultBlockState();
         }
@@ -412,9 +415,11 @@ public final class VolcanoEdifice {
     }
 
     /**
-     * Younger lava tongues down a shield, in -1..1: long down the slope, a few blocks to twenty across. Read at a
-     * position pushed about by a coarse field, so a tongue winds down the flank instead of running out as a
-     * straight spoke; the idea of warping where ridge noise is read comes from Tectonic's mountain ridges.
+     * Younger lava tongues down a shield, in -1..1: three to six round the mountain, each tens of blocks across and
+     * long down the slope. Read at a position pushed about by a coarse field, so a tongue winds down the flank
+     * instead of running out as a straight spoke; the idea of warping where ridge noise is read comes from
+     * Tectonic's mountain ridges. Few noise cells round the circle: with seventy of them the flank was a comb of
+     * evenly spaced spokes, whatever the flow count said.
      */
     static double shieldTongue(Ctx c, int gx, int gz) {
         int ox = (int) (c.phaseB * 4096), oz = (int) (c.phaseC * 4096);
@@ -422,7 +427,7 @@ public final class VolcanoEdifice {
         int wz = gz + (int) Math.round(24.0 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx - oz, gz + ox, 90.0));
         int dx = wx - c.x, dz = wz - c.z;
         return polarNoise(Math.atan2(dz, dx), Math.sqrt((double) dx * dx + (double) dz * dz),
-                c.coneBaseR * 0.7, (int) (c.phaseA * 4096) + 4271, 4.0, 16.0);
+                c.coneBaseR * 0.1, (int) (c.phaseA * 4096) + 4271, 6.0, 16.0);
     }
 
     /**
