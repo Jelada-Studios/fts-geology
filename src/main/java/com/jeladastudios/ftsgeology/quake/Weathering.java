@@ -219,6 +219,9 @@ public final class Weathering {
                             job.moved, job.columns.length, job.felledBase.size(), job.nanos / 1_000_000,
                             job.worstNanos / 1_000_000);
                     QUEUE.poll();
+                    // The rivers over the corridor are surveyed again: their banks and beds have moved.
+                    com.jeladastudios.ftsgeology.hydrology.MeanderScheduler.terrainChanged(
+                            level, job.minX, job.minZ, job.maxX, job.maxZ);
                     return;
                 }
             }

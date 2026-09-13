@@ -176,6 +176,9 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue SPRING_STAGE_THREE_DAYS;
     public static final ForgeConfigSpec.BooleanValue QUAKES_OPEN_NEW_SPRINGS;
     public static final ForgeConfigSpec.DoubleValue QUAKE_SPRING_CHANCE;   // per magnitude over 3
+    public static final ForgeConfigSpec.BooleanValue RIVER_MEANDERS;       // bends migrate over weeks
+    public static final ForgeConfigSpec.DoubleValue RIVER_MEANDER_DAYS;    // days a bend takes to finish its shift
+    public static final ForgeConfigSpec.DoubleValue RIVER_MIGRATION_SCALE; // how far a bend shifts, per curvature
 
     // --- Instruments ---------------------------------------------------------
     public static final ForgeConfigSpec.IntValue SEISMOGRAPH_RANGE;   // blocks a station can hear
@@ -927,6 +930,21 @@ public final class GeyserConfig {
                         "want a world that visibly rearranges itself; set quakesOpenNewSprings to",
                         "false to switch the whole thing off.")
                 .defineInRange("quakeSpringChance", 0.06D, 0.0D, 1.0D);
+        RIVER_MEANDERS = b
+                .comment("Let river bends migrate: the outer bank is cut back and a sand bar grows on",
+                        "the inner one, a block at a time over weeks, until each bend has shifted",
+                        "as far as its curvature and width say and then stops. Each loaded chunk's",
+                        "river is surveyed once; only natural ground moves, never a build, a bridge,",
+                        "a hot spring or a cliff, and the water level never changes.")
+                .define("riverMeanders", true);
+        RIVER_MEANDER_DAYS = b
+                .comment("In-game days a bend takes to complete its shift. A block or two a day.")
+                .defineInRange("riverMeanderDays", 14.0D, 0.01D, 1000.0D);
+        RIVER_MIGRATION_SCALE = b
+                .comment("How far a bend shifts in all, in channel widths per unit of curvature times",
+                        "width. At 1.5 a typical bend (radius three widths) moves half a width;",
+                        "no bend ever moves more than six tenths of its width.")
+                .defineInRange("riverMigrationScale", 1.5D, 0.0D, 10.0D);
         b.pop();
 
         SPEC = b.build();
