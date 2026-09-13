@@ -70,6 +70,8 @@ public final class RiverSurvey extends SavedData {
         int x, z;
         float nx, nz;
         int width, steps, done;
+        /** How fast the water runs here, 0.5 to 1.5; the bar is gravelly where it is fast. */
+        float speed = 1.0f;
         long next;
         boolean dead;
 
@@ -188,21 +190,33 @@ public final class RiverSurvey extends SavedData {
      * width, a bend is planned to shift outward by {@code scale * curvature * width^2}, never more than
      * {@link #MAX_SHIFT} of the width.
      */
-    void plan(ServerLevel level, int cx, int cz) {
+    boolean plan(ServerLevel level, int cx, int cz) {
         Rec r = rec(cx, cz);
+        if (!r.river()) {
+            r.planned = true;
+            setDirty();
+            return true;
+        }
+        // The river as a whole first: which way it flows here, how much it carries, whether this is a lake.
+        int rx = -1, rz = -1;
+        for (int i = 0; i < 256 && rx < 0; i++) {
+            if (r.at(i & 15, i >> 4)) { rx = cx * 16 + (i & 15); rz = cz * 16 + (i >> 4); }
+        }
+        RiverNetwork.Node here = RiverNetwork.at(level, rx, rz);
+        if (here == null && !RiverNetwork.known(rx, rz)) return false;   // still being read; asked again later
         r.planned = true;
         r.bends.clear();
         setDirty();
-        if (!r.river()) return;
+        if (here != null && here.lake()) return true;
         boolean[][] water = new boolean[WIN][WIN];
         int[][] rel = new int[WIN][WIN];
         for (int ox = -1; ox <= 1; ox++) {
             for (int oz = -1; oz <= 1; oz++) {
                 Rec n = get(cx + ox, cz + oz);
-                if (n == null) return;
+                if (n == null) return true;
                 // A river mouth, or water at another level next door, is not a meandering reach.
-                if (n.coast) return;
-                if (n.river() && Math.abs(n.yW - r.yW) > 1) return;
+                if (n.coast) return true;
+                if (n.river() && Math.abs(n.yW - r.yW) > 1) return true;
                 for (int lz = 0; lz < 16; lz++) {
                     for (int lx = 0; lx < 16; lx++) {
                         int wx = (ox + 1) * 16 + lx, wz = (oz + 1) * 16 + lz;
@@ -215,12 +229,16 @@ public final class RiverSurvey extends SavedData {
         int[][] dist = distance(water);
         boolean[][] skel = thin(water);
         double scale = GeyserConfig.RIVER_MIGRATION_SCALE.get();
-        List<double[]> found = new ArrayList<>();   // wx, wz, curvature, width, nx, nz
+        int x0 = (cx - 1) * 16, z0 = (cz - 1) * 16;
+        List<double[]> found = new ArrayList<>();   // wx, wz, curvature, width, nx, nz, speed
         for (int wz = 16; wz < 32; wz++) {
             for (int wx = 16; wx < 32; wx++) {
                 if (!skel[wx][wz]) continue;
                 int width = Math.min(MAX_WIDTH, 2 * dist[wx][wz] - 1);
                 if (width < 3) continue;
+                // A lake, or the delta at the mouth: the water stands still, the banks stay.
+                RiverNetwork.Node node = RiverNetwork.at(level, x0 + wx, z0 + wz);
+                if (node != null && (node.lake() || (node.directed() && node.dist() < RiverNetwork.MOUTH_ZONE))) continue;
                 int h = Math.max(4, width);
                 int[] back = trace(skel, wx, wz, h, -1, -1);
                 if (back == null) continue;
@@ -236,9 +254,19 @@ public final class RiverSurvey extends SavedData {
                 double mx = (back[0] + fore[0]) * 0.5 - wx, mz = (back[1] + fore[1]) * 0.5 - wz;
                 double lm = Math.hypot(mx, mz);
                 if (lm < 0.5) continue;
-                double shift = scale * curvature * width * width;
+                double speed = speed(node);
+                double shift = scale * speed * curvature * width * width;
                 if (shift < 1.0) continue;
-                found.add(new double[] {wx, wz, curvature, width, -mx / lm, -mz / lm});
+                // The bank is cut hardest a little downstream of the apex, not at it: the work is set out there.
+                int px = wx, pz = wz;
+                double[] flow = RiverNetwork.flow(x0 + wx, z0 + wz);
+                if (flow != null) {
+                    boolean foreDown = bx * flow[0] + bz * flow[1] > ax * flow[0] + az * flow[1];
+                    int lag = (int) Math.round(1.5 * width);
+                    int[] moved = foreDown ? trace(skel, wx, wz, lag, back[3], back[4]) : trace(skel, wx, wz, lag, fore[3], fore[4]);
+                    if (moved != null) { px = moved[0]; pz = moved[1]; }
+                }
+                found.add(new double[] {px, pz, curvature, width, -mx / lm, -mz / lm, speed});
             }
         }
         // The tightest bends first; one bend a channel width.
@@ -248,7 +276,7 @@ public final class RiverSurvey extends SavedData {
             int wx = (int) f[0], wz = (int) f[1], width = (int) f[3];
             boolean near = false;
             for (Bend b : r.bends) {
-                int bx = b.x - (cx - 1) * 16, bz = b.z - (cz - 1) * 16;
+                int bx = b.x - x0, bz = b.z - z0;
                 if (Math.hypot(bx - wx, bz - wz) < width) { near = true; break; }
             }
             if (near) continue;
@@ -257,18 +285,29 @@ public final class RiverSurvey extends SavedData {
             int bank = bankAlong(water, rel, wx, wz, nx, nz, width + 4);
             if (bank == Integer.MIN_VALUE || bank > MAX_BANK) continue;
             if (bankAlong(water, rel, wx, wz, -nx, -nz, width + 4) == Integer.MIN_VALUE) continue;
-            int steps = (int) Math.min(Math.floor(MAX_SHIFT * width), Math.round(scale * f[2] * width * width));
+            int steps = (int) Math.min(Math.floor(MAX_SHIFT * width), Math.round(scale * f[6] * f[2] * width * width));
             if (steps < 1) continue;
             Bend b = new Bend();
-            b.x = (cx - 1) * 16 + wx;
-            b.z = (cz - 1) * 16 + wz;
+            b.x = x0 + wx;
+            b.z = z0 + wz;
             b.nx = (float) nx;
             b.nz = (float) nz;
             b.width = width;
             b.steps = steps;
+            b.speed = (float) f[6];
             b.next = now + MeanderScheduler.interval(steps);
             r.bends.add(b);
         }
+        return true;
+    }
+
+    /**
+     * How fast the water runs, from what it carries: a river's velocity grows slowly with its discharge. Half
+     * speed on a headwater trickle, half again as fast on a river with a thousand cells behind it.
+     */
+    static double speed(RiverNetwork.Node node) {
+        if (node == null) return 1.0;
+        return Mth.clamp(0.5 + 0.5 * Math.log10(1.0 + node.upstream() / 200.0), 0.5, 1.5);
     }
 
     /** Height of the first bank cell along a bearing over the water, or MIN where the window runs out first. */
@@ -436,6 +475,7 @@ public final class RiverSurvey extends SavedData {
                 b.done = bt.getInt("d");
                 b.next = bt.getLong("t");
                 b.dead = bt.getBoolean("k");
+                b.speed = bt.contains("v") ? bt.getFloat("v") : 1.0f;
                 r.bends.add(b);
             }
             s.recs.put(c.getLong("key"), r);
@@ -473,6 +513,7 @@ public final class RiverSurvey extends SavedData {
                     bt.putInt("d", b.done);
                     bt.putLong("t", b.next);
                     bt.putBoolean("k", b.dead);
+                    bt.putFloat("v", b.speed);
                     bends.add(bt);
                 }
                 c.put("bends", bends);

@@ -105,6 +105,7 @@ public final class MeanderScheduler {
 
     /** Drops the in-memory queues; the survey itself lives in the world save. */
     public static void clear() {
+        RiverNetwork.clear();
         TO_SURVEY.clear();
         TO_PLAN.clear();
         LIVE.clear();
@@ -177,7 +178,10 @@ public final class MeanderScheduler {
                 RiverSurvey.Rec r = s.get(cx, cz);
                 if (r == null || !r.river() || r.planned || !r.current()) continue;
                 if (!s.neighbourhoodKnown(cx, cz)) continue;   // waits for its neighbours to load
-                s.plan(level, cx, cz);
+                if (!s.plan(level, cx, cz)) {
+                    q.add(key);                                 // its river is still being read
+                    continue;
+                }
                 if (hasLive(r)) {
                     noteLive(level, cx, cz);
                     GeysersMod.LOGGER.debug("river bends planned in chunk {},{}: {}", cx, cz, describe(r));
@@ -301,11 +305,11 @@ public final class MeanderScheduler {
         if (ox == Integer.MIN_VALUE) return dead(b, "no bank within reach");
 
         // In: the last water before the inner bank.
-        int ix = Integer.MIN_VALUE, iz = 0;
+        int ix = Integer.MIN_VALUE, iz = 0, tIn = 0;
         for (int t = 1; t <= reach; t++) {
             int x = (int) Math.floor(ax - b.nx * t), z = (int) Math.floor(az - b.nz * t);
             if (!level.hasChunkAt(m.set(x, yW, z))) return STEP_WAIT;
-            if (riverWater(level.getBlockState(m.set(x, yW, z)))) { ix = x; iz = z; continue; }
+            if (riverWater(level.getBlockState(m.set(x, yW, z)))) { ix = x; iz = z; tIn = t; continue; }
             break;
         }
         // The channel would be closed if the bar reached the outer bank: the bend has done all it can.
@@ -339,34 +343,50 @@ public final class MeanderScheduler {
             if (!holds(level.getBlockState(m.set(sx, yW, sz)))) return dead(b, "nothing beside the bank");
         }
 
-        // Cut: the bank above the water goes, the water comes in down to the bed.
+        // Cut: the bank above the water goes, and the water comes in. The new bed shelves from the old bank down to
+        // the channel's depth, a block deeper every second cell, as a cut bank's margin does.
         for (int y = g + 2; y > yW; y--) {
             BlockState s = level.getBlockState(m.set(ox, y, oz));
             if (!s.isAir()) level.setBlock(new BlockPos(ox, y, oz), Blocks.AIR.defaultBlockState(), FLAGS);
         }
-        for (int y = yW; y > yW - depth; y--) {
+        int cut = Math.min(depth, (b.done + 2) / 2);
+        for (int y = yW; y > yW - cut; y--) {
             BlockState s = level.getBlockState(m.set(ox, y, oz));
             if (s.is(Blocks.BEDROCK) || (EruptionHandler.isPlayerPlaced(s) && !s.isAir())) break;
             level.setBlock(new BlockPos(ox, y, oz), Blocks.WATER.defaultBlockState(), FLAGS);
         }
 
-        // Fill: the bar on the inner side, from the bed up to the water line, so the sand rests on ground and
-        // never falls through water it was set over.
+        // Fill: the bar, a wedge rising towards the inner bank, a cell longer and a block higher every step, its
+        // face one in one under the water and a dry crescent of sand at the water line. Only where the water is
+        // shallow: in deep water a bar would be a pillar, and what a river drops in a lake is a delta, not a bar.
         if (ix != Integer.MIN_VALUE) {
-            int bottom = yW;
-            while (bottom - 1 > yW - depth - 4 && level.getBlockState(m.set(ix, bottom - 1, iz)).getFluidState().is(FluidTags.WATER)) bottom--;
-            for (int y = bottom; y <= yW; y++) {
-                BlockState s = level.getBlockState(m.set(ix, y, iz));
-                if (!s.getFluidState().is(FluidTags.WATER)) continue;
-                level.setBlock(new BlockPos(ix, y, iz), sediment(ix, y, iz, b.width, y == yW), FLAGS);
+            int grown = b.done + 1;
+            for (int i = 0; i < Math.min(grown, tIn); i++) {
+                int t = tIn - i;
+                int x = (int) Math.floor(ax - b.nx * t), z = (int) Math.floor(az - b.nz * t);
+                if (!level.hasChunkAt(m.set(x, yW, z))) break;
+                int bottom = yW;
+                while (bottom - 1 > yW - BAR_DEPTH - 1
+                        && level.getBlockState(m.set(x, bottom - 1, z)).getFluidState().is(FluidTags.WATER)) bottom--;
+                if (yW - bottom + 1 > BAR_DEPTH) continue;
+                if (!holds(level.getBlockState(m.set(x, bottom - 1, z)))) continue;   // nothing under it to rest on
+                int target = Math.min(yW, bottom - 1 + grown - i);
+                for (int y = bottom; y <= target; y++) {
+                    BlockState s = level.getBlockState(m.set(x, y, z));
+                    if (!s.getFluidState().is(FluidTags.WATER)) continue;
+                    level.setBlock(new BlockPos(x, y, z), sediment(x, y, z, b.width, b.speed, y == yW), FLAGS);
+                }
             }
         }
         return STEP_DONE;
     }
 
-    /** Still water at the surface: the river, not a placed bucket in a hole. */
+    /** Deepest water a bar builds up in. */
+    private static final int BAR_DEPTH = 4;
+
+    /** The river's water at the surface, frozen or not, water plants included. */
     private static boolean riverWater(BlockState s) {
-        return s.getFluidState().is(FluidTags.WATER);
+        return s.getFluidState().is(FluidTags.WATER) || s.is(Blocks.ICE) || s.is(Blocks.FROSTED_ICE);
     }
 
     /** True where a cell at the water level keeps the water in: solid ground, or more river. */
@@ -376,12 +396,13 @@ public final class MeanderScheduler {
     }
 
     /** What a point bar is made of: mostly sand, gravel in a fast narrow channel, a little clay in a slow wide one. */
-    private static BlockState sediment(int x, int y, int z, int width, boolean top) {
+    private static BlockState sediment(int x, int y, int z, int width, float speed, boolean top) {
         long h = com.jeladastudios.ftsgeology.util.SeedHash.hash(0x5EDL ^ y, x, z, 0x5EDL);
-        int roll = (int) Math.floorMod(h, 10L);
-        if (top) return (roll < 8 || width < 6 ? Blocks.SAND : Blocks.GRAVEL).defaultBlockState();
-        if (width < 6) return (roll < 5 ? Blocks.GRAVEL : Blocks.SAND).defaultBlockState();
-        if (width > 12 && roll < 2) return Blocks.CLAY.defaultBlockState();
-        return (roll < 8 ? Blocks.SAND : Blocks.GRAVEL).defaultBlockState();
+        int roll = (int) Math.floorMod(h, 20L);
+        // Fast water carries the sand away and leaves the gravel; slow wide water drops clay as well.
+        int gravel = (int) Math.round(4 + 8 * (speed - 1.0)) + (width < 6 ? 4 : 0);
+        if (top) return (roll < Math.max(2, gravel - 2) ? Blocks.GRAVEL : Blocks.SAND).defaultBlockState();
+        if (width > 12 && speed < 1.0 && roll < 3) return Blocks.CLAY.defaultBlockState();
+        return (roll < Math.max(2, gravel) ? Blocks.GRAVEL : Blocks.SAND).defaultBlockState();
     }
 }
