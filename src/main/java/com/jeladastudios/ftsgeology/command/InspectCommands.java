@@ -45,6 +45,12 @@ public final class InspectCommands {
         source.sendSuccess(() -> Component.translatable("command.fts_geology.tectonics.boundary", s.faultType(), dec(s.faultDistance(), 0))
                 .withStyle(colorOf(s.faultType())), false);
         source.sendSuccess(() -> Component.translatable("command.fts_geology.tectonics.neighbour", TectonicMap.plateCode(s.neighbourId()), s.neighbourKind(), String.format(Locale.ROOT, "%+.2f", s.convergence()), dec(s.shear(), 2)), false);
+        if (s.faultType() == com.jeladastudios.ftsgeology.tectonics.FaultType.CONVERGENT_SUBDUCTION
+                || s.faultType() == com.jeladastudios.ftsgeology.tectonics.FaultType.CONVERGENT_COLLISION) {
+            source.sendSuccess(() -> Component.translatable(s.downGoing()
+                    ? "command.fts_geology.tectonics.side_under" : "command.fts_geology.tectonics.side_over",
+                    String.format(Locale.ROOT, "%.2f", s.faultNormalX()), String.format(Locale.ROOT, "%.2f", s.faultNormalZ())), false);
+        }
         source.sendSuccess(() -> Component.translatable("command.fts_geology.tectonics.stress", dec(s.stress(), 2), bar(s.stress())), false);
         source.sendSuccess(() -> Component.translatable(describeKey(s)).withStyle(ChatFormatting.GRAY), false);
 

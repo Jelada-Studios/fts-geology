@@ -217,7 +217,18 @@ public final class OreGenesis {
         // A ragged margin rather than a line at a fixed distance.
         double dist = s.faultDistance() + 0.25 * width * noise(x + 211, z - 211, 60.0);
         boolean headOn = Math.abs(s.convergence()) >= s.shear();
-        if (headOn && s.convergence() > 0 && dist > width && dist < 3.0 * width) return true;
+        if (headOn && s.convergence() > 0) {
+            if (s.neighbourKind().isOceanic()) {
+                // An arc: the fore-arc basin between trench and arc and the back-arc basin behind it, both on the
+                // plate that rides over (the Great Valley, the shores of the Sea of Japan).
+                if (dist > 0.15 * width && dist < 0.35 * width) return true;
+                if (dist > 1.0 * width && dist < 2.0 * width) return true;
+            } else if (s.downGoing()) {
+                // Two continents: the foreland basin sags on the plate pushed under the mountains (the Ruhr, the
+                // Appalachians, Zonguldak), not on the one riding over them.
+                if (dist > width && dist < 3.0 * width) return true;
+            }
+        }
         if (headOn && s.convergence() < 0 && dist < 1.5 * width) return true;
         return noise(x - 7717, z + 7717, 1500.0) > 0.3;
     }
@@ -308,8 +319,8 @@ public final class OreGenesis {
             int ax = cellX + (int) (die(h, 1) * PORPHYRY_CELL), az = cellZ + (int) (die(h, 2) * PORPHYRY_CELL);
             PlateSample s = TectonicMap.sampleCached(d.world, ax, az);
             if (s.faultType() != FaultType.CONVERGENT_SUBDUCTION || s.stress() < 0.2) return;
-            // Around the arc root, not out on the fore-arc.
-            if (s.faultDistance() / GeyserConfig.FAULT_WIDTH.get() > 0.65) return;
+            // Around the arc root on the overriding plate, not out on the fore-arc and never on the plate going under.
+            if (s.downGoing() || s.faultDistance() / GeyserConfig.FAULT_WIDTH.get() > 0.65) return;
 
             int ay = d.level.getMinBuildHeight() + 24 + (int) (die(h, 3) * 50);
             double core = 4.5 + die(h, 4) * 3.0;

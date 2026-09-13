@@ -148,7 +148,7 @@ public final class Earthquake {
         // plate id does.
         double sx = strikeX, sz = strikeZ;
         if ((type == FaultType.CONVERGENT_SUBDUCTION || type == FaultType.CONVERGENT_COLLISION)
-                && downGoingIsOurs(here)) {
+                && here.downGoing()) {
             sx = -strikeX;
             sz = -strikeZ;
         }
@@ -446,16 +446,6 @@ public final class Earthquake {
         return Mth.clamp(m + stress * 0.6, lo, hi);
     }
 
-    /**
-     * Is the plate the sample was taken on the one that goes under? Oceanic crust always does;
-     * between two of a kind the lower id does, the same answer from either side of the line.
-     */
-    private static boolean downGoingIsOurs(PlateSample s) {
-        boolean ours = s.plateKind().isOceanic();
-        boolean theirs = s.neighbourKind().isOceanic();
-        if (ours != theirs) return ours;
-        return Long.compareUnsigned(s.plateId(), s.neighbourId()) < 0;
-    }
 
     public static double quakeDepthMetres(FaultType type, RandomSource rng) {
         double base = type.typicalQuakeDepth() * 1000.0;   // the enum reports kilometres

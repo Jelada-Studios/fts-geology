@@ -49,9 +49,14 @@ public final class RiverNetwork {
      * One river cell: distance to the mouth along the river, cells upstream of it, its distance to the bank, and
      * whether it is part of a lake (wide water, or its shore).
      */
-    public record Node(int dist, int upstream, int halfWidth, boolean lake, long river) {
+    public record Node(int dist, int upstream, int halfWidth, boolean lake, long river, int load) {
         public boolean directed() { return dist >= 0; }
     }
+
+    /** What the water carries down from the country it drains: gold off a collision belt or a shear zone. */
+    public static final int LOAD_GOLD = 1;
+    /** Copper off an arc, a rift or a plume. */
+    public static final int LOAD_COPPER = 2;
 
     /** All the cells of every river read so far, by cell key, each pointing at its river's nodes. */
     private static final Long2ObjectOpenHashMap<Long2ObjectOpenHashMap<Node>> BY_CELL = new Long2ObjectOpenHashMap<>();
@@ -209,6 +214,20 @@ public final class RiverNetwork {
         for (long m : mouths) { dist.put(m, new int[] {0}); bfs.add(m); }
         spread(river, dist, bfs);
 
+        // The minerals the water picks up: every fourth cell asks the plate model what the ground there holds, and
+        // each cell hands what it carries to the next one down, so a bend far below a gold belt still gets its share.
+        Long2ObjectOpenHashMap<int[]> load = new Long2ObjectOpenHashMap<>();
+        int goldCells = 0, copperCells = 0;
+        for (long c : river) {
+            int qx = (int) (c >> 32), qz = (int) c;
+            if (((qx ^ qz) & 3) != 0) continue;
+            int bits = loadAt(level, qx * 4 + 2, qz * 4 + 2);
+            if (bits == 0) continue;
+            load.put(c, new int[] {bits});
+            if ((bits & LOAD_GOLD) != 0) goldCells++;
+            if ((bits & LOAD_COPPER) != 0) copperCells++;
+        }
+
         // What each cell carries: the cells upstream of it, handed down towards the mouth.
         Long2ObjectOpenHashMap<int[]> up = new Long2ObjectOpenHashMap<>();
         if (!dist.isEmpty()) {
@@ -228,7 +247,11 @@ public final class RiverNetwork {
                     int[] nd = dist.get(nk);
                     if (nd != null && nd[0] < best) { best = nd[0]; down = nk; }
                 }
-                if (down != Long.MIN_VALUE) up.computeIfAbsent(down, k -> new int[] {0})[0] += mine[0] + 1;
+                if (down != Long.MIN_VALUE) {
+                    up.computeIfAbsent(down, k -> new int[] {0})[0] += mine[0] + 1;
+                    int[] carried = load.get(c);
+                    if (carried != null) load.computeIfAbsent(down, k -> new int[] {0})[0] |= carried[0];
+                }
             }
         }
 
@@ -243,14 +266,31 @@ public final class RiverNetwork {
 
         Long2ObjectOpenHashMap<Node> out = new Long2ObjectOpenHashMap<>(river.size());
         for (long c : river) {
-            int[] d = dist.get(c), u = up.get(c), h = half.get(c), l = lake.get(c);
+            int[] d = dist.get(c), u = up.get(c), h = half.get(c), l = lake.get(c), ld = load.get(c);
             out.put(c, new Node(d == null ? -1 : d[0], u == null ? 0 : u[0], h == null ? 1 : h[0],
-                    l != null && l[0] <= LAKE_SHORE, key(qx0, qz0)));
+                    l != null && l[0] <= LAKE_SHORE, key(qx0, qz0), ld == null ? 0 : ld[0]));
         }
-        GeysersMod.LOGGER.info("river network from {},{}: {} cells{}, {} mouths, {} biome samples, {} ms",
-                qx0 * 4, qz0 * 4, river.size(), cut ? " (cut short)" : "", mouths.size(), samples,
+        GeysersMod.LOGGER.info("river network from {},{}: {} cells{}, {} mouths, {} biome samples, gold under {} cells, copper under {}, {} ms",
+                qx0 * 4, qz0 * 4, river.size(), cut ? " (cut short)" : "", mouths.size(), samples, goldCells, copperCells,
                 (System.nanoTime() - started) / 1_000_000);
         return out;
+    }
+
+    /** The placer minerals the ground at a point would shed into a river: from the plate model and the plume map. */
+    private static int loadAt(ServerLevel level, int x, int z) {
+        com.jeladastudios.ftsgeology.tectonics.PlateSample s = com.jeladastudios.ftsgeology.tectonics.TectonicMap.sampleCached(level, x, z);
+        int bits = 0;
+        if (s.stress() >= 0.35) {
+            switch (s.faultType()) {
+                // Orogenic gold in the shear zones of a collision belt and along a strike-slip fault.
+                case CONVERGENT_COLLISION, TRANSFORM -> bits |= LOAD_GOLD;
+                // Porphyry copper under an arc, the copper of a rift's sulphides.
+                case CONVERGENT_SUBDUCTION, DIVERGENT -> bits |= LOAD_COPPER;
+                default -> { }
+            }
+        }
+        if (com.jeladastudios.ftsgeology.tectonics.HotspotMap.plumeStrength(level, x, z) >= 0.45) bits |= LOAD_COPPER;
+        return bits;
     }
 
     /** Breadth-first from the seeded cells over the river, each unseen neighbour one more than its seed. */

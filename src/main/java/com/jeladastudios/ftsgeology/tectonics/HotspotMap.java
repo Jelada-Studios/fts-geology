@@ -250,6 +250,28 @@ public final class HotspotMap {
         return rand01(hash(seed, cx, cz, 0x487A5L)) < density;
     }
 
+    /** The centre of the live plume whose dome this column is under, or null where there is none. */
+    public static double[] plumeCentre(ServerLevel level, int blockX, int blockZ) {
+        if (!GeyserConfig.HOTSPOTS_ENABLED.get()) return null;
+        double scale = GeyserConfig.HOTSPOT_SCALE.get();
+        double density = GeyserConfig.HOTSPOT_DENSITY.get();
+        double radius = GeyserConfig.HOTSPOT_RADIUS.get();
+        long seed = level.getSeed();
+        int gx = Mth.floor(blockX / scale), gz = Mth.floor(blockZ / scale);
+        double[] best = null;
+        double bestD = radius;
+        for (int ox = -1; ox <= 1; ox++) {
+            for (int oz = -1; oz <= 1; oz++) {
+                int cx = gx + ox, cz = gz + oz;
+                if (!cellHasPlume(seed, cx, cz, density)) continue;
+                double px = plumeX(seed, cx, cz, scale), pz = plumeZ(seed, cx, cz, scale);
+                double d = Math.hypot(blockX - px, blockZ - pz);
+                if (d < bestD) { bestD = d; best = new double[] {px, pz}; }
+            }
+        }
+        return best;
+    }
+
     private static double plumeX(long seed, int cx, int cz, double scale) {
         return (cx + 0.5 + (rand01(hash(seed, cx, cz, 0x1B7C3L)) - 0.5) * 0.7) * scale;
     }

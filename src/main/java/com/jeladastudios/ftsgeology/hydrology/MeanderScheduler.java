@@ -298,6 +298,9 @@ public final class MeanderScheduler {
     private static int transect(ServerLevel level, RiverSurvey.Rec r, RiverSurvey.Bend b, double ax, double az) {
         int yW = r.yW, depth = r.bed;
         int reach = b.width * 2 + b.steps + 3;
+        if (b.done == 0 && Math.abs(ax - (b.x + 0.5)) < 1.0e-6 && Math.abs(az - (b.z + 0.5)) < 1.0e-6) {
+            GeysersMod.LOGGER.debug("bend {},{} starts: width {}, speed {}, carrying {}", b.x, b.z, b.width, b.speed, placerLoad(b));
+        }
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
 
         // Out: the bank.
@@ -401,7 +404,7 @@ public final class MeanderScheduler {
                 for (int y = bottom; y <= target; y++) {
                     BlockState s = level.getBlockState(m.set(x, y, z));
                     if (!s.getFluidState().is(FluidTags.WATER)) continue;
-                    level.setBlock(new BlockPos(x, y, z), sediment(x, y, z, b.width, b.speed, y == yW), FLAGS);
+                    level.setBlock(new BlockPos(x, y, z), sediment(x, y, z, b.width, b.speed, y == yW, placerLoad(b)), FLAGS);
                 }
             }
         }
@@ -422,14 +425,30 @@ public final class MeanderScheduler {
         return !s.isAir() && s.getFluidState().isEmpty() && !TerrainProbe.isVegetation(s);
     }
 
-    /** What a point bar is made of: mostly sand, gravel in a fast narrow channel, a little clay in a slow wide one. */
-    private static BlockState sediment(int x, int y, int z, int width, float speed, boolean top) {
+    /** What the river at a bend carries down from the country above it, once its network has been read. */
+    private static int placerLoad(RiverSurvey.Bend b) {
+        RiverNetwork.Node node = RiverNetwork.peek(b.x, b.z);
+        return node == null ? 0 : node.load();
+    }
+
+    /**
+     * What a point bar is made of: mostly sand, gravel in a fast narrow channel, a little clay in a slow wide one.
+     * Under the water line, in the gravel, a river draining a gold belt or a copper arc drops a placer grain now and
+     * then, more the faster it runs: the heavy metal settles where the current slackens on the inside of the bend.
+     */
+    private static BlockState sediment(int x, int y, int z, int width, float speed, boolean top, int load) {
         long h = com.jeladastudios.ftsgeology.util.SeedHash.hash(0x5EDL ^ y, x, z, 0x5EDL);
         int roll = (int) Math.floorMod(h, 20L);
         // Fast water carries the sand away and leaves the gravel; slow wide water drops clay as well.
         int gravel = (int) Math.round(4 + 8 * (speed - 1.0)) + (width < 6 ? 4 : 0);
         if (top) return (roll < Math.max(2, gravel - 2) ? Blocks.GRAVEL : Blocks.SAND).defaultBlockState();
         if (width > 12 && speed < 1.0 && roll < 3) return Blocks.CLAY.defaultBlockState();
-        return (roll < Math.max(2, gravel) ? Blocks.GRAVEL : Blocks.SAND).defaultBlockState();
+        boolean stones = roll < Math.max(2, gravel);
+        if (stones && load != 0 && Math.floorMod(h >> 8, 100L) < 15 * speed) {
+            boolean gold = (load & RiverNetwork.LOAD_GOLD) != 0
+                    && ((load & RiverNetwork.LOAD_COPPER) == 0 || ((h >> 20) & 1) == 0);
+            return (gold ? Blocks.GOLD_ORE : Blocks.COPPER_ORE).defaultBlockState();
+        }
+        return (stones ? Blocks.GRAVEL : Blocks.SAND).defaultBlockState();
     }
 }

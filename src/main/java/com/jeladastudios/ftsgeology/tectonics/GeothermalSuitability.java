@@ -36,6 +36,11 @@ public final class GeothermalSuitability {
      * geyser and hot spring may exceed 1 inside a hotspot basin. {@code reasonKey} is a translation
      * key explaining the verdict.
      */
+    /** 1 across the middle of a subduction zone, where the arc stands, falling to 0 at the trench and the far edge. */
+    static double arcBand(double across) {
+        return Mth.clamp(Math.min((across - 0.10) / 0.15, (0.90 - across) / 0.15), 0.0, 1.0);
+    }
+
     public record Suitability(double volcano, double geyser, double hotSpring, String reasonKey) {
 
         public boolean anything() {
@@ -56,10 +61,16 @@ public final class GeothermalSuitability {
 
         switch (plate.faultType()) {
             case CONVERGENT_SUBDUCTION -> {
-                // The classic volcanic arc: Andes, Cascades, Japan, Kamchatka.
-                volcano = 1.00 * s;
-                geyser = 0.90 * s;
-                hotSpring = 1.00 * s;
+                // The classic volcanic arc: Andes, Cascades, Japan, Kamchatka. It stands on the plate that rides
+                // over, a set way back from the trench where the slab is deep enough to melt; the plate going
+                // under has no melt beneath it, only the warm springs of the fore-arc.
+                if (plate.downGoing()) {
+                    hotSpring = 0.30 * s;
+                } else {
+                    volcano = 1.00 * s * arcBand(plate.across(GeyserConfig.FAULT_WIDTH.get()));
+                    geyser = 0.90 * s;
+                    hotSpring = 1.00 * s;
+                }
                 reasonKey = "command.fts_geology.suitability.reason.subduction";
             }
             case DIVERGENT -> {

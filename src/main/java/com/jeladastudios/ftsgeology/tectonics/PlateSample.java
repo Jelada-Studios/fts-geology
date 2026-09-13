@@ -62,4 +62,34 @@ public record PlateSample(
     public double faultStrikeZ() {
         return faultNormalX;
     }
+
+    /**
+     * On a convergent boundary, is this the plate that goes under? Oceanic crust always does; between two of a
+     * kind the lower id does, so both sides of one line agree. Everything the arc does happens on the other plate.
+     */
+    public boolean downGoing() {
+        boolean ours = plateKind.isOceanic();
+        boolean theirs = neighbourKind.isOceanic();
+        if (ours != theirs) return ours;
+        return Long.compareUnsigned(plateId, neighbourId) < 0;
+    }
+
+    /** On a subduction margin, is this the plate that rides over: the one the arc stands on? */
+    public boolean overriding() {
+        return faultType == FaultType.CONVERGENT_SUBDUCTION && !downGoing();
+    }
+
+    /** How far across the fault zone this column lies, as a share of its width: 0 on the line, 1 at the edge. */
+    public double across(double faultWidth) {
+        return faultDistance / faultWidth;
+    }
+
+    /**
+     * Is this where an arc's volcanoes stand: on the overriding plate, a set way back from the trench? The arc
+     * sits where the slab is deep enough to melt, roughly a quarter to three quarters of the way across the zone.
+     */
+    public boolean onArc(double faultWidth) {
+        double a = across(faultWidth);
+        return overriding() && a >= 0.25 && a <= 0.75;
+    }
 }

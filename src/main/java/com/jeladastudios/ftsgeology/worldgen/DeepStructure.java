@@ -198,6 +198,24 @@ public final class DeepStructure {
                                   int floor, int top, double faultWidth, int o, RandomSource rng) {
         int placed = 0;
         double across = Mth.clamp(s.faultDistance() / faultWidth, 0.0, 1.0);
+        // The plate going under has not gone under yet here: its own ocean floor lies flat under it, and the arc's
+        // roots and chambers are all on the other plate. Against the trench it carries the accretionary prism, the
+        // sea-floor mud and chert scraped off it and stacked in tilted slices.
+        boolean under = s.downGoing();
+        if (under) {
+            if (across < 0.25) {
+                int prismTop = top - 2;
+                int prismBottom = Math.max(floor + 4, top - 14 - (int) Math.round(6.0 * (0.25 - across) / 0.25));
+                for (int y = prismTop; y >= prismBottom; y--) {
+                    // Slices a few blocks thick, each one rock, leaning in towards the arc.
+                    double slice = noise(x + 3 * o + y * 2, z - 3 * o + y, 14.0);
+                    Block b = slice > 0.25 ? ModBlocks.CHERT.get() : slice > -0.2 ? ModBlocks.SHALE.get()
+                            : slice > -0.45 ? ModBlocks.SERPENTINITE.get() : Blocks.BASALT;
+                    if (set(level, x, y, z, b, top)) placed++;
+                }
+            }
+            across = 0.0;
+        }
 
         // The slab: dips away from the trench, sweeping the deep half of the column. It is old sea floor, an
         // ophiolite, with its layers in the order they formed: mantle peridotite at the base, serpentinite where
@@ -220,6 +238,8 @@ public final class DeepStructure {
             }
             if (set(level, x, y, z, b, top)) placed++;
         }
+
+        if (under) return placed;
 
         // The arc's plutonic root in the upper crust, above the wedge: separate bodies, each one rock for tens of
         // blocks - granite, diorite or gabbro - thickest in the middle, with a contact that wanders a block.

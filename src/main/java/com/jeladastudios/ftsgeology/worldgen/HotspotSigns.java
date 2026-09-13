@@ -96,9 +96,37 @@ public final class HotspotSigns {
         };
     }
 
+    /**
+     * Which way a fracture trace runs: along the fault where a boundary's heat feeds the field, give or take
+     * fifteen degrees; out from the plume over a hotspot, as its dykes run; round the ring fault on a caldera
+     * floor; and anywhere at all where none of those holds.
+     */
+    private static double fieldBearing(ServerLevel model, int x, int z, RandomSource rng) {
+        double jitter = (rng.nextDouble() - 0.5) * Math.PI / 6;
+        var ring = com.jeladastudios.ftsgeology.volcano.VolcanoField.nearestLarge(model, x, z);
+        if (ring != null && com.jeladastudios.ftsgeology.volcano.VolcanoField.onCalderaFloor(model, x, z)) {
+            com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("Fumarole field at {},{}: round the ring fault", x, z);
+            return Math.atan2(z - ring.z(), x - ring.x()) + Math.PI / 2 + jitter;
+        }
+        double heat = boundaryHeat(model, x, z);
+        double plume = HotspotMap.plumeStrength(model, x, z);
+        if (heat > 0 && heat >= plume) {
+            PlateSample plate = TectonicMap.sampleCached(model, x, z);
+            com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("Fumarole field at {},{}: along the {} strike, off by {} degrees",
+                    x, z, plate.faultType(), Math.round(Math.toDegrees(jitter)));
+            return Math.atan2(plate.faultStrikeZ(), plate.faultStrikeX()) + jitter;
+        }
+        double[] centre = HotspotMap.plumeCentre(model, x, z);
+        if (centre != null) {
+            com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("Fumarole field at {},{}: radial from the plume", x, z);
+            return Math.atan2(z - centre[1], x - centre[0]) + jitter;
+        }
+        return rng.nextDouble() * Math.PI * 2;
+    }
+
     /** One fumarole field, a fracture trace with its alteration haloes, painted where it crosses this chunk. */
     private static void field(WorldGenLevel level, ChunkPos cp, int x, int z, RandomSource rng, long fieldHash) {
-        double bearing = rng.nextDouble() * Math.PI * 2;
+        double bearing = fieldBearing(level.getLevel(), x, z, rng);
         int length = 14 + rng.nextInt(20);
         int halfWidth = 2 + rng.nextInt(3);
         int minX = cp.getMinBlockX(), minZ = cp.getMinBlockZ();

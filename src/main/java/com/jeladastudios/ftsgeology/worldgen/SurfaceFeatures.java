@@ -137,6 +137,14 @@ public final class SurfaceFeatures {
             springFit = Math.max(springFit, 0.6 * (1.0 - margin / APRON_SPRINGS));
         }
         double springChance = GeyserConfig.HOT_SPRING_SPAWN_CHANCE.get() * springFit * springBoost;
+        // The water has to be there too: on a spring line the table reaches the surface and every spring can; the
+        // deeper the dry ground above it, the fewer come up.
+        if (GeyserConfig.WATER_TABLE_ENABLED.get()) {
+            com.jeladastudios.ftsgeology.hydrology.WaterTable.Sample table =
+                    com.jeladastudios.ftsgeology.hydrology.WaterTable.sampleCached(level, centreX, centreZ);
+            springChance *= table.isSpringLine(level.getSeaLevel()) ? 1.0
+                    : net.minecraft.util.Mth.clamp(1.0 - table.depthToWater() / 24.0, 0.3, 1.0);
+        }
         // At a big mountain's foot the springs come in groups: inside a cluster most chunks get one.
         if (com.jeladastudios.ftsgeology.volcano.VolcanoField.footCluster(level, centreX, centreZ)
                 <= com.jeladastudios.ftsgeology.volcano.VolcanoField.FOOT_CLUSTER_R) {
@@ -239,7 +247,11 @@ public final class SurfaceFeatures {
         // Not on the flank of a large one; the field is pure arithmetic, so no record is needed.
         if (com.jeladastudios.ftsgeology.volcano.VolcanoField.nearLarge(level, x, z, 96)) return;
 
-        int magnitude = 8 + rng.nextInt(12);
+        // The cone's size follows the heat under it: a busy arc or rift builds big, a plume bigger, a quiet
+        // margin small.
+        double stress = com.jeladastudios.ftsgeology.tectonics.TectonicMap.sampleCached(level, x, z).stress();
+        double plume = com.jeladastudios.ftsgeology.tectonics.HotspotMap.plumeStrength(level, x, z);
+        int magnitude = Math.min(19, 8 + (int) Math.round(8 * stress) + rng.nextInt(4) + (int) Math.round(4 * plume));
         com.jeladastudios.ftsgeology.volcano.VolcanoSize size =
                 com.jeladastudios.ftsgeology.volcano.VolcanoSize.forMagnitude(magnitude);
         if (VolcanoBuilder.build(level, summit, magnitude, size)) {

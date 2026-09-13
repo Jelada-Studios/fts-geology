@@ -134,6 +134,22 @@ public final class VolcanoField {
         return out;
     }
 
+    /** The chosen large volcano nearest this column among the cells round it, or null. */
+    public static Site nearestLarge(ServerLevel level, int x, int z) {
+        int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
+        Site best = null;
+        double bestD = Double.MAX_VALUE;
+        for (int ox = -1; ox <= 1; ox++) {
+            for (int oz = -1; oz <= 1; oz++) {
+                Site s = site(level, cx0 + ox, cz0 + oz);
+                if (s == null || !s.chosen()) continue;
+                double d = Math.hypot(x - s.x(), z - s.z());
+                if (d < bestD) { bestD = d; best = s; }
+            }
+        }
+        return best;
+    }
+
     /** Radius of a foot spring cluster: the springs of one group lie within this of its centre. */
     public static final int FOOT_CLUSTER_R = 30;
 
@@ -445,6 +461,8 @@ public final class VolcanoField {
             int z = minZ + (int) (rand01(hash(seed, i, 2, 0x71A2L)) * span);
             PlateSample s = TectonicMap.sampleCached(level, x, z);
             if (s.stress() < MIN_STRESS) continue;
+            // An arc stands on the plate that rides over, back from the trench; the plate going under has none.
+            if (s.faultType() == FaultType.CONVERGENT_SUBDUCTION && !s.onArc(GeyserConfig.FAULT_WIDTH.get())) continue;
             VolcanoType type = switch (s.faultType()) {
                 // A quarter of the arc volcanoes have blown their tops off, as at Crater Lake or Aso.
                 case CONVERGENT_SUBDUCTION -> calderas && rand01(hash(seed, i, 4, 0xCA2DL)) < 0.25
@@ -523,6 +541,7 @@ public final class VolcanoField {
             } else {
                 PlateSample p = TectonicMap.sampleCached(level, sx, sz);
                 if (p.stress() < MIN_STRESS || p.faultType() != fault) continue;
+                if (fault == FaultType.CONVERGENT_SUBDUCTION && !p.onArc(GeyserConfig.FAULT_WIDTH.get())) continue;
             }
             // Two height samples rule most of the sea out before a full check is paid for.
             if (centreWet(level, sx, sz)) continue;
