@@ -156,6 +156,23 @@ public final class VolcanoField {
         return best;
     }
 
+    /**
+     * How far outside the nearest chosen large volcano's body this column lies, apron not counted: negative on
+     * the mountain itself, huge where there is none. Springs are kept off the body and let onto the apron.
+     */
+    public static double bodyMargin(ServerLevel level, int x, int z) {
+        int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
+        double best = Double.MAX_VALUE;
+        for (int ox = -1; ox <= 1; ox++) {
+            for (int oz = -1; oz <= 1; oz++) {
+                Site s = site(level, cx0 + ox, cz0 + oz);
+                if (s == null || !s.chosen()) continue;
+                best = Math.min(best, Math.hypot(x - s.x(), z - s.z()) - s.edificeReach());
+            }
+        }
+        return best;
+    }
+
     /** The chosen large volcanoes whose mountain reaches into this box of blocks. */
     public static List<Site> sitesInBox(ServerLevel level, int minX, int minZ, int maxX, int maxZ) {
         List<Site> out = new ArrayList<>(1);
@@ -404,7 +421,7 @@ public final class VolcanoField {
                 // Younger than a plume's track: an old arc island is worn and cliffed but still stands well out of the sea.
                 double age = 0.1 + 0.3 * ageRoll;
                 // The oldest, in a warm sea, have sunk under their reef: Darwin's atoll, on an arc as on a plume.
-                VolcanoSetting old = ageRoll >= 0.45 && seaTemperature(level, x, z) > OceanEdifice.ATOLL_TEMPERATURE
+                VolcanoSetting old = ageRoll >= 0.55 && seaTemperature(level, x, z) > OceanEdifice.ATOLL_TEMPERATURE
                         ? VolcanoSetting.ATOLL : VolcanoSetting.ERODED;
                 Site island = dead
                         ? checkOcean(level, x, z, type, old, old == VolcanoSetting.ATOLL ? 0.4 + age : age, seed,
@@ -495,7 +512,7 @@ public final class VolcanoField {
                 if (along < TRAIL_START) continue;
                 int x = (int) Math.round(t.x() + t.dirX() * along), z = (int) Math.round(t.z() + t.dirZ() * along);
                 double age = along / length;
-                VolcanoSetting setting = age < 0.4 ? VolcanoSetting.ERODED
+                VolcanoSetting setting = age < 0.5 ? VolcanoSetting.ERODED
                         : seaTemperature(level, x, z) > OceanEdifice.ATOLL_TEMPERATURE ? VolcanoSetting.ATOLL
                         : VolcanoSetting.GUYOT;
                 int depth = oceanDepth(level, x, z);
@@ -658,8 +675,11 @@ public final class VolcanoField {
         RandomState rs = level.getChunkSource().randomState();
         int surface = gen.getBaseHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
         int floor = gen.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
-        return surface > floor || floor <= gen.getSeaLevel();
+        return surface - floor >= DEEP_WATER;
     }
+
+    /** Water this deep under a probe is a lake or the sea; anything shallower is a river the mountain buries. */
+    private static final int DEEP_WATER = 4;
 
     /**
      * Whether a large volcano of this type can stand here, from the generator's own terrain rather than
@@ -689,7 +709,9 @@ public final class VolcanoField {
                 int pz = z + (int) Math.round(Math.sin(a) * r);
                 int surface = gen.getBaseHeight(px, pz, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
                 int floor = gen.getBaseHeight(px, pz, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
-                if (surface > floor || floor <= sea) {
+                // Only deep water counts: a river or a shallow lake under the body is built over, as real
+                // volcanoes stand by rivers. In a world full of rivers, counting every one left no site at all.
+                if (surface - floor >= DEEP_WATER) {
                     if (ring == 0) return refuse(refused, type, WATER, x, z, "centre in water");
                     wet[ring]++;
                 }
@@ -738,10 +760,13 @@ public final class VolcanoField {
                 if (plan == null) return refuse(refused, type, OTHER, x, z, "no plan at raised base " + baseY);
             }
         }
-        // Structures are placed before the mountain and would end up inside it, so none may stand on the
-        // edifice itself; one out on the apron keeps its buildings, which the apron will not cover.
-        if (structureInTheWay(level, gen, rs, x, z, plan[1] + 8, structures, false)) {
-            return refuse(refused, type, STRUCTURE, x, z, "structure within " + (plan[1] + 8));
+        // Structures are placed before the mountain. One under the summit would be cut by the crater, so the
+        // crater zone is kept clear; one on the flank stays where it is, its blocks never written over, and
+        // the mountain rises round it, as Pompeii lies under Vesuvius. Asking for the whole body left no
+        // site in a world with structure mods.
+        int keepClear = Math.max(plan[3] + 16, (int) Math.round(plan[1] * 0.35));
+        if (structureInTheWay(level, gen, rs, x, z, keepClear, structures, false)) {
+            return refuse(refused, type, STRUCTURE, x, z, "structure within " + keepClear);
         }
         return new Site(x, z, baseY, plan[2], type, magnitude, seed, plan[0], plan[1],
                 rand01(hash(seed, x, z, 0xC40L)), VolcanoSetting.LAND, 0.0);

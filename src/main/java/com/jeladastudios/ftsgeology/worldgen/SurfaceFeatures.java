@@ -114,8 +114,9 @@ public final class SurfaceFeatures {
                 (GeothermalBasin.basin(level, centreX, centreZ) - 0.30) / 0.30, 0.0, 1.0);
         springBoost = Math.max(springBoost, 1.0 + (BASIN_SPRING_BOOST - 1.0) * floor);
         double springChance = GeyserConfig.HOT_SPRING_SPAWN_CHANCE.get() * fit.hotSpring() * springBoost;
-        // A large volcano's body is its own ground; its summit builds any springs it gets. A caldera's floor is a basin.
-        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.largeMargin(level, centreX, centreZ) < 0
+        // A large volcano's body is its own ground; its summit builds any springs it gets. A caldera's floor is a
+        // basin, and the apron round the body is ordinary country, where springs belong as they do round Fuji.
+        if (com.jeladastudios.ftsgeology.volcano.VolcanoField.bodyMargin(level, centreX, centreZ) < 0
                 && !com.jeladastudios.ftsgeology.volcano.VolcanoField.onCalderaFloor(level, centreX, centreZ)) {
             springChance = 0.0;
         }
