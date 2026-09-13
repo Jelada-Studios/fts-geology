@@ -365,7 +365,9 @@ public class SpringSourceBlockEntity extends BlockEntity {
      */
     private boolean recoverPool(ServerLevel level, long quake, int ring) {
         resitedFor = quake;
-        if (HotSpringShape.restoreBasin(level, poolCells, datumY - 1) && applyStage(level, stage)) {
+        // On a volcano's own rock the basin is not cut back in: on a young cone that took half the cone away.
+        boolean onRock = com.jeladastudios.ftsgeology.volcano.VolcanoSummit.standsOnVolcanicRock(level, siteX(), siteZ());
+        if (!onRock && HotSpringShape.restoreBasin(level, poolCells, datumY - 1) && applyStage(level, stage)) {
             GeysersMod.LOGGER.info("Spring at {},{} restored its basin after a quake", siteX(), siteZ());
             setChanged();
             return true;

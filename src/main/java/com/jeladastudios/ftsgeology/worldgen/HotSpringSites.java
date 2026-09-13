@@ -27,6 +27,23 @@ public final class HotSpringSites {
     /** How far from a pool's centre its bands, halo, canopy clearing and runoff reach. */
     private static final int POOL_REACH = 56;
 
+    /** How far a spring keeps from open lava, across; a volcano's lake had pools on its very rim. */
+    private static final int LAVA_CLEARANCE = 16;
+
+    /** Is there lava within {@code range} across and eight up or down of here? A bounded box, since springs are rare. */
+    static boolean lavaNear(ServerLevel level, int x, int y, int z, int range) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int dy = -8; dy <= 8; dy++) {
+            for (int dx = -range; dx <= range; dx++) {
+                for (int dz = -range; dz <= range; dz++) {
+                    if (!level.hasChunkAt(m.set(x + dx, y + dy, z + dz))) continue;
+                    if (level.getBlockState(m).getFluidState().is(net.minecraft.tags.FluidTags.LAVA)) return true;
+                }
+            }
+        }
+        return false;
+    }
+
     /** Builds a hot spring system here: one broad pool on the flat, a terrace chain on a slope. */
     public static boolean placeHotSpringAt(ServerLevel level, int x, int z) {
         return placeHotSpringAt(level, x, z, HotSpringShape.MAX_STAGE);
@@ -54,6 +71,8 @@ public final class HotSpringSites {
         int relief = hi - lo;
         // Up to 12 blocks of relief is allowed; broken ground gets a terrace chain.
         if (relief > 12) return false;
+        // Not beside a lava lake or over one: the water would be steam.
+        if (lavaNear(level, x, centre, z, LAVA_CLEARANCE)) return false;
 
         // Layout: one broad pool on the flat or anywhere in a geothermal basin, a chain of smaller
         // terraces on a slope (Pamukkale), each a little lower than the one above.

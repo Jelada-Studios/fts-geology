@@ -679,14 +679,17 @@ public final class VolcanoSummit {
         // A flooded caldera's springs rise on its young cone's own flanks and shore, as at Palea Kameni: round it is sea.
         boolean isle = c.isle != null;
         // Inner edge of the field: outside the cone, or outside the ring-fault scarp.
-        double inner = isle ? c.isle.coneR * 0.35 : ring ? c.craterR * 1.05 : c.coneBaseR * 1.15 + 4;
+        double inner = isle ? c.isle.coneR * 0.6 : ring ? c.craterR * 1.05 : c.coneBaseR * 1.15 + 4;
         double outer = isle ? c.isle.coneR * 0.95 : inner + 26 + c.magnitude;
 
         int springs = 0;
-        for (int attempt = 0; attempt < 120 && springs < (isle ? 3 : ring ? 7 : 5); attempt++) {
+        for (int attempt = 0; attempt < 120 && springs < (isle ? 2 : ring ? 7 : 5); attempt++) {
             int[] p = ringSite(level, c, inner, outer);
             if (!isle && standsOnVolcanicRock(level, p[0], p[1])) continue;
-            if (HotSpringSites.placeHotSpringAt(level, p[0], p[1])) springs++;
+            // On the young cone the pools stay small and low on its flank: a mature one cut the cone away.
+            boolean placed = isle ? HotSpringSites.placeHotSpringAt(level, p[0], p[1], 2)
+                    : HotSpringSites.placeHotSpringAt(level, p[0], p[1]);
+            if (placed) springs++;
         }
         if (isle) return;
 
@@ -713,7 +716,7 @@ public final class VolcanoSummit {
     }
 
     /** True where the ground is rock this volcano laid down - its cone, its apron or its flows. */
-    static boolean standsOnVolcanicRock(ServerLevel level, int x, int z) {
+    public static boolean standsOnVolcanicRock(ServerLevel level, int x, int z) {
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return true;
         BlockState s = level.getBlockState(new BlockPos(x, g, z));
