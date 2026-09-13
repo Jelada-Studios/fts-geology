@@ -34,7 +34,7 @@ public final class RiverNetwork {
     private RiverNetwork() {}
 
     /** Cells one river may have: some eighty kilometres of channel. */
-    private static final int MAX_CELLS = 20_000;
+    private static final int MAX_CELLS = 30_000;
     /** Half a channel this wide, in cells, is a lake: sixteen blocks either side of the centre. */
     static final int LAKE_HALF = 4;
     /**
@@ -66,8 +66,8 @@ public final class RiverNetwork {
      * The node of the river cell holding a block, or null while its river is still being read. A river not read
      * yet is started here; the caller asks again next tick. Server thread only.
      */
-    public static Node at(ServerLevel level, int blockX, int blockZ) {
-        int qx = QuartPos.fromBlock(blockX), qz = QuartPos.fromBlock(blockZ);
+    public static Node at(ServerLevel level, int blockX, int blockZ, int waterY) {
+        int qx = QuartPos.fromBlock(blockX), qz = QuartPos.fromBlock(blockZ), qy = QuartPos.fromBlock(waterY);
         long k = key(qx, qz);
         Long2ObjectOpenHashMap<Node> river = BY_CELL.get(k);
         if (river != null) return river.get(k);
@@ -80,14 +80,14 @@ public final class RiverNetwork {
             if (river != null) return river.get(k);
         }
         // Not a river cell at all (the water is there but the biome is not): known, and nothing.
-        if (!RiverSurvey.river(biome(level, qx, qz))) {
+        if (!RiverSurvey.river(biome(level, qx, qy, qz))) {
             Long2ObjectOpenHashMap<Node> none = new Long2ObjectOpenHashMap<>();
             BY_CELL.put(k, none);
             return null;
         }
         inFlight = CompletableFuture.supplyAsync(() -> {
             try {
-                return read(level, qx, qz);
+                return read(level, qx, qz, qy);
             } catch (RuntimeException e) {
                 GeysersMod.LOGGER.warn("river network at {},{}: {}", blockX, blockZ, e.toString());
                 return null;
@@ -137,14 +137,15 @@ public final class RiverNetwork {
         inFlight = null;
     }
 
-    private static Holder<Biome> biome(ServerLevel level, int qx, int qz) {
+    /** The biome at a quart, sampled at the river's own water level: a hanging valley's river is not at the sea's. */
+    private static Holder<Biome> biome(ServerLevel level, int qx, int qy, int qz) {
         BiomeSource biomes = level.getChunkSource().getGenerator().getBiomeSource();
         Climate.Sampler sampler = level.getChunkSource().randomState().sampler();
-        return biomes.getNoiseBiome(qx, QuartPos.fromBlock(level.getSeaLevel()), qz, sampler);
+        return biomes.getNoiseBiome(qx, qy, qz, sampler);
     }
 
     /** Reads the river a cell belongs to. Worker thread; touches only the biome source and the generator. */
-    private static Long2ObjectOpenHashMap<Node> read(ServerLevel level, int qx0, int qz0) {
+    private static Long2ObjectOpenHashMap<Node> read(ServerLevel level, int qx0, int qz0, int qy) {
         long started = System.nanoTime();
         LongOpenHashSet river = new LongOpenHashSet();
         LongOpenHashSet notRiver = new LongOpenHashSet();
@@ -164,12 +165,19 @@ public final class RiverNetwork {
                     int nx = qx + dx, nz = qz + dz;
                     long nk = key(nx, nz);
                     if (river.contains(nk) || notRiver.contains(nk)) continue;
-                    Holder<Biome> b = biome(level, nx, nz);
+                    Holder<Biome> b = biome(level, nx, qy, nz);
                     samples++;
                     if (RiverSurvey.river(b)) {
                         river.add(nk);
                         queue.add(new long[] {nx, nz});
+                    } else if ((dx == 0 || dz == 0) && RiverSurvey.river(biome(level, nx + dx, qy, nz + dz))) {
+                        // A one-cell gap in a narrow river's biome is bridged, or the network falls apart into
+                        // reaches of a few cells and none knows which way it runs.
+                        samples++;
+                        river.add(nk);
+                        queue.add(new long[] {nx, nz});
                     } else {
+                        if (dx == 0 || dz == 0) samples++;
                         notRiver.add(nk);
                         if (RiverSurvey.ocean(b)) mouths.add(key(qx, qz));
                     }

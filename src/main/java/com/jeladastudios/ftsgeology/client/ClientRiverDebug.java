@@ -56,6 +56,7 @@ public final class ClientRiverDebug {
 
     /** One colour a river: a hue from the network's key, bright and saturated. */
     private static int colour(long river) {
+        if (river == 0) return 0x8899BB;   // a river the network has not read: grey-blue
         float hue = (float) (((river * 0x9E3779B97F4A7C15L) >>> 40) % 360) / 360.0f;
         return Mth.hsvToRgb(hue, 0.85f, 1.0f);
     }

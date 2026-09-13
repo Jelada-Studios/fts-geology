@@ -297,7 +297,7 @@ public final class MeanderScheduler {
      */
     private static int transect(ServerLevel level, RiverSurvey.Rec r, RiverSurvey.Bend b, double ax, double az) {
         int yW = r.yW, depth = r.bed;
-        int reach = b.width + b.steps + 3;
+        int reach = b.width * 2 + b.steps + 3;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
 
         // Out: the bank.

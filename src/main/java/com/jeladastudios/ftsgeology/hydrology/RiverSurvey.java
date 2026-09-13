@@ -211,7 +211,7 @@ public final class RiverSurvey extends SavedData {
         for (int i = 0; i < 256 && rx < 0; i++) {
             if (r.at(i & 15, i >> 4)) { rx = cx * 16 + (i & 15); rz = cz * 16 + (i >> 4); }
         }
-        RiverNetwork.Node here = RiverNetwork.at(level, rx, rz);
+        RiverNetwork.Node here = RiverNetwork.at(level, rx, rz, r.yW);
         if (here == null && !RiverNetwork.known(rx, rz)) return false;   // still being read; asked again later
         r.planned = true;
         r.bends.clear();
@@ -254,7 +254,7 @@ public final class RiverSurvey extends SavedData {
                 int width = Math.min(MAX_WIDTH, 2 * dist[wx][wz] - 1);
                 if (width < 3) continue;
                 // A lake, or the delta at the mouth: the water stands still, the banks stay.
-                RiverNetwork.Node node = RiverNetwork.at(level, x0 + wx, z0 + wz);
+                RiverNetwork.Node node = RiverNetwork.at(level, x0 + wx, z0 + wz, r.yW);
                 if (node != null && (node.lake() || (node.directed() && node.dist() < RiverNetwork.MOUTH_ZONE))) continue;
                 int h = Math.max(4, width);
                 int[] back = trace(skel, wx, wz, h, -1, -1);
@@ -303,6 +303,9 @@ public final class RiverSurvey extends SavedData {
             int bank = bankAlong(water, rel, wx, wz, nx, nz, width + 4);
             if (bank == Integer.MIN_VALUE || bank > MAX_BANK) continue;
             if (bankAlong(water, rel, wx, wz, -nx, -nz, width + 4) == Integer.MIN_VALUE) continue;
+            // Land with water again behind it is an islet or a braid bar, and the water either side of it a side
+            // channel: a bend cut there would eat the island and never find its bank.
+            if (islandAlong(water, wx, wz, nx, nz, width + 4) || islandAlong(water, wx, wz, -nx, -nz, width + 4)) continue;
             int steps = (int) Math.min(Math.floor(MAX_SHIFT * width),
                     Math.round(scale * f[6] * f[2] * width * width * (width > BIG_RIVER ? 0.5 : 1.0)));
             if (steps < 1) continue;
@@ -337,6 +340,22 @@ public final class RiverSurvey extends SavedData {
             if (!water[x][z]) return rel[x][z];
         }
         return Integer.MIN_VALUE;
+    }
+
+    /**
+     * True when the first land along a bearing is a strip no wider than {@code reach} with water behind it: an
+     * island or a bar, not a bank. Unknown past the window's edge, which counts as a bank.
+     */
+    static boolean islandAlong(boolean[][] water, int wx, int wz, double nx, double nz, int reach) {
+        int land = -1;
+        for (int t = 1; t <= reach * 2 + 2; t++) {
+            int x = (int) Math.round(wx + nx * t), z = (int) Math.round(wz + nz * t);
+            if (x < 0 || z < 0 || x >= WIN || z >= WIN) return false;
+            if (land < 0) { if (!water[x][z]) land = t; continue; }
+            if (t - land > reach) return false;
+            if (water[x][z]) return true;
+        }
+        return false;
     }
 
     /** Chebyshev distance of each water cell to the nearest cell that is not water; 0 elsewhere. */
