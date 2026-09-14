@@ -137,21 +137,17 @@ public final class SurfaceFeatures {
             springFit = Math.max(springFit, 0.6 * (1.0 - margin / APRON_SPRINGS));
         }
         double springChance = GeyserConfig.HOT_SPRING_SPAWN_CHANCE.get() * springFit * springBoost;
-        // The water has to be there too: on a spring line the table reaches the surface and every spring can; the
-        // deeper the dry ground above it, the fewer come up.
-        if (GeyserConfig.WATER_TABLE_ENABLED.get()) {
-            com.jeladastudios.ftsgeology.hydrology.WaterTable.Sample table =
-                    com.jeladastudios.ftsgeology.hydrology.WaterTable.sampleCached(level, centreX, centreZ);
-            springChance *= table.isSpringLine(level.getSeaLevel()) ? 1.0
-                    : net.minecraft.util.Mth.clamp(1.0 - table.depthToWater() / 24.0, 0.3, 1.0);
-        }
         // At a big mountain's foot the springs come in groups: inside a cluster most chunks get one.
         if (com.jeladastudios.ftsgeology.volcano.VolcanoField.footCluster(level, centreX, centreZ)
                 <= com.jeladastudios.ftsgeology.volcano.VolcanoField.FOOT_CLUSTER_R) {
             springChance = Math.max(springChance, FOOT_CLUSTER_CHANCE);
         }
         EXPECTED_SPRINGS.add(Math.min(1.0, springChance));
-        if (rng.nextDouble() < springChance) {
+        // The water has to be there too: on a spring line the table reaches the surface and every spring can; the
+        // deeper the dry ground above it, the fewer come up. Asked only once the dice have fallen for a spring: a
+        // table reading costs a stack of generator columns, and under Terralith's terrain that was two fifths of
+        // the server thread when every chunk asked.
+        if (rng.nextDouble() < springChance && waterAllows(level, centreX, centreZ, rng)) {
             generateHotSpring(level, cp, rng);
         }
         t = lap(4, t);
@@ -224,6 +220,15 @@ public final class SurfaceFeatures {
      * blocks below (which also reads as warm to Tough As Nails). Aborts near builds or on unsuitable
      * ground so it never scars terrain badly.
      */
+    /** Does the groundwater let a spring come up here: always on a spring line, with falling odds over dry ground. */
+    private static boolean waterAllows(ServerLevel level, int x, int z, RandomSource rng) {
+        if (!GeyserConfig.WATER_TABLE_ENABLED.get()) return true;
+        com.jeladastudios.ftsgeology.hydrology.WaterTable.Sample table =
+                com.jeladastudios.ftsgeology.hydrology.WaterTable.sampleCached(level, x, z);
+        if (table.isSpringLine(level.getSeaLevel())) return true;
+        return rng.nextDouble() < net.minecraft.util.Mth.clamp(1.0 - table.depthToWater() / 24.0, 0.3, 1.0);
+    }
+
     static void generateHotSpring(ServerLevel level, ChunkPos cp, RandomSource rng) {
         placeHotSpringAt(level, cp.getMinBlockX() + rng.nextInt(12) + 2, cp.getMinBlockZ() + rng.nextInt(12) + 2);
     }
