@@ -390,5 +390,11 @@
   "book.fts_geology.page.16": "§lVI. Commands§r\n§oField Operations§r\n\n§l/geology find <feature>§r\nLocates the nearest plate boundary, volcano, geyser, or fault scarp.\n\n§l/geology place <feature>§r\nManually generates a geological feature (spring, geyser, vent, volcano) at crosshairs.\n\n§l/geology quake <mag> [x z]§r\nTriggers an earthquake of given magnitude. Plays alarms, warning window, and real rupture.\n\n§l/geology map [radius]§r\nDisplays regional boundary vectors.",
   "book.fts_geology.page.17": "§lVI. Commands§r\n§oSubsurface Analysis§r\n\n§l/geology column [x z]§r\nDrills an analytical core sample, printing the stratified crustal beds, thicknesses, and rock types beneath the coordinates.\n\n§l/geology suitability [x z]§r\nEvaluates geothermal heat flow, permeability, and volcanological formation suitability.\n\n§l/geology plate [x z]§r\nInspects plate ID, velocity (cm/yr), drift heading, and crust type.",
   "book.fts_geology.page.18": "§lVI. Commands§r\n§oSimulation & Config§r\n\n§l/geology deepgen§r\nTriggers or tests deep crustal rock replacement beneath terrain.\n\n§l/geology feature§r\nLists active hydrothermal, volcanic, and seismic entities in loaded chunks.\n\n§l/geology setting <name> [val]§r\nReads or edits server settings in real-time:\n- quakesBreakBuilds\n- fallingIncludesBuilds\n- earthquakeRuptureInterval\n- retrogenMaxY",
-  "generator.fts_geology.geology": "FT's Geology"
+  "generator.fts_geology.geology": "FT's Geology",
+  "biome.fts_geology.geothermal_basin": "Geothermal Basin",
+  "biome.fts_geology.rift_valley": "Rift Valley",
+  "biome.fts_geology.volcanic_highland": "Volcanic Highland",
+  "biome.fts_geology.orogenic_highland": "Orogenic Highland",
+  "biome.fts_geology.alluvial_plain": "Alluvial Plain",
+  "biome.fts_geology.oceanic_ridge": "Oceanic Ridge"
 }

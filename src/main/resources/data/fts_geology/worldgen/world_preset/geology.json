@@ -5,8 +5,19 @@
       "generator": {
         "type": "minecraft:noise",
         "biome_source": {
-          "type": "minecraft:multi_noise",
-          "preset": "minecraft:overworld"
+          "type": "fts_geology:geology",
+          "parent": {
+            "type": "minecraft:multi_noise",
+            "preset": "minecraft:overworld"
+          },
+          "biomes": {
+            "geothermal_basin": "fts_geology:geothermal_basin",
+            "rift_valley": "fts_geology:rift_valley",
+            "volcanic_highland": "fts_geology:volcanic_highland",
+            "orogenic_highland": "fts_geology:orogenic_highland",
+            "alluvial_plain": "fts_geology:alluvial_plain",
+            "oceanic_ridge": "fts_geology:oceanic_ridge"
+          }
         },
         "settings": "fts_geology:geology"
       }

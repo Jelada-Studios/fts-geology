@@ -380,5 +380,11 @@
   "book.fts_geology.page.16": "§lVI. Komutlar§r\n§oArazi Operasyonları§r\n\n§l/geology find <yapı>§r\nEn yakın levha sınırını, volkanı, gayzeri veya fay aynasını bulur.\n\n§l/geology place <yapı>§r\nİşaret edilen yere jeolojik bir yapı (kaynak, gayzer, volkan vb.) yerleştirir.\n\n§l/geology quake <büyüklük> [x z]§r\nBelirtilen büyüklükte bir deprem tetikler. Alarm, erken uyarı ve gerçek kırılma işletilir.\n\n§l/geology map [yarıçap]§r\nBölgesel levha sınırlarını ve vektörleri haritalandırır.",
   "book.fts_geology.page.17": "§lVI. Komutlar§r\n§oYeraltı Analizi§r\n\n§l/geology column [x z]§r\nAnalitik sondaj yaparak altınızdaki tabakaları, kalınlıklarını ve kayaç türlerini döker.\n\n§l/geology suitability [x z]§r\nJeotermal ısı akısını, geçirgenliği ve volkanik/gayzer oluşum uygunluğunu puanlar.\n\n§l/geology plate [x z]§r\nKoordinattaki levha numarasını, hızını (cm/yıl), yönünü ve kabuk türünü inceler.",
   "book.fts_geology.page.18": "§lVI. Komutlar§r\n§oSimülasyon ve Ayarlar§r\n\n§l/geology deepgen§r\nDerin kabuk tabakası dönüşümünü tetikler veya test eder.\n\n§l/geology feature§r\nYüklü alanlardaki aktif hidrotermal, volkanik ve sismik yapıları listeler.\n\n§l/geology setting <ayar> [değer]§r\nSunucu ayarlarını anında okur veya düzenler:\n- quakesBreakBuilds\n- fallingIncludesBuilds\n- earthquakeRuptureInterval\n- retrogenMaxY",
-  "generator.fts_geology.geology": "FT's Geology"
+  "generator.fts_geology.geology": "FT's Geology",
+  "biome.fts_geology.geothermal_basin": "Jeotermal Havza",
+  "biome.fts_geology.rift_valley": "Rift Vadisi",
+  "biome.fts_geology.volcanic_highland": "Volkanik Yayla",
+  "biome.fts_geology.orogenic_highland": "Orojenik Yayla",
+  "biome.fts_geology.alluvial_plain": "Alüvyon Ovası",
+  "biome.fts_geology.oceanic_ridge": "Okyanus Sırtı"
 }

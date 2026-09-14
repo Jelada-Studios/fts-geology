@@ -120,6 +120,9 @@ public final class ThermalBiomes {
 
             ResourceLocation id = biome.unwrapKey().map(k -> k.location()).orElse(null);
             if (id == null) return NONE;
+            // Our own biomes are where they are because the geology put them there. Reading them back as
+            // evidence of geology would let a geothermal basin argue itself into being hotter.
+            if (id.getNamespace().equals(com.jeladastudios.ftsgeology.GeysersMod.MODID)) return NONE;
             String path = id.getPath().toLowerCase(Locale.ROOT);
             // Cave biomes sit under everything and must never be mistaken for surface geology.
             if (path.contains("cave") || path.contains("deep_dark")) return NONE;

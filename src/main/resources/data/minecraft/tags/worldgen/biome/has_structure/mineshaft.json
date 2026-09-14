@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:geothermal_basin",
+    "fts_geology:rift_valley",
+    "fts_geology:volcanic_highland",
+    "fts_geology:orogenic_highland",
+    "fts_geology:alluvial_plain",
+    "fts_geology:oceanic_ridge"
+  ]
+}

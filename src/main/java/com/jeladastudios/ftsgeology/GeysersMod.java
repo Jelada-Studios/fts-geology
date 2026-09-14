@@ -36,6 +36,7 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.registry.ModParticles.PARTICLES.register(modBus);
         com.jeladastudios.ftsgeology.registry.ModFeatures.FEATURES.register(modBus);
         com.jeladastudios.ftsgeology.registry.ModDensityFunctions.DENSITY_FUNCTIONS.register(modBus);
+        com.jeladastudios.ftsgeology.registry.ModBiomeSources.BIOME_SOURCES.register(modBus);
 
         // Populate the creative menu once tabs are built (mod bus event).
         modBus.addListener(this::onBuildCreativeTabs);

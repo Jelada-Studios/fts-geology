@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:orogenic_highland",
+    "fts_geology:volcanic_highland"
+  ]
+}
