@@ -147,12 +147,20 @@ public final class VolcanoEdifice {
      */
     static void coneColumn(LevelAccessor level, Ctx c, int gx, int gz, RandomSource rng,
                                    boolean worldgen) {
+        coneColumn(level, c, gx, gz, rng, worldgen, Integer.MIN_VALUE);
+    }
+
+    /** @param floor the ground to build up from at generation ({@link TerrainProbe#buildGround}), or MIN_VALUE */
+    static void coneColumn(LevelAccessor level, Ctx c, int gx, int gz, RandomSource rng,
+                                   boolean worldgen, int floor) {
         int dx = gx - c.x, dz = gz - c.z;
         double dist = Math.sqrt((double) dx * dx + (double) dz * dz);
         double ang = Math.atan2(dz, dx);
 
         int ground = TerrainProbe.groundY(level, gx, gz);
         if (ground == Integer.MIN_VALUE) return;
+        // A hole into a cave is roofed over at its rim, not filled from its floor as a pillar.
+        if (floor != Integer.MIN_VALUE) ground = Math.max(ground, floor);
         int water = 0;
         while (water < 32 && !level.getBlockState(new BlockPos(gx, ground + 1 + water, gz)).getFluidState().isEmpty()) {
             water++;
@@ -667,6 +675,11 @@ public final class VolcanoEdifice {
     /** One column of the apron. See {@link #coneColumn}. */
     static void apronColumn(LevelAccessor level, Ctx c, int gx, int gz, RandomSource rng,
                                     boolean worldgen) {
+        apronColumn(level, c, gx, gz, rng, worldgen, Integer.MIN_VALUE);
+    }
+
+    static void apronColumn(LevelAccessor level, Ctx c, int gx, int gz, RandomSource rng,
+                                    boolean worldgen, int floor) {
         int dx = gx - c.x, dz = gz - c.z;
         int reach = c.apronReach;
         double dist = apronDistance(c, dx, dz);
@@ -714,6 +727,7 @@ public final class VolcanoEdifice {
 
         int ground = TerrainProbe.groundY(level, gx, gz);
         if (ground == Integer.MIN_VALUE) return;
+        if (floor != Integer.MIN_VALUE) ground = Math.max(ground, floor);
         // Checked directly: hasFluidAbove would walk the column a second time.
         int water = 0;
         while (water < 8 && !level.getBlockState(new BlockPos(gx, ground + 1 + water, gz)).getFluidState().isEmpty()) {

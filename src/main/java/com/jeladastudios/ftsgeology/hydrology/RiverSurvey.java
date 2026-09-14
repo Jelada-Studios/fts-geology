@@ -45,7 +45,7 @@ public final class RiverSurvey extends SavedData {
     /** Highest bank, over the water, a bend may still cut into. A canyon does not meander. */
     static final int MAX_BANK = 4;
     /** Furthest a bend may shift, as a share of the channel width. */
-    static final double MAX_SHIFT = 0.6;
+    static final double MAX_SHIFT = 1.0;
     /**
      * Nearest two bends stand, in channel widths. A meander's wavelength is ten to fourteen widths, so one bend
      * and the next on the far bank are five to seven apart; within twice this the next bend has to face the
@@ -602,7 +602,7 @@ public final class RiverSurvey extends SavedData {
 
     /**
      * A chunk's bends have all finished: it rests, then is surveyed and planned again on the channel as it now
-     * is, until {@code riverMeanderGenerations} sets have run. Only where a bend moved: a set that died at once
+     * is, until {@code riverMeanderGenerations} sets have run; the rest is one step interval. Only where a bend moved: a set that died at once
      * would be planned the same again.
      */
     void finished(int cx, int cz, long now) {
@@ -615,7 +615,7 @@ public final class RiverSurvey extends SavedData {
             steps = Math.max(steps, b.steps);
         }
         if (!moved) return;
-        r.rest = now + 2 * MeanderScheduler.interval(steps);
+        r.rest = now + MeanderScheduler.interval(steps);
         setDirty();
     }
 

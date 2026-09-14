@@ -948,17 +948,17 @@ public final class GeyserConfig {
                 .define("riverMeanders", true);
         RIVER_MEANDER_DAYS = b
                 .comment("In-game days a bend takes to complete its shift. A block or two a day.")
-                .defineInRange("riverMeanderDays", 14.0D, 0.01D, 1000.0D);
+                .defineInRange("riverMeanderDays", 3.0D, 0.01D, 1000.0D);
         RIVER_MEANDER_GENERATIONS = b
                 .comment("How many sets of bends a chunk's river runs through. When every bend of a set has",
-                        "shifted as far as it will, the chunk rests for twice a bend's interval, is surveyed",
+                        "shifted as far as it will, the chunk rests for one step interval, is surveyed",
                         "again on the channel as it now is, and a new set is planned on that; a river keeps",
                         "winding instead of stopping after its first bends. 1 plans each chunk once.")
-                .defineInRange("riverMeanderGenerations", 6, 1, 100);
+                .defineInRange("riverMeanderGenerations", 10, 1, 100);
         RIVER_MIGRATION_SCALE = b
                 .comment("How far a bend shifts in all, in channel widths per unit of curvature times",
                         "width. At 1.5 a typical bend (radius three widths) moves half a width;",
-                        "no bend ever moves more than six tenths of its width.")
+                        "no bend ever moves more than its own width in one set.")
                 .defineInRange("riverMigrationScale", 1.5D, 0.0D, 10.0D);
         b.pop();
 

@@ -1,5 +1,6 @@
 package com.jeladastudios.ftsgeology.volcano;
 
+import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
 import com.jeladastudios.ftsgeology.blockentity.VolcanoCoreBlockEntity;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
@@ -244,6 +245,18 @@ public final class VolcanoBuilder {
         RandomSource rng = RandomSource.create(0L);
         long reach2 = (long) (c.clearReach + 1) * (c.clearReach + 1);
         int columns = 0;
+        // The ground each column is built from, read before any column is written: a hole into a cave is roofed at
+        // its rim rather than filled from its floor.
+        int[] floor = null;
+        if (c.isle == null) {
+            int[] natural = new int[256];
+            for (int lx = 0; lx < 16; lx++) {
+                for (int lz = 0; lz < 16; lz++) {
+                    natural[lx * 16 + lz] = TerrainProbe.groundY(level, cp.getMinBlockX() + lx, cp.getMinBlockZ() + lz);
+                }
+            }
+            floor = TerrainProbe.buildGround(level, cp.getMinBlockX(), cp.getMinBlockZ(), natural);
+        }
         for (int lx = 0; lx < 16; lx++) {
             for (int lz = 0; lz < 16; lz++) {
                 int gx = cp.getMinBlockX() + lx, gz = cp.getMinBlockZ() + lz;
@@ -256,9 +269,9 @@ public final class VolcanoBuilder {
                     OceanEdifice.column(level, c, gx, gz, rng);
                     continue;
                 }
-                if (c.coneHeight > 0) coneColumn(level, c, gx, gz, rng, true);
+                if (c.coneHeight > 0) coneColumn(level, c, gx, gz, rng, true, floor[lx * 16 + lz]);
                 if (c.type.excavates()) calderaColumn(level, c, gx, gz, rng, true);
-                apronColumn(level, c, gx, gz, rng, true);
+                apronColumn(level, c, gx, gz, rng, true, floor[lx * 16 + lz]);
                 if (hasRamparts(c)) fissureRampartColumn(level, c, gx, gz, true);
             }
         }

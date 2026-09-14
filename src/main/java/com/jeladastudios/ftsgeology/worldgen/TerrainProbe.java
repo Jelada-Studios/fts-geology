@@ -142,6 +142,76 @@ public final class TerrainProbe {
         return Integer.MIN_VALUE;
     }
 
+    /** A column this far below the ground on every side of it is a hole into a cave, not the ground. */
+    private static final int PIT_DEPTH = 6;
+    private static final int PIT_REACH = 4;
+
+    /**
+     * The ground a mountain is built on, for each column of a chunk, worked out before any of it is written: the
+     * natural ground {@code natural[lx * 16 + lz]}, unless the column is the bottom of a hole. A cell walled in by
+     * solid neighbours somewhere above its floor (a hole a block wide, a pocket under a roof) is built from the wall's
+     * top; one with ground {@link #PIT_DEPTH} higher within {@link #PIT_REACH} on every side (a wider hole open to
+     * the sky) from the rim. A big cave breaks the surface in holes a few blocks wide; a volcano built from the
+     * bottom of each stood on the cave floor as a pillar of rock, the surface's tree on top. Only this chunk is
+     * read, and before it is touched: a neighbour already raised by the mountain would pass for a wall, and the
+     * answer would depend on which chunk came first. The foot of a cliff has low ground on its open side and is
+     * left alone; a hole across a chunk line is only half seen.
+     */
+    public static int[] buildGround(LevelReader level, int minX, int minZ, int[] natural) {
+        int[] out = new int[256];
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int[] dxs = {1, -1, 0, 0}, dzs = {0, 0, 1, -1};
+        for (int lx = 0; lx < 16; lx++) {
+            for (int lz = 0; lz < 16; lz++) {
+                int i = lx * 16 + lz, ground = natural[i];
+                out[i] = ground;
+                if (ground == Integer.MIN_VALUE) continue;
+                int x = minX + lx, z = minZ + lz;
+                // Walled in: the highest level over the floor where three of the four neighbours are solid.
+                int top = ground;
+                for (int d = 0; d < 4; d++) {
+                    int nx = lx + dxs[d], nz = lz + dzs[d];
+                    if (nx >= 0 && nx < 16 && nz >= 0 && nz < 16 && natural[nx * 16 + nz] > top) top = natural[nx * 16 + nz];
+                }
+                boolean walled = false;
+                for (int y = top; y > ground + 1 && !walled; y--) {
+                    int solid = 0;
+                    for (int d = 0; d < 4; d++) {
+                        int nx = lx + dxs[d], nz = lz + dzs[d];
+                        if (nx < 0 || nx >= 16 || nz < 0 || nz >= 16) continue;
+                        if (isSolidGround(level.getBlockState(m.set(x + dxs[d], y, z + dzs[d])))) solid++;
+                    }
+                    if (solid >= 3) { out[i] = y; walled = true; }
+                }
+                if (walled) continue;
+                // A wider hole: higher ground on every side within reach, as far as this chunk shows.
+                int rim = Integer.MAX_VALUE, known = 0;
+                boolean pit = true;
+                for (int dx = -1; dx <= 1 && pit; dx++) {
+                    for (int dz = -1; dz <= 1 && pit; dz++) {
+                        if (dx == 0 && dz == 0) continue;
+                        int high = Integer.MIN_VALUE;
+                        for (int r = 1; r <= PIT_REACH; r++) {
+                            int nx = lx + dx * r, nz = lz + dz * r;
+                            if (nx < 0 || nx >= 16 || nz < 0 || nz >= 16) break;
+                            if (natural[nx * 16 + nz] > high) high = natural[nx * 16 + nz];
+                        }
+                        if (high == Integer.MIN_VALUE) continue;   // this side lies in the next chunk
+                        known++;
+                        if (high - ground < PIT_DEPTH) pit = false;
+                        else if (high < rim) rim = high;
+                    }
+                }
+                if (pit && known >= 5) out[i] = rim - 1;
+            }
+        }
+        return out;
+    }
+
+    private static boolean isSolidGround(BlockState s) {
+        return !s.isAir() && s.getFluidState().isEmpty() && !isVegetation(s) && !isTreePart(s);
+    }
+
     /** True when the column carries standing fluid above its ground (a lake, sea or lava pool). */
     public static boolean hasFluidAbove(LevelReader level, int x, int z) {
         int g = groundY(level, x, z);
