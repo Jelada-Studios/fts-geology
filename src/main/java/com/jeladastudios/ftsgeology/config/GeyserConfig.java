@@ -940,12 +940,13 @@ public final class GeyserConfig {
                         "false to switch the whole thing off.")
                 .defineInRange("quakeSpringChance", 0.06D, 0.0D, 1.0D);
         RIVER_MEANDERS = b
-                .comment("Let river bends migrate: the outer bank is cut back and a sand bar grows on",
+                .comment("Experimental, off by default: rivers are to be laid out by the mod's own terrain generation.",
+                        "On, river bends migrate: the outer bank is cut back and a sand bar grows on",
                         "the inner one, a block at a time over weeks, until each bend has shifted",
                         "as far as its curvature and width say and then stops. Each loaded chunk's",
                         "river is surveyed once; only natural ground moves, never a build, a bridge,",
                         "a hot spring or a cliff, and the water level never changes.")
-                .define("riverMeanders", true);
+                .define("riverMeanders", false);
         RIVER_MEANDER_DAYS = b
                 .comment("In-game days a bend takes to complete its shift. A block or two a day.")
                 .defineInRange("riverMeanderDays", 3.0D, 0.01D, 1000.0D);
