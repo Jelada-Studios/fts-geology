@@ -7,8 +7,6 @@ import com.jeladastudios.ftsgeology.tectonics.PlateSample;
 import com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.Field;
 
 import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * What the plate model knows about a place that its climate cannot say: the floor of a rift, the ribbon of a
@@ -52,30 +50,11 @@ public final class GeologyRoles {
     private static final double GRABEN_TO = 0.35, RIDGE_TO = 0.9, APRON_OVER = 1.6;
 
     /**
-     * Which role belongs at a column. Cached on the four-block grid the biomes are laid out on: the answer does
-     * not depend on height, and a chunk asks for each of its columns once for every level of it.
+     * Which role belongs at a column. Kept in {@link TerrainCache}: the answer does not depend on height, and a
+     * chunk asks for each of its columns once for every level of it.
      */
     public static Role roleAt(int x, int z) {
-        long seed = TerrainContext.seed();
-        if (seed != cachedFor) {
-            ROLES.clear();
-            cachedFor = seed;
-        }
-        long key = ((long) (x >> 2) & 0xFFFFFFFFL) | (((long) (z >> 2) & 0xFFFFFFFFL) << 32);
-        Role hit = ROLES.get(key);
-        if (hit != null) return hit;
-        Role role = decide(seed, TerrainContext.params(), x, z);
-        if (ROLES.size() > ROLE_CACHE_MAX) ROLES.clear();
-        ROLES.put(key, role);
-        return role;
-    }
-
-    private static final Map<Long, Role> ROLES = new ConcurrentHashMap<>();
-    private static final int ROLE_CACHE_MAX = 200_000;
-    private static volatile long cachedFor;
-
-    public static void clearCache() {
-        ROLES.clear();
+        return TerrainCache.role(TerrainContext.seed(), TerrainContext.params(), x, z);
     }
 
     /** The rule itself, a pure function of the seed and the column. */

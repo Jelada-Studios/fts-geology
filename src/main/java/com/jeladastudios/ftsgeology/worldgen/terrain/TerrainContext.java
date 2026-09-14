@@ -31,7 +31,6 @@ public final class TerrainContext {
         GeologyParams.take();
         TerrainCache.clear();
         GeologyWorld.clear();
-        GeologyRoles.clearCache();
     }
 
     @SubscribeEvent
@@ -40,7 +39,6 @@ public final class TerrainContext {
         GeologyParams.forget();
         TerrainCache.clear();
         GeologyWorld.clear();
-        GeologyRoles.clearCache();
     }
 
     /** The current world's seed, or 0 with one warning when no server has announced one. */
