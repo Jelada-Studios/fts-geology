@@ -12,7 +12,11 @@
       },
       "argument2": {
         "type": "minecraft:mul",
-        "argument1": 0.35,
+        "argument1": {
+          "type": "fts_geology:plate",
+          "field": "variety",
+          "scale": 0.35
+        },
         "argument2": {
           "type": "minecraft:shifted_noise",
           "noise": "minecraft:erosion",

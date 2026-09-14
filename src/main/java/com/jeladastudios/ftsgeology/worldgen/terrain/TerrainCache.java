@@ -1,5 +1,6 @@
 package com.jeladastudios.ftsgeology.worldgen.terrain;
 
+import com.jeladastudios.ftsgeology.tectonics.GeologyParams;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
 import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 
@@ -19,7 +20,7 @@ public final class TerrainCache {
     private static final int MAX = 200_000;
     private static volatile long forSeed;
 
-    public static PlateSample sample(long seed, int x, int z) {
+    public static PlateSample sample(long seed, GeologyParams params, int x, int z) {
         if (seed != forSeed) {
             SAMPLES.clear();
             forSeed = seed;
@@ -27,7 +28,7 @@ public final class TerrainCache {
         long key = ((long) (x >> 2) & 0xFFFFFFFFL) | (((long) (z >> 2) & 0xFFFFFFFFL) << 32);
         PlateSample hit = SAMPLES.get(key);
         if (hit != null) return hit;
-        PlateSample s = TectonicMap.sampleSeeded(seed, x, z);
+        PlateSample s = TectonicMap.sampleSeeded(seed, x, z, params);
         if (SAMPLES.size() > MAX) SAMPLES.clear();
         SAMPLES.put(key, s);
         return s;

@@ -695,9 +695,11 @@ public final class VolcanoField {
         if (landOff > (setting == VolcanoSetting.ISLAND ? 3 : 1)) {
             return refuse(refused, type, WATER, x, z, "land off the coast, " + landOff + " of 16");
         }
-        // Only a monument is in the way: a wreck or a ruin is built first and ends up inside the island.
-        if (structureInTheWay(level, gen, rs, x, z, plan.isle.edifice + 16, structures, true)) {
-            return refuse(refused, type, STRUCTURE, x, z, "monument within " + (plan.isle.edifice + 16));
+        // Only a monument is in the way: a wreck or a ruin is built first and ends up inside the island. And only
+        // near the summit, where the crater would cut it; one out on the flank is built round, as on land.
+        int keepClear = Math.max(plan.craterR + 16, (int) Math.round(plan.isle.edifice * 0.35));
+        if (structureInTheWay(level, gen, rs, x, z, keepClear, structures, true)) {
+            return refuse(refused, type, STRUCTURE, x, z, "monument within " + keepClear);
         }
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("Ocean {} {} at {},{}: floor {}, top {}, reach {}, age {}, sea {}",
                 setting, type, x, z, baseY, plan.summitY, plan.clearReach, String.format(java.util.Locale.ROOT, "%.2f", age),

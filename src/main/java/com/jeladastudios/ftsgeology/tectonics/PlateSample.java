@@ -39,6 +39,34 @@ public record PlateSample(
         return faultType != FaultType.INTERIOR;
     }
 
+    /**
+     * What the nearest boundary is doing, whatever this column's distance from it. {@link #faultType()} is this
+     * answer within the fault zone and {@link FaultType#INTERIOR} outside it; the terrain reaches further than the
+     * zone (a mountain belt is wider than the fault that raised it) and needs the boundary's kind out there too.
+     * The one place either question is decided.
+     */
+    public FaultType boundaryType() {
+        if (Math.abs(convergence) >= shear) {
+            if (convergence > 0) {
+                // Dense oceanic crust always loses and dives under; two continents just crumple.
+                boolean anyOceanic = plateKind.isOceanic() || neighbourKind.isOceanic();
+                return anyOceanic ? FaultType.CONVERGENT_SUBDUCTION : FaultType.CONVERGENT_COLLISION;
+            }
+            return FaultType.DIVERGENT;
+        }
+        return FaultType.TRANSFORM;
+    }
+
+    /**
+     * How strong the boundary's grip is here, over a zone {@code widths} fault widths across: 1 on the line,
+     * 0 at the edge, and the same curve {@link #stress()} uses within the fault zone itself.
+     */
+    public double belt(double faultWidth, double widths) {
+        double proximity = Math.sqrt(Math.max(0.0, 1.0 - Math.min(1.0, across(faultWidth) / widths)));
+        double motion = Math.min(1.0, Math.max(Math.abs(convergence), shear) / 1.2);
+        return proximity * (0.45 + 0.55 * motion);
+    }
+
     /** Speed of the plate this column rides on. */
     public double plateSpeed() {
         return Math.sqrt(plateVelX * plateVelX + plateVelZ * plateVelZ);
@@ -77,6 +105,15 @@ public record PlateSample(
     /** On a subduction margin, is this the plate that rides over: the one the arc stands on? */
     public boolean overriding() {
         return faultType == FaultType.CONVERGENT_SUBDUCTION && !downGoing();
+    }
+
+    /**
+     * The same question without the fault zone's edge: which side of a subduction margin this column is on,
+     * however far away it lies. The terrain reaches past the zone and has to keep its answer out there, or the
+     * back-arc would end in a step exactly one fault width from the boundary.
+     */
+    public boolean overridingSide() {
+        return boundaryType() == FaultType.CONVERGENT_SUBDUCTION && !downGoing();
     }
 
     /** How far across the fault zone this column lies, as a share of its width: 0 on the line, 1 at the edge. */

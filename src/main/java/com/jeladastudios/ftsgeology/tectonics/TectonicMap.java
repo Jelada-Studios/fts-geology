@@ -4,7 +4,6 @@ import static com.jeladastudios.ftsgeology.util.SeedHash.hash;
 import static com.jeladastudios.ftsgeology.util.SeedHash.mix;
 import static com.jeladastudios.ftsgeology.util.SeedHash.rand01;
 
-import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
 import net.minecraft.server.level.ServerChunkCache;
@@ -50,24 +49,24 @@ public final class TectonicMap {
         // In the mod's own terrain the plates shaped the ground, so a plate's crust is the seed's; elsewhere the
         // plates lie over ground made without them and read their crust from the biomes.
         boolean own = com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level);
-        return compute(level.getSeed(), blockX, blockZ, own ? null : level);
+        return compute(level.getSeed(), blockX, blockZ, own ? null : level, GeologyParams.current());
     }
 
     /** The same picture from the seed alone, as the terrain generator asks for it: crust from the seed. */
-    public static PlateSample sampleSeeded(long seed, int blockX, int blockZ) {
-        return compute(seed, blockX, blockZ, null);
+    public static PlateSample sampleSeeded(long seed, int blockX, int blockZ, GeologyParams params) {
+        return compute(seed, blockX, blockZ, null, params);
     }
 
     /** A plate's crust from the seed: {@code oceanShare} of the plates are oceanic. */
-    static PlateKind seededKind(long seed, long plateId) {
-        return rand01(mix(plateId ^ seed ^ 0x0CEA4L)) < GeyserConfig.OCEAN_SHARE.get() ? PlateKind.OCEANIC : PlateKind.CONTINENTAL;
+    static PlateKind seededKind(long seed, long plateId, GeologyParams params) {
+        return rand01(mix(plateId ^ seed ^ 0x0CEA4L)) < params.oceanShare() ? PlateKind.OCEANIC : PlateKind.CONTINENTAL;
     }
 
     /** @param biomes the level whose biomes decide each plate's crust, or null for the seed to decide */
-    private static PlateSample compute(long seed, int blockX, int blockZ, ServerLevel biomes) {
-        double scale = GeyserConfig.PLATE_SCALE.get();
-        double jitter = GeyserConfig.PLATE_JITTER.get();
-        double faultWidth = GeyserConfig.FAULT_WIDTH.get();
+    private static PlateSample compute(long seed, int blockX, int blockZ, ServerLevel biomes, GeologyParams params) {
+        double scale = params.plateScale();
+        double jitter = params.plateJitter();
+        double faultWidth = params.faultWidth();
 
         double px = blockX, pz = blockZ;
         int gx = Mth.floor(px / scale);
@@ -134,9 +133,8 @@ public final class TectonicMap {
         double convergence = -(relX * nx + relZ * nz);
         double shear = Math.abs(relX * nz - relZ * nx);
 
-        PlateKind kind = biomes == null ? seededKind(seed, plateId) : plateKind(biomes, seed, bgx, bgz, scale, jitter);
-        PlateKind neighbourKind = biomes == null ? seededKind(seed, neighbourId) : plateKind(biomes, seed, ngx, ngz, scale, jitter);
-        FaultType type = classify(faultDistance, faultWidth, convergence, shear, kind, neighbourKind);
+        PlateKind kind = biomes == null ? seededKind(seed, plateId, params) : plateKind(biomes, seed, bgx, bgz, scale, jitter);
+        PlateKind neighbourKind = biomes == null ? seededKind(seed, neighbourId, params) : plateKind(biomes, seed, ngx, ngz, scale, jitter);
 
         // 4. Stress: the square root of proximity times motion, with a motion floor, so the active
         //    core of the fault zone is wide and a slow boundary still lives on the line.
@@ -145,8 +143,14 @@ public final class TectonicMap {
         double motion = Mth.clamp(Math.max(Math.abs(convergence), shear) / 1.2, 0.0, 1.0);
         double stress = Mth.clamp(proximity * (0.45 + 0.55 * motion), 0.0, 1.0);
 
+        // What the boundary is doing is PlateSample's own answer, so the terrain, which reaches past the fault
+        // zone, and the features, which do not, can never disagree about it. Here it is only narrowed to
+        // INTERIOR outside the zone.
+        PlateSample s = new PlateSample(plateId, kind, vA[0], vA[1], neighbourId, neighbourKind,
+                FaultType.INTERIOR, faultDistance, convergence, shear, nx, nz, stress);
+        if (faultDistance > faultWidth) return s;
         return new PlateSample(plateId, kind, vA[0], vA[1], neighbourId, neighbourKind,
-                type, faultDistance, convergence, shear, nx, nz, stress);
+                s.boundaryType(), faultDistance, convergence, shear, nx, nz, stress);
     }
 
     /**
@@ -176,23 +180,6 @@ public final class TectonicMap {
     public static void clearCache() {
         KIND_CACHE.clear();
         SAMPLE_CACHE.clear();
-    }
-
-    // === Classification =====================================================
-
-    private static FaultType classify(double faultDistance, double faultWidth,
-                                      double convergence, double shear,
-                                      PlateKind a, PlateKind b) {
-        if (faultDistance > faultWidth) return FaultType.INTERIOR;
-        if (Math.abs(convergence) >= shear) {
-            if (convergence > 0) {
-                // Dense oceanic crust always loses and dives under; two continents just crumple.
-                boolean anyOceanic = a.isOceanic() || b.isOceanic();
-                return anyOceanic ? FaultType.CONVERGENT_SUBDUCTION : FaultType.CONVERGENT_COLLISION;
-            }
-            return FaultType.DIVERGENT;
-        }
-        return FaultType.TRANSFORM;
     }
 
     // === Plate geometry =====================================================

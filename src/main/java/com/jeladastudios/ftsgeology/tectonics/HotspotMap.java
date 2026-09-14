@@ -149,15 +149,15 @@ public final class HotspotMap {
      * than {@link #sample}, which asks {@link ThermalBiomes} and so the generator's base height.
      */
     public static double plumeStrength(ServerLevel level, int blockX, int blockZ) {
-        return plumeStrength(level.getSeed(), blockX, blockZ);
+        return plumeStrength(level.getSeed(), blockX, blockZ, GeologyParams.current());
     }
 
     /** The plume dome from the seed alone, for the terrain generator. */
-    public static double plumeStrength(long seed, int blockX, int blockZ) {
-        if (!GeyserConfig.HOTSPOTS_ENABLED.get()) return 0.0;
-        double scale = GeyserConfig.HOTSPOT_SCALE.get();
-        double density = GeyserConfig.HOTSPOT_DENSITY.get();
-        double radius = GeyserConfig.HOTSPOT_RADIUS.get();
+    public static double plumeStrength(long seed, int blockX, int blockZ, GeologyParams params) {
+        if (!params.hotspots()) return 0.0;
+        double scale = params.hotspotScale();
+        double density = params.hotspotDensity();
+        double radius = params.hotspotRadius();
         int gx = Mth.floor(blockX / scale);
         int gz = Mth.floor(blockZ / scale);
         double best = 0.0;

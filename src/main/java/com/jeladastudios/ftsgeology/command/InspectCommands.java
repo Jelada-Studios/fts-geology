@@ -73,12 +73,12 @@ public final class InspectCommands {
         Pos pos = new Pos(at.getX(), 64, at.getZ());
         StringBuilder sb = new StringBuilder();
         for (String f : new String[] {"continents", "erosion", "ridges", "relief"}) {
-            sb.append(f).append(' ').append(String.format(Locale.ROOT, "%.3f", new com.jeladastudios.ftsgeology.worldgen.terrain.PlateDensity(f, 1.0).compute(pos))).append("; ");
+            sb.append(f).append(' ').append(String.format(Locale.ROOT, "%.3f", com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.field(com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.Field.valueOf(f.toUpperCase(Locale.ROOT)), com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(), com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params(), at.getX(), at.getZ()))).append("; ");
         }
         var generator = level.getChunkSource().getGenerator();
         int base = generator.getBaseHeight(at.getX(), at.getZ(), net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG, level, level.getChunkSource().randomState());
         String line = String.format(Locale.ROOT, "terrain at %d,%d: %sbase %d; level seed %d, terrain seed %d, own %s",
-                at.getX(), at.getZ(), sb, base, level.getSeed(), com.jeladastudios.ftsgeology.worldgen.terrain.WorldSeed.current(),
+                at.getX(), at.getZ(), sb, base, level.getSeed(), com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(),
                 com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level));
         source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);

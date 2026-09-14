@@ -182,8 +182,8 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue RIVER_MEANDER_DAYS;    // days a bend takes to finish its shift
     public static final ForgeConfigSpec.IntValue RIVER_MEANDER_GENERATIONS; // sets of bends a chunk runs through
     public static final ForgeConfigSpec.DoubleValue OCEAN_SHARE;           // share of plates that are oceanic (own terrain)
-    public static final ForgeConfigSpec.IntValue TERRAIN_BELT_WIDTH;       // width of a mountain belt from its boundary
-    public static final ForgeConfigSpec.IntValue TERRAIN_UPLIFT;           // blocks a collision lifts the ground
+    public static final ForgeConfigSpec.DoubleValue TERRAIN_BELT_FACTOR;   // mountain belt width, in fault widths
+    public static final ForgeConfigSpec.DoubleValue TERRAIN_UPLIFT;        // blocks a collision lifts the ground
     public static final ForgeConfigSpec.DoubleValue RIVER_MIGRATION_SCALE; // how far a bend shifts, per curvature
 
     // --- Instruments ---------------------------------------------------------
@@ -972,15 +972,17 @@ public final class GeyserConfig {
                 .comment("The share of plates that are oceanic crust, and so sea. Set when a world is made; the",
                         "plates never change afterwards.")
                 .defineInRange("oceanShare", 0.4D, 0.0D, 1.0D);
-        TERRAIN_BELT_WIDTH = b
-                .comment("How far a mountain belt reaches from its plate boundary, in blocks. A collision lifts a",
-                        "fold belt this wide either side of the boundary; a subduction zone its arc on the",
-                        "overriding side and a trench on the other; a rift its graben and shoulders.")
-                .defineInRange("terrainBeltWidth", 400, 100, 2000);
+        TERRAIN_BELT_FACTOR = b
+                .comment("How far a mountain belt reaches from its plate boundary, in fault widths (faultWidth above).",
+                        "A collision lifts a fold belt this far either side of the boundary; a subduction zone its arc",
+                        "on the overriding side and a trench on the other; a rift its graben and shoulders. Everything",
+                        "else the mod does is measured from the same boundary in the same units, so the mountains, the",
+                        "volcanoes, the quake corridor and the ore belts line up.")
+                .defineInRange("terrainBeltFactor", 2.5D, 0.5D, 10.0D);
         TERRAIN_UPLIFT = b
                 .comment("How high a collision lifts the ground at the boundary, in blocks, before the peaks",
                         "the ridge noise adds on top.")
-                .defineInRange("terrainUplift", 110, 0, 200);
+                .defineInRange("terrainUplift", 110.0D, 0.0D, 400.0D);
         b.pop();
 
         SPEC = b.build();

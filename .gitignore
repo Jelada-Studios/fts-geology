@@ -38,3 +38,6 @@ run/
 # Store-page copy and screenshots: kept locally, never published to the repo.
 # The repo is mod files only.
 docs/
+
+# Log4j writes here when a scratchpad tool runs against the mod classes.
+/logs/
