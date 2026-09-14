@@ -84,15 +84,25 @@ public final class RiverNetwork {
             river = BY_CELL.get(k);
             if (river != null) return river.get(k);
         }
-        // Not a river cell at all (the water is there but the biome is not): known, and nothing.
-        if (!RiverSurvey.river(biome(level, qx, qy, qz))) {
-            Long2ObjectOpenHashMap<Node> none = new Long2ObjectOpenHashMap<>();
-            BY_CELL.put(k, none);
-            return null;
+        // The read is seeded with every water cell the survey knows round here: the survey read the chunk's own
+        // biome, which the water follows, and under Terralith the biome source calls the same cell something else
+        // often enough that a read asked of the source alone never started. Off the survey's map the source decides.
+        LongOpenHashSet seeds = new LongOpenHashSet(), coast = new LongOpenHashSet();
+        RiverSurvey.of(level).seedsAround(blockX >> 4, blockZ >> 4, 2, seeds, coast);
+        if (seeds.isEmpty()) {
+            // Not a river cell at all (the water is there but the biome is not): known, and nothing.
+            if (!RiverSurvey.river(biome(level, qx, qy, qz))) {
+                GeysersMod.LOGGER.debug("river cell {},{}: no survey round it and not a river to the biome source", blockX, blockZ);
+                Long2ObjectOpenHashMap<Node> none = new Long2ObjectOpenHashMap<>();
+                BY_CELL.put(k, none);
+                return null;
+            }
         }
+        seeds.add(k);
+        GeysersMod.LOGGER.debug("river network read starts at {},{} with {} surveyed cells", blockX, blockZ, seeds.size());
         inFlight = CompletableFuture.supplyAsync(() -> {
             try {
-                return read(level, qx, qz, qy);
+                return read(level, qx, qz, qy, seeds, coast);
             } catch (RuntimeException e) {
                 GeysersMod.LOGGER.warn("river network at {},{}: {}", blockX, blockZ, e.toString());
                 return null;
@@ -106,6 +116,14 @@ public final class RiverNetwork {
         long k = key(QuartPos.fromBlock(blockX), QuartPos.fromBlock(blockZ));
         Long2ObjectOpenHashMap<Node> river = BY_CELL.get(k);
         return river == null ? null : river.get(k);
+    }
+
+    /** What the cache holds for a cell, for the log. */
+    static String describe(int blockX, int blockZ) {
+        long k = key(QuartPos.fromBlock(blockX), QuartPos.fromBlock(blockZ));
+        Long2ObjectOpenHashMap<Node> river = BY_CELL.get(k);
+        if (river == null) return "no entry (cache holds " + BY_CELL.size() + " cells, read in flight: " + (inFlight != null) + ")";
+        return "map of " + river.size() + " cells, node " + river.get(k);
     }
 
     /** True when the cell's river is known, whether or not the cell is in one. */
@@ -150,7 +168,8 @@ public final class RiverNetwork {
     }
 
     /** Reads the river a cell belongs to. Worker thread; touches only the biome source and the generator. */
-    private static Long2ObjectOpenHashMap<Node> read(ServerLevel level, int qx0, int qz0, int qy) {
+    private static Long2ObjectOpenHashMap<Node> read(ServerLevel level, int qx0, int qz0, int qy,
+                                                     LongOpenHashSet seeds, LongOpenHashSet coastSeeds) {
         long started = System.nanoTime();
         LongOpenHashSet river = new LongOpenHashSet();
         LongOpenHashSet notRiver = new LongOpenHashSet();
@@ -159,6 +178,9 @@ public final class RiverNetwork {
         ArrayDeque<long[]> queue = new ArrayDeque<>();
         river.add(key(qx0, qz0));
         queue.add(new long[] {qx0, qz0});
+        for (long s : seeds) {
+            if (river.add(s)) queue.add(new long[] {(int) (s >> 32), (int) s});
+        }
         int samples = 0;
         while (!queue.isEmpty() && river.size() < MAX_CELLS) {
             long[] c = queue.poll();
@@ -170,6 +192,11 @@ public final class RiverNetwork {
                     int nx = qx + dx, nz = qz + dz;
                     long nk = key(nx, nz);
                     if (river.contains(nk) || notRiver.contains(nk)) continue;
+                    if (seeds.contains(nk)) {
+                        river.add(nk);
+                        queue.add(new long[] {nx, nz});
+                        continue;
+                    }
                     Holder<Biome> b = biome(level, nx, qy, nz);
                     samples++;
                     if (RiverSurvey.river(b)) {
@@ -190,6 +217,16 @@ public final class RiverNetwork {
             }
         }
         boolean cut = river.size() >= MAX_CELLS;
+        // A surveyed cell in a chunk that touches the sea, with something that is not river beside it, is a mouth too.
+        for (long c : coastSeeds) {
+            if (!river.contains(c)) continue;
+            int qx = (int) (c >> 32), qz = (int) c;
+            for (int dx = -1; dx <= 1 && !mouths.contains(c); dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if ((dx != 0 || dz != 0) && !river.contains(key(qx + dx, qz + dz))) { mouths.add(c); break; }
+                }
+            }
+        }
 
         // Distance to the bank: the cells next to land first, then inward.
         Long2ObjectOpenHashMap<int[]> half = new Long2ObjectOpenHashMap<>();
@@ -270,9 +307,14 @@ public final class RiverNetwork {
             out.put(c, new Node(d == null ? -1 : d[0], u == null ? 0 : u[0], h == null ? 1 : h[0],
                     l != null && l[0] <= LAKE_SHORE, key(qx0, qz0), ld == null ? 0 : ld[0]));
         }
-        GeysersMod.LOGGER.info("river network from {},{}: {} cells{}, {} mouths, {} biome samples, gold under {} cells, copper under {}, {} ms",
-                qx0 * 4, qz0 * 4, river.size(), cut ? " (cut short)" : "", mouths.size(), samples, goldCells, copperCells,
-                (System.nanoTime() - started) / 1_000_000);
+        int minQx = Integer.MAX_VALUE, maxQx = Integer.MIN_VALUE, minQz = Integer.MAX_VALUE, maxQz = Integer.MIN_VALUE;
+        for (long c : river) {
+            int qx = (int) (c >> 32), qz = (int) c;
+            minQx = Math.min(minQx, qx); maxQx = Math.max(maxQx, qx); minQz = Math.min(minQz, qz); maxQz = Math.max(maxQz, qz);
+        }
+        GeysersMod.LOGGER.info("river network from {},{}: {} cells{} from {} surveyed, x {}..{} z {}..{}, {} mouths, {} biome samples, gold under {} cells, copper under {}, {} ms",
+                qx0 * 4, qz0 * 4, river.size(), cut ? " (cut short)" : "", seeds.size(), minQx * 4, maxQx * 4, minQz * 4, maxQz * 4,
+                mouths.size(), samples, goldCells, copperCells, (System.nanoTime() - started) / 1_000_000);
         return out;
     }
 

@@ -1,5 +1,6 @@
 package com.jeladastudios.ftsgeology.hydrology;
 
+import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.network.ModNetwork;
 import com.jeladastudios.ftsgeology.network.RiverDebugPacket;
 import net.minecraft.server.MinecraftServer;
@@ -57,15 +58,16 @@ public final class RiverDebug {
                 RiverSurvey.Rec r = survey.get(cx, cz);
                 if (r == null || !r.river()) continue;
                 // The first river cell, where the network is asked about the chunk's water.
-                int rx = -1, rz = -1;
-                for (int i = 0; i < 256 && rx < 0; i++) {
+                // West of the origin the coordinate itself is negative, so "not found" is not a sign.
+                int rx = Integer.MIN_VALUE, rz = Integer.MIN_VALUE;
+                for (int i = 0; i < 256 && rx == Integer.MIN_VALUE; i++) {
                     if (r.at(i & 15, i >> 4)) { rx = cx * 16 + (i & 15); rz = cz * 16 + (i >> 4); }
                 }
                 byte state;
                 long river = 0;
                 float fx = 0, fz = 0, speed = 1.0f;
                 // Only what has been read: the view must not start reads of its own.
-                RiverNetwork.Node node = rx < 0 ? null : RiverNetwork.peek(rx, rz);
+                RiverNetwork.Node node = rx == Integer.MIN_VALUE ? null : RiverNetwork.peek(rx, rz);
                 if (node != null) {
                     river = node.river();
                     speed = (float) RiverSurvey.speed(node);

@@ -2,6 +2,7 @@ package com.jeladastudios.ftsgeology.hydrology;
 
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
@@ -211,12 +212,14 @@ public final class RiverSurvey extends SavedData {
             return true;
         }
         // The river as a whole first: which way it flows here, how much it carries, whether this is a lake.
-        int rx = -1, rz = -1;
-        for (int i = 0; i < 256 && rx < 0; i++) {
+        // The first river cell; west of the origin the coordinate is negative, so "not found" is a sentinel, not a sign.
+        int rx = Integer.MIN_VALUE, rz = Integer.MIN_VALUE;
+        for (int i = 0; i < 256 && rx == Integer.MIN_VALUE; i++) {
             if (r.at(i & 15, i >> 4)) { rx = cx * 16 + (i & 15); rz = cz * 16 + (i >> 4); }
         }
         RiverNetwork.Node here = RiverNetwork.at(level, rx, rz, r.yW);
         if (here == null && !RiverNetwork.known(rx, rz)) return false;   // still being read; asked again later
+        if (here == null) com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("chunk {},{}: planned without a network node at {},{}: {}", cx, cz, rx, rz, RiverNetwork.describe(rx, rz));
         r.planned = true;
         r.bends.clear();
         setDirty();
@@ -373,6 +376,28 @@ public final class RiverSurvey extends SavedData {
                         b.next = now + MeanderScheduler.interval(b.steps);
                         r.bends.add(b);
                         return;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Every water cell the survey knows within {@code radius} chunks of a chunk, as network cell keys, and those of
+     * them in chunks that touch the sea. The network is seeded from these: the survey read the chunk's own biome,
+     * which is what the water follows, and the biome source can call the same cell something else.
+     */
+    void seedsAround(int cx, int cz, int radius, LongOpenHashSet seeds, LongOpenHashSet coast) {
+        for (int ox = -radius; ox <= radius; ox++) {
+            for (int oz = -radius; oz <= radius; oz++) {
+                Rec r = get(cx + ox, cz + oz);
+                if (r == null || !r.river()) continue;
+                for (int lz = 0; lz < 16; lz++) {
+                    for (int lx = 0; lx < 16; lx++) {
+                        if (!r.at(lx, lz)) continue;
+                        long k = RiverNetwork.key(((cx + ox) * 16 + lx) >> 2, ((cz + oz) * 16 + lz) >> 2);
+                        seeds.add(k);
+                        if (r.coast) coast.add(k);
                     }
                 }
             }

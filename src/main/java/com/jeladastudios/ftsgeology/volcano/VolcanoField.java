@@ -156,8 +156,8 @@ public final class VolcanoField {
     /**
      * How far this column is from the nearest spring cluster at the foot of a chosen large land volcano, in blocks;
      * huge where there is none. A big mountain's springs come up in a few groups on the fan below its slopes
-     * (Beppu, Hakone, Kusatsu): three centres a third of a circle apart, set from the site's seed between the outer
-     * apron and sixty blocks past it. The chunk pass fills each group as the ground there loads.
+     * (Beppu, Hakone, Kusatsu): three centres a third of a circle apart, set from the site's seed on the apron,
+     * between a bit over half its reach and nine tenths of it. The chunk pass fills each group as the ground loads.
      */
     public static double footCluster(ServerLevel level, int x, int z) {
         int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
@@ -170,7 +170,8 @@ public final class VolcanoField {
                 for (int k = 0; k < 3; k++) {
                     long h = mix(s.seed() ^ (0xC1A5L + k * 0x9E37L));
                     double a = a0 + k * Math.PI * 2 / 3 + (rand01(h) - 0.5) * Math.PI / 3;
-                    double r = s.reach() * 0.8 + rand01(mix(h)) * (s.reach() * 0.2 + 60);
+                    // On the apron itself, the fan below the slopes, not out in the country past it.
+                    double r = s.reach() * 0.55 + rand01(mix(h)) * (s.reach() * 0.35);
                     best = Math.min(best, Math.hypot(x - (s.x() + Math.cos(a) * r), z - (s.z() + Math.sin(a) * r)));
                 }
             }

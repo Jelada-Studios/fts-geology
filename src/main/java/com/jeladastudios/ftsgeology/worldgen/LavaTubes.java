@@ -29,6 +29,34 @@ public final class LavaTubes {
     private static final long SALT = 0x7B3EL;
     /** The longest a tube runs from its start. */
     private static final int MAX_LENGTH = 220;
+    /** The share of grid cells that start a tube, where the ground allows one. */
+    private static final double CELL_SHARE = 0.6;
+
+    /** The start of the tube nearest a point within a few cells, or null: {x, z}. The roof is open there. */
+    public static int[] nearestStart(ServerLevel model, int x, int z) {
+        if (!GeyserConfig.HOTSPOTS_ENABLED.get()) return null;
+        long seed = model.getSeed();
+        int ccx = Math.floorDiv(x, CELL), ccz = Math.floorDiv(z, CELL);
+        int[] best = null;
+        double bestD = Double.MAX_VALUE;
+        for (int ox = -6; ox <= 6; ox++) {
+            for (int oz = -6; oz <= 6; oz++) {
+                int cx = ccx + ox, cz = ccz + oz;
+                long h = SeedHash.hash(seed, cx, cz, SALT);
+                if (SeedHash.rand01(h) > CELL_SHARE) continue;
+                int sx = cx * CELL + (int) (SeedHash.rand01(SeedHash.mix(h)) * CELL);
+                int sz = cz * CELL + (int) (SeedHash.rand01(SeedHash.mix(h ^ 0x51L)) * CELL);
+                double d = Math.hypot(sx - x, sz - z);
+                if (d >= bestD) continue;
+                HotspotMap.Hotspot hot = HotspotMap.sample(model, sx, sz);
+                if (!hot.onTrail() && hot.strength() < 0.25) continue;
+                if (base(model, sx, sz) <= model.getSeaLevel() + 4) continue;
+                bestD = d;
+                best = new int[] {sx, sz};
+            }
+        }
+        return best;
+    }
 
     public static int generate(WorldGenLevel level, ChunkPos cp) {
         if (!GeyserConfig.HOTSPOTS_ENABLED.get()) return 0;
@@ -41,7 +69,7 @@ public final class LavaTubes {
             for (int oz = -3; oz <= 3; oz++) {
                 int cx = ccx + ox, cz = ccz + oz;
                 long h = SeedHash.hash(seed, cx, cz, SALT);
-                if (SeedHash.rand01(h) > 0.4) continue;
+                if (SeedHash.rand01(h) > CELL_SHARE) continue;
                 int sx = cx * CELL + (int) (SeedHash.rand01(SeedHash.mix(h)) * CELL);
                 int sz = cz * CELL + (int) (SeedHash.rand01(SeedHash.mix(h ^ 0x51L)) * CELL);
                 // Too far to reach this chunk: asked before the map is, since most cells are.
@@ -79,7 +107,8 @@ public final class LavaTubes {
                 heading += (rng.nextDouble() - 0.5) * 0.5;
                 targetY = base(model, (int) Math.floor(x), (int) Math.floor(z)) - depth;
             }
-            boolean sky = t % 40 == 20 && rng.nextDouble() < 0.35;
+            // The roof has fallen in at the start of every tube, so each one has an entrance, and here and there along it.
+            boolean sky = (t % 40 == 20 && rng.nextDouble() < 0.35) || t == 1;
             y += Mth.clamp(targetY - y, -0.3, 0.3);
             x += Math.cos(heading);
             z += Math.sin(heading);

@@ -85,6 +85,11 @@ public final class FindCommands {
 
     /** Spirals outward looking for the requested setting. Pure maths - runs off the server thread. */
     static Hit search(ServerLevel level, BlockPos at, String what) {
+        // A lava tube is a point on a seeded grid, not a setting to spiral for: the nearest start is worked out directly.
+        if (what.equals("tube")) {
+            int[] s = com.jeladastudios.ftsgeology.worldgen.LavaTubes.nearestStart(level, at.getX(), at.getZ());
+            return s == null ? null : new Hit(s[0], s[1], (int) Math.round(Math.hypot(s[0] - at.getX(), s[1] - at.getZ())));
+        }
         int step = 96;
         int maxRings = 220;                 // reaches out about 21k blocks
         for (int ring = 1; ring <= maxRings; ring++) {
