@@ -420,7 +420,9 @@ public final class VolcanoField {
         Map<StructureKey, Boolean> structures = new HashMap<>();
 
         boolean ocean = GeyserConfig.OCEAN_VOLCANOES.get();
-        boolean calderas = GeyserConfig.LARGE_CALDERAS.get();
+        // The land caldera is out: its 300-block columns stalled the generator's workers under a terrain mod. The
+        // code stays; the sites that would have been calderas are shields over plumes and stratovolcanoes on arcs.
+        boolean calderas = false;
         // A plume first: fewer of them, and the grander sight. A centre just outside the usable part
         // of the cell is pulled in.
         for (int[] p : HotspotMap.plumeCentres(level, minX - PLUME_PULL, minZ - PLUME_PULL,

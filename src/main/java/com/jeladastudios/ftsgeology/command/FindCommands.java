@@ -133,7 +133,7 @@ public final class FindCommands {
             case "caldera", "flooded" -> VolcanoType.CALDERA;
             default -> null;
         };
-        if ("caldera".equals(typeName) && !GeyserConfig.LARGE_CALDERAS.get()) {
+        if ("caldera".equals(typeName)) {   // the land caldera is switched off in VolcanoField
             ctx.getSource().sendFailure(Component.translatable("command.fts_geology.field.calderas_off"));
             return 0;
         }

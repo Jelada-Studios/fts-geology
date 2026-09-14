@@ -225,6 +225,9 @@ public final class CaveCollapse {
         Cave cave = caveUnder(level, x, z);
         if (cave == null) return;
         job.caves++;
+        // A really tall void is a big cave, and its roof is left alone whatever its thickness: brought down, a
+        // thin roof over one stood on the floor as a forest of tree-topped pillars under a pit in the ground.
+        if (cave.top() - cave.floor() >= DEEP_VOID) return;
 
         // A wide span under a thin roof is the one that fails. The roof counts at half weight, since
         // rock arches over far more than its own thickness.
@@ -232,10 +235,6 @@ public final class CaveCollapse {
         double arch = Mth.clamp(span / (cave.roof() * 0.5 + 2.0), 0.0, 1.5) / 1.5;
         double weak = RockTypes.erodibility(level.getBlockState(new BlockPos(x, cave.top() + 1, z)));
         if (level.random.nextDouble() >= CHANCE * shaking * arch * (0.4 + 0.6 * weak)) return;
-
-        // A thick roof over a really tall void is an arch too deep to fail: without this every column over a big
-        // cave dropped its roof as a pillar and opened a well to the surface.
-        if (cave.top() - cave.floor() >= DEEP_VOID && cave.roof() > DEEP_VOID_ROOF) return;
 
         boolean throughRoof = cave.roof() <= THIN_ROOF;
         int fall = throughRoof ? cave.roof() : Math.min(cave.roof() - 2, 2 + level.random.nextInt(3));
@@ -327,11 +326,13 @@ public final class CaveCollapse {
         for (int y = c.floor(); y <= c.top(); y++) {
             if (!level.getBlockState(m.set(x, y, z)).isAir()) return -1;
         }
-        // Breaking through only where nothing stands on the ground: a tree, a build or a lake up
-        // there keeps its last block of support.
+        // Breaking through only where nothing built stands on the ground: a build or a lake up there keeps its
+        // last block of support. A tree comes down with the column; left its block it stood on a pillar.
+        boolean tree = false;
         if (n >= c.roof()) {
             BlockState above = level.getBlockState(m.set(x, c.ground() + 1, z));
-            if (!above.getFluidState().isEmpty() || (!above.isAir() && !TerrainProbe.isVegetation(above))) {
+            tree = above.getFluidState().isEmpty() && TerrainProbe.isTreePart(above);
+            if (!tree && (!above.getFluidState().isEmpty() || (!above.isAir() && !TerrainProbe.isVegetation(above)))) {
                 n = c.roof() - 1;
                 if (n <= 0) return 0;
             }
@@ -346,6 +347,7 @@ public final class CaveCollapse {
             }
             slab[i] = s;
         }
+        if (tree) fellTree(level, x, c.ground() + 1, z);
         if (n >= c.roof()) TerrainProbe.clearVegetation(level, x, c.ground(), z, 2);
         for (int i = 0; i < n; i++) {
             level.setBlock(m.set(x, c.top() + 1 + i, z), Blocks.AIR.defaultBlockState(), FLAGS);
@@ -354,9 +356,20 @@ public final class CaveCollapse {
         return n;
     }
 
-    /** A void this tall is a big cave, whose roof holds unless it is thin. */
+    /** Fells the tree standing at {@code from}: its trunk up, then the crown round it, as a quake's weathering does. */
+    private static void fellTree(ServerLevel level, int x, int from, int z) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int roof = Math.min(from + 48, level.getMaxBuildHeight() - 1);
+        int top = from;
+        while (top <= roof && TerrainProbe.isTreePart(level.getBlockState(m.set(x, top, z)))) {
+            level.setBlock(new BlockPos(x, top, z), Blocks.AIR.defaultBlockState(), FLAGS);
+            top++;
+        }
+        Weathering.takeCrown(level, x, from - 1, top + 8, z, Weathering.CROWN_REACH);
+    }
+
+    /** A void this tall is a big cave, whose roof is never brought down. */
     private static final int DEEP_VOID = 24;
-    private static final int DEEP_VOID_ROOF = 8;
     /** Tallest a rubble heap stands. */
     private static final int HEAP_HEIGHT = 4;
 

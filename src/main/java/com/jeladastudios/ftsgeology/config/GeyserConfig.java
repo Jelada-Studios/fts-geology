@@ -127,7 +127,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue LARGE_VOLCANOES;      // raised with new terrain
     public static final ForgeConfigSpec.DoubleValue LARGE_VOLCANO_CHANCE;  // share of suitable sites
     public static final ForgeConfigSpec.BooleanValue OCEAN_VOLCANOES;      // islands, atolls, guyots
-    public static final ForgeConfigSpec.BooleanValue LARGE_CALDERAS;       // the 400-block calderas on land
+
     public static final ForgeConfigSpec.DoubleValue OCEAN_TRAIL_LENGTH;    // a plume's track through the sea, blocks
     public static final ForgeConfigSpec.BooleanValue DEEP_STRUCTURE_ENABLED;
     public static final ForgeConfigSpec.BooleanValue DEEP_SURFACE_OUTCROP;  // boundary rock reaches daylight
@@ -180,6 +180,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue QUAKE_SPRING_CHANCE;   // per magnitude over 3
     public static final ForgeConfigSpec.BooleanValue RIVER_MEANDERS;       // bends migrate over weeks
     public static final ForgeConfigSpec.DoubleValue RIVER_MEANDER_DAYS;    // days a bend takes to finish its shift
+    public static final ForgeConfigSpec.IntValue RIVER_MEANDER_GENERATIONS; // sets of bends a chunk runs through
     public static final ForgeConfigSpec.DoubleValue RIVER_MIGRATION_SCALE; // how far a bend shifts, per curvature
 
     // --- Instruments ---------------------------------------------------------
@@ -659,11 +660,7 @@ public final class GeyserConfig {
                         "and along a plume's track through the sea older islands, atolls and guyots. Like",
                         "largeVolcanoes, only terrain generated from now on gets them.")
                 .define("oceanVolcanoes", true);
-        LARGE_CALDERAS = b
-                .comment("Let a large volcano on land be a caldera 400 blocks across. Off, the sites that would have",
-                        "been calderas are shields over plumes and stratovolcanoes on arcs instead; flooded calderas",
-                        "in the sea are not affected. Off while the land caldera is being redesigned.")
-                .define("largeCalderas", false);
+
         OCEAN_TRAIL_LENGTH = b
                 .comment("How far a plume's track runs through the sea, in blocks. The plate carries its islands off the",
                         "plume, so along the track they are older, lower and more worn, then reefs round lagoons in warm",
@@ -952,6 +949,12 @@ public final class GeyserConfig {
         RIVER_MEANDER_DAYS = b
                 .comment("In-game days a bend takes to complete its shift. A block or two a day.")
                 .defineInRange("riverMeanderDays", 14.0D, 0.01D, 1000.0D);
+        RIVER_MEANDER_GENERATIONS = b
+                .comment("How many sets of bends a chunk's river runs through. When every bend of a set has",
+                        "shifted as far as it will, the chunk rests for twice a bend's interval, is surveyed",
+                        "again on the channel as it now is, and a new set is planned on that; a river keeps",
+                        "winding instead of stopping after its first bends. 1 plans each chunk once.")
+                .defineInRange("riverMeanderGenerations", 6, 1, 100);
         RIVER_MIGRATION_SCALE = b
                 .comment("How far a bend shifts in all, in channel widths per unit of curvature times",
                         "width. At 1.5 a typical bend (radius three widths) moves half a width;",

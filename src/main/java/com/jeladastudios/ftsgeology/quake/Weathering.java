@@ -55,7 +55,7 @@ public final class Weathering {
     private static final int STACK_LIMIT = 48;
 
     /** How far across from a felled trunk its crown is taken: a canopy's reach, and a little of the next tree's. */
-    private static final int CROWN_REACH = 6;
+    static final int CROWN_REACH = 6;
 
     /** How far the corridor is widened before settling, so a wide canopy's outer leaves are visited too. */
     private static final int CORRIDOR_DILATION = 12;
@@ -484,7 +484,7 @@ public final class Weathering {
      * the trunk's foot and a little over its top. A neighbouring tree may lose a few overlapping leaves;
      * finding each leaf's own trunk cost more than the quake itself.
      */
-    private static void takeCrown(ServerLevel level, int x, int lo, int hi, int z, int reach) {
+    static void takeCrown(ServerLevel level, int x, int lo, int hi, int z, int reach) {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         int floor = Math.max(lo, level.getMinBuildHeight()), roof = Math.min(hi, level.getMaxBuildHeight() - 1);
         for (int dx = -reach; dx <= reach; dx++) {

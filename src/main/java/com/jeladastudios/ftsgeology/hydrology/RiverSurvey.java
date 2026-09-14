@@ -46,6 +46,12 @@ public final class RiverSurvey extends SavedData {
     static final int MAX_BANK = 4;
     /** Furthest a bend may shift, as a share of the channel width. */
     static final double MAX_SHIFT = 0.6;
+    /**
+     * Nearest two bends stand, in channel widths. A meander's wavelength is ten to fourteen widths, so one bend
+     * and the next on the far bank are five to seven apart; within twice this the next bend has to face the
+     * other way.
+     */
+    static final int SPACING = 5;
 
     /** One chunk's river, or the fact that it has none. */
     public static final class Rec {
@@ -63,6 +69,10 @@ public final class RiverSurvey extends SavedData {
         int ver;
         int surveyed = -1;
         boolean planned;
+        /** How many times this chunk's bends were planned; each finished set is followed by a rest and a new survey. */
+        int gen;
+        /** Game time the rest after the last finished set ends and the chunk is surveyed again; 0 while not resting. */
+        long rest;
         final List<Bend> bends = new ArrayList<>();
         /** The channel's centre line through this chunk, as (lx, lz) pairs; null until planned. For the debug view. */
         byte[] centre;
@@ -141,6 +151,7 @@ public final class RiverSurvey extends SavedData {
         }
         r.coast = coast;
         r.planned = false;
+        r.rest = 0;
         r.bends.clear();
         r.surveyed = r.ver;
         if (riverCells == 0) {
@@ -295,18 +306,14 @@ public final class RiverSurvey extends SavedData {
                 found.add(new double[] {px, pz, curvature, width, -mx / lm, -mz / lm, speed});
             }
         }
-        // The tightest bends first; one bend a channel width.
+        // The tightest bends first; the next bend five widths on and on the far bank, this chunk's and the
+        // neighbours' bends alike, so two bends do not stand side by side across a chunk line.
         found.sort((a, b) -> Double.compare(b[2], a[2]));
         long now = level.getGameTime();
         for (double[] f : found) {
             int wx = (int) f[0], wz = (int) f[1], width = (int) f[3];
-            boolean near = false;
-            for (Bend b : r.bends) {
-                int bx = b.x - x0, bz = b.z - z0;
-                if (Math.hypot(bx - wx, bz - wz) < width) { near = true; break; }
-            }
-            if (near) continue;
             double nx = f[4], nz = f[5];
+            if (crowded(cx, cz, x0 + wx, z0 + wz, nx, nz, width)) continue;
             // The outer bank has to be there, low enough to cut, and the inner bank within reach.
             int bank = bankAlong(water, rel, wx, wz, nx, nz, width + 4);
             if (bank == Integer.MIN_VALUE || bank > MAX_BANK) continue;
@@ -329,6 +336,31 @@ public final class RiverSurvey extends SavedData {
             r.bends.add(b);
         }
         return true;
+    }
+
+    /**
+     * Whether a bend at {@code (x, z)} facing {@code (nx, nz)} stands too close to one already planned in this
+     * chunk or the ones round it as far as a wavelength reaches: within {@link #SPACING} widths of any, or
+     * within twice that of the nearest one facing the same way. Bends alternate banks along a channel.
+     */
+    private boolean crowded(int cx, int cz, int x, int z, double nx, double nz, int width) {
+        double bestD = Double.MAX_VALUE;
+        Bend nearest = null;
+        int reach = (2 * SPACING * Math.max(width, BIG_RIVER)) / 16 + 1;
+        for (int ox = -reach; ox <= reach; ox++) {
+            for (int oz = -reach; oz <= reach; oz++) {
+                Rec n = get(cx + ox, cz + oz);
+                if (n == null) continue;
+                for (Bend b : n.bends) {
+                    if (b.kind != KIND_BEND) continue;
+                    // In widths of the wider of the two: the channel's width varies along a reach.
+                    double d = Math.hypot(b.x - x, b.z - z) / Math.max(width, b.width);
+                    if (d < SPACING) return true;
+                    if (d < bestD) { bestD = d; nearest = b; }
+                }
+            }
+        }
+        return nearest != null && bestD < 2 * SPACING && nx * nearest.nx + nz * nearest.nz > 0;
     }
 
     /**
@@ -561,10 +593,43 @@ public final class RiverSurvey extends SavedData {
                 if (r == null) continue;
                 r.ver++;
                 r.planned = false;
+                r.rest = 0;
                 r.bends.clear();
             }
         }
         setDirty();
+    }
+
+    /**
+     * A chunk's bends have all finished: it rests, then is surveyed and planned again on the channel as it now
+     * is, until {@code riverMeanderGenerations} sets have run. Only where a bend moved: a set that died at once
+     * would be planned the same again.
+     */
+    void finished(int cx, int cz, long now) {
+        Rec r = get(cx, cz);
+        if (r == null || r.rest != 0 || r.gen + 1 >= GeyserConfig.RIVER_MEANDER_GENERATIONS.get()) return;
+        int steps = 0;
+        boolean moved = false;
+        for (Bend b : r.bends) {
+            if (b.done > 0) moved = true;
+            steps = Math.max(steps, b.steps);
+        }
+        if (!moved) return;
+        r.rest = now + 2 * MeanderScheduler.interval(steps);
+        setDirty();
+    }
+
+    /** Ends a chunk's rest: the next generation is surveyed when it is next looked at. */
+    void nextGeneration(int cx, int cz) {
+        Rec r = get(cx, cz);
+        if (r == null) return;
+        r.gen++;
+        r.rest = 0;
+        r.ver++;
+        r.planned = false;
+        r.bends.clear();
+        setDirty();
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("river chunk {},{}: generation {} after its bends finished", cx, cz, r.gen + 1);
     }
 
     // === NBT ================================================================
@@ -579,6 +644,8 @@ public final class RiverSurvey extends SavedData {
             r.surveyed = c.getInt("s");
             r.coast = c.getBoolean("c");
             r.planned = c.getBoolean("p");
+            r.gen = c.getInt("g");
+            r.rest = c.getLong("rs");
             if (c.contains("w")) {
                 r.yW = c.getInt("w");
                 r.bed = c.getInt("b");
@@ -619,6 +686,8 @@ public final class RiverSurvey extends SavedData {
             c.putInt("s", r.surveyed);
             c.putBoolean("c", r.coast);
             c.putBoolean("p", r.planned);
+            if (r.gen != 0) c.putInt("g", r.gen);
+            if (r.rest != 0) c.putLong("rs", r.rest);
             if (r.river()) {
                 c.putInt("w", r.yW);
                 c.putInt("b", r.bed);

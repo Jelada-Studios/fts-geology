@@ -72,6 +72,8 @@ public final class MeanderScheduler {
     private static final Map<ResourceKey<Level>, List<Long>> LIVE = new HashMap<>();
     private static final Map<ResourceKey<Level>, Integer> CURSOR = new HashMap<>();
     private static final Map<ResourceKey<Level>, Boolean> LOADED = new HashMap<>();
+    /** Chunks whose bends all finished and are resting before their next generation is surveyed. */
+    private static final Map<ResourceKey<Level>, List<Long>> RESTING = new HashMap<>();
 
     /** Ticks between two steps of a bend of this many steps. */
     static long interval(int steps) {
@@ -98,6 +100,7 @@ public final class MeanderScheduler {
             surveySome(server, deadline);
             planSome(server, deadline);
             stepSome(server, deadline);
+            restSome(server);
             RiverDebug.tick(server);
         } catch (RuntimeException e) {
             GeysersMod.LOGGER.warn("River meanders: {}", e.toString());
@@ -113,6 +116,7 @@ public final class MeanderScheduler {
         LIVE.clear();
         CURSOR.clear();
         LOADED.clear();
+        RESTING.clear();
     }
 
     /** The ground under a box changed (a quake): its chunks are surveyed again when next loaded. */
@@ -218,6 +222,32 @@ public final class MeanderScheduler {
         RiverSurvey s = RiverSurvey.of(level);
         for (var e : s.recs.long2ObjectEntrySet()) {
             if (hasLive(e.getValue())) noteLive(level, ChunkPos.getX(e.getLongKey()), ChunkPos.getZ(e.getLongKey()));
+            if (e.getValue().rest != 0) noteResting(level, e.getLongKey());
+        }
+    }
+
+    private static void noteResting(ServerLevel level, long key) {
+        List<Long> resting = RESTING.computeIfAbsent(level.dimension(), d -> new ArrayList<>());
+        if (!resting.contains(key)) resting.add(key);
+    }
+
+    /** Ends the rests that are over: the chunk is surveyed again, on the channel its bends left, if it is loaded. */
+    private static void restSome(MinecraftServer server) {
+        for (ServerLevel level : server.getAllLevels()) {
+            List<Long> resting = RESTING.get(level.dimension());
+            if (resting == null || resting.isEmpty()) continue;
+            RiverSurvey s = RiverSurvey.of(level);
+            long now = level.getGameTime();
+            for (int i = resting.size() - 1; i >= 0; i--) {
+                long key = resting.get(i);
+                int cx = ChunkPos.getX(key), cz = ChunkPos.getZ(key);
+                RiverSurvey.Rec r = s.get(cx, cz);
+                if (r == null || r.rest == 0) { resting.remove(i); continue; }
+                if (now < r.rest || level.getChunkSource().getChunkNow(cx, cz) == null) continue;
+                s.nextGeneration(cx, cz);
+                TO_SURVEY.add(new Key(level.dimension(), key));
+                resting.remove(i);
+            }
         }
     }
 
@@ -237,6 +267,11 @@ public final class MeanderScheduler {
                 long key = live.get(cursor);
                 RiverSurvey.Rec r = s.get(ChunkPos.getX(key), ChunkPos.getZ(key));
                 if (r == null || !hasLive(r)) {
+                    // Its last bend finished: after a rest the chunk is planned again on the new channel.
+                    if (r != null) {
+                        s.finished(ChunkPos.getX(key), ChunkPos.getZ(key), now);
+                        if (r.rest != 0) noteResting(level, key);
+                    }
                     live.remove(cursor);
                     if (live.isEmpty()) break;
                     cursor = cursor % live.size();

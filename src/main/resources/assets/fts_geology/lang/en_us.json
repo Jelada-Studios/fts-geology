@@ -269,7 +269,7 @@
   "command.fts_geology.field.seams": "%s at %s, %s. Inside chunks: %s column pairs, mean step %s, steps of 4 or more %s per thousand. Across chunk borders: %s pairs, mean step %s, steps of 4 or more %s per thousand. Height digest %s over %s columns.",
   "command.fts_geology.field.no_seams": "No generated large volcano near you to measure.",
   "command.fts_geology.field.refused": "Candidates turned down in the search (water / relief / structure / other): strato %s, shield %s, fissure %s, caldera %s.",
-  "command.fts_geology.field.calderas_off": "Large calderas on land are switched off (largeCalderas in the config); flooded calderas in the sea are still there, try field flooded.",
+  "command.fts_geology.field.calderas_off": "Large calderas on land are switched off; flooded calderas in the sea are still there, try field flooded.",
   "command.fts_geology.debug.river_on": "River debug view on: centre lines, flow arrows and planned bends are drawn round you, with the nearest river in the corner.",
   "command.fts_geology.debug.river_off": "River debug view off.",
   "command.fts_geology.debug.river_dump": "%s lines written to chat and the log.",
