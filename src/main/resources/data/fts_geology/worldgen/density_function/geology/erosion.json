@@ -1,0 +1,28 @@
+{
+  "type": "minecraft:flat_cache",
+  "argument": {
+    "type": "minecraft:clamp",
+    "min": -1.0,
+    "max": 1.0,
+    "input": {
+      "type": "minecraft:add",
+      "argument1": {
+        "type": "fts_geology:plate",
+        "field": "erosion"
+      },
+      "argument2": {
+        "type": "minecraft:mul",
+        "argument1": 0.35,
+        "argument2": {
+          "type": "minecraft:shifted_noise",
+          "noise": "minecraft:erosion",
+          "shift_x": "minecraft:shift_x",
+          "shift_y": 0.0,
+          "shift_z": "minecraft:shift_z",
+          "xz_scale": 0.25,
+          "y_scale": 0.0
+        }
+      }
+    }
+  }
+}

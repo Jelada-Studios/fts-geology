@@ -29,6 +29,86 @@ public final class InspectCommands {
 
     private InspectCommands() {}
 
+    /**
+     * The generator's ground along a line from here, every eight blocks, without loading a chunk: for measuring
+     * the terrain the plates make. Prints the heights as a row and a summary.
+     */
+    static int terrain(CommandContext<CommandSourceStack> ctx, int dx, int dz, int length) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        if (dx == 0 && dz == 0) dx = 1;
+        BlockPos at = BlockPos.containing(source.getPosition());
+        var generator = level.getChunkSource().getGenerator();
+        var state = level.getChunkSource().randomState();
+        int step = 8, n = length / step;
+        StringBuilder row = new StringBuilder();
+        int max = Integer.MIN_VALUE, min = Integer.MAX_VALUE, sum = 0, high = 0, sea = 0;
+        int sealevel = level.getSeaLevel();
+        for (int i = 0; i <= n; i++) {
+            int x = at.getX() + dx * i * step, z = at.getZ() + dz * i * step;
+            int y = generator.getBaseHeight(x, z, net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG, level, state);
+            if (i > 0) row.append(' ');
+            row.append(y);
+            max = Math.max(max, y); min = Math.min(min, y); sum += y;
+            if (y >= 120) high++;
+            if (y < sealevel) sea++;
+        }
+        final int count = n + 1, fmax = max, fmin = min, fhigh = high, fsea = sea, fdx = dx, fdz = dz;
+        final double mean = (double) sum / count;
+        String line = String.format(Locale.ROOT, "terrain from %d,%d along %+d,%+d for %d: max %d, min %d, mean %.1f, above 120: %d blocks, under sea: %d blocks",
+                at.getX(), at.getZ(), fdx, fdz, length, fmax, fmin, mean, fhigh * step, fsea * step);
+        source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
+        source.sendSuccess(() -> Component.literal(row.toString()).withStyle(ChatFormatting.GRAY), false);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("terrain heights: {}", row);
+        return 1;
+    }
+
+    /** The plate density fields at this column, as the terrain generator sees them, and the seeds in play. */
+    static int terrainHere(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        record Pos(int blockX, int blockY, int blockZ) implements net.minecraft.world.level.levelgen.DensityFunction.FunctionContext {}
+        Pos pos = new Pos(at.getX(), 64, at.getZ());
+        StringBuilder sb = new StringBuilder();
+        for (String f : new String[] {"continents", "erosion", "ridges", "relief"}) {
+            sb.append(f).append(' ').append(String.format(Locale.ROOT, "%.3f", new com.jeladastudios.ftsgeology.worldgen.terrain.PlateDensity(f, 1.0).compute(pos))).append("; ");
+        }
+        var generator = level.getChunkSource().getGenerator();
+        int base = generator.getBaseHeight(at.getX(), at.getZ(), net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG, level, level.getChunkSource().randomState());
+        String line = String.format(Locale.ROOT, "terrain at %d,%d: %sbase %d; level seed %d, terrain seed %d, own %s",
+                at.getX(), at.getZ(), sb, base, level.getSeed(), com.jeladastudios.ftsgeology.worldgen.terrain.WorldSeed.current(),
+                com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level));
+        source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
+        return 1;
+    }
+
+    /** The share of the generator's ground under the sea within a radius, on a 64-block grid. */
+    static int terrainOcean(CommandContext<CommandSourceStack> ctx, int radius) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        var generator = level.getChunkSource().getGenerator();
+        var state = level.getChunkSource().randomState();
+        int sealevel = level.getSeaLevel();
+        int total = 0, sea = 0, mountain = 0;
+        for (int x = at.getX() - radius; x <= at.getX() + radius; x += 64) {
+            for (int z = at.getZ() - radius; z <= at.getZ() + radius; z += 64) {
+                int y = generator.getBaseHeight(x, z, net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG, level, state);
+                total++;
+                if (y < sealevel) sea++;
+                if (y >= 150) mountain++;
+            }
+        }
+        String line = String.format(Locale.ROOT, "terrain within %d of %d,%d: %d samples, %.1f%% under sea, %.1f%% at or over 150",
+                radius, at.getX(), at.getZ(), total, 100.0 * sea / total, 100.0 * mountain / total);
+        source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
+        return 1;
+    }
+
     static int plate(CommandContext<CommandSourceStack> ctx) {
         CommandSourceStack source = ctx.getSource();
         if (!GeyserConfig.TECTONICS_ENABLED.get()) {

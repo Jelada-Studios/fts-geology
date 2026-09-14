@@ -116,6 +116,20 @@ public final class TectonicCommands {
                                                         StringArgumentType.getString(ctx, "feature"),
                                                         IntegerArgumentType.getInteger(ctx, "stage"))))))
                         // The river debug view: what the survey knows around a player, drawn on their screen.
+                        .then(Commands.literal("terrain")
+                                // The generator's ground along a line from here, without loading a chunk.
+                                .then(Commands.literal("here").executes(InspectCommands::terrainHere))
+                                .then(Commands.literal("ocean")
+                                        .then(Commands.argument("radius", IntegerArgumentType.integer(64, 20000))
+                                                .executes(ctx -> InspectCommands.terrainOcean(ctx,
+                                                        IntegerArgumentType.getInteger(ctx, "radius")))))
+                                .then(Commands.argument("dx", IntegerArgumentType.integer(-1, 1))
+                                        .then(Commands.argument("dz", IntegerArgumentType.integer(-1, 1))
+                                                .then(Commands.argument("length", IntegerArgumentType.integer(16, 20000))
+                                                        .executes(ctx -> InspectCommands.terrain(ctx,
+                                                                IntegerArgumentType.getInteger(ctx, "dx"),
+                                                                IntegerArgumentType.getInteger(ctx, "dz"),
+                                                                IntegerArgumentType.getInteger(ctx, "length")))))))
                         .then(Commands.literal("debug")
                                 .then(Commands.literal("river")
                                         .then(Commands.literal("on").executes(ctx -> riverDebug(ctx, 1)))
