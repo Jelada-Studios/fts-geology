@@ -136,21 +136,15 @@ public final class TectonicMap {
         PlateKind kind = biomes == null ? seededKind(seed, plateId, params) : plateKind(biomes, seed, bgx, bgz, scale, jitter);
         PlateKind neighbourKind = biomes == null ? seededKind(seed, neighbourId, params) : plateKind(biomes, seed, ngx, ngz, scale, jitter);
 
-        // 4. Stress: the square root of proximity times motion, with a motion floor, so the active
-        //    core of the fault zone is wide and a slow boundary still lives on the line.
-        double proximity = 1.0 - Mth.clamp(faultDistance / faultWidth, 0.0, 1.0);
-        proximity = Math.sqrt(proximity);
-        double motion = Mth.clamp(Math.max(Math.abs(convergence), shear) / 1.2, 0.0, 1.0);
-        double stress = Mth.clamp(proximity * (0.45 + 0.55 * motion), 0.0, 1.0);
-
-        // What the boundary is doing is PlateSample's own answer, so the terrain, which reaches past the fault
-        // zone, and the features, which do not, can never disagree about it. Here it is only narrowed to
-        // INTERIOR outside the zone.
-        PlateSample s = new PlateSample(plateId, kind, vA[0], vA[1], neighbourId, neighbourKind,
-                FaultType.INTERIOR, faultDistance, convergence, shear, nx, nz, stress);
-        if (faultDistance > faultWidth) return s;
+        // 4. What the boundary is doing, and how hard, are PlateSample's own answers, so the terrain, which
+        //    reaches past the fault zone, and the features, which do not, can never disagree about either. The
+        //    sample is built once without them and then again with what it said about itself.
+        PlateSample bare = new PlateSample(plateId, kind, vA[0], vA[1], neighbourId, neighbourKind,
+                FaultType.INTERIOR, faultDistance, convergence, shear, nx, nz, 0.0);
+        double stress = bare.belt(faultWidth, 1.0);
+        FaultType type = faultDistance > faultWidth ? FaultType.INTERIOR : bare.boundaryType();
         return new PlateSample(plateId, kind, vA[0], vA[1], neighbourId, neighbourKind,
-                s.boundaryType(), faultDistance, convergence, shear, nx, nz, stress);
+                type, faultDistance, convergence, shear, nx, nz, stress);
     }
 
     /**

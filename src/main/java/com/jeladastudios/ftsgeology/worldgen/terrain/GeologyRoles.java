@@ -42,8 +42,12 @@ public final class GeologyRoles {
 
     /** Ground flatter than this can hold a basin. */
     private static final double FLAT = 0.1;
-    /** How strong a plume's dome has to be under a geothermal basin. */
-    private static final double BASIN_PLUME = 0.45;
+    /**
+     * How strong a plume's dome has to be under a geothermal basin: the same strength at which
+     * { GeothermalBasin} starts laying its sinter and mud down, so the biome covers the ground the mod
+     * already paints rather than a smaller circle inside it.
+     */
+    private static final double BASIN_PLUME = 0.30;
     /** How far the arc's ribbon reaches, and how deep into a belt its core goes; see {@link PlateSample#onArc}. */
     private static final double ARC_FROM = 0.25, ARC_TO = 0.75, BELT_CORE = 0.55;
     /** How wide a rift floor is, how far a ridge reaches, and how far a belt's sediment goes, in fault widths. */
