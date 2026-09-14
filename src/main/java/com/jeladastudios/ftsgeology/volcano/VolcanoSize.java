@@ -42,7 +42,8 @@ public enum VolcanoSize {
             // Capped well short of what the width would suggest: the whole summit lake is molten, and
             // a lake the size of the mountain would be thousands of lava cells for the core to track.
             case SHIELD -> this == MEDIUM ? 16 : 18;
-            case CALDERA -> this == MEDIUM ? 70 : 200;
+            // Some 250 blocks across the ring: Yellowstone's sixty kilometres would be a hole the size of the map.
+            case CALDERA -> this == MEDIUM ? 70 : 125;
             case FISSURE -> this == MEDIUM ? 3 : 4;
         };
         return Math.max(2, (int) Math.round(base * (0.9 + rng.nextDouble() * 0.2)));
@@ -98,7 +99,7 @@ public enum VolcanoSize {
         return switch (this) {
             case SMALL -> 3 + magnitude / 5.0;
             case MEDIUM -> 12;
-            case LARGE -> 28;
+            case LARGE -> 22;
         };
     }
 
@@ -108,7 +109,7 @@ public enum VolcanoSize {
             case SMALL -> 6;
             // A big caldera's rim is a plateau, not a wall.
             case MEDIUM -> 30;
-            case LARGE -> 90;
+            case LARGE -> 64;
         };
     }
 

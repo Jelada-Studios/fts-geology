@@ -319,7 +319,8 @@ public final class VolcanoEdifice {
             case STRATOVOLCANO -> stratoRock(rng, c, gx, y, gz);
             case SHIELD -> (rng.nextInt(3) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT)
                     .defaultBlockState();
-            case CALDERA -> (rng.nextInt(3) == 0 ? Blocks.BLACKSTONE : Blocks.TUFF)
+            // Welded ash and the rhyolite it came from, as the Yellowstone plateau is.
+            case CALDERA -> (rng.nextInt(3) == 0 ? com.jeladastudios.ftsgeology.registry.ModBlocks.RHYOLITE.get() : Blocks.TUFF)
                     .defaultBlockState();
             case FISSURE -> (rng.nextInt(4) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT)
                     .defaultBlockState();
@@ -554,6 +555,7 @@ public final class VolcanoEdifice {
         double wallWidth = rr * 0.15;
         double noise = surfaceNoise(c, gx, gz);
         boolean lake = false;
+        int pond = Integer.MIN_VALUE;
         int target;
         if (dist <= rr - wallWidth) {
             lake = inLake(c, gx, gz);
@@ -561,6 +563,11 @@ public final class VolcanoEdifice {
             target = lake ? c.calderaFloorY : c.calderaFloorY + Math.max(0, (int) Math.round(noise * 1.2));
             if (!lake && dist < c.domeR) {
                 target += (int) Math.round(c.domeH * (1.0 - dist / Math.max(1.0, c.domeR)));
+            }
+            // The water lake: a shallow bowl in the floor, its surface a block under the floor so it cannot run.
+            if (!lake) {
+                pond = pondBed(c, gx, gz);
+                if (pond != Integer.MIN_VALUE) target = Math.min(target, pond);
             }
         } else if (inside) {
             // The inner wall: slumped into terraces rather than cut sheer.
@@ -585,7 +592,17 @@ public final class VolcanoEdifice {
         }
         for (int y = Math.min(ground, target); y <= target; y++) {
             BlockState rock = coneRock(rng, c, gx, y, gz);
-            setRock(level, new BlockPos(gx, y, gz), y == target ? calderaSurface(rng, gx, gz, rock) : rock);
+            BlockState top = pond != Integer.MIN_VALUE ? (rng.nextInt(3) == 0 ? Blocks.GRAVEL : Blocks.SAND).defaultBlockState()
+                    : calderaSurface(rng, gx, gz, rock);
+            setRock(level, new BlockPos(gx, y, gz), y == target ? top : rock);
+        }
+        if (pond != Integer.MIN_VALUE) {
+            // The bowl was just cleared to air, which setRock leaves alone: the water goes in directly.
+            for (int y = target + 1; y <= c.calderaFloorY - 1; y++) {
+                BlockPos p = new BlockPos(gx, y, gz);
+                BlockState s = level.getBlockState(p);
+                if (s.isAir() || !com.jeladastudios.ftsgeology.eruption.EruptionHandler.isPlayerPlaced(s)) level.setBlock(p, Blocks.WATER.defaultBlockState(), 2);
+            }
         }
         if (lake) {
             // Recessed one block: the lake is the lowest point of its basin. Lava on a live caldera, a crust over the
@@ -607,9 +624,23 @@ public final class VolcanoEdifice {
     /** A big caldera's ground: welded tuff and scree, and grass, where forest grows, over the old floor and plateau. */
     static BlockState calderaSurface(RandomSource rng, int gx, int gz, BlockState rock) {
         double n = com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx - 613, gz + 613, 45.0);
-        if (n > 0.1) return Blocks.GRASS_BLOCK.defaultBlockState();
-        if (n > -0.2) return (rng.nextInt(3) == 0 ? Blocks.GRAVEL : Blocks.COARSE_DIRT).defaultBlockState();
+        if (n > -0.05) return Blocks.GRASS_BLOCK.defaultBlockState();
+        if (n > -0.3) return (rng.nextInt(3) == 0 ? Blocks.GRAVEL : Blocks.COARSE_DIRT).defaultBlockState();
         return rock;
+    }
+
+    /**
+     * The bed of a big caldera's water lake at a column, or MIN outside it: a bowl up to five blocks under the floor
+     * with a noisy shore, its surface a block below the floor so the floor round it holds it in.
+     */
+    static int pondBed(Ctx c, int gx, int gz) {
+        if (c.pondR <= 0) return Integer.MIN_VALUE;
+        double dx = gx - c.pondX, dz = gz - c.pondZ;
+        double ang = Math.atan2(dz, dx);
+        double edge = c.pondR * (1.0 + 0.16 * Math.sin(3 * ang + c.phaseB) + 0.09 * Math.sin(5 * ang + c.phaseA));
+        double d = Math.hypot(dx, dz) / edge;
+        if (d >= 1.0) return Integer.MIN_VALUE;
+        return c.calderaFloorY - 1 - (int) Math.round(5.0 * (1.0 - d * d));
     }
 
     /** True in a big caldera's lava lake: a small round pool near the ring fault. */

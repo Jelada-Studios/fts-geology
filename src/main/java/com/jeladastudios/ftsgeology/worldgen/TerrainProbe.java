@@ -29,6 +29,8 @@ public final class TerrainProbe {
      */
     public static boolean isVegetation(BlockState s) {
         if (s.isAir()) return false;
+        // Water is in replaceable_by_trees since mangroves; it is not cover, and clearing it drained a caldera's lake.
+        if (!s.getFluidState().isEmpty()) return false;
         return s.is(BlockTags.FLOWERS)
                 || s.is(BlockTags.SAPLINGS)
                 || s.is(BlockTags.CROPS)

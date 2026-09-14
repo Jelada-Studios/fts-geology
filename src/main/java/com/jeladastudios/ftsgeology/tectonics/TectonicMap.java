@@ -38,7 +38,7 @@ public final class TectonicMap {
     private static final Map<String, PlateKind> KIND_CACHE = new ConcurrentHashMap<>();
 
     /** How many block samples decide a plate crust type. */
-    private static final int KIND_SAMPLES = 5;
+    private static final int KIND_SAMPLES = 9;
 
     // === Public API =========================================================
 
@@ -235,7 +235,8 @@ public final class TectonicMap {
             // Spread the probes over a good fraction of the plate, so one stray lake or island does
             // not decide the crust type of an entire plate.
             int spread = (int) Math.max(64.0, scale * 0.25);
-            int[][] offsets = { {0, 0}, {spread, 0}, {-spread, 0}, {0, spread}, {0, -spread} };
+            int[][] offsets = { {0, 0}, {spread, 0}, {-spread, 0}, {0, spread}, {0, -spread},
+                    {spread, spread}, {-spread, spread}, {spread, -spread}, {-spread, -spread} };
             int ocean = 0;
             for (int i = 0; i < KIND_SAMPLES; i++) {
                 int bxx = (int) sx + offsets[i][0];

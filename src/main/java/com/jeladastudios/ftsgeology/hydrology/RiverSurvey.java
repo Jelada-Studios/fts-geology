@@ -83,9 +83,13 @@ public final class RiverSurvey extends SavedData {
         boolean dead;
         /** Why the last step could not move, for the debug view; not saved. */
         String why = "";
+        /** What kind of work this is: {@link #KIND_BEND}, or {@link #KIND_DELTA} where a river enters a lake. */
+        byte kind = KIND_BEND;
 
         boolean live() { return !dead && done < steps; }
     }
+
+    static final byte KIND_BEND = 0, KIND_DELTA = 1;
 
     final Long2ObjectOpenHashMap<Rec> recs = new Long2ObjectOpenHashMap<>();
 
@@ -216,6 +220,7 @@ public final class RiverSurvey extends SavedData {
         r.planned = true;
         r.bends.clear();
         setDirty();
+        planDelta(level, cx, cz, r);
         if (here != null && here.lake()) return true;
         boolean[][] water = new boolean[WIN][WIN];
         int[][] rel = new int[WIN][WIN];
@@ -330,6 +335,62 @@ public final class RiverSurvey extends SavedData {
     static double speed(RiverNetwork.Node node) {
         if (node == null) return 1.0;
         return Mth.clamp(0.5 + 0.5 * Math.log10(1.0 + node.upstream() / 200.0), 0.5, 1.5);
+    }
+
+    /**
+     * Where the river's channel opens into a lake in this chunk, one piece of delta work: the water slows to nothing
+     * there and drops what it carries in a fan. The entry is a channel cell of the lake's shore band next to a cell
+     * of the open water (half a channel width and more to the bank in every direction).
+     */
+    private void planDelta(ServerLevel level, int cx, int cz, Rec r) {
+        long now = level.getGameTime();
+        for (int lz = 2; lz < 16; lz += 4) {
+            for (int lx = 2; lx < 16; lx += 4) {
+                if (!r.at(lx, lz)) continue;
+                int x = cx * 16 + lx, z = cz * 16 + lz;
+                RiverNetwork.Node here = RiverNetwork.peek(x, z);
+                if (here == null || !here.lake() || here.halfWidth() >= RiverNetwork.LAKE_HALF) continue;
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        if (dx == 0 && dz == 0) continue;
+                        RiverNetwork.Node n = RiverNetwork.peek(x + dx * 4, z + dz * 4);
+                        if (n == null || n.halfWidth() < RiverNetwork.LAKE_HALF) continue;
+                        // The open water has to be there at this level: the biome runs wider than the water does.
+                        BlockPos open = new BlockPos(x + dx * 4, r.yW, z + dz * 4);
+                        if (!level.hasChunkAt(open) || !MeanderScheduler.riverWater(level.getBlockState(open))) continue;
+                        // One delta an entry: the shore band is wide, and every chunk along it would find the same lake.
+                        if (deltaNear(cx, cz, x, z, 40)) return;
+                        double l = Math.hypot(dx, dz);
+                        Bend b = new Bend();
+                        b.kind = KIND_DELTA;
+                        b.x = x;
+                        b.z = z;
+                        b.nx = (float) (dx / l);
+                        b.nz = (float) (dz / l);
+                        b.width = Math.max(4, here.halfWidth() * 8);
+                        b.steps = Mth.clamp(b.width, 8, 24);
+                        b.speed = (float) speed(here);
+                        b.next = now + MeanderScheduler.interval(b.steps);
+                        r.bends.add(b);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    /** Is there delta work already within {@code reach} blocks of a point, in this chunk or the ones round it? */
+    private boolean deltaNear(int cx, int cz, int x, int z, int reach) {
+        for (int ox = -3; ox <= 3; ox++) {
+            for (int oz = -3; oz <= 3; oz++) {
+                Rec n = get(cx + ox, cz + oz);
+                if (n == null) continue;
+                for (Bend b : n.bends) {
+                    if (b.kind == KIND_DELTA && Math.hypot(b.x - x, b.z - z) <= reach) return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** Height of the first bank cell along a bearing over the water, or MIN where the window runs out first. */
@@ -514,6 +575,7 @@ public final class RiverSurvey extends SavedData {
                 b.next = bt.getLong("t");
                 b.dead = bt.getBoolean("k");
                 b.speed = bt.contains("v") ? bt.getFloat("v") : 1.0f;
+                b.kind = bt.getByte("y");
                 r.bends.add(b);
             }
             s.recs.put(c.getLong("key"), r);
@@ -552,6 +614,7 @@ public final class RiverSurvey extends SavedData {
                     bt.putLong("t", b.next);
                     bt.putBoolean("k", b.dead);
                     bt.putFloat("v", b.speed);
+                    bt.putByte("y", b.kind);
                     bends.add(bt);
                 }
                 c.put("bends", bends);

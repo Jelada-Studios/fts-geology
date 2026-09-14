@@ -41,6 +41,8 @@ public final class ThermalBiomes {
             // A caldera has already collapsed, so no new cone belongs in it, but it stays thermally
             // alive: springs and geysers still do.
             new Match("caldera",     0.95, false, "a collapsed caldera"),
+            // Burnt's Geothermal biome: its own springs and sulphur go with our basins rather than beside them.
+            new Match("geothermal",  0.90, true,  "a geothermal field"),
             new Match("crater",      0.90, false, "a volcanic crater"),
             new Match("hot_spring",  0.85, true,  "hot-spring country"),
             new Match("hotspring",   0.85, true,  "hot-spring country"),

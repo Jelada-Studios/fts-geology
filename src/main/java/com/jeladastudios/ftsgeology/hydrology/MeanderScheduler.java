@@ -244,7 +244,7 @@ public final class MeanderScheduler {
                 }
                 for (RiverSurvey.Bend b : r.bends) {
                     if (!b.live() || b.next > now) continue;
-                    int result = step(level, r, b);
+                    int result = b.kind == RiverSurvey.KIND_DELTA ? deltaStep(level, r, b) : step(level, r, b);
                     if (result == STEP_WAIT) continue;
                     if (result == STEP_DONE) {
                         b.done++;
@@ -288,6 +288,48 @@ public final class MeanderScheduler {
             else if (res == STEP_WAIT) wait = true;
         }
         return done ? STEP_DONE : wait ? STEP_WAIT : STEP_DEAD;
+    }
+
+    /**
+     * One ring of a delta: the water entering a lake slows to nothing and drops what it carries in a fan, one ring
+     * further out each step. The fan is a half-disc into the lake from the mouth, its top at the water line at the
+     * mouth and a block lower every three rings out, so it shelves off into the lake; only shallow water is filled,
+     * and only water standing on ground.
+     */
+    private static int deltaStep(ServerLevel level, RiverSurvey.Rec r, RiverSurvey.Bend b) {
+        int yW = r.yW;
+        int ring = b.done + 1;
+        if (ring == 1) GeysersMod.LOGGER.debug("delta at {},{} starts: width {}, {} rings", b.x, b.z, b.width, b.steps);
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        boolean wrote = false;
+        for (int dx = -ring; dx <= ring; dx++) {
+            for (int dz = -ring; dz <= ring; dz++) {
+                double d = Math.hypot(dx, dz);
+                if (d < ring - 1 || d >= ring) continue;
+                // Into the lake, within a quarter turn either side of the way the channel runs.
+                if (dx * b.nx + dz * b.nz < d * 0.3) continue;
+                int x = b.x + dx, z = b.z + dz;
+                if (!level.hasChunkAt(m.set(x, yW, z))) return STEP_WAIT;
+                if (QuakeQuiet.isQuiet(level, new BlockPos(x, yW, z))) return STEP_WAIT;
+                if (!riverWater(level.getBlockState(m.set(x, yW, z)))) continue;
+                // A delta builds out into deeper water than a bar does: its front is a slope of what it dropped.
+                int bottom = yW;
+                while (bottom - 1 > yW - DELTA_DEPTH - 1
+                        && level.getBlockState(m.set(x, bottom - 1, z)).getFluidState().is(FluidTags.WATER)) bottom--;
+                if (yW - bottom + 1 > DELTA_DEPTH) continue;
+                if (!holds(level.getBlockState(m.set(x, bottom - 1, z)))) continue;
+                int target = ring <= 2 ? yW : yW - 1 - (ring - 3) / 3;
+                for (int y = bottom; y <= target; y++) {
+                    BlockState s = level.getBlockState(m.set(x, y, z));
+                    if (!s.getFluidState().is(FluidTags.WATER)) continue;
+                    level.setBlock(new BlockPos(x, y, z), sediment(x, y, z, b.width, b.speed, y == yW, placerLoad(b)), FLAGS);
+                    wrote = true;
+                }
+            }
+        }
+        // An empty ring is a stretch of shore or deep water; the fan goes on past it to the next.
+        if (!wrote) b.why = "ring " + ring + " had nowhere to build";
+        return STEP_DONE;
     }
 
     /**
@@ -413,9 +455,11 @@ public final class MeanderScheduler {
 
     /** Deepest water a bar builds up in. */
     private static final int BAR_DEPTH = 4;
+    /** How deep a lake a delta still builds into. */
+    private static final int DELTA_DEPTH = 8;
 
     /** The river's water at the surface, frozen or not, water plants included. */
-    private static boolean riverWater(BlockState s) {
+    static boolean riverWater(BlockState s) {
         return s.getFluidState().is(FluidTags.WATER) || s.is(Blocks.ICE) || s.is(Blocks.FROSTED_ICE);
     }
 

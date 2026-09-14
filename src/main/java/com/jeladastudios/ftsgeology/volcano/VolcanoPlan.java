@@ -37,6 +37,8 @@ public final class VolcanoPlan {
         double lakeOuter;
         /** A big caldera's round lava lake: its centre and radius. */
         double lakeX, lakeZ, lakeR;
+        /** A big caldera's water lake on the floor, across from the lava lake: its centre and radius. */
+        double pondX, pondZ, pondR;
         /** Length of one en-echelon segment of a fissure. */
         int segLen = 8;
         /**
@@ -235,6 +237,16 @@ public final class VolcanoPlan {
             c.lakeX = c.x + Math.cos(c.lakeAngle) * lakeDist;
             c.lakeZ = c.z + Math.sin(c.lakeAngle) * lakeDist;
             c.lakeOuter = lakeDist + c.lakeR;
+            // The water lake in the low half of the floor, as Yellowstone Lake lies in its caldera's south-east.
+            double pondAngle = c.lakeAngle + Math.PI + (rng.nextDouble() - 0.5) * 0.8;
+            double pondDist = VolcanoEdifice.ringRadius(c, pondAngle) * 0.55;
+            c.pondR = c.craterR * (0.28 + rng.nextDouble() * 0.06);
+            c.pondX = c.x + Math.cos(pondAngle) * pondDist;
+            c.pondZ = c.z + Math.sin(pondAngle) * pondDist;
+            if (type == VolcanoType.CALDERA) {
+                com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("Caldera at {},{}: floor {}, ring {}, pond at {},{} r {}",
+                        c.x, c.z, c.calderaFloorY, c.craterR, Math.round(c.pondX), Math.round(c.pondZ), Math.round(c.pondR));
+            }
         }
         c.segLen = 6 + rng.nextInt(5);
 

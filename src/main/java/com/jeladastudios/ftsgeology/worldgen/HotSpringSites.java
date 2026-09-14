@@ -211,8 +211,11 @@ public final class HotSpringSites {
      * @param groundY surface height there, which fixes how deep the line is seated
      */
     static BlockPos place(ServerLevel level, BlockPos at, int groundY, int maxStage) {
-        // Pulled up where the world floor is close; refused only if it cannot sit deeper than a quake digs.
-        int y = Math.max(groundY - SOURCE_DEPTH, level.getMinBuildHeight() + 5);
+        // Seated below the water table, since that is what feeds it: as deep as usual, or deeper under dry ground
+        // where the table is far down. Pulled up where the world floor is close; refused only if it cannot sit
+        // deeper than a quake digs.
+        int table = com.jeladastudios.ftsgeology.hydrology.WaterTable.tableY(level, at.getX(), at.getZ());
+        int y = Math.max(Math.min(groundY - SOURCE_DEPTH, table - 20), level.getMinBuildHeight() + 5);
         if (groundY - y < MIN_SOURCE_DEPTH) return null;           // too shallow a world here
         BlockPos src = new BlockPos(at.getX(), y, at.getZ());
         BlockState existing = level.getBlockState(src);

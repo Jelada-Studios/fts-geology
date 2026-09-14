@@ -26,8 +26,9 @@ import net.minecraft.world.level.block.state.BlockState;
  * pale rendzina over limestone and marble, leached podzol over granite. Appearance only.
  *
  * <p>Only named rock counts. {@code RockTypes.classify} calls plain stone plutonic, which would turn
- * every hillside into podzol, so the feature stays where the mod has put geology: near an active
- * boundary or over a plume.</p>
+ * every hillside into podzol, so plain stone paints nothing. The feature runs everywhere, at a third of its
+ * density in the quiet country where the only named rock is the generator's own granite, diorite, calcite and
+ * dripstone, and in full near an active boundary or over a plume.</p>
  *
  * <p>Every column reads its own parent rock, and where the feature runs at all comes from stress
  * interpolated between the chunk corners, so a soil patch never ends on a chunk border.</p>
@@ -59,17 +60,14 @@ public final class SoilProfile {
         double s10 = setting(model, x0 + 16, z0);
         double s01 = setting(model, x0, z0 + 16);
         double s11 = setting(model, x0 + 16, z0 + 16);
-        if (Math.max(Math.max(s00, s10), Math.max(s01, s11)) <= GATE_MIN) return;
-
         long seed = level.getSeed() ^ SALT;
         for (int dx = 0; dx < 16; dx++) {
             for (int dz = 0; dz < 16; dz++) {
                 double s = Mth.lerp(dz / 16.0, Mth.lerp(dx / 16.0, s00, s10), Mth.lerp(dx / 16.0, s01, s11));
-                if (s <= GATE_MIN) continue;
                 int x = x0 + dx, z = z0 + dz;
                 RandomSource rng = RandomSource.create(SeedHash.columnSeed(seed, x, z));
-                // Fades in over the gate band rather than starting on a line.
-                double gate = (s - GATE_MIN) / (GATE_FULL - GATE_MIN);
+                // A third of the density in quiet country, rising over the gate band to the full thing.
+                double gate = Mth.clamp(QUIET_SHARE + (s - GATE_MIN) / (GATE_FULL - GATE_MIN), QUIET_SHARE, 1.0);
                 if (gate < 1.0 && rng.nextDouble() > gate) continue;
 
                 // Patches on two scales, leaving about half the ground as ordinary soil.
@@ -82,6 +80,9 @@ public final class SoilProfile {
             }
         }
     }
+
+    /** The share of the painting that runs in quiet country, away from any boundary or plume. */
+    private static final double QUIET_SHARE = 0.35;
 
     /** How active the ground is here: boundary stress, or a plume's strength, whichever is more. */
     private static double setting(ServerLevel model, int x, int z) {

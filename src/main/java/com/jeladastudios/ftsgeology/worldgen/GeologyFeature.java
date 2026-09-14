@@ -53,6 +53,7 @@ public class GeologyFeature extends Feature<NoneFeatureConfiguration> {
             OceanicRidge.generate(level, cp, rng);
             long t2 = System.nanoTime();
             ore = OreGenesis.generate(level, cp);
+            placed += LavaTubes.generate(level, cp);
             long t3 = System.nanoTime();
             GenCost.add(GenCost.DEEP, t1 - t0);
             GenCost.add(GenCost.RIDGE, t2 - t1);

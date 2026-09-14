@@ -142,6 +142,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue UNSUPPORTED_BLOCKS_FALL;   // default ON
     public static final ForgeConfigSpec.BooleanValue FALLING_INCLUDES_BUILDS;   // default ON
     public static final ForgeConfigSpec.BooleanValue QUAKE_CAVE_COLLAPSE;       // cave roofs come down
+    public static final ForgeConfigSpec.BooleanValue QUAKE_PRESERVES_ORES;      // ore stays put in a quake
     public static final ForgeConfigSpec.IntValue CAVE_COLLAPSE_DEPTH;           // how deep a probe looks
     public static final ForgeConfigSpec.IntValue QUAKE_BLOCKS_PER_TICK;    // main-thread apply budget
     public static final ForgeConfigSpec.IntValue QUAKE_WARNING_TICKS;      // alert window before the ground moves
@@ -714,6 +715,11 @@ public final class GeyserConfig {
                         "moves a roof of player blocks, never buries anything standing in a cave, and leaves",
                         "flooded caves and ground under water alone.")
                 .define("quakeCaveCollapse", true);
+        QUAKE_PRESERVES_ORES = b
+                .comment("Leave ore blocks where they are when a quake moves the ground round them. Off by",
+                        "default: a fault really does offset an ore body, which is a known headache in mining.",
+                        "For packs whose ore veins must stay whole.")
+                .define("quakePreservesOres", false);
         CAVE_COLLAPSE_DEPTH = b
                 .comment("How far below the surface, in blocks, a quake looks for caves to bring down.")
                 .defineInRange("caveCollapseDepth", 48, 8, 128);
