@@ -54,12 +54,41 @@ public class GeologyBiomeSource extends BiomeSource {
     @Override
     public Holder<Biome> getNoiseBiome(int qx, int qy, int qz, Climate.Sampler sampler) {
         Holder<Biome> base = parent.getNoiseBiome(qx, qy, qz, sampler);
-        Holder<Biome> ours = roles[GeologyRoles.roleAt(QuartPos.toBlock(qx), QuartPos.toBlock(qz)).ordinal()];
+        Role role = GeologyRoles.roleAt(QuartPos.toBlock(qx), QuartPos.toBlock(qz));
+        Holder<Biome> ours = roles[role.ordinal()];
         if (ours == null) return base;
+        // Every one of ours is a biome of the surface. The same column underground is a cave biome, and putting
+        // a mountainside over it would take the moss out of a lush cave and the city out of the deep dark.
+        if (underground(base)) return base;
+        // The plates decide the rock, never the weather. The bare ones can stand in any climate, but a warm
+        // green valley laid over the tundra would only look wrong, so up there the snow keeps its own biome.
+        if (WARM.contains(role) && frozen(base)) return base;
         boolean sea = base.is(BiomeTags.IS_OCEAN) || base.is(BiomeTags.IS_DEEP_OCEAN);
-        if (ours == roles[Role.OCEANIC_RIDGE.ordinal()]) return sea ? ours : base;
+        if (role == Role.OCEANIC_RIDGE) return sea ? ours : base;
         // The water is the parent's to place: a river, a beach or the sea keeps whatever it was.
         if (sea || base.is(BiomeTags.IS_RIVER) || base.is(BiomeTags.IS_BEACH)) return base;
         return ours;
+    }
+
+    /** The ones of ours that are green and warm, and so out of place under snow. */
+    private static final java.util.EnumSet<Role> WARM =
+            java.util.EnumSet.of(Role.GEOTHERMAL_BASIN, Role.RIFT_VALLEY, Role.ALLUVIAL_PLAIN);
+
+    /**
+     * Whether a biome belongs under the ground. Matched by name, as {@code ThermalBiomes} does, because 1.20
+     * has no tag for it and a terrain mod's own caves should count too.
+     */
+    private static boolean underground(Holder<Biome> biome) {
+        return named(biome, p -> p.contains("cave") || p.contains("deep_dark"));
+    }
+
+    /** Whether a biome is one of the snowy ones. */
+    private static boolean frozen(Holder<Biome> biome) {
+        return named(biome, p -> p.startsWith("snowy") || p.startsWith("frozen") || p.startsWith("ice")
+                || p.equals("grove") || p.equals("jagged_peaks"));
+    }
+
+    private static boolean named(Holder<Biome> biome, java.util.function.Predicate<String> test) {
+        return biome.unwrapKey().map(k -> test.test(k.location().getPath())).orElse(false);
     }
 }
