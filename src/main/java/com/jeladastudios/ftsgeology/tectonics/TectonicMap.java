@@ -152,17 +152,16 @@ public final class TectonicMap {
      * {@link #sample} where exactness matters, such as tracing a rupture.
      */
     public static PlateSample sampleCached(ServerLevel level, int blockX, int blockZ) {
-        long key = ((long) (blockX >> 2) & 0xFFFFFFFFL) | (((long) (blockZ >> 2) & 0xFFFFFFFFL) << 32);
+        long key = com.jeladastudios.ftsgeology.util.ColumnCache.key(blockX >> 2, blockZ >> 2);
         PlateSample hit = SAMPLE_CACHE.get(key);
         if (hit != null) return hit;
         PlateSample s = sample(level, blockX, blockZ);
-        if (SAMPLE_CACHE.size() > SAMPLE_CACHE_MAX) SAMPLE_CACHE.clear();
         SAMPLE_CACHE.put(key, s);
         return s;
     }
 
-    private static final Map<Long, PlateSample> SAMPLE_CACHE = new ConcurrentHashMap<>();
-    private static final int SAMPLE_CACHE_MAX = 60000;
+    private static final com.jeladastudios.ftsgeology.util.ColumnCache<PlateSample> SAMPLE_CACHE =
+            new com.jeladastudios.ftsgeology.util.ColumnCache<>(16);
 
     /** Short human-friendly code for a plate id, for display in commands and tooltips. */
     public static String plateCode(long plateId) {

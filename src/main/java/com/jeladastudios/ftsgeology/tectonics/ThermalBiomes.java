@@ -10,9 +10,9 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.biome.Climate;
 
+import com.jeladastudios.ftsgeology.util.ColumnCache;
+
 import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Recognises ground the world generator already painted as geothermal, such as Terralith's
@@ -83,19 +83,17 @@ public final class ThermalBiomes {
      * whichever asks first. Thermal biomes are hundreds of blocks across, and the map and suitability
      * commands sample tens of thousands of columns at a time.
      */
-    private static final Map<Long, Match> CACHE = new ConcurrentHashMap<>();
-    private static final int CACHE_MAX = 60000;
+    private static final ColumnCache<Match> CACHE = new ColumnCache<>(15);
 
     private static Match lookup(ServerLevel level, int blockX, int blockZ) {
         if (!GeyserConfig.BIOME_ANCHORING.get()) return NONE;
 
         int cellX = blockX >> 4, cellZ = blockZ >> 4;
-        long key = ((long) cellX & 0xFFFFFFFFL) | (((long) cellZ & 0xFFFFFFFFL) << 32);
+        long key = ColumnCache.key(cellX, cellZ);
         Match hit = CACHE.get(key);
         if (hit != null) return hit;
 
         Match found = classify(level, (cellX << 4) + 8, (cellZ << 4) + 8);
-        if (CACHE.size() > CACHE_MAX) CACHE.clear();
         CACHE.put(key, found);
         return found;
     }

@@ -76,6 +76,7 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.hydrology.MeanderScheduler.clear();
         com.jeladastudios.ftsgeology.instrument.SeismicNetwork.clear();
         com.jeladastudios.ftsgeology.command.SiteTeleport.clear();
+        com.jeladastudios.ftsgeology.worldgen.LavaTubes.clear();
         // And quakes still mid-application, so a half-applied rupture cannot write into the next world.
         com.jeladastudios.ftsgeology.quake.Earthquake.cancelAll();
     }
