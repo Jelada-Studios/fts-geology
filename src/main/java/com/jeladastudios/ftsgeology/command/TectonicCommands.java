@@ -131,6 +131,7 @@ public final class TectonicCommands {
                                                                 IntegerArgumentType.getInteger(ctx, "dz"),
                                                                 IntegerArgumentType.getInteger(ctx, "length")))))))
                         .then(Commands.literal("debug")
+                                .then(Commands.literal("cost").executes(TectonicCommands::cost))
                                 .then(Commands.literal("river")
                                         .then(Commands.literal("on").executes(ctx -> riverDebug(ctx, 1)))
                                         .then(Commands.literal("off").executes(ctx -> riverDebug(ctx, 0)))
@@ -162,6 +163,15 @@ public final class TectonicCommands {
         source.sendSuccess(() -> Component.translatable(mode == 1
                 ? "command.fts_geology.debug.river_on" : "command.fts_geology.debug.river_off")
                 .withStyle(ChatFormatting.GREEN), false);
+        return 1;
+    }
+
+    /** /geology debug cost: what world generation has cost the mod since the last time it was asked; then starts again. */
+    static int cost(CommandContext<CommandSourceStack> ctx) {
+        String line = com.jeladastudios.ftsgeology.worldgen.GenCost.summary();
+        com.jeladastudios.ftsgeology.worldgen.GenCost.reset();
+        GeysersMod.LOGGER.info("{}", line);
+        ctx.getSource().sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
         return 1;
     }
 

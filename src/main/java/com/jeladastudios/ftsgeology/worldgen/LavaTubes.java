@@ -84,6 +84,7 @@ public final class LavaTubes {
 
     /** The generator's ground, which every chunk agrees on. */
     private static int base(ServerLevel model, int x, int z) {
+        GenCost.height();
         return model.getChunkSource().getGenerator().getBaseHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG, model,
                 model.getChunkSource().randomState());
     }
