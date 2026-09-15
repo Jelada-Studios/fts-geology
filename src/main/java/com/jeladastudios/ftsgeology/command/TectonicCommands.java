@@ -119,6 +119,12 @@ public final class TectonicCommands {
                         .then(Commands.literal("terrain")
                                 // The generator's ground along a line from here, without loading a chunk.
                                 .then(Commands.literal("here").executes(InspectCommands::terrainHere))
+                                .then(Commands.literal("grid")
+                                        .then(Commands.argument("half", IntegerArgumentType.integer(8, 2000))
+                                                .then(Commands.argument("step", IntegerArgumentType.integer(1, 64))
+                                                        .executes(ctx -> InspectCommands.terrainGrid(ctx,
+                                                                IntegerArgumentType.getInteger(ctx, "half"),
+                                                                IntegerArgumentType.getInteger(ctx, "step"))))))
                                 .then(Commands.literal("ocean")
                                         .then(Commands.argument("radius", IntegerArgumentType.integer(64, 20000))
                                                 .executes(ctx -> InspectCommands.terrainOcean(ctx,

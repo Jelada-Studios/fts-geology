@@ -42,8 +42,8 @@ public final class InspectCommands {
         var state = level.getChunkSource().randomState();
         int step = 8, n = length / step;
         StringBuilder row = new StringBuilder();
-        int max = Integer.MIN_VALUE, min = Integer.MAX_VALUE, sum = 0, high = 0, sea = 0;
-        int sealevel = level.getSeaLevel();
+        int max = Integer.MIN_VALUE, min = Integer.MAX_VALUE, sum = 0, high = 0, sea = 0, steepest = 0, walls = 0;
+        int sealevel = level.getSeaLevel(), previous = Integer.MIN_VALUE;
         for (int i = 0; i <= n; i++) {
             int x = at.getX() + dx * i * step, z = at.getZ() + dz * i * step;
             int y = generator.getBaseHeight(x, z, net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG, level, state);
@@ -52,15 +52,75 @@ public final class InspectCommands {
             max = Math.max(max, y); min = Math.min(min, y); sum += y;
             if (y >= 120) high++;
             if (y < sealevel) sea++;
+            if (previous != Integer.MIN_VALUE) {
+                int rise = Math.abs(y - previous);
+                steepest = Math.max(steepest, rise);
+                if (rise >= 2 * step) walls++;
+            }
+            previous = y;
         }
         final int count = n + 1, fmax = max, fmin = min, fhigh = high, fsea = sea, fdx = dx, fdz = dz;
         final double mean = (double) sum / count;
-        String line = String.format(Locale.ROOT, "terrain from %d,%d along %+d,%+d for %d: max %d, min %d, mean %.1f, above 120: %d blocks, under sea: %d blocks",
-                at.getX(), at.getZ(), fdx, fdz, length, fmax, fmin, mean, fhigh * step, fsea * step);
+        // A wall: two samples eight blocks apart whose ground differs by sixteen or more.
+        String line = String.format(Locale.ROOT, "terrain from %d,%d along %+d,%+d for %d: max %d, min %d, mean %.1f, above 120: %d blocks, under sea: %d blocks, steepest step %d, walls %d",
+                at.getX(), at.getZ(), fdx, fdz, length, fmax, fmin, mean, fhigh * step, fsea * step, steepest, walls);
         source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
         source.sendSuccess(() -> Component.literal(row.toString()).withStyle(ChatFormatting.GRAY), false);
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("terrain heights: {}", row);
+        return 1;
+    }
+
+    /**
+     * The generator's ground on a square grid round here, for the shape of a mountain or a slope: the highest and
+     * lowest ground, how much of the square lies within three blocks of the top (a flat-topped mountain has a lot),
+     * how the high ground spreads, and how many neighbouring samples differ by more than twice their spacing.
+     */
+    static int terrainGrid(CommandContext<CommandSourceStack> ctx, int half, int step) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        var generator = level.getChunkSource().getGenerator();
+        var state = level.getChunkSource().randomState();
+        int n = 2 * (half / step) + 1;
+        int[][] h = new int[n][n];
+        int max = Integer.MIN_VALUE, min = Integer.MAX_VALUE;
+        long sum = 0;
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                int x = at.getX() + (i - n / 2) * step, z = at.getZ() + (j - n / 2) * step;
+                int y = generator.getBaseHeight(x, z, net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG, level, state);
+                h[i][j] = y;
+                max = Math.max(max, y);
+                min = Math.min(min, y);
+                sum += y;
+            }
+        }
+        int nearTop = 0, steep = 0, walls = 0, pairs = 0;
+        int[] bands = new int[8];   // 160-179, 180-199, ... 300-319
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                if (h[i][j] >= max - 3) nearTop++;
+                if (h[i][j] >= 160) bands[Math.min(7, (h[i][j] - 160) / 20)]++;
+                for (int[] d : new int[][] {{1, 0}, {0, 1}}) {
+                    int a = i + d[0], b = j + d[1];
+                    if (a >= n || b >= n) continue;
+                    int rise = Math.abs(h[i][j] - h[a][b]);
+                    pairs++;
+                    if (rise >= step) steep++;
+                    if (rise >= 2 * step) walls++;
+                }
+            }
+        }
+        StringBuilder spread = new StringBuilder();
+        for (int b = 0; b < bands.length; b++) {
+            if (bands[b] > 0) spread.append(' ').append(160 + 20 * b).append('+').append(':').append(bands[b]);
+        }
+        String line = String.format(Locale.ROOT, "terrain grid at %d,%d, half %d every %d: %d samples, max %d, min %d, mean %.1f, within 3 of the top %d, slope 1+ %.1f%%, slope 2+ %.1f%%, high ground%s",
+                at.getX(), at.getZ(), half, step, n * n, max, min, (double) sum / (n * n), nearTop,
+                100.0 * steep / Math.max(1, pairs), 100.0 * walls / Math.max(1, pairs), spread.length() == 0 ? " none" : spread);
+        source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
         return 1;
     }
 
