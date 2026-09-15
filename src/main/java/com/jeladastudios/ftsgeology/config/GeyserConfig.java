@@ -981,8 +981,9 @@ public final class GeyserConfig {
                 .defineInRange("terrainBeltFactor", 2.5D, 0.5D, 10.0D);
         TERRAIN_UPLIFT = b
                 .comment("How high a collision lifts the ground at the boundary, in blocks, before the peaks",
-                        "the ridge noise adds on top.")
-                .defineInRange("terrainUplift", 110.0D, 0.0D, 400.0D);
+                        "the ridge noise adds on top. The crests of a belt get all of it, the passes between them",
+                        "about half; much past 100 and the highest crests reach the top of the terrain and flatten.")
+                .defineInRange("terrainUplift", 80.0D, 0.0D, 400.0D);
         b.pop();
 
         SPEC = b.build();

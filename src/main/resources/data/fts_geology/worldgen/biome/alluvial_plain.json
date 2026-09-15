@@ -9,8 +9,8 @@
   "downfall": 0.55,
   "effects": {
     "fog_color": 12638463,
-    "foliage_color": 7842607,
-    "grass_color": 9551193,
+    "foliage_color": 5151274,
+    "grass_color": 6270524,
     "mood_sound": {
       "block_search_extent": 8,
       "offset": 2.0,
@@ -77,6 +77,7 @@
       "minecraft:trees_plains",
       "minecraft:flower_plains",
       "minecraft:patch_grass_plain",
+      "minecraft:patch_waterlily",
       "minecraft:brown_mushroom_normal",
       "minecraft:red_mushroom_normal",
       "minecraft:patch_sugar_cane",

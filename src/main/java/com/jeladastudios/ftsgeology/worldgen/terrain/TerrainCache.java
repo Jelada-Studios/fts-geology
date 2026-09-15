@@ -7,27 +7,33 @@ import com.jeladastudios.ftsgeology.util.ColumnCache;
 import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyRoles.Role;
 
 /**
- * What the terrain has already worked out about a four-block cell: the plate under it and the role it plays. The
- * density functions and the biome source ask from every generator thread at once, and for the same cell over and
- * over — each column of a chunk asks for the cell it sits in, and the biome source asks again for every level.
- * Kept in {@link ColumnCache}s, for the seed they were worked out for.
+ * What the terrain has already worked out about a four-block cell: the plate under it with its two nearest boundaries,
+ * and the role it plays. The density functions and the biome source ask from every generator thread at once, and for
+ * the same cell over and over — each column of a chunk asks for the cell it sits in, and the biome source asks again
+ * for every level. Kept in {@link ColumnCache}s, for the seed they were worked out for.
  */
 public final class TerrainCache {
 
     private TerrainCache() {}
 
-    private static final ColumnCache<PlateSample> PLATES = new ColumnCache<>(16);
+    private static final ColumnCache<TectonicMap.Edges> PLATES = new ColumnCache<>(16);
     private static final ColumnCache<Role> ROLES = new ColumnCache<>(16);
     private static volatile long forSeed;
 
+    /** The plate against its nearest boundary. */
     public static PlateSample sample(long seed, GeologyParams params, int x, int z) {
+        return edges(seed, params, x, z).first();
+    }
+
+    /** The plate against its nearest boundary and the next nearest. */
+    public static TectonicMap.Edges edges(long seed, GeologyParams params, int x, int z) {
         checkSeed(seed);
         long key = ColumnCache.key(x >> 2, z >> 2);
-        PlateSample hit = PLATES.get(key);
+        TectonicMap.Edges hit = PLATES.get(key);
         if (hit != null) return hit;
-        PlateSample s = TectonicMap.sampleSeeded(seed, x, z, params);
-        PLATES.put(key, s);
-        return s;
+        TectonicMap.Edges e = TectonicMap.sampleSeededEdges(seed, x, z, params);
+        PLATES.put(key, e);
+        return e;
     }
 
     /** The role at a cell, worked out once; {@code decide} is the rule itself. See {@link GeologyRoles}. */

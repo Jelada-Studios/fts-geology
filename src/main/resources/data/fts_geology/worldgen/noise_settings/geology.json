@@ -61,9 +61,9 @@
                         "argument1": {
                           "type": "minecraft:y_clamped_gradient",
                           "from_value": 1.0,
-                          "from_y": 240,
+                          "from_y": 288,
                           "to_value": 0.0,
-                          "to_y": 256
+                          "to_y": 304
                         },
                         "argument2": {
                           "type": "minecraft:add",
@@ -201,9 +201,9 @@
               "argument1": {
                 "type": "minecraft:y_clamped_gradient",
                 "from_value": 1.0,
-                "from_y": 240,
+                "from_y": 288,
                 "to_value": 0.0,
-                "to_y": 256
+                "to_y": 304
               },
               "argument2": {
                 "type": "minecraft:add",
@@ -251,7 +251,7 @@
       "shift_x": "minecraft:shift_x",
       "shift_y": 0.0,
       "shift_z": "minecraft:shift_z",
-      "xz_scale": 0.25,
+      "xz_scale": 0.125,
       "y_scale": 0.0
     },
     "vegetation": {
@@ -260,7 +260,7 @@
       "shift_x": "minecraft:shift_x",
       "shift_y": 0.0,
       "shift_z": "minecraft:shift_z",
-      "xz_scale": 0.25,
+      "xz_scale": 0.125,
       "y_scale": 0.0
     },
     "vein_gap": {

@@ -32,7 +32,7 @@ public record GeologyParams(
     private static final GeologyParams DEFAULTS = new GeologyParams(
             3000.0, 0.8, 220.0, 0.4,
             true, 8500.0, 0.18, 700.0,
-            2.5, 110.0);
+            2.5, 80.0);
 
     /** The numbers with no config behind them: the config's own defaults, for tests and tools. */
     public static GeologyParams defaults() {

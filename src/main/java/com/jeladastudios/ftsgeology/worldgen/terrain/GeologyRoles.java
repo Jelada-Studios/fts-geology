@@ -50,8 +50,12 @@ public final class GeologyRoles {
     private static final double BASIN_PLUME = 0.30;
     /** How far the arc's ribbon reaches, and how deep into a belt its core goes; see {@link PlateSample#onArc}. */
     private static final double ARC_FROM = 0.25, ARC_TO = 0.75, BELT_CORE = 0.55;
-    /** How wide a rift floor is, how far a ridge reaches, and how far a belt's sediment goes, in fault widths. */
-    private static final double GRABEN_TO = 0.35, RIDGE_TO = 0.9, APRON_OVER = 1.6;
+    /** How wide a rift floor is and how far a ridge reaches, in fault widths. */
+    private static final double GRABEN_TO = 0.35, RIDGE_TO = TerrainFields.RIDGE_HALF;
+    /** How deep into a floodplain ({@link TerrainFields#apron}) the plain begins. */
+    private static final double APRON_CORE = 0.25;
+    /** How far the border between two kinds of ground wanders, in fault widths or belt grip. */
+    private static final double EDGE = 0.05;
 
     /**
      * Which role belongs at a column. Kept in {@link TerrainCache}: the answer does not depend on height, and a
@@ -68,23 +72,23 @@ public final class GeologyRoles {
         double a = TerrainFields.across(s, p);
         boolean oceanic = s.plateKind().isOceanic();
         boolean margin = oceanic != s.neighbourKind().isOceanic();
+        // Borders between one kind of ground and the next wander, as vanilla's own biome edges do, instead of
+        // following a line a set distance from the boundary.
+        double j = EDGE * TerrainFields.jitter(seed, x, z);
 
         // New sea floor, rising out of the abyss along the line where two ocean plates part.
         if (oceanic) {
-            return !margin && k == FaultType.DIVERGENT && a < RIDGE_TO ? Role.OCEANIC_RIDGE : Role.NONE;
+            return !margin && k == FaultType.DIVERGENT && a < RIDGE_TO + j ? Role.OCEANIC_RIDGE : Role.NONE;
         }
 
         double erosion = TerrainFields.field(Field.EROSION, seed, p, x, z);
         // A plume's basin: wide, flat, and hot underneath, whatever the boundary nearest it happens to be doing.
         if (HotspotMap.plumeStrength(seed, x, z, p) >= BASIN_PLUME && erosion > FLAT) return Role.GEOTHERMAL_BASIN;
-        if (k == FaultType.DIVERGENT && a < GRABEN_TO) return Role.RIFT_VALLEY;
-        if (s.overridingSide() && a >= ARC_FROM && a <= ARC_TO) return Role.VOLCANIC_HIGHLAND;
-        if (k == FaultType.CONVERGENT_COLLISION && TerrainFields.belt(s, p) > BELT_CORE) return Role.OROGENIC_HIGHLAND;
-        // The apron of sediment a belt sheds just beyond its mountains: flat, low, and the coal country. It lies
-        // on the side that is being pushed down and so kept low, which is where the coal basins are too: under
-        // the thrust in a collision, behind the arc at a subduction margin.
-        boolean foreland = k == FaultType.CONVERGENT_COLLISION ? s.downGoing() : s.overridingSide();
-        if (foreland && a > p.beltFactor() && a < p.beltFactor() * APRON_OVER) return Role.ALLUVIAL_PLAIN;
+        if (k == FaultType.DIVERGENT && a < GRABEN_TO + j) return Role.RIFT_VALLEY;
+        if (s.overridingSide() && a >= ARC_FROM + j && a <= ARC_TO + j) return Role.VOLCANIC_HIGHLAND;
+        if (k == FaultType.CONVERGENT_COLLISION && TerrainFields.belt(s, p) > BELT_CORE + j) return Role.OROGENIC_HIGHLAND;
+        // The apron of sediment a belt sheds beyond its mountains: flat, low, and the coal country.
+        if (TerrainFields.apron(s, p) > APRON_CORE + 2 * j) return Role.ALLUVIAL_PLAIN;
         return Role.NONE;
     }
 }

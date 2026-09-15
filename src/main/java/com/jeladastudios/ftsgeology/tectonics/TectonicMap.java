@@ -62,8 +62,26 @@ public final class TectonicMap {
         return rand01(mix(plateId ^ seed ^ 0x0CEA4L)) < params.oceanShare() ? PlateKind.OCEANIC : PlateKind.CONTINENTAL;
     }
 
+    /**
+     * A column's plate against its nearest boundary and against the next nearest. The terrain blends the two where
+     * they are almost as near, so the ground does not jump along the line where one boundary hands over to another.
+     *
+     * @param gap how much further away the second boundary is, in blocks
+     */
+    public record Edges(PlateSample first, PlateSample second, double gap) {}
+
+    /** Both boundaries from the seed alone, as the terrain generator asks for them. */
+    public static Edges sampleSeededEdges(long seed, int blockX, int blockZ, GeologyParams params) {
+        return computeEdges(seed, blockX, blockZ, null, params, true);
+    }
+
     /** @param biomes the level whose biomes decide each plate's crust, or null for the seed to decide */
     private static PlateSample compute(long seed, int blockX, int blockZ, ServerLevel biomes, GeologyParams params) {
+        return computeEdges(seed, blockX, blockZ, biomes, params, false).first();
+    }
+
+    private static Edges computeEdges(long seed, int blockX, int blockZ, ServerLevel biomes, GeologyParams params,
+                                      boolean withSecond) {
         double scale = params.plateScale();
         double jitter = params.plateJitter();
         double faultWidth = params.faultWidth();
@@ -95,10 +113,10 @@ public final class TectonicMap {
         //    is the perpendicular bisector between two centres, so the distance to the nearest edge
         //    is the smallest distance to any of those bisectors. That is exact, unlike the common
         //    second-nearest-minus-nearest approximation, which bulges where three plates meet.
-        double nearestEdge = Double.MAX_VALUE;
+        double nearestEdge = Double.MAX_VALUE, secondEdge = Double.MAX_VALUE;
         double nx = 1, nz = 0;                 // unit normal across that nearest boundary
-        long neighbourId = plateId;
-        int ngx = bgx, ngz = bgz;
+        double mx = 1, mz = 0;                 // and across the second nearest
+        int ngx = bgx, ngz = bgz, sgx = bgx, sgz = bgz;
         for (int ox = -2; ox <= 2; ox++) {
             for (int oz = -2; oz <= 2; oz++) {
                 int cx = bgx + ox, cz = bgz + oz;
@@ -115,15 +133,32 @@ public final class TectonicMap {
                 // positive perpendicular distance to that edge.
                 double d = -((px - midX) * ux + (pz - midZ) * uz);
                 if (d < nearestEdge) {
+                    secondEdge = nearestEdge;
+                    mx = nx; mz = nz; sgx = ngx; sgz = ngz;
                     nearestEdge = d;
                     nx = ux; nz = uz;
-                    neighbourId = plateId(seed, cx, cz);
                     ngx = cx; ngz = cz;
+                } else if (d < secondEdge) {
+                    secondEdge = d;
+                    mx = ux; mz = uz; sgx = cx; sgz = cz;
                 }
             }
         }
         double faultDistance = Math.max(0.0, nearestEdge);
 
+        PlateKind kind = biomes == null ? seededKind(seed, plateId, params) : plateKind(biomes, seed, bgx, bgz, scale, jitter);
+        PlateSample first = boundary(seed, plateId, kind, ngx, ngz, faultDistance, nx, nz, biomes, params);
+        if (!withSecond || secondEdge == Double.MAX_VALUE || (sgx == bgx && sgz == bgz)) {
+            return new Edges(first, first, Double.MAX_VALUE);
+        }
+        PlateSample second = boundary(seed, plateId, kind, sgx, sgz, Math.max(0.0, secondEdge), mx, mz, biomes, params);
+        return new Edges(first, second, second.faultDistance() - first.faultDistance());
+    }
+
+    /** A column's plate against one of its boundaries, the plate across it lying in grid cell (ngx, ngz). */
+    private static PlateSample boundary(long seed, long plateId, PlateKind kind, int ngx, int ngz, double faultDistance,
+                                        double nx, double nz, ServerLevel biomes, GeologyParams params) {
+        long neighbourId = plateId(seed, ngx, ngz);
         // 3. Plate drift, and therefore what this boundary is doing.
         double[] vA = plateVelocity(seed, plateId);
         double[] vB = plateVelocity(seed, neighbourId);
@@ -133,12 +168,13 @@ public final class TectonicMap {
         double convergence = -(relX * nx + relZ * nz);
         double shear = Math.abs(relX * nz - relZ * nx);
 
-        PlateKind kind = biomes == null ? seededKind(seed, plateId, params) : plateKind(biomes, seed, bgx, bgz, scale, jitter);
-        PlateKind neighbourKind = biomes == null ? seededKind(seed, neighbourId, params) : plateKind(biomes, seed, ngx, ngz, scale, jitter);
+        PlateKind neighbourKind = biomes == null ? seededKind(seed, neighbourId, params)
+                : plateKind(biomes, seed, ngx, ngz, params.plateScale(), params.plateJitter());
 
         // 4. What the boundary is doing, and how hard, are PlateSample's own answers, so the terrain, which
         //    reaches past the fault zone, and the features, which do not, can never disagree about either. The
         //    sample is built once without them and then again with what it said about itself.
+        double faultWidth = params.faultWidth();
         PlateSample bare = new PlateSample(plateId, kind, vA[0], vA[1], neighbourId, neighbourKind,
                 FaultType.INTERIOR, faultDistance, convergence, shear, nx, nz, 0.0);
         double stress = bare.belt(faultWidth, 1.0);

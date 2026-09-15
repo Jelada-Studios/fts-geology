@@ -74,21 +74,37 @@ public class GeologyBiomeSource extends BiomeSource {
     private static final java.util.EnumSet<Role> WARM =
             java.util.EnumSet.of(Role.GEOTHERMAL_BASIN, Role.RIFT_VALLEY, Role.ALLUVIAL_PLAIN);
 
-    /**
-     * Whether a biome belongs under the ground. Matched by name, as {@code ThermalBiomes} does, because 1.20
-     * has no tag for it and a terrain mod's own caves should count too.
-     */
-    private static boolean underground(Holder<Biome> biome) {
-        return named(biome, p -> p.contains("cave") || p.contains("deep_dark"));
+    /** Whether a biome belongs under the ground. See {@link #kindOf}. */
+    private boolean underground(Holder<Biome> biome) {
+        return (kindOf(biome) & UNDERGROUND) != 0;
     }
 
     /** Whether a biome is one of the snowy ones. */
-    private static boolean frozen(Holder<Biome> biome) {
-        return named(biome, p -> p.startsWith("snowy") || p.startsWith("frozen") || p.startsWith("ice")
-                || p.equals("grove") || p.equals("jagged_peaks"));
+    private boolean frozen(Holder<Biome> biome) {
+        return (kindOf(biome) & FROZEN) != 0;
     }
 
-    private static boolean named(Holder<Biome> biome, java.util.function.Predicate<String> test) {
-        return biome.unwrapKey().map(k -> test.test(k.location().getPath())).orElse(false);
+    private static final int UNDERGROUND = 1, FROZEN = 2;
+
+    /** What each biome the parent hands back is, worked out once per biome rather than for every quarter-block. */
+    private final java.util.Map<Holder<Biome>, Integer> kinds = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Matched by name, as {@code ThermalBiomes} does, because 1.20 has no tag for caves and a terrain mod's own caves
+     * and snow should count too.
+     */
+    private int kindOf(Holder<Biome> biome) {
+        Integer known = kinds.get(biome);
+        if (known != null) return known;
+        int kind = biome.unwrapKey().map(k -> {
+            String p = k.location().getPath();
+            int bits = 0;
+            if (p.contains("cave") || p.contains("deep_dark")) bits |= UNDERGROUND;
+            if (p.startsWith("snowy") || p.startsWith("frozen") || p.startsWith("ice")
+                    || p.equals("grove") || p.equals("jagged_peaks")) bits |= FROZEN;
+            return bits;
+        }).orElse(0);
+        kinds.put(biome, kind);
+        return kind;
     }
 }
