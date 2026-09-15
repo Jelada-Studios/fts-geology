@@ -769,6 +769,9 @@ public final class VolcanoField {
         // The centre, then eight points half way out and eight at the foot.
         int[] ground = new int[17];
         int[] wet = new int[3];
+        boolean[][] wetAt = new boolean[3][8];
+        boolean[] riverAt = new boolean[8];
+        int rivers = 0;
         int n = 0;
         int wetMid = type == VolcanoType.SHIELD ? 4 : 2;
         for (int ring = 0; ring <= 2; ring++) {
@@ -780,11 +783,22 @@ public final class VolcanoField {
                 int pz = z + (int) Math.round(Math.sin(a) * r);
                 int surface = gen.getBaseHeight(px, pz, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
                 int floor = gen.getBaseHeight(px, pz, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
-                // Only deep water counts: a river or a shallow lake under the body is built over, as real
-                // volcanoes stand by rivers. In a world full of rivers, counting every one left no site at all.
+                // Only deep water counts here: a shallow lake under the body is built over.
                 if (surface - floor >= DEEP_WATER) {
                     if (ring == 0) return refuse(refused, type, WATER, x, z, "centre in water");
                     wet[ring]++;
+                    wetAt[ring][i] = true;
+                }
+                // A river through the body would be dammed by the mountain, and the ground it cut shows through the
+                // cone as stripes. Volcanoes stand by rivers, not across them: a river at the centre, one crossing
+                // from side to side, or one winding through much of the body refuses the site; a river lapping one
+                // side is built round, and out at the foot the apron only laps one.
+                if (ring < 2 && gen.getBiomeSource().getNoiseBiome(net.minecraft.core.QuartPos.fromBlock(px),
+                        net.minecraft.core.QuartPos.fromBlock(sea), net.minecraft.core.QuartPos.fromBlock(pz), rs.sampler())
+                        .is(net.minecraft.tags.BiomeTags.IS_RIVER)) {
+                    if (ring == 0) return refuse(refused, type, WATER, x, z, "river under the centre");
+                    riverAt[i] = true;
+                    rivers++;
                 }
                 ground[n++] = floor - 1;
             }
@@ -792,6 +806,15 @@ public final class VolcanoField {
             // since the apron carries on under water as a thin skin. A volcano half in the sea is a job for
             // the ocean volcanoes, not this. A body already too wet is refused before its foot is sampled.
             if (ring == 1 && wet[1] > wetMid) return refuse(refused, type, WATER, x, z, "wet " + wet[1] + " mid");
+            if (ring == 1) {
+                boolean crossing = false;
+                for (int b = 0; b < 4; b++) crossing |= riverAt[b] && riverAt[b + 4];
+                if (crossing || rivers >= 3) return refuse(refused, type, WATER, x, z, "river through the body");
+            }
+            // Deep water on opposite sides is a lake or a river valley the mountain would fill from shore to shore.
+            for (int b = 0; ring > 0 && b < 4; b++) {
+                if (wetAt[ring][b] && wetAt[ring][b + 4]) return refuse(refused, type, WATER, x, z, "water either side");
+            }
         }
         if (wet[2] > 6) return refuse(refused, type, WATER, x, z, "wet " + wet[2] + " foot");
 
