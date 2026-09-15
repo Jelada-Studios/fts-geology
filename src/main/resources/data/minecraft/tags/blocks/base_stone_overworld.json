@@ -1,0 +1,16 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:gneiss",
+    "fts_geology:schist",
+    "fts_geology:slate",
+    "fts_geology:marble",
+    "fts_geology:quartzite",
+    "fts_geology:shale",
+    "fts_geology:chert",
+    "fts_geology:serpentinite",
+    "fts_geology:gabbro",
+    "fts_geology:peridotite",
+    "fts_geology:rhyolite"
+  ]
+}

@@ -184,6 +184,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue OCEAN_SHARE;           // share of plates that are oceanic (own terrain)
     public static final ForgeConfigSpec.DoubleValue TERRAIN_BELT_FACTOR;   // mountain belt width, in fault widths
     public static final ForgeConfigSpec.DoubleValue TERRAIN_UPLIFT;        // blocks a collision lifts the ground
+    public static final ForgeConfigSpec.BooleanValue LITHOLOGY;           // rock sequences under the ground (own terrain)
     public static final ForgeConfigSpec.DoubleValue RIVER_MIGRATION_SCALE; // how far a bend shifts, per curvature
 
     // --- Instruments ---------------------------------------------------------
@@ -984,6 +985,11 @@ public final class GeyserConfig {
                         "the ridge noise adds on top. The crests of a belt get all of it, the passes between them",
                         "about half; much past 100 and the highest crests reach the top of the terrain and flatten.")
                 .defineInRange("terrainUplift", 80.0D, 0.0D, 400.0D);
+        LITHOLOGY = b
+                .comment("Lay the rock the plates imply under the ground: a platform's beds over its basement, a fold",
+                        "belt's gneiss and marble, an arc's ash over its plutons. Off leaves plain stone, and chunks",
+                        "generate a little faster.")
+                .define("lithology", true);
         b.pop();
 
         SPEC = b.build();

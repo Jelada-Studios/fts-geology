@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "minecraft:basalt",
+    "minecraft:smooth_basalt",
+    "minecraft:blackstone"
+  ]
+}

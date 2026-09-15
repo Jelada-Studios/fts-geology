@@ -44,7 +44,11 @@ public class GeologyFeature extends Feature<NoneFeatureConfiguration> {
             if (!GeyserConfig.GEOLOGY_AT_GENERATION.get()) return false;
             long t0 = System.nanoTime();
             DeepStructure.Report report = new DeepStructure.Report();
-            DeepStructure.generate(level, cp, report);
+            // In the mod's own world type the rock went down with the ground (LithologyRule); this is for worlds made
+            // without it.
+            if (!com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level.getLevel())) {
+                DeepStructure.generate(level, cp, report);
+            }
             placed = report.blocks;
             long t1 = System.nanoTime();
             // The seed retrogen uses, so a ridge comes out the same whichever path built it.
