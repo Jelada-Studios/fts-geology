@@ -124,6 +124,135 @@ public final class InspectCommands {
         return 1;
     }
 
+    /**
+     * The biomes the generator would pick on a square grid round here, asked above the ground so no cave biome
+     * answers: each biome's share of the samples, and how far a biome runs along the grid's rows and columns before
+     * the next one starts, on average, which is how large the patches are. Loads no chunk.
+     */
+    static int terrainBiomes(CommandContext<CommandSourceStack> ctx, int half, int step) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        int n = 2 * (half / step) + 1;
+        if ((long) n * n > 250_000) {
+            source.sendFailure(Component.literal("Too many samples: " + (long) n * n + ", keep it under 250000"));
+            return 0;
+        }
+        var biomes = level.getChunkSource().getGenerator().getBiomeSource();
+        var sampler = level.getChunkSource().randomState().sampler();
+        int qy = net.minecraft.core.QuartPos.fromBlock(level.getMaxBuildHeight() - 16);
+        String[][] name = new String[n][n];
+        boolean[][] land = new boolean[n][n];
+        int[][] bands = new int[n][n];
+        java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                int x = at.getX() + (i - n / 2) * step, z = at.getZ() + (j - n / 2) * step;
+                int qx = net.minecraft.core.QuartPos.fromBlock(x), qz = net.minecraft.core.QuartPos.fromBlock(z);
+                var biome = biomes.getNoiseBiome(qx, qy, qz, sampler);
+                bands[i][j] = bands(sampler.sample(qx, qy, qz));
+                String b = biome.unwrapKey().map(k -> k.location().toString().replace("minecraft:", "")).orElse("?");
+                name[i][j] = b;
+                land[i][j] = !(biome.is(net.minecraft.tags.BiomeTags.IS_OCEAN) || biome.is(net.minecraft.tags.BiomeTags.IS_DEEP_OCEAN)
+                        || biome.is(net.minecraft.tags.BiomeTags.IS_RIVER) || biome.is(net.minecraft.tags.BiomeTags.IS_BEACH));
+                counts.merge(b, 1, Integer::sum);
+            }
+        }
+        int changes = 0;
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j + 1 < n; j++) {
+                if (!name[i][j].equals(name[i][j + 1])) changes++;
+                if (!name[j][i].equals(name[j + 1][i])) changes++;
+            }
+        }
+        // Every sample lies on one row and one column; each line starts one run and every change starts another.
+        double run = (double) step * 2 * n * n / (2 * n + changes);
+        // The same over the land alone, stepping across rivers, beaches and the sea, which cut every line every few
+        // hundred blocks whatever the size of the patches either side.
+        long landSamples = 0, landRuns = 0, landChanges = 0, landSteps = 0, noBand = 0, ours = 0;
+        long[] byParameter = new long[BAND_NAMES.length], everyStep = new long[BAND_NAMES.length];
+        for (int line = 0; line < 2 * n; line++) {
+            String previous = null;
+            int previousBands = 0;
+            for (int k = 0; k < n; k++) {
+                int i = line < n ? line : k, j = line < n ? k : line - n;
+                if (!land[i][j]) continue;
+                landSamples++;
+                // How often each parameter crosses a band on any step over the land, biome change or not: a
+                // parameter that crosses on most steps anyway is not what makes the biomes change.
+                if (previous != null) {
+                    landSteps++;
+                    for (int p = 0; p < BAND_NAMES.length; p++) {
+                        if (crossed(previousBands, bands[i][j], p)) everyStep[p]++;
+                    }
+                }
+                if (!name[i][j].equals(previous)) {
+                    landRuns++;
+                    if (previous != null) {
+                        // Which climate parameters crossed a band of the biome table between the two samples.
+                        landChanges++;
+                        boolean any = false;
+                        for (int p = 0; p < BAND_NAMES.length; p++) {
+                            if (crossed(previousBands, bands[i][j], p)) {
+                                byParameter[p]++;
+                                any = true;
+                            }
+                        }
+                        if (!any) noBand++;
+                        if (previous.startsWith("fts_geology:") || name[i][j].startsWith("fts_geology:")) ours++;
+                    }
+                }
+                previous = name[i][j];
+                previousBands = bands[i][j];
+            }
+        }
+        double landRun = landRuns == 0 ? 0.0 : (double) step * landSamples / landRuns;
+        StringBuilder why = new StringBuilder();
+        for (int p = 0; p < BAND_NAMES.length; p++) {
+            why.append(String.format(Locale.ROOT, " %s %.0f/%.0f%%,", BAND_NAMES[p], 100.0 * byParameter[p] / Math.max(1, landChanges),
+                    100.0 * everyStep[p] / Math.max(1, landSteps)));
+        }
+        StringBuilder top = new StringBuilder();
+        final int total = n * n;
+        counts.entrySet().stream().sorted((a, b) -> b.getValue() - a.getValue()).limit(16).forEach(e ->
+                top.append(String.format(Locale.ROOT, "%s %s %.1f%%", top.length() == 0 ? "" : ",", e.getKey(),
+                        100.0 * e.getValue() / total)));
+        String line = String.format(Locale.ROOT, "terrain biomes at %d,%d, half %d every %d: %d samples, %d biomes, mean run %.0f blocks, on land %.0f; land changes %d of %d steps, band crossed (at a change/on any step):%s none %.0f%%, one of ours %.0f%%;%s",
+                at.getX(), at.getZ(), half, step, total, counts.size(), run, landRun, landChanges, landSteps, why,
+                100.0 * noBand / Math.max(1, landChanges), 100.0 * ours / Math.max(1, landChanges), top);
+        source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
+        return 1;
+    }
+
+    /** The parameters of the overworld biome table, and the edges of its bands: a biome only changes across one. */
+    private static final String[] BAND_NAMES = {"temperature", "humidity", "continentalness", "erosion", "weirdness"};
+    private static final float[][] BAND_EDGES = {
+            {-0.45F, -0.15F, 0.2F, 0.55F},
+            {-0.35F, -0.1F, 0.1F, 0.3F},
+            {-1.05F, -0.455F, -0.19F, -0.11F, 0.03F, 0.3F},
+            {-0.78F, -0.375F, -0.2225F, 0.05F, 0.45F, 0.55F},
+            {-0.93333334F, -0.7666667F, -0.56666666F, -0.4F, -0.26666668F, -0.05F, 0.05F, 0.26666668F, 0.4F,
+                    0.56666666F, 0.7666667F, 0.93333334F}};
+
+    /** Whether two samples lie in different bands of parameter {@code p}. */
+    private static boolean crossed(int a, int b, int p) {
+        return ((a ^ b) >> (3 * p) & (p == 4 ? 15 : 7)) != 0;
+    }
+
+    /** A sample's band in each parameter, three bits apiece and four for weirdness's thirteen slices. */
+    private static int bands(net.minecraft.world.level.biome.Climate.TargetPoint t) {
+        long[] v = {t.temperature(), t.humidity(), t.continentalness(), t.erosion(), t.weirdness()};
+        int packed = 0;
+        for (int p = 0; p < v.length; p++) {
+            float value = net.minecraft.world.level.biome.Climate.unquantizeCoord(v[p]);
+            int band = 0;
+            for (float edge : BAND_EDGES[p]) if (value >= edge) band++;
+            packed |= band << (3 * p);
+        }
+        return packed;
+    }
+
     /** The plate density fields at this column, as the terrain generator sees them, and the seeds in play. */
     static int terrainHere(CommandContext<CommandSourceStack> ctx) {
         CommandSourceStack source = ctx.getSource();

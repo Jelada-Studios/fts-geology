@@ -115,7 +115,7 @@ public final class TectonicCommands {
                                                 .executes(ctx -> place(ctx,
                                                         StringArgumentType.getString(ctx, "feature"),
                                                         IntegerArgumentType.getInteger(ctx, "stage"))))))
-                        // The river debug view: what the survey knows around a player, drawn on their screen.
+                        // The terrain and the biomes the generator makes, measured without loading a chunk.
                         .then(Commands.literal("terrain")
                                 // The generator's ground along a line from here, without loading a chunk.
                                 .then(Commands.literal("here").executes(InspectCommands::terrainHere))
@@ -123,6 +123,12 @@ public final class TectonicCommands {
                                         .then(Commands.argument("half", IntegerArgumentType.integer(8, 2000))
                                                 .then(Commands.argument("step", IntegerArgumentType.integer(1, 64))
                                                         .executes(ctx -> InspectCommands.terrainGrid(ctx,
+                                                                IntegerArgumentType.getInteger(ctx, "half"),
+                                                                IntegerArgumentType.getInteger(ctx, "step"))))))
+                                .then(Commands.literal("biomes")
+                                        .then(Commands.argument("half", IntegerArgumentType.integer(64, 16000))
+                                                .then(Commands.argument("step", IntegerArgumentType.integer(16, 1024))
+                                                        .executes(ctx -> InspectCommands.terrainBiomes(ctx,
                                                                 IntegerArgumentType.getInteger(ctx, "half"),
                                                                 IntegerArgumentType.getInteger(ctx, "step"))))))
                                 .then(Commands.literal("ocean")
