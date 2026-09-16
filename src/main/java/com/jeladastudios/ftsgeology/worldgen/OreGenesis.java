@@ -12,6 +12,7 @@ import com.jeladastudios.ftsgeology.tectonics.FaultType;
 import com.jeladastudios.ftsgeology.tectonics.HotspotMap;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
 import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
+import com.jeladastudios.ftsgeology.worldgen.lithology.Lithology;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
@@ -79,6 +80,14 @@ public final class OreGenesis {
         final int x0, z0;
         final int[] ground = new int[256];
         int placed;
+        /**
+         * On the mod's own world type the rock under the ground comes from {@link Lithology}, and a deposit sits where
+         * that rock says its geology is: a stock at the top of a pluton, a skarn in a marble band, a lens in the rift's
+         * fill. On any other world type there is no such model and the deposits keep to the plates alone.
+         */
+        final boolean own;
+        final long rockSeed;
+        final com.jeladastudios.ftsgeology.tectonics.GeologyParams params;
 
         Deposit(WorldGenLevel level, ChunkPos cp) {
             this.level = level;
@@ -87,6 +96,22 @@ public final class OreGenesis {
             this.x0 = cp.getMinBlockX();
             this.z0 = cp.getMinBlockZ();
             Arrays.fill(ground, UNREAD);
+            this.own = com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(world);
+            this.rockSeed = own ? com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed() : 0L;
+            this.params = own ? com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params() : null;
+        }
+
+        /** The rock column the lithology model gives a point, or null off the own world type. */
+        com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.Column column(int x, int z) {
+            return own ? com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.column(rockSeed, params, x, z) : null;
+        }
+
+        /**
+         * The ground at a deposit's anchor, which may lie outside this chunk. Always the generator's ground, never the
+         * chunk's own heightmap, so every chunk a deposit reaches puts it at the same height. Own world type only.
+         */
+        int base(int x, int z) {
+            return anchorGround(world, x, z);
         }
 
         boolean inside(int x, int z) {
@@ -128,6 +153,42 @@ public final class OreGenesis {
         int maxX(int to) { return Math.min(x0 + 15, to); }
         int minZ(int from) { return Math.max(z0, from); }
         int maxZ(int to) { return Math.min(z0 + 15, to); }
+    }
+
+    /**
+     * The generator's ground at the deposits' anchors, kept for the world: every chunk a deposit reaches asks for it,
+     * and on the own world type each answer is a whole noise column. Dropped when the world stops.
+     */
+    private static final com.jeladastudios.ftsgeology.util.ColumnCache<Integer> ANCHOR_GROUND =
+            new com.jeladastudios.ftsgeology.util.ColumnCache<>(16);
+    private static volatile ServerLevel anchorsFor;
+
+    private static int anchorGround(ServerLevel world, int x, int z) {
+        if (world != anchorsFor) {
+            synchronized (ANCHOR_GROUND) {
+                if (world != anchorsFor) {
+                    ANCHOR_GROUND.clear();
+                    anchorsFor = world;
+                }
+            }
+        }
+        long key = com.jeladastudios.ftsgeology.util.ColumnCache.key(x, z);
+        Integer known = ANCHOR_GROUND.get(key);
+        if (known != null) return known;
+        GenCost.height();
+        int g = world.getChunkSource().getGenerator().getBaseHeight(x, z,
+                net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, world,
+                world.getChunkSource().randomState());
+        ANCHOR_GROUND.put(key, g);
+        return g;
+    }
+
+    /** Drops the anchor grounds kept for a world that has stopped. */
+    public static void clear() {
+        synchronized (ANCHOR_GROUND) {
+            ANCHOR_GROUND.clear();
+            anchorsFor = null;
+        }
     }
 
     @FunctionalInterface
@@ -177,12 +238,16 @@ public final class OreGenesis {
                 if (perColumn && TectonicMap.sampleCached(d.world, x, z).stress()
                         > 0.62 + 0.16 * noise(x + 1301, z - 1301, 48.0)) continue;
                 if (!coalBasin(d, x, z)) continue;
+                // On the own world type a seam belongs in the sedimentary cover: where the basement comes up under
+                // its level the seam pinches out, as at the edge of a real coalfield.
+                Lithology.Column col = d.column(x, z);
+                int cover = col == null ? Integer.MAX_VALUE : Lithology.coverDepth(col);
 
                 // The upper seam: a buried delta swamp around Y=32, under a shale roof.
                 if (noise(x, z, 80.0) > -0.25) {
                     int y = (int) Math.round(32.0 + 8.0 * Math.sin(x * 0.0075) + 6.0 * Math.cos(z * 0.0069)
                             + 1.5 * Math.sin(x * 0.2) + 1.5 * Math.cos(z * 0.2));
-                    if (y < ground - 5 && y > d.level.getMinBuildHeight() + 10) {
+                    if (y < ground - 5 && y > d.level.getMinBuildHeight() + 10 && ground - y < cover) {
                         d.set(x, y + 1, z, ModBlocks.SHALE.get(), 4);
                         d.set(x, y, z, Blocks.COAL_ORE, 4);
                         d.set(x, y - 1, z, roll(x, y, z, 3) == 0 ? Blocks.COAL_ORE : ModBlocks.SHALE.get(), 4);
@@ -198,7 +263,7 @@ public final class OreGenesis {
                 // Ironstone: a thin oolitic horizon around Y=18, with grains of ore scattered through it.
                 if (noise(x - 4099, z + 4099, 48.0) > 0.35 && roll(x, 18, z, 3) == 0) {
                     int y = (int) Math.round(18.0 + 3.0 * Math.sin(z * 0.011) + 2.0 * Math.cos(x * 0.009));
-                    if (ground > y + 6) d.set(x, y, z, Blocks.IRON_ORE, 4);
+                    if (ground > y + 6 && ground - y < cover) d.set(x, y, z, Blocks.IRON_ORE, 4);
                 }
             }
         }
@@ -322,8 +387,15 @@ public final class OreGenesis {
             // Around the arc root on the overriding plate, not out on the fore-arc and never on the plate going under.
             if (s.downGoing() || s.faultDistance() / GeyserConfig.FAULT_WIDTH.get() > 0.65) return;
 
-            int ay = d.level.getMinBuildHeight() + 24 + (int) (die(h, 3) * 50);
             double core = 4.5 + die(h, 4) * 3.0;
+            int ay = d.level.getMinBuildHeight() + 24 + (int) (die(h, 3) * 50);
+            Lithology.Column col = d.column(ax, az);
+            if (col != null) {
+                // A stock is the apex of the pluton that fed it: no pluton under the arc here, no stock.
+                if (col.setting() != Lithology.Setting.ARC || !Lithology.hasPluton(col)) return;
+                ay = d.base(ax, az) - col.plutonTop() - (int) Math.ceil(core);
+                if (ay < d.level.getMinBuildHeight() + 24) return;
+            }
             double shell = core + 5.0 + die(h, 5) * 3.0;
             double stretch = 1.4;                       // a stock stands taller than it is wide
             int ext = (int) Math.ceil(shell) + 1;
@@ -405,6 +477,15 @@ public final class OreGenesis {
             double slope = 0.45 + die(h, 5) * 0.4;
             double side = die(h, 6) < 0.5 ? -1.0 : 1.0;
             int ay = d.level.getMinBuildHeight() + 20 + (int) (die(h, 7) * 64);
+            Lithology.Column col = d.column(ax, az);
+            if (col != null) {
+                // In the belt's metamorphic bands, above the granite core they wrap round.
+                if (col.setting() != Lithology.Setting.FOLD_BELT) return;
+                int ground = d.base(ax, az), top = ground - 24;
+                int floor = Lithology.hasPluton(col) ? ground - col.plutonTop() + 4 : d.level.getMinBuildHeight() + 20;
+                if (top - floor < 8) return;
+                ay = floor + (int) (die(h, 7) * (top - floor));
+            }
             int shoots = (int) (h & 0xFFF);
 
             int ext = half + (int) Math.ceil(run) + 2;
@@ -438,6 +519,23 @@ public final class OreGenesis {
             PlateSample s = TectonicMap.sampleCached(d.world, ax, az);
             if (s.faultType() != FaultType.CONVERGENT_COLLISION || s.stress() < 0.2) return;
             int ay = d.level.getMinBuildHeight() + 12 + (int) (die(h, 3) * 60);
+            Lithology.Column col = d.column(ax, az);
+            if (col != null) {
+                // A skarn is a marble band an intrusion cooked: the pod goes in the nearest one, or nowhere.
+                if (col.setting() != Lithology.Setting.FOLD_BELT) return;
+                int ground = d.base(ax, az), found = Integer.MIN_VALUE;
+                for (int off = 0; off <= 30 && found == Integer.MIN_VALUE; off++) {
+                    for (int y : new int[] {ay - off, ay + off}) {
+                        if (y <= d.level.getMinBuildHeight() + 8 || y > ground - 8) continue;
+                        if (Lithology.rockAt(d.rockSeed, col, ax, y, az, ground) == Lithology.Rock.MARBLE) {
+                            found = y;
+                            break;
+                        }
+                    }
+                }
+                if (found == Integer.MIN_VALUE) return;
+                ay = found;
+            }
             double r = 2.0 + die(h, 4) * 1.5;
             boolean emerald = die(h, 5) < 0.5;
             int ext = (int) Math.ceil(r) + 1;
@@ -475,6 +573,14 @@ public final class OreGenesis {
             }
             double a = 6.0 + die(h, 3) * 3.0, b = 4.0 + die(h, 4) * 2.0, c = 1.5 + die(h, 5);
             int ay = d.level.getMinBuildHeight() + 22 + (int) (die(h, 6) * 50);
+            Lithology.Column col = d.column(ax, az);
+            if (col != null) {
+                // In the rift's fill, the new crust the ore fluid rose through, not the basement under it.
+                if (col.setting() != Lithology.Setting.RIFT) return;
+                int fill = Lithology.coverDepth(col);
+                if (fill < 12) return;
+                ay = d.base(ax, az) - 6 - (int) (die(h, 6) * (fill - 10));
+            }
             int stringer = 8 + (int) (die(h, 7) * 5);
             int ext = (int) Math.ceil(a) + 1;
             for (int x = d.minX(ax - ext); x <= d.maxX(ax + ext); x++) {

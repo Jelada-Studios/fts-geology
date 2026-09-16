@@ -160,10 +160,36 @@ public final class Lithology {
 
     /** A rift's floor holds basalt flows and sediment, deepest on the axis; its shoulders are basement, cut by dykes. */
     private static Rock rift(long seed, long salt, Column c, int x, int y, int z, int depth) {
-        int fill = (int) Math.round(40.0 * (1.0 - smooth((c.across() - 0.1) / 0.45)));
+        int fill = riftFill(c);
         if (depth < fill) return bed(salt ^ 0x80L, y + c.bedShift(), RIFT_FILL, RIFT_BANDS);
         if (c.dyke() && Math.floorMod((int) Math.floor(c.folded()), 41) < 2) return Rock.GABBRO;
         return basement(seed, c, x, y, z, depth - fill);
+    }
+
+    /** How deep a rift's fill goes: forty blocks on the axis, thinning to nothing at the shoulders. */
+    private static int riftFill(Column c) {
+        return (int) Math.round(40.0 * (1.0 - smooth((c.across() - 0.1) / 0.45)));
+    }
+
+    // === For the deposits =====================================================
+
+    /** Whether a granite body lies under this column at all. */
+    public static boolean hasPluton(Column c) {
+        return c.plutonTop() != NO_PLUTON;
+    }
+
+    /**
+     * How deep under the ground a column's sediment or fill reaches before its basement: a platform's beds, a
+     * foreland's thicker ones, a rift's floor. Zero where the setting has no cover, so a coal seam or a sulfide lens
+     * that belongs in the cover has nowhere to go.
+     */
+    public static int coverDepth(Column c) {
+        return switch (c.setting()) {
+            case PLATFORM -> c.cover();
+            case FORELAND -> c.cover() + 12;
+            case RIFT -> riftFill(c);
+            default -> 0;
+        };
     }
 
     /** How deep under its cover the basement is laid whole, and the share of it laid below that, in bodies. */
