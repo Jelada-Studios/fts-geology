@@ -191,7 +191,7 @@ public final class Lithology {
     private static Rock bed(long salt, int level, Rock[] beds, Rock[] bands) {
         long thin = SeedHash.mix(salt ^ (Math.floorDiv(level, 3) * 0x9E3779B97F4A7C15L));
         if ((thin & 7) == 1) return bands[(int) Math.floorMod(thin >>> 4, (long) bands.length)];
-        return pick(beds, salt, Math.floorDiv(level, 8));
+        return pick(beds, salt, Math.floorDiv(level, 5));
     }
 
     private static Rock pick(Rock[] table, long salt, long index) {
@@ -202,8 +202,8 @@ public final class Lithology {
     // rock a vanilla ore may replace; the blocks that cannot hold one are in the BANDS tables, laid as thin bands.
     // Shale carries most of it, which is also what a real sedimentary section is made of.
     private static final Rock[] PLATFORM_BEDS = {
-            Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.STONE, Rock.STONE, Rock.STONE, Rock.STONE,
-            Rock.CHERT, Rock.SHALE};
+            Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.MARBLE, Rock.MARBLE, Rock.CHERT, Rock.CHERT,
+            Rock.STONE, Rock.STONE};
     private static final Rock[] PLATFORM_BANDS = {
             Rock.SANDSTONE, Rock.SANDSTONE, Rock.SANDSTONE, Rock.CALCITE, Rock.RED_BEDS};
     private static final Rock[] FOLD_BANDS = {
@@ -211,8 +211,8 @@ public final class Lithology {
             Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.QUARTZITE, Rock.QUARTZITE, Rock.QUARTZITE,
             Rock.MARBLE, Rock.MARBLE, Rock.MARBLE, Rock.SCHIST, Rock.SLATE, Rock.GRANITE};
     private static final Rock[] FORELAND_BEDS = {
-            Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.STONE, Rock.STONE,
-            Rock.STONE, Rock.CHERT};
+            Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.CHERT, Rock.CHERT, Rock.MARBLE,
+            Rock.STONE, Rock.STONE};
     private static final Rock[] FORELAND_BANDS = {
             Rock.SANDSTONE, Rock.SANDSTONE, Rock.RED_BEDS, Rock.RED_BEDS, Rock.CALCITE};
     private static final Rock[] ARC_BEDS = {
