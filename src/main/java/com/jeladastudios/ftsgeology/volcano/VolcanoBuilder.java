@@ -20,6 +20,8 @@ import java.util.HashMap;
 import java.util.Map;
 import static com.jeladastudios.ftsgeology.volcano.VolcanoPlan.*;
 import static com.jeladastudios.ftsgeology.volcano.VolcanoEdifice.*;
+import static com.jeladastudios.ftsgeology.volcano.CalderaEdifice.*;
+import static com.jeladastudios.ftsgeology.volcano.ApronEdifice.*;
 import static com.jeladastudios.ftsgeology.volcano.VolcanoSummit.*;
 
 /**
@@ -266,7 +268,7 @@ public final class VolcanoBuilder {
                 rng.setSeed(com.jeladastudios.ftsgeology.util.SeedHash.columnSeed(site.seed(), gx, gz));
                 columns++;
                 if (c.isle != null) {
-                    OceanEdifice.column(level, c, gx, gz, rng);
+                    OceanColumn.column(level, c, gx, gz, rng);
                     continue;
                 }
                 if (c.coneHeight > 0) coneColumn(level, c, gx, gz, rng, true, floor[lx * 16 + lz]);
@@ -276,7 +278,7 @@ public final class VolcanoBuilder {
             }
         }
         // An ocean biome grows nothing on dry land, so the island plants its own, once all its columns here stand.
-        if (c.isle != null) OceanEdifice.plant(level, generator, c, cp, site.seed());
+        if (c.isle != null) OceanColumn.plant(level, generator, c, cp, site.seed());
         // An extinct volcano, on land or an old island, has no core to finish.
         if (site.setting().active() && site.activity() != VolcanoActivity.EXTINCT
                 && cp.x == SectionPos.blockToSectionCoord(c.x) && cp.z == SectionPos.blockToSectionCoord(c.z)) {

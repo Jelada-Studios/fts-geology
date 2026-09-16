@@ -19,6 +19,8 @@ import net.minecraft.world.level.LevelAccessor;
 import static com.jeladastudios.ftsgeology.volcano.VolcanoBuilder.*;
 import static com.jeladastudios.ftsgeology.volcano.VolcanoPlan.*;
 import static com.jeladastudios.ftsgeology.volcano.VolcanoEdifice.*;
+import static com.jeladastudios.ftsgeology.volcano.CalderaEdifice.*;
+import static com.jeladastudios.ftsgeology.volcano.ApronEdifice.*;
 
 /** Finishes a volcano: summit, core, conduit, flank vents, chimneys and the lava containment sweep. */
 public final class VolcanoSummit {

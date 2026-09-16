@@ -14,6 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 import static com.jeladastudios.ftsgeology.volcano.VolcanoBuilder.*;
 import static com.jeladastudios.ftsgeology.volcano.VolcanoEdifice.*;
+import static com.jeladastudios.ftsgeology.volcano.CalderaEdifice.*;
+import static com.jeladastudios.ftsgeology.volcano.ApronEdifice.*;
 import static com.jeladastudios.ftsgeology.volcano.VolcanoSummit.*;
 
 /** Works out a volcano's dimensions from a random source, and checks the ground can carry it. */
@@ -232,14 +234,14 @@ public final class VolcanoPlan {
         if (size == VolcanoSize.SMALL) {
             c.lakeOuter = c.craterR * 0.85;
         } else {
-            double lakeDist = VolcanoEdifice.ringRadius(c, c.lakeAngle) * 0.72;
+            double lakeDist = CalderaEdifice.ringRadius(c, c.lakeAngle) * 0.72;
             c.lakeR = 4.0 + 3.0 * (c.lakeWidth - Math.PI * 0.45) / (Math.PI * 0.35);
             c.lakeX = c.x + Math.cos(c.lakeAngle) * lakeDist;
             c.lakeZ = c.z + Math.sin(c.lakeAngle) * lakeDist;
             c.lakeOuter = lakeDist + c.lakeR;
             // The water lake in the low half of the floor, as Yellowstone Lake lies in its caldera's south-east.
             double pondAngle = c.lakeAngle + Math.PI + (rng.nextDouble() - 0.5) * 0.8;
-            double pondDist = VolcanoEdifice.ringRadius(c, pondAngle) * 0.55;
+            double pondDist = CalderaEdifice.ringRadius(c, pondAngle) * 0.55;
             c.pondR = c.craterR * (0.28 + rng.nextDouble() * 0.06);
             c.pondX = c.x + Math.cos(pondAngle) * pondDist;
             c.pondZ = c.z + Math.sin(pondAngle) * pondDist;

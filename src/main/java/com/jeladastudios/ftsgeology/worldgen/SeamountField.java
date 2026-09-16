@@ -7,6 +7,7 @@ import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 import com.jeladastudios.ftsgeology.util.SeedHash;
 import com.jeladastudios.ftsgeology.util.ValueNoise;
 import com.jeladastudios.ftsgeology.volcano.OceanEdifice;
+import com.jeladastudios.ftsgeology.volcano.OceanColumn;
 import com.jeladastudios.ftsgeology.volcano.VolcanoField;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -128,7 +129,7 @@ public final class SeamountField {
         if (m.crater() && d < 4.5) h -= 3.0 * (1.0 - d / 4.5);
         int sea = level.getSeaLevel();
         int target = Math.min(m.floorY() + (int) Math.round(h), sea - 1 - CLEARANCE);
-        int bed = OceanEdifice.seabed(level, gx, gz);
+        int bed = OceanColumn.seabed(level, gx, gz);
         if (bed == Integer.MIN_VALUE || target <= bed || bed >= sea - 1) return 0;
         // Only under open water.
         if (level.getBlockState(new BlockPos(gx, bed + 1, gz)).getFluidState().isEmpty()) return 0;
