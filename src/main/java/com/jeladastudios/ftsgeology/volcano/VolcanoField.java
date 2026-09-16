@@ -19,6 +19,12 @@ import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
 import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.NoiseColumn;
+import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
+import net.minecraft.world.level.levelgen.RandomState;
+import org.apache.commons.lang3.mutable.MutableObject;
+import java.util.function.Predicate;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureSet;
@@ -367,8 +373,8 @@ public final class VolcanoField {
             double a = Math.PI * 2 * i / OceanEdifice.COAST_BEARINGS;
             double r = OceanEdifice.coastAt(c, a) + 4;
             int px = c.x + (int) Math.round(Math.cos(a) * r), pz = c.z + (int) Math.round(Math.sin(a) * r);
-            int surface = gen.getBaseHeight(px, pz, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
-            int floor = gen.getBaseHeight(px, pz, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
+            int[] hs = heights(gen, px, pz, level, rs);
+            int surface = hs[0], floor = hs[1];
             if (surface <= floor || floor >= sea) bits |= 1L << i;
         }
         COAST_LAND.put(key, bits);
@@ -377,6 +383,36 @@ public final class VolcanoField {
 
     private static Site site(ServerLevel level, int cx, int cz) {
         return cell(level, cx, cz).site();
+    }
+
+    /**
+     * The generator's surface and sea floor at a column in one pass, {@code {surface, floor}}: the same numbers
+     * {@code getBaseHeight} gives for WORLD_SURFACE_WG and OCEAN_FLOOR_WG. Each of those walks the noise column from
+     * the top and stops at its own block, so asked separately the column is walked twice; here it is walked once, to
+     * the sea floor, and the surface is picked out of what was walked. The noise generator's walk is opened by
+     * META-INF/accesstransformer.cfg; any other generator is asked twice, as before.
+     */
+    static int[] heights(ChunkGenerator gen, int x, int z, LevelHeightAccessor level, RandomState rs) {
+        if (gen instanceof NoiseBasedChunkGenerator noise) {
+            MutableObject<NoiseColumn> column = new MutableObject<>();
+            int floor = noise.iterateNoiseColumn(level, rs, x, z, column, Heightmap.Types.OCEAN_FLOOR_WG.isOpaque())
+                    .orElse(level.getMinBuildHeight());
+            int surface = level.getMinBuildHeight();
+            NoiseColumn col = column.getValue();
+            if (col != null) {
+                Predicate<net.minecraft.world.level.block.state.BlockState> notAir = Heightmap.Types.WORLD_SURFACE_WG.isOpaque();
+                // Filled from the top down to the block the walk stopped at; nothing below it was read.
+                for (int y = level.getMaxBuildHeight() - 1; y >= floor - 1 && y >= level.getMinBuildHeight(); y--) {
+                    if (notAir.test(col.getBlock(y))) {
+                        surface = y + 1;
+                        break;
+                    }
+                }
+            }
+            return new int[] {surface, floor};
+        }
+        return new int[] {gen.getBaseHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG, level, rs),
+                gen.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, rs)};
     }
 
     private static Cell cell(ServerLevel level, int cx, int cz) {
@@ -619,8 +655,8 @@ public final class VolcanoField {
     public static int oceanDepth(ServerLevel level, int x, int z) {
         ChunkGenerator gen = level.getChunkSource().getGenerator();
         RandomState rs = level.getChunkSource().randomState();
-        int surface = gen.getBaseHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
-        int floor = gen.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
+        int[] hs = heights(gen, x, z, level, rs);
+        int surface = hs[0], floor = hs[1];
         return surface > floor ? gen.getSeaLevel() - floor : -1;
     }
 
@@ -661,8 +697,8 @@ public final class VolcanoField {
                 double r = foot * ring / 2.0;
                 int px = x + (int) Math.round(Math.cos(a) * r);
                 int pz = z + (int) Math.round(Math.sin(a) * r);
-                int surface = gen.getBaseHeight(px, pz, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
-                int floor = gen.getBaseHeight(px, pz, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
+                int[] hs = heights(gen, px, pz, level, rs);
+                int surface = hs[0], floor = hs[1];
                 boolean wet = surface > floor && floor < sea;
                 if (ring == 0 && (!wet || sea - floor < depth)) {
                     return refuse(refused, type, WATER, x, z, "centre not over open sea");
@@ -720,8 +756,8 @@ public final class VolcanoField {
             double a = Math.PI * 2 * i / 16 + 0.2;
             double r = OceanEdifice.coastAt(plan, a) + COAST_CLEARANCE;
             int px = x + (int) Math.round(Math.cos(a) * r), pz = z + (int) Math.round(Math.sin(a) * r);
-            int surface = gen.getBaseHeight(px, pz, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
-            int floor = gen.getBaseHeight(px, pz, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
+            int[] hs = heights(gen, px, pz, level, rs);
+            int surface = hs[0], floor = hs[1];
             if (surface <= floor || floor >= sea) dry++;
         }
         return dry;
@@ -744,8 +780,8 @@ public final class VolcanoField {
     private static boolean centreWet(ServerLevel level, int x, int z) {
         ChunkGenerator gen = level.getChunkSource().getGenerator();
         RandomState rs = level.getChunkSource().randomState();
-        int surface = gen.getBaseHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
-        int floor = gen.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
+        int[] hs = heights(gen, x, z, level, rs);
+        int surface = hs[0], floor = hs[1];
         return surface - floor >= DEEP_WATER;
     }
 
@@ -781,8 +817,8 @@ public final class VolcanoField {
                 double r = foot * ring / 2.0;
                 int px = x + (int) Math.round(Math.cos(a) * r);
                 int pz = z + (int) Math.round(Math.sin(a) * r);
-                int surface = gen.getBaseHeight(px, pz, Heightmap.Types.WORLD_SURFACE_WG, level, rs);
-                int floor = gen.getBaseHeight(px, pz, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
+                int[] hs = heights(gen, px, pz, level, rs);
+                int surface = hs[0], floor = hs[1];
                 // Only deep water counts here: a shallow lake under the body is built over.
                 if (surface - floor >= DEEP_WATER) {
                     if (ring == 0) return refuse(refused, type, WATER, x, z, "centre in water");
