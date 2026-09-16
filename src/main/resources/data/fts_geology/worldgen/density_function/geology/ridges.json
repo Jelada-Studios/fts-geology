@@ -26,7 +26,7 @@
           "field": "meander_z"
         }
       },
-      "xz_scale": 0.25,
+      "xz_scale": 0.125,
       "y_scale": 0.0
     }
   }
