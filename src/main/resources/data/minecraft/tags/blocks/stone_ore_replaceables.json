@@ -11,6 +11,8 @@
     "fts_geology:serpentinite",
     "fts_geology:gabbro",
     "fts_geology:peridotite",
-    "fts_geology:rhyolite"
+    "fts_geology:rhyolite",
+    "minecraft:basalt",
+    "minecraft:blackstone"
   ]
 }

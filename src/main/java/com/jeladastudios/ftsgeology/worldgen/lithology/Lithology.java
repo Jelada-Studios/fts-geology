@@ -133,12 +133,13 @@ public final class Lithology {
         }
         long salt = SeedHash.mix(seed ^ 0x117E5L);
         return switch (setting) {
-            case PLATFORM -> depth < c.cover() ? bed(salt, y + c.bedShift(), PLATFORM_BEDS)
+            case PLATFORM -> depth < c.cover() ? bed(salt, y + c.bedShift(), PLATFORM_BEDS, PLATFORM_BANDS)
                     : basement(seed, c, x, y, z, depth - c.cover());
             case FOLD_BELT -> depth > c.plutonTop() ? Rock.GRANITE
                     : pick(FOLD_BANDS, salt ^ 0x40L, Math.floorDiv((int) Math.floor(c.folded() + 0.8 * y), 6));
             case FORELAND -> depth < c.cover() + 12
-                    ? bed(salt ^ 0x50L, y + c.bedShift() + (int) Math.round(0.35 * c.folded() / 8.0), FORELAND_BEDS)
+                    ? bed(salt ^ 0x50L, y + c.bedShift() + (int) Math.round(0.35 * c.folded() / 8.0), FORELAND_BEDS,
+                            FORELAND_BANDS)
                     : basement(seed, c, x, y, z, depth - c.cover() - 12);
             // An arc's lavas and ash lie over everything to a good depth; under them, older flows and dykes, and
             // the plutons that fed them.
@@ -151,7 +152,7 @@ public final class Lithology {
                     : pick(SHEAR_BANDS, salt ^ 0x90L, Math.floorDiv((int) Math.floor(c.folded()), 3));
             case HOTSPOT -> depth < 50 ? pick(HOTSPOT_BEDS, salt ^ 0xA0L, Math.floorDiv(depth + c.bedShift(), 5))
                     : Rock.GABBRO;
-            case OCEAN_FLOOR -> depth < 8 ? ((h >>> 5) & 1) == 0 ? Rock.BASALT : Rock.SMOOTH_BASALT
+            case OCEAN_FLOOR -> depth < 8 ? ((h >>> 5) & 3) == 0 ? Rock.SMOOTH_BASALT : Rock.BASALT
                     : depth < 30 ? Rock.GABBRO
                     : pick(MANTLE, salt ^ 0xB0L, SeedHash.hash(seed ^ 0xB0L, x >> 3, z >> 3, y >> 3));
         };
@@ -160,7 +161,7 @@ public final class Lithology {
     /** A rift's floor holds basalt flows and sediment, deepest on the axis; its shoulders are basement, cut by dykes. */
     private static Rock rift(long seed, long salt, Column c, int x, int y, int z, int depth) {
         int fill = (int) Math.round(40.0 * (1.0 - smooth((c.across() - 0.1) / 0.45)));
-        if (depth < fill) return bed(salt ^ 0x80L, y + c.bedShift(), RIFT_FILL);
+        if (depth < fill) return bed(salt ^ 0x80L, y + c.bedShift(), RIFT_FILL, RIFT_BANDS);
         if (c.dyke() && Math.floorMod((int) Math.floor(c.folded()), 41) < 2) return Rock.GABBRO;
         return basement(seed, c, x, y, z, depth - fill);
     }
@@ -182,13 +183,14 @@ public final class Lithology {
     }
 
     /**
-     * A bed of a flat-lying sequence: beds of eight, with a thin one here and there. Pale calcite comes only as those
-     * thin beds; laid down eight thick it stood out of every cliff as a white stripe.
+     * A bed of a flat-lying sequence: beds of eight, with a thin band here and there. The beds themselves are rock an
+     * ore can sit in ({@code #stone_ore_replaceables}); sandstone, calcite and the red beds come only as the thin
+     * bands, which is where a cliff face shows them anyway. Laid down eight thick they stood out as white and yellow
+     * stripes and, because no vanilla ore may replace them, they took better than half the coal out of the ground.
      */
-    private static Rock bed(long salt, int level, Rock[] beds) {
+    private static Rock bed(long salt, int level, Rock[] beds, Rock[] bands) {
         long thin = SeedHash.mix(salt ^ (Math.floorDiv(level, 3) * 0x9E3779B97F4A7C15L));
-        if ((thin & 15) == 0) return Rock.CALCITE;
-        if ((thin & 7) == 1) return beds[(int) Math.floorMod(thin >>> 4, (long) beds.length)];
+        if ((thin & 7) == 1) return bands[(int) Math.floorMod(thin >>> 4, (long) bands.length)];
         return pick(beds, salt, Math.floorDiv(level, 8));
     }
 
@@ -196,17 +198,23 @@ public final class Lithology {
         return table[(int) Math.floorMod(SeedHash.mix(salt ^ (index * 0xD1B54A32D192ED03L)), (long) table.length)];
     }
 
-    // Tables: a rock appears as often as it is common in the sequence.
+    // Tables: a rock appears as often as it is common in the sequence. The beds of a flat-lying sequence hold only
+    // rock a vanilla ore may replace; the blocks that cannot hold one are in the BANDS tables, laid as thin bands.
+    // Shale carries most of it, which is also what a real sedimentary section is made of.
     private static final Rock[] PLATFORM_BEDS = {
-            Rock.STONE, Rock.STONE, Rock.STONE, Rock.SANDSTONE, Rock.SANDSTONE, Rock.SANDSTONE,
-            Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.RED_BEDS};
+            Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.STONE, Rock.STONE, Rock.STONE, Rock.STONE,
+            Rock.CHERT, Rock.SHALE};
+    private static final Rock[] PLATFORM_BANDS = {
+            Rock.SANDSTONE, Rock.SANDSTONE, Rock.SANDSTONE, Rock.CALCITE, Rock.RED_BEDS};
     private static final Rock[] FOLD_BANDS = {
             Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS,
             Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.QUARTZITE, Rock.QUARTZITE, Rock.QUARTZITE,
             Rock.MARBLE, Rock.MARBLE, Rock.MARBLE, Rock.SCHIST, Rock.SLATE, Rock.GRANITE};
     private static final Rock[] FORELAND_BEDS = {
-            Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SANDSTONE, Rock.SANDSTONE, Rock.SANDSTONE,
-            Rock.SANDSTONE, Rock.RED_BEDS, Rock.RED_BEDS, Rock.STONE};
+            Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.STONE, Rock.STONE,
+            Rock.STONE, Rock.CHERT};
+    private static final Rock[] FORELAND_BANDS = {
+            Rock.SANDSTONE, Rock.SANDSTONE, Rock.RED_BEDS, Rock.RED_BEDS, Rock.CALCITE};
     private static final Rock[] ARC_BEDS = {
             Rock.ANDESITE, Rock.ANDESITE, Rock.ANDESITE, Rock.ANDESITE, Rock.TUFF, Rock.TUFF, Rock.TUFF, Rock.TUFF,
             Rock.RHYOLITE, Rock.BASALT, Rock.BLACKSTONE};
@@ -217,14 +225,17 @@ public final class Lithology {
             Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.CHERT, Rock.CHERT, Rock.CHERT,
             Rock.SERPENTINITE, Rock.SERPENTINITE, Rock.SLATE, Rock.BASALT};
     private static final Rock[] RIFT_FILL = {
-            Rock.SANDSTONE, Rock.SANDSTONE, Rock.SANDSTONE, Rock.SHALE, Rock.SHALE,
-            Rock.BASALT, Rock.BASALT, Rock.BASALT, Rock.SMOOTH_BASALT};
+            Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.STONE, Rock.STONE,
+            Rock.BASALT, Rock.BASALT, Rock.BASALT, Rock.BASALT};
+    private static final Rock[] RIFT_BANDS = {
+            Rock.SANDSTONE, Rock.SANDSTONE, Rock.SMOOTH_BASALT, Rock.CALCITE};
     private static final Rock[] SHEAR_BANDS = {
             Rock.SLATE, Rock.SLATE, Rock.SLATE, Rock.SLATE, Rock.SCHIST, Rock.SCHIST, Rock.SCHIST,
             Rock.GNEISS, Rock.GNEISS, Rock.STONE};
+    // Smooth basalt is the one volcanic block no vanilla ore may replace, so a hotspot's stack keeps only a little.
     private static final Rock[] HOTSPOT_BEDS = {
-            Rock.BASALT, Rock.BASALT, Rock.BASALT, Rock.BASALT, Rock.BASALT, Rock.SMOOTH_BASALT, Rock.SMOOTH_BASALT,
-            Rock.TUFF, Rock.TUFF, Rock.BLACKSTONE};
+            Rock.BASALT, Rock.BASALT, Rock.BASALT, Rock.BASALT, Rock.BASALT, Rock.BASALT, Rock.BLACKSTONE,
+            Rock.BLACKSTONE, Rock.TUFF, Rock.SMOOTH_BASALT};
     private static final Rock[] MANTLE = {Rock.PERIDOTITE, Rock.PERIDOTITE, Rock.PERIDOTITE, Rock.SERPENTINITE};
 
     // === Noise ==============================================================
