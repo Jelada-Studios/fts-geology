@@ -191,7 +191,9 @@ public final class TectonicMap {
         long key = com.jeladastudios.ftsgeology.util.ColumnCache.key(blockX >> 2, blockZ >> 2);
         PlateSample hit = SAMPLE_CACHE.get(key);
         if (hit != null) return hit;
-        PlateSample s = sample(level, blockX, blockZ);
+        // Sampled at the cell's centre, not where the first asker stood, so the answer does not depend on which chunk
+        // generated first.
+        PlateSample s = sample(level, (blockX & ~3) + 2, (blockZ & ~3) + 2);
         SAMPLE_CACHE.put(key, s);
         return s;
     }

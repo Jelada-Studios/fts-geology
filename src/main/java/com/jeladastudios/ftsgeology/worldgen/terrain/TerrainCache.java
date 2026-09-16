@@ -31,7 +31,7 @@ public final class TerrainCache {
         long key = ColumnCache.key(x >> 2, z >> 2);
         TectonicMap.Edges hit = PLATES.get(key);
         if (hit != null) return hit;
-        TectonicMap.Edges e = TectonicMap.sampleSeededEdges(seed, x, z, params);
+        TectonicMap.Edges e = TectonicMap.sampleSeededEdges(seed, (x & ~3) + 2, (z & ~3) + 2, params);
         PLATES.put(key, e);
         return e;
     }
@@ -42,7 +42,7 @@ public final class TerrainCache {
         long key = ColumnCache.key(x >> 2, z >> 2);
         Role hit = ROLES.get(key);
         if (hit != null) return hit;
-        Role r = GeologyRoles.decide(seed, params, x, z);
+        Role r = GeologyRoles.decide(seed, params, (x & ~3) + 2, (z & ~3) + 2);
         ROLES.put(key, r);
         return r;
     }
