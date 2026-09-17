@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.volcano;
 
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
+
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.util.SeedHash;
 import com.jeladastudios.ftsgeology.util.ValueNoise;
@@ -49,7 +51,7 @@ public final class OceanColumn {
                 BlockPos pos = new BlockPos(gx, y, gz);
                 BlockState s = level.getBlockState(pos);
                 if (s.is(Blocks.BEDROCK) || com.jeladastudios.ftsgeology.eruption.EruptionHandler.isPlayerPlaced(s)) break;
-                level.setBlock(pos, Blocks.WATER.defaultBlockState(), Block.UPDATE_CLIENTS);
+                level.setBlock(pos, TfcCompat.translate(level, pos, Blocks.WATER.defaultBlockState()), Block.UPDATE_CLIENTS);
             }
             VolcanoSummit.setRock(level, new BlockPos(gx, target, gz), surface(c, k, rng, gx, target, gz, p.bits, 0.0, p));
             return;
@@ -83,7 +85,7 @@ public final class OceanColumn {
         }
         if ((bits & (REEF | RIM)) != 0 && target < water && rng.nextInt(4) == 0) {
             BlockPos above = new BlockPos(gx, target + 1, gz);
-            if (level.getBlockState(above).is(Blocks.WATER)) level.setBlock(above, coralPlant(gx, gz, rng), 2);
+            if (level.getBlockState(above).is(Blocks.WATER)) level.setBlock(above, TfcCompat.translate(level, above, coralPlant(gx, gz, rng)), 2);
         }
         clearAbove(level, gx, target + 1, gz, Math.max(surfaceTop, target + 1), k.seaY);
         if (dry) VolcanoEdifice.clearCover(level, gx, target, gz);
@@ -139,10 +141,10 @@ public final class OceanColumn {
             BlockState s = level.getBlockState(m.set(x, y, z));
             boolean clear = frozen(s) || loose(s);
             if (y < seaY) {
-                if (s.isAir() || clear) level.setBlock(m, Blocks.WATER.defaultBlockState(), Block.UPDATE_CLIENTS);
+                if (s.isAir() || clear) level.setBlock(m, TfcCompat.translate(level, m, Blocks.WATER.defaultBlockState()), Block.UPDATE_CLIENTS);
                 else if (s.getFluidState().isEmpty()) return;
             } else {
-                if (clear) level.setBlock(m, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+                if (clear) level.setBlock(m, TfcCompat.translate(level, m, Blocks.AIR.defaultBlockState()), Block.UPDATE_CLIENTS);
                 else if (!s.isAir()) return;
             }
         }
@@ -186,9 +188,9 @@ public final class OceanColumn {
                     continue;
                 }
                 int roll = rng.nextInt(12);
-                if (roll < 2) level.setBlock(ground.above(), Blocks.GRASS.defaultBlockState(), Block.UPDATE_CLIENTS);
+                if (roll < 2) level.setBlock(ground.above(), TfcCompat.translate(level, ground.above(), Blocks.GRASS.defaultBlockState()), Block.UPDATE_CLIENTS);
                 else if (roll == 2 && k.seaTemp > -0.15) {
-                    level.setBlock(ground.above(), Blocks.FERN.defaultBlockState(), Block.UPDATE_CLIENTS);
+                    level.setBlock(ground.above(), TfcCompat.translate(level, ground.above(), Blocks.FERN.defaultBlockState()), Block.UPDATE_CLIENTS);
                 }
             }
         }

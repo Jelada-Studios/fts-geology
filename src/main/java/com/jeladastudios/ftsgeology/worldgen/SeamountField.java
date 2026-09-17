@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.worldgen;
 
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
+
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.tectonics.FaultType;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
@@ -137,7 +139,7 @@ public final class SeamountField {
             BlockPos p = new BlockPos(gx, y, gz);
             BlockState s = level.getBlockState(p);
             if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) continue;
-            level.setBlock(p, y == target ? top(m, rng, d) : pillow(rng), Block.UPDATE_CLIENTS);
+            level.setBlock(p, TfcCompat.translate(level, p, y == target ? top(m, rng, d) : pillow(rng)), Block.UPDATE_CLIENTS);
         }
         return target - bed;
     }

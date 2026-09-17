@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.worldgen;
 
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
+
 import static com.jeladastudios.ftsgeology.util.SeedHash.hash;
 import static com.jeladastudios.ftsgeology.util.SeedHash.rand01;
 import static com.jeladastudios.ftsgeology.util.ValueNoise.lattice3D;
@@ -134,7 +136,7 @@ public final class OreGenesis {
             BlockPos p = new BlockPos(x, y, z);
             BlockState s = level.getBlockState(p);
             if (s.is(block) || s.hasBlockEntity() || !isHostRock(s)) return;
-            level.setBlock(p, block.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+            level.setBlock(p, TfcCompat.translate(level, p, block.defaultBlockState()), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
             placed++;
         }
 

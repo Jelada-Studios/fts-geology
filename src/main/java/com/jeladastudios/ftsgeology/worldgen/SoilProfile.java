@@ -9,6 +9,7 @@ import com.jeladastudios.ftsgeology.tectonics.PlateSample;
 import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 import com.jeladastudios.ftsgeology.util.SeedHash;
 import com.jeladastudios.ftsgeology.util.ValueNoise;
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
@@ -51,6 +52,8 @@ public final class SoilProfile {
 
     /** Paints this chunk's soil where the rock under it has anything to say. */
     public static void generate(WorldGenLevel level, ChunkPos cp) {
+        // TFC lays its own rock and soil; the mod does not lay a second geology under it.
+        if (TfcCompat.active()) return;
         if (!GeyserConfig.SOIL_FROM_BEDROCK.get()) return;
 
         ServerLevel model = level.getLevel();

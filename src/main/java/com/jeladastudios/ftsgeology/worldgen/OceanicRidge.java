@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.worldgen;
 
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
+
 import static com.jeladastudios.ftsgeology.util.ValueNoise.noise;
 
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
@@ -221,7 +223,7 @@ public final class OceanicRidge {
         BlockState s = level.getBlockState(p);
         if (s == state) return false;   // already this: a write that changes nothing still costs one
         if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) return false;
-        level.setBlock(p, state, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);   // see DeepStructure.set
+        level.setBlock(p, TfcCompat.translate(level, p, state), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);   // see DeepStructure.set
         return true;
     }
 }

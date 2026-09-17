@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.volcano;
 
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
+
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -135,8 +137,8 @@ public final class VolcanoEruption {
             int layers = here.getValue(
                     com.jeladastudios.ftsgeology.block.VolcanicAshBlock.LAYERS);
             if (layers >= 8) return;                       // as deep as it goes
-            level.setBlock(at, here.setValue(
-                    com.jeladastudios.ftsgeology.block.VolcanicAshBlock.LAYERS, layers + 1), 2);
+            level.setBlock(at, TfcCompat.translate(level, at, here.setValue(
+                    com.jeladastudios.ftsgeology.block.VolcanicAshBlock.LAYERS, layers + 1)), 2);
             if (field && layers + 1 >= FIELD_LOST_LAYERS) {
                 net.minecraft.world.level.block.FarmBlock.turnToDirt(null, below, level, at.below());
             }
@@ -145,7 +147,7 @@ public final class VolcanoEruption {
         // Ash falls through a tuft of grass, or a crop, and buries it; it does not stack on top of it.
         if (!here.isAir() && !com.jeladastudios.ftsgeology.worldgen.TerrainProbe.isVegetation(here)) return;
         if (!ash.canSurvive(level, at)) return;
-        level.setBlock(at, ash, 2);
+        level.setBlock(at, TfcCompat.translate(level, at, ash), 2);
     }
 
     /** Layers of ash over a field at which its tilled soil is lost. */
@@ -163,7 +165,7 @@ public final class VolcanoEruption {
     public static boolean spillLava(ServerLevel level, BlockPos summit) {
         // True only when lava was put out, so the core can hold the flow to a budget.
         if (!level.getBlockState(summit).isAir()) return false;
-        level.setBlock(summit, Blocks.LAVA.defaultBlockState(), 3);
+        level.setBlock(summit, TfcCompat.translate(level, summit, Blocks.LAVA.defaultBlockState()), 3);
         level.scheduleTick(summit, Fluids.LAVA, 5);
         return true;
     }
@@ -219,7 +221,7 @@ public final class VolcanoEruption {
         if (ground.getY() <= summitY) {   // never build above the original summit
             BlockState s = level.getBlockState(ground);
             if (!s.isAir() && !s.is(Blocks.BEDROCK) && s.getFluidState().isEmpty()) {
-                level.setBlock(ground, Blocks.BASALT.defaultBlockState(), 3);
+                level.setBlock(ground, TfcCompat.translate(level, ground, Blocks.BASALT.defaultBlockState()), 3);
             }
         }
         level.sendParticles(ParticleTypes.LAVA, target.getX() + 0.5, target.getY() + 0.3, target.getZ() + 0.5,
@@ -238,7 +240,7 @@ public final class VolcanoEruption {
     public static void seepVent(ServerLevel level, BlockPos vent) {
         boolean opened = level.getBlockState(vent).isAir();
         if (opened) {
-            level.setBlock(vent, Blocks.LAVA.defaultBlockState(), 3);
+            level.setBlock(vent, TfcCompat.translate(level, vent, Blocks.LAVA.defaultBlockState()), 3);
             level.scheduleTick(vent, Fluids.LAVA, 5);
         }
         double x = vent.getX() + 0.5, y = vent.getY() + 1.0, z = vent.getZ() + 0.5;
@@ -267,7 +269,7 @@ public final class VolcanoEruption {
      */
     public static void dryVent(ServerLevel level, BlockPos vent) {
         if (level.getBlockState(vent).getFluidState().is(net.minecraft.tags.FluidTags.LAVA)) {
-            level.setBlock(vent, Blocks.AIR.defaultBlockState(), 3);
+            level.setBlock(vent, TfcCompat.translate(level, vent, Blocks.AIR.defaultBlockState()), 3);
         }
     }
 
@@ -294,7 +296,7 @@ public final class VolcanoEruption {
             // started is put out, unless eruptionsStartFires lets the burn outlive the flow.
             if (level.getBlockState(p).is(Blocks.FIRE)) {
                 if (!GeyserConfig.ERUPTIONS_START_FIRES.get()) {
-                    level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                    level.setBlock(p, TfcCompat.translate(level, p, Blocks.AIR.defaultBlockState()), 2);
                 }
                 continue;
             }
@@ -305,13 +307,13 @@ public final class VolcanoEruption {
             BlockState below = level.getBlockState(p.below());
             if (below.isAir() || !below.getFluidState().isEmpty()) continue;   // must rest on solid ground
             if (p.getY() > summit.getY()) {
-                level.setBlock(p, Blocks.AIR.defaultBlockState(), 2); // drain it: never stack upward
+                level.setBlock(p, TfcCompat.translate(level, p, Blocks.AIR.defaultBlockState()), 2); // drain it: never stack upward
                 continue;
             }
             // Lava that pooled in a hollow freezes where it lies.
             if (walledSides(level, p) >= 3) {
-                level.setBlock(p, (level.random.nextInt(3) == 0
-                        ? Blocks.TUFF : Blocks.BASALT).defaultBlockState(), 2);
+                level.setBlock(p, TfcCompat.translate(level, p, (level.random.nextInt(3) == 0
+                        ? Blocks.TUFF : Blocks.BASALT).defaultBlockState()), 2);
                 continue;
             }
             // A stream over the surface leaves a skin, never a course laid on top: cooling in place combed a flank
@@ -320,14 +322,14 @@ public final class VolcanoEruption {
             // is gone, or every eruption combed the flank again in tuff. The ground under a sheet turns to rock,
             // mostly tuff so the trace reads as baked ground rather than a black stripe; the volcano's own rock
             // takes a fresh crust.
-            level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+            level.setBlock(p, TfcCompat.translate(level, p, Blocks.AIR.defaultBlockState()), 2);
             if (flowSides(level, p) < 2) continue;
             if (below.is(Blocks.BEDROCK) || below.hasBlockEntity()
                     || com.jeladastudios.ftsgeology.eruption.EruptionHandler.isPlayerPlaced(below)) continue;
             BlockState skin = ownRock(below)
                     ? com.jeladastudios.ftsgeology.registry.ModBlocks.COOLING_LAVA_CRUST.get().defaultBlockState()
                     : (level.random.nextInt(100) < 65 ? Blocks.TUFF : Blocks.BASALT).defaultBlockState();
-            level.setBlock(p.below(), skin, 2);
+            level.setBlock(p.below(), TfcCompat.translate(level, p.below(), skin), 2);
         }
     }
 
@@ -382,7 +384,7 @@ public final class VolcanoEruption {
             for (long key : molten) {
                 BlockPos p = BlockPos.of(key);
                 if (level.getBlockState(p).isAir()) {
-                    level.setBlock(p, Blocks.LAVA.defaultBlockState(), 3);
+                    level.setBlock(p, TfcCompat.translate(level, p, Blocks.LAVA.defaultBlockState()), 3);
                 }
             }
         }
@@ -397,12 +399,12 @@ public final class VolcanoEruption {
                 FluidState fs = s.getFluidState();
                 if (d2 < (r - 1) * (r - 1)) {
                     // The whole floor inside the rim, air only, so basalt the eruption laid down stays.
-                    if (fs.isEmpty()) level.setBlock(p, Blocks.LAVA.defaultBlockState(), 3);
+                    if (fs.isEmpty()) level.setBlock(p, TfcCompat.translate(level, p, Blocks.LAVA.defaultBlockState()), 3);
                 } else if (d2 >= (r - 1) * (r - 1)) {
                     // rim: cooled volcanic rock, occasionally still smouldering
                     if (!s.isAir() && fs.isEmpty()) {
-                        level.setBlock(p, (level.random.nextInt(3) == 0
-                                ? Blocks.MAGMA_BLOCK : Blocks.BASALT).defaultBlockState(), 3);
+                        level.setBlock(p, TfcCompat.translate(level, p, (level.random.nextInt(3) == 0
+                                ? Blocks.MAGMA_BLOCK : Blocks.BASALT).defaultBlockState()), 3);
                     }
                 }
             }

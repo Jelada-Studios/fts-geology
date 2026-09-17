@@ -1,5 +1,6 @@
 package com.jeladastudios.ftsgeology.tectonics;
 
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 import static com.jeladastudios.ftsgeology.util.SeedHash.hash;
 import static com.jeladastudios.ftsgeology.util.SeedHash.mix;
 import static com.jeladastudios.ftsgeology.util.SeedHash.rand01;
@@ -278,7 +279,7 @@ public final class TectonicMap {
                 int bzz = (int) sz + offsets[i][1];
                 Holder<Biome> biome = biomes.getNoiseBiome(
                         QuartPos.fromBlock(bxx), qy, QuartPos.fromBlock(bzz), sampler);
-                if (biome.is(BiomeTags.IS_OCEAN) || biome.is(BiomeTags.IS_DEEP_OCEAN)) ocean++;
+                if (TfcCompat.ocean(biome)) ocean++;
             }
             return ocean * 2 > KIND_SAMPLES ? PlateKind.OCEANIC : PlateKind.CONTINENTAL;
         } catch (Throwable t) {

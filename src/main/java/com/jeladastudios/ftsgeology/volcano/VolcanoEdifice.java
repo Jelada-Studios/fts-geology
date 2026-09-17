@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.volcano;
 
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
+
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
 import net.minecraft.core.BlockPos;
@@ -272,7 +274,7 @@ public final class VolcanoEdifice {
             BlockState s = level.getBlockState(p);
             if (s.isAir()) continue;
             if (!(TerrainProbe.isTreePart(s) || TerrainProbe.isVegetation(s))) return;
-            level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+            level.setBlock(p, TfcCompat.translate(level, p, Blocks.AIR.defaultBlockState()), 2);
         }
     }
 
@@ -476,12 +478,12 @@ public final class VolcanoEdifice {
                 BlockState s = level.getBlockState(p);
                 if (s.isAir()) continue;
                 if (!TerrainProbe.isTreePart(s) && !TerrainProbe.isVegetation(s)) break;
-                level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                level.setBlock(p, TfcCompat.translate(level, p, Blocks.AIR.defaultBlockState()), 2);
                 // A two-by-two trunk goes whole: half a dark oak's trunk left at the edge still held its crown.
                 if (s.is(BlockTags.LOGS)) {
                     for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
                         BlockPos q = p.relative(d);
-                        if (level.getBlockState(q).is(BlockTags.LOGS)) level.setBlock(q, Blocks.AIR.defaultBlockState(), 2);
+                        if (level.getBlockState(q).is(BlockTags.LOGS)) level.setBlock(q, TfcCompat.translate(level, q, Blocks.AIR.defaultBlockState()), 2);
                     }
                 }
             }

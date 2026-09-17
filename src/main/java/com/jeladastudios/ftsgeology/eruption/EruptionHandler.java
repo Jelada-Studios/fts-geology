@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.eruption;
 
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
+
 import com.jeladastudios.ftsgeology.blockentity.GeyserCoreBlockEntity;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
@@ -136,9 +138,9 @@ public final class EruptionHandler {
         if (isPlayerPlaced(cap)) return;
 
         if (cap.is(Blocks.DEEPSLATE) || cap.is(Blocks.STONE)) {
-            level.setBlock(capPos, Blocks.COBBLED_DEEPSLATE.defaultBlockState(), 3);
+            level.setBlock(capPos, TfcCompat.translate(level, capPos, Blocks.COBBLED_DEEPSLATE.defaultBlockState()), 3);
         } else if (isSoftRock(cap)) {
-            level.setBlock(capPos, Blocks.GRAVEL.defaultBlockState(), 3);
+            level.setBlock(capPos, TfcCompat.translate(level, capPos, Blocks.GRAVEL.defaultBlockState()), 3);
         }
     }
 
@@ -206,7 +208,7 @@ public final class EruptionHandler {
             int dy = level.random.nextInt(3);
             BlockPos p = mouth.offset(dx, dy, dz);
             if (level.getBlockState(p).getFluidState().is(FluidTags.WATER)) {
-                level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                level.setBlock(p, TfcCompat.translate(level, p, Blocks.AIR.defaultBlockState()), 2);
                 level.sendParticles(ParticleTypes.SPLASH,
                         p.getX() + 0.5, p.getY() + 0.8, p.getZ() + 0.5, 10, 0.25, 0.35, 0.25, 0.25);
                 level.sendParticles(ParticleTypes.CLOUD,
@@ -283,7 +285,7 @@ public final class EruptionHandler {
         // Fill the mouth, and once in vanilla lay a small patch of sources on the ground around it, each
         // recorded in spilled so the eruption can take it back and no infinite pool is left.
         if (level.getBlockState(mouth).isAir()) {
-            level.setBlock(mouth, Blocks.WATER.defaultBlockState(), 3);
+            level.setBlock(mouth, TfcCompat.translate(level, mouth, Blocks.WATER.defaultBlockState()), 3);
             level.scheduleTick(mouth, Fluids.WATER, 5);
         }
 
@@ -300,7 +302,7 @@ public final class EruptionHandler {
                 BlockState below = level.getBlockState(p.below());
                 if (!level.getBlockState(p).isAir()) continue;
                 if (below.isAir() || !below.getFluidState().isEmpty()) continue;
-                level.setBlock(p, Blocks.WATER.defaultBlockState(), 3);
+                level.setBlock(p, TfcCompat.translate(level, p, Blocks.WATER.defaultBlockState()), 3);
                 spilled.add(p.asLong());
             }
         }
@@ -341,7 +343,7 @@ public final class EruptionHandler {
                 if (!at.isAir() && !(at.is(Blocks.WATER) && !at.getFluidState().isSource())) continue;
                 BlockState below = level.getBlockState(p.below());
                 if (below.isAir() || !below.getFluidState().isEmpty()) continue;
-                level.setBlock(p, flowing, 2);
+                level.setBlock(p, TfcCompat.translate(level, p, flowing), 2);
             }
         }
     }
@@ -354,7 +356,7 @@ public final class EruptionHandler {
      */
     public static void removeJetField(ServerLevel level, BlockPos mouth, LongOpenHashSet spilled) {
         if (level.getBlockState(mouth).getFluidState().is(FluidTags.WATER)) {
-            level.setBlock(mouth, Blocks.AIR.defaultBlockState(), 3);
+            level.setBlock(mouth, TfcCompat.translate(level, mouth, Blocks.AIR.defaultBlockState()), 3);
         }
         if (spilled == null) return;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
@@ -368,7 +370,7 @@ public final class EruptionHandler {
                     boolean ours = dx == 0 && dz == 0;
                     if (!ours && !spilled.contains(m.asLong()) && !isPromoted(level, m, spilled)) continue;
                     if (level.getBlockState(m).is(Blocks.WATER)) {
-                        level.setBlock(m.immutable(), Blocks.AIR.defaultBlockState(), 3);
+                        level.setBlock(m.immutable(), TfcCompat.translate(level, m.immutable(), Blocks.AIR.defaultBlockState()), 3);
                     }
                 }
             }
@@ -393,7 +395,7 @@ public final class EruptionHandler {
         boolean surfaceHasWater = level.getBlockState(mouth.above()).getFluidState().is(FluidTags.WATER);
         if (surfaceHasWater && level.random.nextDouble() < intakeFraction) {
             if (level.getBlockState(mouth).isAir()) {
-                level.setBlock(mouth, Blocks.WATER.defaultBlockState(), 3);
+                level.setBlock(mouth, TfcCompat.translate(level, mouth, Blocks.WATER.defaultBlockState()), 3);
             }
         }
     }
@@ -409,7 +411,7 @@ public final class EruptionHandler {
                     BlockState s = level.getBlockState(p);
                     if (s.is(BlockTags.LOGS) || s.is(BlockTags.LEAVES)
                             || s.is(Blocks.MANGROVE_ROOTS)) {
-                        level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                        level.setBlock(p, TfcCompat.translate(level, p, Blocks.AIR.defaultBlockState()), 2);
                     }
                 }
             }
@@ -434,7 +436,7 @@ public final class EruptionHandler {
                         || s.getFluidState().is(FluidTags.WATER)
                         || isSoftRock(s);
                 if (fillable) {
-                    level.setBlock(p, Blocks.CALCITE.defaultBlockState(), 3);
+                    level.setBlock(p, TfcCompat.translate(level, p, Blocks.CALCITE.defaultBlockState()), 3);
                 }
             }
         }
@@ -461,7 +463,7 @@ public final class EruptionHandler {
                 if (isPlayerPlaced(s)) continue;
                 if (s.isAir() || isSoftRock(s) || s.getFluidState().is(FluidTags.WATER)) {
                     boolean calcite = level.random.nextBoolean();
-                    level.setBlock(rim, (calcite ? Blocks.CALCITE : Blocks.TUFF).defaultBlockState(), 3);
+                    level.setBlock(rim, TfcCompat.translate(level, rim, (calcite ? Blocks.CALCITE : Blocks.TUFF).defaultBlockState()), 3);
                 }
             }
         }
@@ -496,7 +498,7 @@ public final class EruptionHandler {
             if (g.isAir() || !isNaturalTerrain(g)) return;
             if (level.random.nextDouble() < chance) {
                 boolean calcite = level.random.nextBoolean();
-                level.setBlock(ground, (calcite ? Blocks.CALCITE : Blocks.TUFF).defaultBlockState(), 3);
+                level.setBlock(ground, TfcCompat.translate(level, ground, (calcite ? Blocks.CALCITE : Blocks.TUFF).defaultBlockState()), 3);
             }
             return;
         }

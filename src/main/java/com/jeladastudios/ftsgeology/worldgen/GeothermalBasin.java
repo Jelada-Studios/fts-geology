@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.worldgen;
 
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
+
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
@@ -194,16 +196,16 @@ public final class GeothermalBasin {
 
         if (over(wet, 0.52, 0.20, rng) && s > 0.45) {
             // A mud flat: mud pots among vanilla mud, not one block stamped over and over.
-            level.setBlock(at, rng.nextInt(7) == 0
+            level.setBlock(at, TfcCompat.translate(level, at, rng.nextInt(7) == 0
                     ? ModBlocks.MUD_POT.get().defaultBlockState()
-                    : Blocks.MUD.defaultBlockState(), FLAGS);
+                    : Blocks.MUD.defaultBlockState()), FLAGS);
             if (rng.nextInt(440) == 0) HotspotSigns.chimney(level, at, rng);
             return true;
         }
 
         if (over(flat, 0.12, 0.22, rng)) {
             // The sinter flat itself: the pale bare floor the basin is named for.
-            level.setBlock(at, flatBlock(rng).defaultBlockState(), FLAGS);
+            level.setBlock(at, TfcCompat.translate(level, at, flatBlock(rng).defaultBlockState()), FLAGS);
             if (s > 0.7 && rng.nextInt(800) == 0) HotspotSigns.chimney(level, at, rng);
             return true;
         }
@@ -211,7 +213,7 @@ public final class GeothermalBasin {
         // Between the flats, ground the runoff has poisoned - the same palette the halo round a
         // single spring already uses, so the two meet without a seam.
         Block b = rng.nextInt(3) == 0 ? ModBlocks.SINTER_CRUST.get() : HotSpringSites.haloBlock(rng);
-        level.setBlock(at, b.defaultBlockState(), FLAGS);
+        level.setBlock(at, TfcCompat.translate(level, at, b.defaultBlockState()), FLAGS);
         // Bobby-socks trees: killed by the silica, left bleached and standing. Rare, or the basin
         // turns into a dead forest instead of an open flat.
         if (rng.nextInt(110) == 0) HotSpringSites.deadTree(level, at, rng);

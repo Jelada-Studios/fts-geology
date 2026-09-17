@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.worldgen;
 
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
+
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.tectonics.HotspotMap;
@@ -200,11 +202,10 @@ public final class LavaTubes {
                         // The floor stays rough: a third of the floor cells keep their basalt.
                         boolean floor = dy < 0 && e > 0.55;
                         if (e <= 1.0 && !(floor && cell < 0.35)) {
-                            level.setBlock(new BlockPos(px, py, pz), Blocks.AIR.defaultBlockState(), 2);
+                            level.setBlock(new BlockPos(px, py, pz), TfcCompat.translate(level, new BlockPos(px, py, pz), Blocks.AIR.defaultBlockState()), 2);
                             placed++;
                         } else {
-                            level.setBlock(new BlockPos(px, py, pz),
-                                    (cell < 0.3 ? Blocks.SMOOTH_BASALT : Blocks.BASALT).defaultBlockState(), 2);
+                            level.setBlock(new BlockPos(px, py, pz), TfcCompat.translate(level, new BlockPos(px, py, pz), (cell < 0.3 ? Blocks.SMOOTH_BASALT : Blocks.BASALT).defaultBlockState()), 2);
                         }
                     }
                     // A skylight: the roof fell in, and the tube opens to the day.
@@ -212,7 +213,7 @@ public final class LavaTubes {
                         for (int py = cy; py <= g + 1; py++) {
                             BlockState s = level.getBlockState(m.set(px, py, pz));
                             if (!EruptionHandler.isNaturalTerrain(s) || !s.getFluidState().isEmpty() || s.isAir()) continue;
-                            level.setBlock(new BlockPos(px, py, pz), Blocks.AIR.defaultBlockState(), 2);
+                            level.setBlock(new BlockPos(px, py, pz), TfcCompat.translate(level, new BlockPos(px, py, pz), Blocks.AIR.defaultBlockState()), 2);
                         }
                     }
                 }

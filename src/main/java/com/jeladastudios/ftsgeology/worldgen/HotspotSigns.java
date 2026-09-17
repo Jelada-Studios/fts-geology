@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.worldgen;
 
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
+
 import com.jeladastudios.ftsgeology.block.SteamVentBlock;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
@@ -233,6 +235,6 @@ public final class HotspotSigns {
     }
 
     private static void set(LevelAccessor level, BlockPos at, BlockState state) {
-        level.setBlock(at, state, FLAGS);
+        level.setBlock(at, TfcCompat.translate(level, at, state), FLAGS);
     }
 }

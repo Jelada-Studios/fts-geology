@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.volcano;
 
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
+
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
 import com.jeladastudios.ftsgeology.blockentity.VolcanoCoreBlockEntity;
 import com.jeladastudios.ftsgeology.GeysersMod;
@@ -296,7 +298,7 @@ public final class VolcanoBuilder {
                 BlockEntityType.getKey(ModBlockEntities.VOLCANO_CORE.get());
         if (id == null) return;
         BlockPos p = new BlockPos(c.x, c.reservoirY, c.z);
-        level.setBlock(p, ModBlocks.VOLCANO_CORE.get().defaultBlockState(), 2);
+        level.setBlock(p, TfcCompat.translate(level, p, ModBlocks.VOLCANO_CORE.get().defaultBlockState()), 2);
         CompoundTag tag = new CompoundTag();
         tag.putString("id", id.toString());
         tag.putInt("x", p.getX());
@@ -322,7 +324,7 @@ public final class VolcanoBuilder {
             // Nothing in the field accounts for this core, so the field no longer agrees with the world.
             // Rock is better than a core with no mountain over it.
             GeysersMod.LOGGER.warn("Large volcano marker at {} matches no planned site; removed", marker);
-            level.setBlock(marker, Blocks.BASALT.defaultBlockState(), 3);
+            level.setBlock(marker, TfcCompat.translate(level, marker, Blocks.BASALT.defaultBlockState()), 3);
             return;
         }
         int area = Math.max(c.liveReach, (int) Math.ceil(c.lakeOuter)) + 8;

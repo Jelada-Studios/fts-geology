@@ -1,6 +1,7 @@
 package com.jeladastudios.ftsgeology.worldgen.terrain;
 
 import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyRoles.Role;
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.Holder;
@@ -63,10 +64,10 @@ public class GeologyBiomeSource extends BiomeSource {
         // The plates decide the rock, never the weather. The bare ones can stand in any climate, but a warm
         // green valley laid over the tundra would only look wrong, so up there the snow keeps its own biome.
         if (WARM.contains(role) && frozen(base)) return base;
-        boolean sea = base.is(BiomeTags.IS_OCEAN) || base.is(BiomeTags.IS_DEEP_OCEAN);
+        boolean sea = TfcCompat.ocean(base);
         if (role == Role.OCEANIC_RIDGE) return sea ? ours : base;
         // The water is the parent's to place: a river, a beach or the sea keeps whatever it was.
-        if (sea || base.is(BiomeTags.IS_RIVER) || base.is(BiomeTags.IS_BEACH)) return base;
+        if (sea || TfcCompat.river(base) || TfcCompat.beach(base)) return base;
         return ours;
     }
 

@@ -1,0 +1,6 @@
+{
+  "type": "forge:add_features",
+  "biomes": "#fts_geology:tfc",
+  "features": "fts_geology:geology_surface",
+  "step": "top_layer_modification"
+}

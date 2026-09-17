@@ -10,6 +10,7 @@ import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
 import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 import com.jeladastudios.ftsgeology.util.SeedHash;
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
@@ -66,6 +67,10 @@ public final class DeepStructure {
      * @return the next column to visit, or {@link #DONE}
      */
     public static int generate(WorldGenLevel level, ChunkPos cp, Report report, int start, long deadline) {
+        if (TfcCompat.active()) {
+            if (report != null) report.note = "TerraFirmaCraft lays the rock here";
+            return DONE;
+        }
         if (!GeyserConfig.DEEP_STRUCTURE_ENABLED.get()) {
             if (report != null) report.note = "deep structure disabled in the config";
             return DONE;

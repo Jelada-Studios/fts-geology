@@ -1,0 +1,6 @@
+{
+  "type": "forge:add_features",
+  "biomes": "#fts_geology:tfc",
+  "features": "fts_geology:volcano_field",
+  "step": "underground_decoration"
+}

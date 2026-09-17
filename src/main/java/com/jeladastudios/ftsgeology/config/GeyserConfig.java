@@ -163,6 +163,7 @@ public final class GeyserConfig {
 
     // --- Integration with other mods ----------------------------------------
     public static final ForgeConfigSpec.BooleanValue SUGGEST_OPTIONAL_MODS;   // default ON
+    public static final ForgeConfigSpec.BooleanValue TFC_COMPAT;             // write TFC blocks on a TFC world
     public static final ForgeConfigSpec.IntValue STALL_REPORT_SECONDS;       // default 30, 0 = off
 
     // --- Hydrology (groundwater) ---------------------------------------------
@@ -830,6 +831,11 @@ public final class GeyserConfig {
         b.pop();
 
         b.push("integration");
+        TFC_COMPAT = b
+                .comment("With TerraFirmaCraft loaded, build volcanoes, veins and the rest out of TFC's rock, soil and sand",
+                        "instead of vanilla blocks, and read TFC's seas and rivers for the plates. Off, the mod behaves as",
+                        "it does anywhere else.")
+                .define("tfcCompat", true);
         SUGGEST_OPTIONAL_MODS = b
                 .comment("Mention the optional mods this one works better with, once, the first time",
                         "a player joins a world without them. The mod has no hard dependencies and",

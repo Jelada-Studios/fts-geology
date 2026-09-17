@@ -9,6 +9,7 @@ import com.jeladastudios.ftsgeology.tectonics.FaultType;
 import com.jeladastudios.ftsgeology.tectonics.HotspotMap;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
 import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
 import net.minecraft.server.level.ServerLevel;
@@ -829,9 +830,8 @@ public final class VolcanoField {
                 // cone as stripes. Volcanoes stand by rivers, not across them: a river at the centre, one crossing
                 // from side to side, or one winding through much of the body refuses the site; a river lapping one
                 // side is built round, and out at the foot the apron only laps one.
-                if (ring < 2 && gen.getBiomeSource().getNoiseBiome(net.minecraft.core.QuartPos.fromBlock(px),
-                        net.minecraft.core.QuartPos.fromBlock(sea), net.minecraft.core.QuartPos.fromBlock(pz), rs.sampler())
-                        .is(net.minecraft.tags.BiomeTags.IS_RIVER)) {
+                if (ring < 2 && TfcCompat.river(gen.getBiomeSource().getNoiseBiome(net.minecraft.core.QuartPos.fromBlock(px),
+                        net.minecraft.core.QuartPos.fromBlock(sea), net.minecraft.core.QuartPos.fromBlock(pz), rs.sampler()))) {
                     if (ring == 0) return refuse(refused, type, WATER, x, z, "river under the centre");
                     riverAt[i] = true;
                     rivers++;

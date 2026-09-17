@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.volcano;
 
+import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
+
 import com.jeladastudios.ftsgeology.blockentity.VolcanoCoreBlockEntity;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
@@ -320,7 +322,7 @@ public final class VolcanoSummit {
 
     static void plantCore(ServerLevel level, Ctx c) {
         BlockPos corePos = c.vent.below();
-        level.setBlock(corePos, ModBlocks.VOLCANO_CORE.get().defaultBlockState(), 2);
+        level.setBlock(corePos, TfcCompat.translate(level, corePos, ModBlocks.VOLCANO_CORE.get().defaultBlockState()), 2);
         if (level.getBlockEntity(corePos) instanceof VolcanoCoreBlockEntity core) {
             core.setMagnitude(c.magnitude);
             core.setCraterRadius(c.coreCraterR);
@@ -341,13 +343,13 @@ public final class VolcanoSummit {
         for (int y = c.reservoirY + 3; y <= topY; y++) {
             BlockPos p = new BlockPos(c.x, y, c.z);
             if (level.getBlockState(p).is(Blocks.BEDROCK)) continue;
-            level.setBlock(p, Blocks.LAVA.defaultBlockState(), 2);
+            level.setBlock(p, TfcCompat.translate(level, p, Blocks.LAVA.defaultBlockState()), 2);
             for (Direction d : Direction.Plane.HORIZONTAL) {
                 BlockPos w = p.relative(d);
                 BlockState ws = level.getBlockState(w);
                 if (!ws.is(Blocks.BEDROCK)
                         && (ws.isAir() || (!ws.getFluidState().isEmpty() && !ws.getFluidState().is(FluidTags.LAVA)))) {
-                    level.setBlock(w, Blocks.BASALT.defaultBlockState(), 2);
+                    level.setBlock(w, TfcCompat.translate(level, w, Blocks.BASALT.defaultBlockState()), 2);
                 }
             }
         }
@@ -376,7 +378,7 @@ public final class VolcanoSummit {
                 BlockPos p = new BlockPos(cx + dx, cy + dy, cz + dz);
                 if (level.getBlockState(p).is(Blocks.BEDROCK)) continue;
                 boolean shell = (dy == -1 || dy == thickness || wall);
-                level.setBlock(p, (shell ? Blocks.BASALT : Blocks.LAVA).defaultBlockState(), 2);
+                level.setBlock(p, TfcCompat.translate(level, p, (shell ? Blocks.BASALT : Blocks.LAVA).defaultBlockState()), 2);
             }
         }
     }
@@ -402,7 +404,7 @@ public final class VolcanoSummit {
                 if (level.getBlockState(p).is(Blocks.BEDROCK)) break;
                 int ground = TerrainProbe.groundY(level, p.getX(), p.getZ());
                 if (ground == Integer.MIN_VALUE || p.getY() > ground - LAVA_SURFACE_CLEARANCE) break;
-                level.setBlock(p, Blocks.LAVA.defaultBlockState(), 2);
+                level.setBlock(p, TfcCompat.translate(level, p, Blocks.LAVA.defaultBlockState()), 2);
             }
         }
     }
@@ -598,7 +600,7 @@ public final class VolcanoSummit {
                     TerrainProbe.clearVegetation(level, x, g, z, 3);
                     for (int y = g + 1; y <= fillTo[i]; y++) {
                         BlockState rock = y == fillTo[i] && !(dx == 0 && dz == 0) ? spatter(rng) : Blocks.BASALT.defaultBlockState();
-                        level.setBlock(new BlockPos(x, y, z), rock, 2);
+                        level.setBlock(new BlockPos(x, y, z), TfcCompat.translate(level, new BlockPos(x, y, z), rock), 2);
                     }
                     continue;
                 }
@@ -614,15 +616,15 @@ public final class VolcanoSummit {
                 if (!level.getBlockState(top.above()).getFluidState().isEmpty()) continue;
                 TerrainProbe.clearVegetation(level, x, g, z, 2);
                 int roll = rng.nextInt(10);
-                level.setBlock(top, (roll < 4 ? Blocks.TUFF : roll < 7 ? Blocks.GRAVEL : Blocks.BLACKSTONE)
-                        .defaultBlockState(), 2);
+                level.setBlock(top, TfcCompat.translate(level, top, (roll < 4 ? Blocks.TUFF : roll < 7 ? Blocks.GRAVEL : Blocks.BLACKSTONE)
+                        .defaultBlockState()), 2);
             }
         }
 
         BlockPos lava = new BlockPos(vx, lavaY, vz);
-        level.setBlock(lava.below(), Blocks.BASALT.defaultBlockState(), 2);
-        level.setBlock(lava, Blocks.LAVA.defaultBlockState(), 2);
-        level.setBlock(lava.above(), Blocks.AIR.defaultBlockState(), 2);
+        level.setBlock(lava.below(), TfcCompat.translate(level, lava.below(), Blocks.BASALT.defaultBlockState()), 2);
+        level.setBlock(lava, TfcCompat.translate(level, lava, Blocks.LAVA.defaultBlockState()), 2);
+        level.setBlock(lava.above(), TfcCompat.translate(level, lava.above(), Blocks.AIR.defaultBlockState()), 2);
         return lava;
     }
 
@@ -660,7 +662,7 @@ public final class VolcanoSummit {
             // A dike ends where it meets a cavern: lava poured into open ground falls, and the cooling sweep
             // would freeze the fallen column into a basalt tube from roof to floor.
             if (openAround(level, p)) { end = "at a cavern"; break; }
-            level.setBlock(p, Blocks.LAVA.defaultBlockState(), 2);
+            level.setBlock(p, TfcCompat.translate(level, p, Blocks.LAVA.defaultBlockState()), 2);
             cells++;
             int sx = Integer.compare(coreX, p.getX());
             int sz = Integer.compare(coreZ, p.getZ());
@@ -788,7 +790,7 @@ public final class VolcanoSummit {
                         BlockState ns = level.getBlockState(n);
                         if (ns.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(ns)) continue;
                         if (ns.isAir() || TerrainProbe.isVegetation(ns)) {
-                            level.setBlock(n, Blocks.BASALT.defaultBlockState(), 2);
+                            level.setBlock(n, TfcCompat.translate(level, n, Blocks.BASALT.defaultBlockState()), 2);
                         }
                     }
                 }
@@ -833,7 +835,7 @@ public final class VolcanoSummit {
                     BlockPos p = new BlockPos(cx + dx, y, cz + dz);
                     if (!level.getBlockState(p).getFluidState().is(FluidTags.LAVA)) continue;
                     if (!canEscape(level, p)) continue;
-                    level.setBlock(p, Blocks.BASALT.defaultBlockState(), 2);
+                    level.setBlock(p, TfcCompat.translate(level, p, Blocks.BASALT.defaultBlockState()), 2);
                 }
             }
         }
@@ -853,13 +855,13 @@ public final class VolcanoSummit {
     static void setRock(LevelAccessor level, BlockPos p, BlockState state) {
         BlockState s = level.getBlockState(p);
         if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) return;
-        level.setBlock(p, state, 2);
+        level.setBlock(p, TfcCompat.translate(level, p, state), 2);
     }
 
     /** Empties a cell, but only if what is there is natural. */
     static void clearNatural(LevelAccessor level, BlockPos p) {
         BlockState s = level.getBlockState(p);
         if (s.isAir() || s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) return;
-        level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+        level.setBlock(p, TfcCompat.translate(level, p, Blocks.AIR.defaultBlockState()), 2);
     }
 }

@@ -47,6 +47,14 @@ earthquakes may deform player blocks at all, are config toggles.
     side = "BOTH"
 
 # Optional integrations — soft deps so we load after them when present.
+# TerraFirmaCraft: optional; loaded after it so its blocks can be looked up by id.
+[[dependencies.fts_geology]]
+    modId = "tfc"
+    mandatory = false
+    versionRange = "*"
+    ordering = "AFTER"
+    side = "BOTH"
+
 [[dependencies.fts_geology]]
     modId = "flowing_fluids"
     mandatory = false
