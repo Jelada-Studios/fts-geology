@@ -128,7 +128,7 @@ public final class Lithology {
         Setting setting = c.setting();
         if (c.weight() < 1.0) {
             // Where one setting gives way to the next, their rocks interfinger in pods rather than meet at a line.
-            double pick = SeedHash.rand01(SeedHash.hash(seed ^ 0x51L, x >> 2, z >> 2, y >> 3));
+            double pick = SeedHash.rand01(SeedHash.hash(seed ^ 0x51L, x >> 3, z >> 3, y >> 3));
             if (pick >= c.weight()) setting = c.fallback();
         }
         long salt = SeedHash.mix(seed ^ 0x117E5L);
@@ -136,7 +136,7 @@ public final class Lithology {
             case PLATFORM -> depth < c.cover() ? bed(salt, y + c.bedShift(), PLATFORM_BEDS, PLATFORM_BANDS)
                     : basement(seed, c, x, y, z, depth - c.cover());
             case FOLD_BELT -> depth > c.plutonTop() ? Rock.GRANITE
-                    : pick(FOLD_BANDS, salt ^ 0x40L, Math.floorDiv((int) Math.floor(c.folded() + 0.8 * y), 6));
+                    : pick(FOLD_BANDS, salt ^ 0x40L, Math.floorDiv((int) Math.floor(c.folded() + 0.5 * y), 12));
             case FORELAND -> depth < c.cover() + 12
                     ? bed(salt ^ 0x50L, y + c.bedShift() + (int) Math.round(0.35 * c.folded() / 8.0), FORELAND_BEDS,
                             FORELAND_BANDS)

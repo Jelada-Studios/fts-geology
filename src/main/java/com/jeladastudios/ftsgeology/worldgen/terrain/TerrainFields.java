@@ -108,8 +108,16 @@ public final class TerrainFields {
      * The plate the terrain sees at a column: the sample at the warped coordinate, which is where the coast, the
      * belt and the arc all really are. Cached on a four-block grid.
      */
+    /**
+     * The plate against the boundary that shapes the ground here. Usually the nearest one; but where a second
+     * boundary is almost as near and lifts the ground more, it is that one: the roles and the rock follow the
+     * mountains, which the two-boundary blend in {@link #field} raises, instead of the nearest line on the map.
+     * A fold belt's highest peaks stood next to a transform fault as plain platform under a badlands biome.
+     */
     public static PlateSample sampleAt(long seed, GeologyParams p, int x, int z) {
-        return edgesAt(seed, p, x, z).first();
+        TectonicMap.Edges e = edgesAt(seed, p, x, z);
+        if (e.gap() >= HANDOVER) return e.first();
+        return relief(e.second(), p, seed, x, z) > relief(e.first(), p, seed, x, z) ? e.second() : e.first();
     }
 
     /** The plate at the warped coordinate against its two nearest boundaries. */

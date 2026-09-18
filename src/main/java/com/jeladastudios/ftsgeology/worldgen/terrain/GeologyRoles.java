@@ -50,6 +50,13 @@ public final class GeologyRoles {
     private static final double BASIN_PLUME = 0.30;
     /** How far the arc's ribbon reaches, and how deep into a belt its core goes; see {@link PlateSample#onArc}. */
     private static final double ARC_FROM = 0.25, ARC_TO = 0.75, BELT_CORE = 0.55;
+    /**
+     * Ground a collision has lifted this much (in offset units, 0.24 is about thirty blocks) is the highland whatever
+     * the belt's grip says: over a slow collision the grip stays under {@link #BELT_CORE} while the mountains stand
+     * as high as anywhere, and they were left as no role at all, under a vanilla biome, with the rock and the rule
+     * that bares it their own.
+     */
+    private static final double HIGH_RELIEF = 0.24;
     /** How wide a rift floor is and how far a ridge reaches, in fault widths. */
     private static final double GRABEN_TO = 0.35, RIDGE_TO = TerrainFields.RIDGE_HALF;
     /** How deep into a floodplain ({@link TerrainFields#apron}) the plain begins. */
@@ -86,7 +93,8 @@ public final class GeologyRoles {
         if (HotspotMap.plumeStrength(seed, x, z, p) >= BASIN_PLUME && erosion > FLAT) return Role.GEOTHERMAL_BASIN;
         if (k == FaultType.DIVERGENT && a < GRABEN_TO + j) return Role.RIFT_VALLEY;
         if (s.overridingSide() && a >= ARC_FROM + j && a <= ARC_TO + j) return Role.VOLCANIC_HIGHLAND;
-        if (k == FaultType.CONVERGENT_COLLISION && TerrainFields.belt(s, p) > BELT_CORE + j) return Role.OROGENIC_HIGHLAND;
+        if (k == FaultType.CONVERGENT_COLLISION && (TerrainFields.belt(s, p) > BELT_CORE + j
+                || TerrainFields.field(Field.RELIEF, seed, p, x, z) > HIGH_RELIEF + j)) return Role.OROGENIC_HIGHLAND;
         // The apron of sediment a belt sheds beyond its mountains: flat, low, and the coal country.
         if (TerrainFields.apron(s, p) > APRON_CORE + 2 * j) return Role.ALLUVIAL_PLAIN;
         return Role.NONE;

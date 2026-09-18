@@ -27,12 +27,16 @@ import net.minecraft.world.level.levelgen.SurfaceRules;
  * cliff sheds its soil, and the rock it shows is the rock behind it. Vanilla's own steep test looks one way along each
  * axis, so it would have stripped a cliff that faced north and left the one facing south under grass; this one looks
  * both ways.</p>
+ *
+ * <p>With {@code bare} it answers in every column, stone included, whatever the slope: the rule above the tree line,
+ * where a mountain carries no soil at all.</p>
  */
-public record LithologyRule(boolean steepOnly) implements SurfaceRules.RuleSource {
+public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceRules.RuleSource {
 
     public static final KeyDispatchDataCodec<LithologyRule> CODEC = KeyDispatchDataCodec.of(
             RecordCodecBuilder.mapCodec(i -> i.group(
-                    Codec.BOOL.optionalFieldOf("steep_only", false).forGetter(LithologyRule::steepOnly)
+                    Codec.BOOL.optionalFieldOf("steep_only", false).forGetter(LithologyRule::steepOnly),
+                    Codec.BOOL.optionalFieldOf("bare", false).forGetter(LithologyRule::bare)
             ).apply(i, LithologyRule::new)));
 
     /** How much the ground must climb across two blocks for a column to count as a cliff. */
@@ -47,23 +51,24 @@ public record LithologyRule(boolean steepOnly) implements SurfaceRules.RuleSourc
     @Override
     public SurfaceRules.SurfaceRule apply(SurfaceRules.Context context) {
         if (!GeyserConfig.LITHOLOGY.get()) return (x, y, z) -> null;
-        return new Pass(context.chunk, TerrainContext.seed(), steepOnly);
+        return new Pass(context.chunk, TerrainContext.seed(), steepOnly, bare);
     }
 
     /** One chunk's pass: each column worked out the first time one of its blocks is asked about. */
     private static final class Pass implements SurfaceRules.SurfaceRule {
         private final ChunkAccess chunk;
         private final long seed;
-        private final boolean steepOnly;
+        private final boolean steepOnly, bare;
         private final Column[] columns = new Column[256];
         private final int[] grounds = new int[256];
         /** 0 not yet looked at, 1 gentle, 2 a cliff. */
         private final byte[] steep = new byte[256];
 
-        Pass(ChunkAccess chunk, long seed, boolean steepOnly) {
+        Pass(ChunkAccess chunk, long seed, boolean steepOnly, boolean bare) {
             this.chunk = chunk;
             this.seed = seed;
             this.steepOnly = steepOnly;
+            this.bare = bare;
         }
 
         @Override
@@ -78,9 +83,10 @@ public record LithologyRule(boolean steepOnly) implements SurfaceRules.RuleSourc
                 grounds[i] = chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x & 15, z & 15) - 1;
             }
             Rock r = Lithology.rockAt(seed, c, x, y, z, grounds[i]);
-            // On a cliff the block asked about would have become soil, so plain stone has to be said out loud. Anywhere
-            // else it is what the block already is, and answering it would only pay for writing it again.
-            if (steepOnly) return States.ALL[(r == Rock.KEEP ? Rock.STONE : r).ordinal()];
+            // On a cliff or above the tree line the block asked about would have become soil, so plain stone has to be
+            // said out loud. Anywhere else it is what the block already is, and answering it would only pay for
+            // writing it again.
+            if (steepOnly || bare) return States.ALL[(r == Rock.KEEP ? Rock.STONE : r).ordinal()];
             return r == Rock.KEEP || r == Rock.STONE ? null : States.ALL[r.ordinal()];
         }
 
