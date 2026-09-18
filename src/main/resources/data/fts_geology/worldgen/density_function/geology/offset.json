@@ -1,6 +1,38 @@
 {
   "type": "minecraft:add",
-  "argument1": "fts_geology:geology/offset_base",
+  "argument1": {
+    "type": "minecraft:mul",
+    "argument1": "fts_geology:geology/offset_base",
+    "argument2": {
+      "type": "minecraft:add",
+      "argument1": 1.0,
+      "argument2": {
+        "type": "minecraft:add",
+        "argument1": {
+          "type": "minecraft:mul",
+          "argument1": -0.5,
+          "argument2": {
+            "type": "minecraft:flat_cache",
+            "argument": {
+              "type": "fts_geology:plate",
+              "field": "belt"
+            }
+          }
+        },
+        "argument2": {
+          "type": "minecraft:mul",
+          "argument1": -0.6,
+          "argument2": {
+            "type": "minecraft:flat_cache",
+            "argument": {
+              "type": "fts_geology:plate",
+              "field": "valley"
+            }
+          }
+        }
+      }
+    }
+  },
   "argument2": {
     "type": "minecraft:flat_cache",
     "argument": {

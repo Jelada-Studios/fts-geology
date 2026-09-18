@@ -990,7 +990,7 @@ public final class GeyserConfig {
                 .comment("How high a collision lifts the ground at the boundary, in blocks, before the peaks",
                         "the ridge noise adds on top. The crests of a belt get all of it, the passes between them",
                         "about half; too much and the highest crests reach the top of the terrain and flatten out.")
-                .defineInRange("terrainUplift", 95.0D, 0.0D, 400.0D);
+                .defineInRange("terrainUplift", 140.0D, 0.0D, 400.0D);
         LITHOLOGY = b
                 .comment("Lay the rock the plates imply under the ground: a platform's beds over its basement, a fold",
                         "belt's gneiss and marble, an arc's ash over its plutons. Off leaves plain stone, and chunks",

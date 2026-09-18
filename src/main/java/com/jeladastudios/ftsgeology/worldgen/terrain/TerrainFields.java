@@ -36,7 +36,7 @@ public final class TerrainFields {
 
     private TerrainFields() {}
 
-    public enum Field { CONTINENTS, EROSION, RIDGES, RELIEF, VARIETY, MEANDER_X, MEANDER_Z }
+    public enum Field { CONTINENTS, EROSION, RIDGES, RELIEF, VARIETY, BELT, VALLEY, MEANDER_X, MEANDER_Z }
 
     /** How far the coordinates are pushed about, in blocks, and the size of the pushing. */
     private static final double WARP_AMPLITUDE = 250.0;
@@ -57,7 +57,7 @@ public final class TerrainFields {
      */
     private static final double COAST_LOWLAND = 0.05, COAST_FOOTHILLS = 0.5;
     /** Where an arc's volcanoes stand: the middle of {@link PlateSample#onArc}'s band. */
-    private static final double ARC_AT = 0.55, ARC_HALF = 0.35;
+    private static final double ARC_AT = 0.55, ARC_SEA_HALF = 0.3, ARC_LAND_HALF = 0.9;
     /** Where a trench lies off a subduction coast. */
     private static final double TRENCH_AT = 0.3, TRENCH_HALF = 0.35;
     /**
@@ -65,7 +65,7 @@ public final class TerrainFields {
      * across and half the drop, the second starting at {@code GRABEN_STEP}. The floor used to rise to the rim as a
      * square root, which stands vertical at the rim.
      */
-    private static final double GRABEN_FLOOR = 0.16, GRABEN_STEP = 0.30, STEP_WIDTH = 0.13;
+    private static final double GRABEN_FLOOR = 0.16, GRABEN_STEP = 0.30, STEP_WIDTH = 0.06;
     private static final double SHOULDER_AT = 0.7, SHOULDER_HALF = 0.4;
     /** Where a rift's floor starts to take the ruggedness of its shoulders, and over how far. */
     private static final double RIFT_CALM_FROM = 0.1, RIFT_CALM_OVER = 0.6;
@@ -92,7 +92,16 @@ public final class TerrainFields {
     /** The hills of new sea floor either side of a ridge, faulted blocks of crust a few blocks high, and their size. */
     private static final double ABYSSAL_HILLS = 0.045, HILL_SCALE = 40.0;
     /** How far a floodplain lies below the country round it. */
-    private static final double APRON_LOW = -0.03;
+    private static final double APRON_LIFT = 0.06;
+
+    /**
+     * Valleys through a convergent belt: the zero line of a slow noise, a flat floor {@code VALLEY_FLOOR} of its range
+     * either side and sides climbing out over {@code VALLEY_SIDE} more, cutting {@code VALLEY_DEPTH} of the uplift and
+     * adding {@code VALLEY_FLAT} to the erosion so the floor lies flat between the ridges. Broad and winding, as
+     * Terralith's are, not the sharp cut of a river: a floor that fell off from the zero line at once was a trench.
+     */
+    private static final double VALLEY_SCALE = 520.0, VALLEY_FLOOR = 0.15, VALLEY_SIDE = 0.3, VALLEY_DEPTH = 0.8,
+            VALLEY_FLAT = 0.5;
     /**
      * How much of a fold belt's uplift stands on its crests: the rest is taken out of the ground between them, so a
      * belt is a range of peaks and passes instead of one raised plateau.
@@ -150,9 +159,14 @@ public final class TerrainFields {
     private static double value(Field field, PlateSample s, GeologyParams p, long seed, int x, int z) {
         return switch (field) {
             case CONTINENTS -> continents(s, p);
-            case EROSION -> erosion(s, p);
+            case EROSION -> erosion(s, p, seed, x, z);
             case RIDGES -> 0.5 + 0.9 * belt(s, p);
             case RELIEF -> relief(s, p, seed, x, z);
+            // A mountain belt's grip, for the offset to scale vanilla's mountain spline down by inside the belt, and
+            // how deep in one of the belt's valleys the column lies, for the offset to cut that spline further. A
+            // rift keeps vanilla's full spline: halving it there lifted the rift floors out of their lakes.
+            case BELT -> mountainBelt(s, p);
+            case VALLEY -> valley(seed, x, z) * mountainBelt(s, p);
             case VARIETY -> variety(s, p);
             case MEANDER_X, MEANDER_Z -> 0.0;
         };
@@ -190,7 +204,7 @@ public final class TerrainFields {
         return SHORE + (ABYSS - SHORE) * Mth.clamp((a - SHELF_TO) / SLOPE_OVER, 0, 1);
     }
 
-    private static double erosion(PlateSample s, GeologyParams p) {
+    private static double erosion(PlateSample s, GeologyParams p, long seed, int x, int z) {
         boolean oceanic = s.plateKind().isOceanic();
         // The quiet ground a plate has away from its edge: a flat sea floor, a worn interior.
         double quiet = oceanic ? OCEAN_EROSION : INTERIOR_EROSION;
@@ -201,13 +215,16 @@ public final class TerrainFields {
         // Every belt starts from that quiet ground and works down from it, so the ruggedness fades out where the
         // belt does instead of ending in a ring one belt width from the boundary. Vanilla's peaks want erosion
         // under -0.4, which a belt's core reaches while its foothills stay gentle.
-        double rugged = belt(s, p) * calm(s, p) * switch (k) {
+        double b = belt(s, p);
+        double rugged = b * calm(s, p) * switch (k) {
             case CONVERGENT_SUBDUCTION, CONVERGENT_COLLISION -> 2.0;
             case TRANSFORM -> 1.2;
             case DIVERGENT -> 0.9;
             case INTERIOR -> 0.0;
         };
-        return quiet - rugged + 0.25 * apron(s, p);
+        boolean convergent = k == FaultType.CONVERGENT_COLLISION || k == FaultType.CONVERGENT_SUBDUCTION;
+        double flat = convergent ? VALLEY_FLAT * valley(seed, x, z) * b : 0.0;
+        return quiet - rugged + flat + 0.25 * apron(s, p);
     }
 
     private static double relief(PlateSample s, GeologyParams p, long seed, int x, int z) {
@@ -215,13 +232,16 @@ public final class TerrainFields {
         if (s.plateKind().isOceanic()) return oceanRelief(s, p, a, seed, x, z);
         double u = p.uplift() / 128.0 * (0.5 + 0.5 * motion(s));
         double t = Math.min(1.0, a / p.beltFactor());
-        double low = APRON_LOW * apron(s, p);
-        return low + switch (s.boundaryType()) {
-            case CONVERGENT_COLLISION -> u * bump(t) * crest(seed, x, z);
+        // The floodplain stands a few blocks clear of the sea: sunk below it, it filled with ponds.
+        double lift = APRON_LIFT * apron(s, p);
+        double cut = 1.0 - VALLEY_DEPTH * valley(seed, x, z);
+        return lift + switch (s.boundaryType()) {
+            case CONVERGENT_COLLISION -> u * bump(t) * crest(seed, x, z) * cut;
             // The arc stands where the volcanoes do, on a plateau that fades out across the belt and keeps clear of
-            // the coast; the trench lies off the coast, on the plate that goes under.
+            // the coast; the trench lies off the coast, on the plate that goes under. The arc's mountains drop
+            // steeply to the sea and go down slowly inland, as the Andes do to the altiplano.
             case CONVERGENT_SUBDUCTION -> s.overridingSide()
-                    ? u * (0.55 * peak(a, ARC_AT, ARC_HALF) + 0.3 * bump(t) * calm(s, p))
+                    ? u * (0.55 * peak(a, ARC_AT, ARC_SEA_HALF, ARC_LAND_HALF) + 0.3 * bump(t) * calm(s, p)) * cut
                     : -0.25 * peak(a, TRENCH_AT, TRENCH_HALF);
             case DIVERGENT -> graben(a) + SHOULDER_RISE * peak(a, SHOULDER_AT, SHOULDER_HALF);
             case TRANSFORM, INTERIOR -> 0.0;
@@ -259,6 +279,17 @@ public final class TerrainFields {
     /** The boundary's grip over the whole mountain belt: 1 on the line, 0 at the belt's edge. */
     public static double belt(PlateSample s, GeologyParams p) {
         return Mth.clamp(s.belt(p.faultWidth(), p.beltFactor()), 0.0, 1.0);
+    }
+
+    /**
+     * {@link #belt} where the boundary raises mountains, on either side of it: a collision, a subduction margin or a
+     * transform fault, whose ranges are vanilla's erosion spline alone and stood as walls too. 0 at a rift and in the
+     * interior. Both sides, because the two plates meet on a line: a grip that dropped to nothing on the plate going
+     * under put a wall along every subduction coast.
+     */
+    private static double mountainBelt(PlateSample s, GeologyParams p) {
+        FaultType k = s.boundaryType();
+        return k == FaultType.DIVERGENT || k == FaultType.INTERIOR ? 0.0 : belt(s, p);
     }
 
     /**
@@ -324,6 +355,17 @@ public final class TerrainFields {
     /** 1 at {@code centre}, 0 at {@code halfWidth} either side, smooth in between. */
     private static double peak(double a, double centre, double halfWidth) {
         return bump(Math.min(1.0, Math.abs(a - centre) / halfWidth));
+    }
+
+    /** {@link #peak} with its own width on each side: {@code nearHalf} towards the boundary, {@code farHalf} away. */
+    private static double peak(double a, double centre, double nearHalf, double farHalf) {
+        return bump(Math.min(1.0, a < centre ? (centre - a) / nearHalf : (a - centre) / farHalf));
+    }
+
+    /** How deep in a valley a column lies, 0 on the ridges to 1 across the whole floor. */
+    private static double valley(long seed, int x, int z) {
+        double off = Math.abs(twoOctaves(seed, x, z, VALLEY_SCALE, 0x5A11L)) - VALLEY_FLOOR;
+        return smooth(Mth.clamp(1.0 - off / VALLEY_SIDE, 0, 1));
     }
 
     // === Noise ==============================================================
