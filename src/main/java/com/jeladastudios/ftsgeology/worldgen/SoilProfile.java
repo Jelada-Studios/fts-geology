@@ -69,14 +69,17 @@ public final class SoilProfile {
                 double s = Mth.lerp(dz / 16.0, Mth.lerp(dx / 16.0, s00, s10), Mth.lerp(dx / 16.0, s01, s11));
                 int x = x0 + dx, z = z0 + dz;
                 RandomSource rng = RandomSource.create(SeedHash.columnSeed(seed, x, z));
-                // A third of the density in quiet country, rising over the gate band to the full thing.
+                // A third of the patches in quiet country, rising over the gate band to all of them. Decided a cell
+                // of thirty-two blocks at a time, not a column at a time: thinned column by column, a patch was a
+                // sprinkle of single blocks.
                 double gate = Mth.clamp(QUIET_SHARE + (s - GATE_MIN) / (GATE_FULL - GATE_MIN), QUIET_SHARE, 1.0);
-                if (gate < 1.0 && rng.nextDouble() > gate) continue;
+                if (gate < 1.0 && SeedHash.rand01(SeedHash.hash(seed ^ 0x5A7CL, x >> 5, z >> 5, 0)) > gate) continue;
 
                 // Patches on two scales, leaving about half the ground as ordinary soil.
                 double n = ValueNoise.noise(x, z, 21.0) + 0.5 * ValueNoise.noise(x + 8192, z - 8192, 7.0);
-                // A feathered ramp rather than a cut, so a patch breaks up at its edge.
-                double keep = (n - 0.10) / 0.16;
+                // A short feathered ramp: a patch is solid inside and frays only at its very edge. The ramp used to
+                // span most of the patch, and the patch came out as a sprinkle of single blocks.
+                double keep = (n - 0.14) / 0.05;
                 if (keep <= 0.0 || (keep < 1.0 && rng.nextDouble() > keep)) continue;
 
                 paint(level, x, z, rng);
@@ -158,14 +161,16 @@ public final class SoilProfile {
         Soil soil = probe(level, x, g, z);
         if (soil == Soil.NONE) return;
 
-        BlockState put = block(soil, rng).defaultBlockState();
+        BlockState put = block(soil, x, z).defaultBlockState();
         // Plants cannot stand on terracotta or calcite, and no shape update will knock them off.
         if (!put.is(BlockTags.DIRT)) TerrainProbe.clearGroundCover(level, x, g, z, 2);
         level.setBlock(at, put, FLAGS);
     }
 
-    private static Block block(Soil soil, RandomSource rng) {
-        int r = rng.nextInt(10);
+    private static Block block(Soil soil, int x, int z) {
+        // A slow field picks the block, not a die a column at a time: the patch is a few blobs of colour a handful of
+        // blocks across, not confetti.
+        int r = Mth.clamp((int) Math.floor(5.0 + 5.0 * ValueNoise.noise(x + 4096, z + 4096, 5.0)), 0, 9);
         return switch (soil) {
             // Red earth: red terracotta leads, the browner blocks break it up.
             case LATERITE -> r < 5 ? Blocks.RED_TERRACOTTA
