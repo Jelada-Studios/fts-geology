@@ -8,6 +8,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.util.RandomSource;
@@ -379,14 +380,15 @@ public final class VolcanoEdifice {
         // Fine noise rather than a dice roll decides the mix, so grass and scree break up in small patches.
         double jitter = 0.5 + 0.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + 57, gz - 57, 4.0);
         double grass = Mth.clamp(1.0 - (h - line + 0.06) / 0.14, 0.0, 1.0);
-        if (jitter < grass) return Blocks.GRASS_BLOCK.defaultBlockState();
+        if (jitter < grass) return c.highland ? highlandSkin(rng) : Blocks.GRASS_BLOCK.defaultBlockState();
         double scree = Mth.clamp(1.0 - (h - line) / 0.20, 0.0, 1.0);
+        Block soil = c.highland ? Blocks.TUFF : Blocks.COARSE_DIRT;
         if (jitter < scree) {
-            return (rng.nextInt(3) == 0 ? Blocks.GRAVEL : Blocks.COARSE_DIRT).defaultBlockState();
+            return (rng.nextInt(3) == 0 ? Blocks.GRAVEL : soil).defaultBlockState();
         }
         // Weathered rock and scree to the top of a dead cone, not the bare fresh rock of a live one.
         if (extinct && rng.nextBoolean()) {
-            return (rng.nextBoolean() ? Blocks.GRAVEL : Blocks.COARSE_DIRT).defaultBlockState();
+            return (rng.nextBoolean() ? Blocks.GRAVEL : soil).defaultBlockState();
         }
         return rock;
     }
@@ -417,14 +419,24 @@ public final class VolcanoEdifice {
         // Fine noise rather than a dice roll decides the mix, so grass and scree break up in small patches.
         double jitter = 0.5 + 0.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx - 97, gz + 97, 4.0);
         double grass = Mth.clamp(1.0 - (h - line + 0.06) / 0.14, 0.0, 1.0);
-        if (jitter < grass) return Blocks.GRASS_BLOCK.defaultBlockState();
+        if (jitter < grass) return c.highland ? highlandSkin(rng) : Blocks.GRASS_BLOCK.defaultBlockState();
         double scree = Mth.clamp(1.0 - (h - line) / 0.22, 0.0, 1.0);
         if (jitter < scree) {
             int r = rng.nextInt(10);
-            return (r < 4 ? Blocks.COARSE_DIRT : r < 7 ? Blocks.SMOOTH_BASALT : r < 9 ? Blocks.TUFF : Blocks.GRAVEL)
-                    .defaultBlockState();
+            return (r < 4 ? (c.highland ? Blocks.TUFF : Blocks.COARSE_DIRT) : r < 7 ? Blocks.SMOOTH_BASALT
+                    : r < 9 ? Blocks.TUFF : Blocks.GRAVEL).defaultBlockState();
         }
         return (rng.nextInt(3) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT).defaultBlockState();
+    }
+
+    /**
+     * What a flank wears in the volcanic highland where any other volcano would grass over: the tuff, ash gravel
+     * and old basalt of the plateau round it, so the mountain reads as part of its country rather than a green
+     * hill set down on it.
+     */
+    static BlockState highlandSkin(RandomSource rng) {
+        int r = rng.nextInt(10);
+        return (r < 5 ? Blocks.TUFF : r < 8 ? Blocks.GRAVEL : Blocks.BASALT).defaultBlockState();
     }
 
     /**

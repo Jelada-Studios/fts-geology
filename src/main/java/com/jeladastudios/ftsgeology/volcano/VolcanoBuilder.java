@@ -3,6 +3,8 @@ package com.jeladastudios.ftsgeology.volcano;
 import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
+import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyRoles;
+import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld;
 import com.jeladastudios.ftsgeology.blockentity.VolcanoCoreBlockEntity;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
@@ -200,7 +202,16 @@ public final class VolcanoBuilder {
                 TectonicMap.sampleCached(level, site.x(), site.z()), site.setting(), site.age(), level.getSeaLevel(),
                 site.setting().ocean() ? VolcanoField.seaTemperature(level, site.x(), site.z()) : 0.0, site.activity());
         if (c != null && c.isle != null) c.isle.coastLand = VolcanoField.coastLand(level, c);
+        if (c != null) c.highland = highlandAt(level, site.x(), site.z());
         return c;
+    }
+
+    /**
+     * Whether a site stands in an arc's volcanic highland, where nothing grasses over a flank. Only the mod's own
+     * world type has the roles; anywhere else every volcano greens as it always did.
+     */
+    static boolean highlandAt(ServerLevel level, int x, int z) {
+        return GeologyWorld.isOwn(level) && GeologyRoles.roleAt(x, z) == GeologyRoles.Role.VOLCANIC_HIGHLAND;
     }
 
     /**
@@ -215,9 +226,11 @@ public final class VolcanoBuilder {
     /** The whole plan of a large volcano from its field seed; null if it cannot stand on this base at all. */
     static Ctx largePlan(ServerLevel level, int x, int baseY, int z, int magnitude, VolcanoType type, long seed,
                          VolcanoSetting setting, double age, double seaTemp) {
-        return plan(level, x, baseY, z, magnitude, type, VolcanoSize.LARGE, RandomSource.create(seed),
+        Ctx c = plan(level, x, baseY, z, magnitude, type, VolcanoSize.LARGE, RandomSource.create(seed),
                 TectonicMap.sampleCached(level, x, z), setting, age, level.getSeaLevel(), seaTemp,
                 VolcanoActivity.of(seed, x, z, type, setting));
+        if (c != null) c.highland = highlandAt(level, x, z);
+        return c;
     }
 
     /** {@link #largeFootprint} for a setting; in the sea {@code baseY} is the sea floor. */

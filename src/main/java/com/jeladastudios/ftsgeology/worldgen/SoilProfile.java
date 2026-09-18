@@ -160,7 +160,7 @@ public final class SoilProfile {
 
         BlockState put = block(soil, rng).defaultBlockState();
         // Plants cannot stand on terracotta or calcite, and no shape update will knock them off.
-        if (!put.is(BlockTags.DIRT)) TerrainProbe.clearVegetation(level, x, g, z, 2);
+        if (!put.is(BlockTags.DIRT)) TerrainProbe.clearGroundCover(level, x, g, z, 2);
         level.setBlock(at, put, FLAGS);
     }
 

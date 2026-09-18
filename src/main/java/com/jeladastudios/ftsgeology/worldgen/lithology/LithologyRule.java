@@ -22,7 +22,7 @@ import net.minecraft.world.level.levelgen.SurfaceRules;
  * that come after it cut and fill the right rock. The mod's own biomes also use it for the bare rock at their surface,
  * so what shows on a cliff is what lies behind it.
  *
- * <p>With {@code steep_only} it answers only in columns whose ground climbs four blocks within two, and then for
+ * <p>With {@code steep_only} it answers only in columns whose ground climbs three blocks within two, and then for
  * every block, stone included. Placed before the soil rules, that leaves a cliff face bare in any biome, the way a real
  * cliff sheds its soil, and the rock it shows is the rock behind it. Vanilla's own steep test looks one way along each
  * axis, so it would have stripped a cliff that faced north and left the one facing south under grass; this one looks
@@ -36,7 +36,7 @@ public record LithologyRule(boolean steepOnly) implements SurfaceRules.RuleSourc
             ).apply(i, LithologyRule::new)));
 
     /** How much the ground must climb across two blocks for a column to count as a cliff. */
-    private static final int STEEP_RISE = 4;
+    private static final int STEEP_RISE = 3;
 
     @Override
     public KeyDispatchDataCodec<? extends SurfaceRules.RuleSource> codec() {

@@ -177,7 +177,7 @@ public final class HotspotSigns {
         // A field runs out along a large volcano's circle, not along the chunk grid.
         if (rng.nextDouble() >= GeothermalBasin.volcanoClearance(level.getLevel(), x, z)) return;
 
-        TerrainProbe.clearVegetation(level, x, g, z, 1);
+        TerrainProbe.clearGroundCover(level, x, g, z, 1);
 
         if (band == 0) {
             // On the trace: where the steam comes out.

@@ -11,6 +11,8 @@ import com.jeladastudios.ftsgeology.block.VolcanoCoreBlock;
 import com.jeladastudios.ftsgeology.block.VolcanoIgniterBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.DropExperienceBlock;
+import net.minecraft.util.valueproviders.UniformInt;
 import net.minecraft.world.level.block.SandBlock;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.SoundType;
@@ -253,17 +255,17 @@ public final class ModBlocks {
 
     /** Quartz vein: white crystalline hydrothermal quartz seam cutting through grey host stone. */
     public static final RegistryObject<Block> QUARTZ_VEIN = BLOCKS.register("quartz_vein",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+            () -> new DropExperienceBlock(BlockBehaviour.Properties.copy(Blocks.STONE)
                     .mapColor(MapColor.QUARTZ)
                     .strength(3.0F, 6.0F)
-                    .requiresCorrectToolForDrops()));
+                    .requiresCorrectToolForDrops(), UniformInt.of(2, 5)));
 
     /** Cinnabar: hydrothermal vermilion-red mercury sulfide ore. */
     public static final RegistryObject<Block> CINNABAR = BLOCKS.register("cinnabar",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+            () -> new DropExperienceBlock(BlockBehaviour.Properties.copy(Blocks.STONE)
                     .mapColor(MapColor.COLOR_RED)
                     .strength(2.5F, 3.0F)
-                    .requiresCorrectToolForDrops()));
+                    .requiresCorrectToolForDrops(), UniformInt.of(1, 5)));
 
     /** Galena: primary lead sulfide ore with metallic lustre and stepped cubic cleavage. */
     public static final RegistryObject<Block> GALENA = BLOCKS.register("galena",

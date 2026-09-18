@@ -341,7 +341,7 @@ public final class HotSpringSites {
         };
         int bandReach = 0;
         for (int b : band) bandReach += b;
-        // Past the last mat, a sterile halo of poisoned crust that thins into the ground, with dead trees.
+        // Past the last mat, a sterile halo of poisoned crust that thins into the ground.
         int halo = stage >= 4 ? 5 + level.random.nextInt(6) : 0;
         int reach = bandReach + halo;
         double phase = level.random.nextDouble() * Math.PI * 2;
@@ -403,7 +403,6 @@ public final class HotSpringSites {
                 TerrainProbe.clearVegetation(level, x, g, z, 2);
                 level.setBlock(p, b.defaultBlockState(), FLAGS);
                 if (bank) stainStepFace(level, x, g, z, b);
-                else if (inHalo && level.random.nextInt(30) == 0) deadTree(level, p, level.random);
             }
         }
     }
@@ -448,25 +447,6 @@ public final class HotSpringSites {
         if (r < 7) return Blocks.GRAVEL;
         if (r < 9) return ModBlocks.SINTER.get();
         return Blocks.TUFF;
-    }
-
-    /**
-     * A dead, bleached tree in the halo, white at the foot where silica wicked up the wood: Yellowstone's
-     * "bobby socks" trees. Only ever placed on fresh halo crust.
-     */
-    static void deadTree(net.minecraft.world.level.LevelAccessor level, BlockPos ground,
-                         net.minecraft.util.RandomSource rng) {
-        int flags = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
-        Block trunk = rng.nextBoolean() ? Blocks.STRIPPED_SPRUCE_LOG : Blocks.STRIPPED_OAK_LOG;
-        int height = 3 + rng.nextInt(4);
-        for (int h = 1; h <= height; h++) {
-            BlockPos p = ground.above(h);
-            BlockState s = level.getBlockState(p);
-            if (!s.isAir() && !TerrainProbe.isVegetation(s)) return;   // something is in the way
-            level.setBlock(p, trunk.defaultBlockState(), flags);
-        }
-        // The white foot: silica drawn up out of the ground, which is where the name comes from.
-        level.setBlock(ground, ModBlocks.SINTER.get().defaultBlockState(), flags);
     }
 
     /** Which band a given distance from the water falls in, or null past the last one. */

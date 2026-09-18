@@ -192,7 +192,7 @@ public final class GeothermalBasin {
         double flat = ValueNoise.noise(x, z, 34.0);
         double wet = ValueNoise.noise(x + 4096, z - 4096, 19.0);
 
-        TerrainProbe.clearVegetation(level, x, g, z, 2);
+        TerrainProbe.clearGroundCover(level, x, g, z, 2);
 
         if (over(wet, 0.52, 0.20, rng) && s > 0.45) {
             // A mud flat: mud pots among vanilla mud, not one block stamped over and over.
@@ -214,9 +214,6 @@ public final class GeothermalBasin {
         // single spring already uses, so the two meet without a seam.
         Block b = rng.nextInt(3) == 0 ? ModBlocks.SINTER_CRUST.get() : HotSpringSites.haloBlock(rng);
         level.setBlock(at, TfcCompat.translate(level, at, b.defaultBlockState()), FLAGS);
-        // Bobby-socks trees: killed by the silica, left bleached and standing. Rare, or the basin
-        // turns into a dead forest instead of an open flat.
-        if (rng.nextInt(110) == 0) HotSpringSites.deadTree(level, at, rng);
         return true;
     }
 

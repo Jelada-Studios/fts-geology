@@ -93,6 +93,8 @@ public final class VolcanoPlan {
         OceanEdifice.Isle isle;
         /** How alive it is: a dormant volcano's crater is sealed, an extinct one has no core at all. */
         VolcanoActivity activity = VolcanoActivity.ACTIVE;
+        /** Standing in an arc's volcanic highland, where a flank stays tuff and scree instead of grassing over. */
+        boolean highland;
         /** The crater cells a dormant volcano keeps crusted over, which turn to lava only while it erupts. */
         final List<BlockPos> seal = new ArrayList<>();
     }
@@ -101,6 +103,7 @@ public final class VolcanoPlan {
                               VolcanoSize size) {
         Ctx c = plan(level, base.getX(), base.getY(), base.getZ(), magnitude, type, size,
                 level.random, TectonicMap.sample(level, base.getX(), base.getZ()));
+        if (c != null) c.highland = VolcanoBuilder.highlandAt(level, base.getX(), base.getZ());
         // The site check scales with what we are actually about to occupy.
         return c != null && siteIsSuitable(level, c) ? c : null;
     }

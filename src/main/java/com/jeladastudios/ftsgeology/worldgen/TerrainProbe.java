@@ -278,4 +278,23 @@ public final class TerrainProbe {
             if (dy == height && level.getBlockState(p.above()).is(s.getBlock())) height++;
         }
     }
+
+    /**
+     * {@link #clearVegetation} for painting the ground under standing trees: stops at a leaf or a log as it stops at
+     * a wall, so a tree at the edge of a sinter flat keeps its whole crown instead of losing the rows the paint
+     * reached. Leaves count as vegetation elsewhere because a volcano's site clearing wants them gone.
+     */
+    public static void clearGroundCover(net.minecraft.world.level.LevelAccessor level, int x, int groundY,
+                                        int z, int height) {
+        for (int dy = 1; dy <= height; dy++) {
+            BlockPos p = new BlockPos(x, groundY + dy, z);
+            BlockState s = level.getBlockState(p);
+            if (s.isAir()) continue;
+            if (isTreePart(s) || !isVegetation(s)) return;
+            level.setBlock(p, Blocks.AIR.defaultBlockState(),
+                    net.minecraft.world.level.block.Block.UPDATE_CLIENTS
+                            | net.minecraft.world.level.block.Block.UPDATE_KNOWN_SHAPE);
+            if (dy == height && level.getBlockState(p.above()).is(s.getBlock())) height++;
+        }
+    }
 }
