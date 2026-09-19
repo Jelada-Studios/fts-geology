@@ -107,27 +107,35 @@ public final class VolcanoField {
     private record StructureKey(int set, long chunk) {}
 
     /** Edge of a grid cell. Each cell holds at most one volcano. */
-    static final int CELL = 2560;
+    static final int CELL_BASE = 2560;
     /**
      * How far a centre keeps from its cell's edge. Twice this is more than the widest footprint, so two
      * large volcanoes can never overlap and a chunk only has to ask the cells around its own.
      */
-    private static final int MARGIN = 620;
+    private static final int MARGIN_BASE = 620;
     /** Points tried per cell on a plate boundary, which is a narrow thing to land on. */
     private static final int TRIES = 12;
     /** How active the boundary has to be. The arc and the rift proper, not their faint outer edge. */
     private static final double MIN_STRESS = 0.4;
     /** How far a plume's centre may be pulled to fit its cell: the dome is still strong there. */
-    private static final int PLUME_PULL = 420;
+    private static final int PLUME_PULL_BASE = 420;
     /** Ground tried around a refused shield or caldera: four bearings at half its foot, at the foot, and half as far again. */
     private static final int SHIFTS = 12;
+
+    /**
+     * The cell, its margin and the plume pull in this world: the base sizes times the horizontal scale, since a
+     * large volcano is built that much bigger ({@link VolcanoPlan#largeScale}) and the margin has to keep clear of it.
+     */
+    static int cell() { return (int) Math.round(CELL_BASE * com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().horizontal()); }
+    private static int margin() { return (int) Math.round(MARGIN_BASE * com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().horizontal()); }
+    private static int plumePull() { return (int) Math.round(PLUME_PULL_BASE * com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().horizontal()); }
 
     private static final Map<Long, CompletableFuture<Cell>> CACHE = new ConcurrentHashMap<>();
 
     /** The chosen large volcanoes whose footprint reaches into this chunk. */
     public static List<Site> sitesTouching(ServerLevel level, ChunkPos cp) {
         List<Site> out = new ArrayList<>(1);
-        int cx0 = Math.floorDiv(cp.getMiddleBlockX(), CELL), cz0 = Math.floorDiv(cp.getMiddleBlockZ(), CELL);
+        int cx0 = Math.floorDiv(cp.getMiddleBlockX(), cell()), cz0 = Math.floorDiv(cp.getMiddleBlockZ(), cell());
         for (int ox = -1; ox <= 1; ox++) {
             for (int oz = -1; oz <= 1; oz++) {
                 Site s = site(level, cx0 + ox, cz0 + oz);
@@ -143,7 +151,7 @@ public final class VolcanoField {
 
     /** The chosen large volcano nearest this column among the cells round it, or null. */
     public static Site nearestLarge(ServerLevel level, int x, int z) {
-        int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
+        int cx0 = Math.floorDiv(x, cell()), cz0 = Math.floorDiv(z, cell());
         Site best = null;
         double bestD = Double.MAX_VALUE;
         for (int ox = -1; ox <= 1; ox++) {
@@ -167,7 +175,7 @@ public final class VolcanoField {
      * between a bit over half its reach and nine tenths of it. The chunk pass fills each group as the ground loads.
      */
     public static double footCluster(ServerLevel level, int x, int z) {
-        int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
+        int cx0 = Math.floorDiv(x, cell()), cz0 = Math.floorDiv(z, cell());
         double best = Double.MAX_VALUE;
         for (int ox = -1; ox <= 1; ox++) {
             for (int oz = -1; oz <= 1; oz++) {
@@ -197,7 +205,7 @@ public final class VolcanoField {
      * out along its circle instead of stopping on a chunk edge.
      */
     public static double largeMargin(ServerLevel level, int x, int z) {
-        int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
+        int cx0 = Math.floorDiv(x, cell()), cz0 = Math.floorDiv(z, cell());
         double best = Double.MAX_VALUE;
         for (int ox = -1; ox <= 1; ox++) {
             for (int oz = -1; oz <= 1; oz++) {
@@ -214,7 +222,7 @@ public final class VolcanoField {
      * the mountain itself, huge where there is none. Springs are kept off the body and let onto the apron.
      */
     public static double bodyMargin(ServerLevel level, int x, int z) {
-        int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
+        int cx0 = Math.floorDiv(x, cell()), cz0 = Math.floorDiv(z, cell());
         double best = Double.MAX_VALUE;
         for (int ox = -1; ox <= 1; ox++) {
             for (int oz = -1; oz <= 1; oz++) {
@@ -231,7 +239,7 @@ public final class VolcanoField {
      * centre, 1 at its foot, more outside it, huge where there is none.
      */
     public static double bodyShare(ServerLevel level, int x, int z) {
-        int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
+        int cx0 = Math.floorDiv(x, cell()), cz0 = Math.floorDiv(z, cell());
         double best = Double.MAX_VALUE;
         for (int ox = -1; ox <= 1; ox++) {
             for (int oz = -1; oz <= 1; oz++) {
@@ -246,8 +254,8 @@ public final class VolcanoField {
     /** The chosen large volcanoes whose mountain reaches into this box of blocks. */
     public static List<Site> sitesInBox(ServerLevel level, int minX, int minZ, int maxX, int maxZ) {
         List<Site> out = new ArrayList<>(1);
-        for (int cx = Math.floorDiv(minX, CELL) - 1; cx <= Math.floorDiv(maxX, CELL) + 1; cx++) {
-            for (int cz = Math.floorDiv(minZ, CELL) - 1; cz <= Math.floorDiv(maxZ, CELL) + 1; cz++) {
+        for (int cx = Math.floorDiv(minX, cell()) - 1; cx <= Math.floorDiv(maxX, cell()) + 1; cx++) {
+            for (int cz = Math.floorDiv(minZ, cell()) - 1; cz <= Math.floorDiv(maxZ, cell()) + 1; cz++) {
                 Site s = site(level, cx, cz);
                 if (s == null || !s.chosen()) continue;
                 int r = s.edificeReach();
@@ -260,7 +268,7 @@ public final class VolcanoField {
 
     /** True on the floor of a chosen large caldera, where hot ground and springs belong. */
     public static boolean onCalderaFloor(ServerLevel level, int x, int z) {
-        int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
+        int cx0 = Math.floorDiv(x, cell()), cz0 = Math.floorDiv(z, cell());
         for (int ox = -1; ox <= 1; ox++) {
             for (int oz = -1; oz <= 1; oz++) {
                 Site s = site(level, cx0 + ox, cz0 + oz);
@@ -277,7 +285,7 @@ public final class VolcanoField {
      * generated before the setting changed still deserves its summit.
      */
     public static Site siteAt(ServerLevel level, int x, int z) {
-        Site s = site(level, Math.floorDiv(x, CELL), Math.floorDiv(z, CELL));
+        Site s = site(level, Math.floorDiv(x, cell()), Math.floorDiv(z, cell()));
         return s != null && s.x() == x && s.z() == z ? s : null;
     }
 
@@ -301,7 +309,7 @@ public final class VolcanoField {
      */
     public static Found nearest(ServerLevel level, int x, int z, int rings, VolcanoType only,
                                 VolcanoSetting onlySetting, VolcanoActivity onlyActivity) {
-        int cx0 = Math.floorDiv(x, CELL), cz0 = Math.floorDiv(z, CELL);
+        int cx0 = Math.floorDiv(x, cell()), cz0 = Math.floorDiv(z, cell());
         Site best = null;
         double bestD = Double.MAX_VALUE;
         int count = 0;
@@ -450,8 +458,8 @@ public final class VolcanoField {
     private static Cell evaluate(ServerLevel level, int cx, int cz) {
         long seed = hash(level.getSeed(), cx, cz, 0x5EED1L);
         int[] refused = new int[VolcanoType.values().length * REASONS];
-        int span = CELL - 2 * MARGIN;
-        int minX = cx * CELL + MARGIN, minZ = cz * CELL + MARGIN;
+        int span = cell() - 2 * margin();
+        int minX = cx * cell() + margin(), minZ = cz * cell() + margin();
         int maxX = minX + span, maxZ = minZ + span;
         // Nearby candidates ask after the same structure starts over and over; each is worked out once.
         Map<StructureKey, Boolean> structures = new HashMap<>();
@@ -462,8 +470,8 @@ public final class VolcanoField {
         boolean calderas = false;
         // A plume first: fewer of them, and the grander sight. A centre just outside the usable part
         // of the cell is pulled in.
-        for (int[] p : HotspotMap.plumeCentres(level, minX - PLUME_PULL, minZ - PLUME_PULL,
-                maxX + PLUME_PULL, maxZ + PLUME_PULL)) {
+        for (int[] p : HotspotMap.plumeCentres(level, minX - plumePull(), minZ - plumePull(),
+                maxX + plumePull(), maxZ + plumePull())) {
             int x = Mth.clamp(p[0], minX, maxX), z = Mth.clamp(p[1], minZ, maxZ);
             if (HotspotMap.plumeStrength(level, x, z) < 0.4) continue;
             // Under the open sea a plume builds an island up from the sea floor, as at Hawaii.

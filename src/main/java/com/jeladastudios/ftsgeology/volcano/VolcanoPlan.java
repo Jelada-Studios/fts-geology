@@ -122,6 +122,21 @@ public final class VolcanoPlan {
     /** {@link #plan} for a volcano of a given activity: an extinct one is worn lower, gullied deeper, and has no flows. */
     static Ctx plan(LevelHeightAccessor level, int x, int baseY, int z, int magnitude, VolcanoType type,
                     VolcanoSize size, RandomSource rng, PlateSample plate, VolcanoActivity activity) {
+        return plan(level, x, baseY, z, magnitude, type, size, rng, plate, activity, largeScale(size));
+    }
+
+    /**
+     * How much bigger a large volcano is built than the size table says: the world's horizontal scale, so the
+     * tall preset's mountains have volcanoes to match. Small and medium ones, raised after generation, and islands,
+     * whose flanks run down to a sea floor that is not scaled, keep the table's sizes.
+     */
+    static double largeScale(VolcanoSize size) {
+        return size == VolcanoSize.LARGE ? com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().horizontal() : 1.0;
+    }
+
+    /** {@link #plan} with every length in blocks multiplied by {@code scale}; the shares and slopes stay. */
+    static Ctx plan(LevelHeightAccessor level, int x, int baseY, int z, int magnitude, VolcanoType type,
+                    VolcanoSize size, RandomSource rng, PlateSample plate, VolcanoActivity activity, double scale) {
         Ctx c = new Ctx();
         c.activity = activity;
         c.type = type;
@@ -131,8 +146,8 @@ public final class VolcanoPlan {
         c.z = z;
         c.baseY = baseY;
 
-        c.craterR = size.craterRadius(type, magnitude, rng);
-        c.coneHeight = size.coneHeight(type, magnitude, rng);
+        c.craterR = (int) Math.round(size.craterRadius(type, magnitude, rng) * scale);
+        c.coneHeight = (int) Math.round(size.coneHeight(type, magnitude, rng) * scale);
         // Rain and ice have taken the top off a mountain that stopped growing.
         if (activity == VolcanoActivity.EXTINCT) c.coneHeight = (int) Math.round(c.coneHeight * 0.85);
         c.coneSlope = size.coneSlope(type);
@@ -150,27 +165,27 @@ public final class VolcanoPlan {
         c.flankExponent = type == VolcanoType.STRATOVOLCANO && size == VolcanoSize.LARGE
                 ? 1.5 : type.flankExponent();
         c.ridgeHeight = type == VolcanoType.STRATOVOLCANO && size != VolcanoSize.SMALL
-                ? Math.min(5.0, c.coneHeight * 0.04) : 0.0;
+                ? Math.min(5.0 * scale, c.coneHeight * 0.04) : 0.0;
         if (activity == VolcanoActivity.EXTINCT) c.ridgeHeight *= 2.0;
 
         c.coneBaseR = c.coneHeight > 0
                 ? (int) Math.round(c.craterR + c.coneHeight * c.coneSlope)
                 : c.craterR;
-        c.fissureHalf = size.fissureHalfLength(magnitude, rng);
+        c.fissureHalf = (int) Math.round(size.fissureHalfLength(magnitude, rng) * scale);
         if (type == VolcanoType.FISSURE) {
             // A fissure has no cone, but it is not a point either: the swarm runs for tens of blocks
             // along the strike and floods the ground around it, so the footprint is the LINE.
             c.coneBaseR = c.fissureHalf;
         }
-        c.rimLift = size.rimLift(magnitude);
-        c.rimWidth = size.rimWidth();
-        c.liveReach = size == VolcanoSize.LARGE ? LARGE_LIVE_REACH : 0;
+        c.rimLift = size.rimLift(magnitude) * scale;
+        c.rimWidth = (int) Math.round(size.rimWidth() * scale);
+        c.liveReach = size == VolcanoSize.LARGE ? (int) Math.round(LARGE_LIVE_REACH * scale) : 0;
         // The apron is measured from the edifice's own foot at each bearing, so a lobe swinging out
         // can never swallow it and leave the cone ending on a step. A large one is capped so the whole
         // footprint stays inside VolcanoField's cell margin.
         double share = size.apronReach(type);
         c.apronLen = size == VolcanoSize.LARGE
-                ? Mth.clamp(c.coneBaseR * share, 20.0, type == VolcanoType.STRATOVOLCANO ? 130.0 : 56.0)
+                ? Mth.clamp(c.coneBaseR * share, 20.0 * scale, (type == VolcanoType.STRATOVOLCANO ? 130.0 : 56.0) * scale)
                 : c.coneBaseR * share + 6;
         double foot = switch (type) {
             case CALDERA -> c.craterR * 1.34 + c.rimWidth;
@@ -226,10 +241,10 @@ public final class VolcanoPlan {
 
         // A small caldera is a pit; a big one's floor lies at the level of the land around it, and its
         // depth comes from the plateau rising round it rather than from digging.
-        int depth = size.calderaDepth(rng);
+        int depth = (int) Math.round(size.calderaDepth(rng) * scale);
         c.calderaFloorY = size == VolcanoSize.SMALL ? c.baseY - depth : c.baseY;
         c.domeR = Math.max(3, c.craterR / 3);
-        c.domeH = size.domeHeight(rng);
+        c.domeH = (int) Math.round(size.domeHeight(rng) * scale);
         c.lakeAngle = rng.nextDouble() * Math.PI * 2;
         c.lakeWidth = Math.PI * (0.45 + rng.nextDouble() * 0.35);
         // A small caldera's lake is a crescent running most of the way to the ring. A big one has a small
@@ -275,7 +290,7 @@ public final class VolcanoPlan {
     static Ctx plan(LevelHeightAccessor level, int x, int baseY, int z, int magnitude, VolcanoType type,
                     VolcanoSize size, RandomSource rng, PlateSample plate, VolcanoSetting setting, double age,
                     int seaY, double seaTemp, VolcanoActivity activity) {
-        Ctx c = plan(level, x, baseY, z, magnitude, type, size, rng, plate, activity);
+        Ctx c = plan(level, x, baseY, z, magnitude, type, size, rng, plate, activity, setting.ocean() ? 1.0 : largeScale(size));
         if (c == null || !setting.ocean()) return c;
         OceanEdifice.plan(c, rng, setting, age, seaY, seaTemp);
         return c;
