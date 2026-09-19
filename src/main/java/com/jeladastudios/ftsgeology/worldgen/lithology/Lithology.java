@@ -5,6 +5,7 @@ import com.jeladastudios.ftsgeology.tectonics.GeologyParams;
 import com.jeladastudios.ftsgeology.tectonics.HotspotMap;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
 import com.jeladastudios.ftsgeology.util.SeedHash;
+import com.jeladastudios.ftsgeology.util.ValueNoise;
 import com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields;
 
 /**
@@ -127,8 +128,8 @@ public final class Lithology {
         int depth = surface - y + (int) ((h >>> 3) & 3) - 1;
         Setting setting = c.setting();
         if (c.weight() < 1.0) {
-            // Where one setting gives way to the next, their rocks interfinger in pods rather than meet at a line.
-            double pick = SeedHash.rand01(SeedHash.hash(seed ^ 0x51L, x >> 3, z >> 3, y >> 3));
+            // Where one setting gives way to the next, their rocks interfinger in blobs rather than meet at a line.
+            double pick = 0.5 + 0.5 * ValueNoise.noise3D(x + shiftX(seed) + 4096, y, z + shiftZ(seed), POD_SCALE, POD_SCALE);
             if (pick >= c.weight()) setting = c.fallback();
         }
         long salt = SeedHash.mix(seed ^ 0x117E5L);
@@ -208,12 +209,28 @@ public final class Lithology {
     }
 
     /**
-     * A rock laid in bodies eight blocks across, {@link #BASEMENT_BODIES} of the volume, with the generator's own
-     * stone between them. The sea floor's gabbro and mantle, the prism and a hotspot's roots come this way as the
-     * basement does: laid whole, every cave wall was the mod's rock and read as painted rather than as ground.
+     * The size of a body and of an interfingering pod, and the noise value a body starts at: a little over the noise's
+     * middle, for {@link #BASEMENT_BODIES} of the volume. Value noise, not a die per eight-block cell: the cells stood
+     * out of every cliff as cubes of diorite and granite.
+     */
+    private static final double BODY_SCALE = 9.0, BODY_CUT = 0.08, POD_SCALE = 8.0;
+
+    /**
+     * A rock laid in bodies, {@link #BASEMENT_BODIES} of the volume, with the generator's own stone between them.
+     * The sea floor's gabbro and mantle, the prism and a hotspot's roots come this way as the basement does: laid
+     * whole, every cave wall was the mod's rock and read as painted rather than as ground.
      */
     private static Rock body(long seed, int x, int y, int z, Rock rock) {
-        return SeedHash.rand01(SeedHash.hash(seed ^ 0xBA5EL, x >> 3, z >> 3, y >> 3)) < BASEMENT_BODIES ? rock : Rock.KEEP;
+        return ValueNoise.noise3D(x + shiftX(seed), y, z + shiftZ(seed), BODY_SCALE, BODY_SCALE) > BODY_CUT ? rock : Rock.KEEP;
+    }
+
+    /** The noise is a function of position alone; the seed moves it. */
+    private static int shiftX(long seed) {
+        return (int) (seed & 0xFFFF);
+    }
+
+    private static int shiftZ(long seed) {
+        return (int) ((seed >>> 16) & 0xFFFF);
     }
 
     /**
