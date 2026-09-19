@@ -90,6 +90,7 @@ public final class FindCommands {
             int[] s = com.jeladastudios.ftsgeology.worldgen.LavaTubes.nearestStart(level, at.getX(), at.getZ());
             return s == null ? null : new Hit(s[0], s[1], (int) Math.round(Math.hypot(s[0] - at.getX(), s[1] - at.getZ())));
         }
+        if (what.equals("valley")) return searchValley(level, at);
         int step = 96;
         int maxRings = 220;                 // reaches out about 21k blocks
         for (int ring = 1; ring <= maxRings; ring++) {
@@ -103,6 +104,71 @@ public final class FindCommands {
         }
         return null;
     }
+
+    /**
+     * The nearest real valley: the plate test alone found the pass line of the crest noise, which is where a valley
+     * runs, and sent the player to the first grid point on it, where the ground could be a saddle or a slope. Each
+     * candidate's ground is read across the valley: the way the crest rises fastest, and both axes for a valley the
+     * grid cuts on the skew. It is a valley when both flanks stand {@code VALLEY_FLANK} blocks over the floor at
+     * {@code VALLEY_REACH}; the nearest ring with a valley on it is taken, and the deepest valley on that ring.
+     */
+    static Hit searchValley(ServerLevel level, BlockPos at) {
+        int step = 96, maxRings = 220;
+        Hit best = null;
+        int bestDepth = 0;
+        for (int ring = 1; ring <= maxRings && best == null; ring++) {
+            int r = ring * step;
+            for (int i = 0; i < ring * 8; i++) {
+                double ang = (Math.PI * 2 * i) / (ring * 8);
+                int x = at.getX() + (int) Math.round(Math.cos(ang) * r);
+                int z = at.getZ() + (int) Math.round(Math.sin(ang) * r);
+                if (!matches(level, x, z, "valley")) continue;
+                int depth = valleyDepth(level, x, z);
+                if (depth < VALLEY_FLANK) continue;
+                if (depth > bestDepth) { bestDepth = depth; best = new Hit(x, z, r); }
+            }
+        }
+        return best;
+    }
+
+    private static final int VALLEY_REACH = 128, VALLEY_FLANK = 30;
+
+    /**
+     * How far both flanks stand over the ground at a column, the lower of the two, along the best of three lines. A
+     * line only counts when the ground along the valley, at right angles to it, does not fall away both ways: that
+     * is a saddle between two ridges, which the pass line of the crest noise runs over as well as through valleys.
+     */
+    static int valleyDepth(ServerLevel level, int x, int z) {
+        long seed = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed();
+        var p = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params();
+        var crest = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.Field.CREST;
+        double gx = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.field(crest, seed, p, x + 64, z)
+                - com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.field(crest, seed, p, x - 64, z);
+        double gz = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.field(crest, seed, p, x, z + 64)
+                - com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.field(crest, seed, p, x, z - 64);
+        double g = Math.hypot(gx, gz);
+        int floor = surfaceY(level, x, z);
+        // The generator's ground, so a bay or a lake in the belt reads as its floor: the deepest "valley" found was
+        // a fjord floor forty blocks under the sea. A valley for the player is dry.
+        if (floor < level.getSeaLevel()) return 0;
+        int depth = Math.max(flanks(level, x, z, 1, 0, floor), flanks(level, x, z, 0, 1, floor));
+        if (g > 1e-6) {
+            depth = Math.max(depth, flanks(level, x, z, gx / g, gz / g, floor));
+        }
+        return depth;
+    }
+
+    private static int flanks(ServerLevel level, int x, int z, double dx, double dz, int floor) {
+        int a = surfaceY(level, x + (int) Math.round(dx * VALLEY_REACH), z + (int) Math.round(dz * VALLEY_REACH));
+        int b = surfaceY(level, x - (int) Math.round(dx * VALLEY_REACH), z - (int) Math.round(dz * VALLEY_REACH));
+        int c = surfaceY(level, x - (int) Math.round(dz * VALLEY_REACH), z + (int) Math.round(dx * VALLEY_REACH));
+        int d = surfaceY(level, x + (int) Math.round(dz * VALLEY_REACH), z - (int) Math.round(dx * VALLEY_REACH));
+        if (Math.max(c, d) < floor - SADDLE_DROP) return 0;
+        return Math.min(a, b) - floor;
+    }
+
+    /** Ground this far below the floor both ways along the line makes it a saddle, not a valley. */
+    private static final int SADDLE_DROP = 4;
 
     static boolean matches(ServerLevel level, int x, int z, String what) {
         if (what.equals("hotspot")) {
