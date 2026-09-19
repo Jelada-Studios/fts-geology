@@ -146,15 +146,15 @@ public final class Lithology {
             case ARC -> depth > c.plutonTop() ? c.pluton()
                     : depth < 22 + c.bedShift() * 2 ? pick(ARC_BEDS, salt ^ 0x60L, Math.floorDiv(depth + c.bedShift(), 4))
                     : pick(ARC_ROOT, salt ^ 0x68L, SeedHash.hash(seed ^ 0x68L, x >> 3, z >> 3, y >> 3));
-            case PRISM -> pick(PRISM_ROCKS, salt ^ 0x70L, SeedHash.hash(seed ^ 0x70L, x >> 3, z >> 3, y >> 2));
+            case PRISM -> body(seed, x, y, z, pick(PRISM_ROCKS, salt ^ 0x70L, SeedHash.hash(seed ^ 0x70L, x >> 3, z >> 3, y >> 2)));
             case RIFT -> rift(seed, salt, c, x, y, z, depth);
             case SHEAR_ZONE -> depth > 40 ? basement(seed, c, x, y, z, depth - 40)
                     : pick(SHEAR_BANDS, salt ^ 0x90L, Math.floorDiv((int) Math.floor(c.folded()), 3));
             case HOTSPOT -> depth < 50 ? pick(HOTSPOT_BEDS, salt ^ 0xA0L, Math.floorDiv(depth + c.bedShift(), 5))
-                    : Rock.GABBRO;
+                    : body(seed, x, y, z, Rock.GABBRO);
             case OCEAN_FLOOR -> depth < 8 ? ((h >>> 5) & 3) == 0 ? Rock.SMOOTH_BASALT : Rock.BASALT
-                    : depth < 30 ? Rock.GABBRO
-                    : pick(MANTLE, salt ^ 0xB0L, SeedHash.hash(seed ^ 0xB0L, x >> 3, z >> 3, y >> 3));
+                    : depth < 30 ? body(seed, x, y, z, Rock.GABBRO)
+                    : body(seed, x, y, z, pick(MANTLE, salt ^ 0xB0L, SeedHash.hash(seed ^ 0xB0L, x >> 3, z >> 3, y >> 3)));
         };
     }
 
@@ -204,8 +204,16 @@ public final class Lithology {
      */
     private static Rock basement(long seed, Column c, int x, int y, int z, int below) {
         if (below < BASEMENT_TOP) return c.basement();
-        return SeedHash.rand01(SeedHash.hash(seed ^ 0xBA5EL, x >> 3, z >> 3, y >> 3)) < BASEMENT_BODIES
-                ? c.basement() : Rock.KEEP;
+        return body(seed, x, y, z, c.basement());
+    }
+
+    /**
+     * A rock laid in bodies eight blocks across, {@link #BASEMENT_BODIES} of the volume, with the generator's own
+     * stone between them. The sea floor's gabbro and mantle, the prism and a hotspot's roots come this way as the
+     * basement does: laid whole, every cave wall was the mod's rock and read as painted rather than as ground.
+     */
+    private static Rock body(long seed, int x, int y, int z, Rock rock) {
+        return SeedHash.rand01(SeedHash.hash(seed ^ 0xBA5EL, x >> 3, z >> 3, y >> 3)) < BASEMENT_BODIES ? rock : Rock.KEEP;
     }
 
     /**
@@ -226,19 +234,20 @@ public final class Lithology {
 
     // Tables: a rock appears as often as it is common in the sequence. The beds of a flat-lying sequence hold only
     // rock a vanilla ore may replace; the blocks that cannot hold one are in the BANDS tables, laid as thin bands.
-    // Shale carries most of it, which is also what a real sedimentary section is made of.
+    // Half of every sequence is the generator's own stone (KEEP): a section laid wholly in the mod's rock read as
+    // painted, not as ground, in every cave. The named rock stands in beds and bands through a vanilla matrix.
     private static final Rock[] PLATFORM_BEDS = {
-            Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.MARBLE, Rock.MARBLE, Rock.CHERT, Rock.CHERT,
-            Rock.STONE, Rock.STONE};
+            Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.MARBLE, Rock.CHERT,
+            Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP};
     private static final Rock[] PLATFORM_BANDS = {
             Rock.SANDSTONE, Rock.SANDSTONE, Rock.SANDSTONE, Rock.CALCITE, Rock.RED_BEDS};
     private static final Rock[] FOLD_BANDS = {
-            Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS,
-            Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.QUARTZITE, Rock.QUARTZITE, Rock.QUARTZITE,
-            Rock.MARBLE, Rock.MARBLE, Rock.MARBLE, Rock.SCHIST, Rock.SLATE, Rock.GRANITE};
+            Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.QUARTZITE, Rock.QUARTZITE,
+            Rock.MARBLE, Rock.MARBLE, Rock.SCHIST, Rock.SLATE,
+            Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP};
     private static final Rock[] FORELAND_BEDS = {
-            Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.CHERT, Rock.CHERT, Rock.MARBLE,
-            Rock.STONE, Rock.STONE};
+            Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.CHERT, Rock.MARBLE,
+            Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP};
     private static final Rock[] FORELAND_BANDS = {
             Rock.SANDSTONE, Rock.SANDSTONE, Rock.RED_BEDS, Rock.RED_BEDS, Rock.CALCITE};
     private static final Rock[] ARC_BEDS = {
@@ -256,8 +265,8 @@ public final class Lithology {
     private static final Rock[] RIFT_BANDS = {
             Rock.SANDSTONE, Rock.SANDSTONE, Rock.SMOOTH_BASALT, Rock.CALCITE};
     private static final Rock[] SHEAR_BANDS = {
-            Rock.SLATE, Rock.SLATE, Rock.SLATE, Rock.SLATE, Rock.SCHIST, Rock.SCHIST, Rock.SCHIST,
-            Rock.GNEISS, Rock.GNEISS, Rock.STONE};
+            Rock.SLATE, Rock.SLATE, Rock.SCHIST, Rock.SCHIST, Rock.GNEISS,
+            Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP};
     // Smooth basalt is the one volcanic block no vanilla ore may replace, so a hotspot's stack keeps only a little.
     private static final Rock[] HOTSPOT_BEDS = {
             Rock.BASALT, Rock.BASALT, Rock.BASALT, Rock.BASALT, Rock.BASALT, Rock.BASALT, Rock.BLACKSTONE,
