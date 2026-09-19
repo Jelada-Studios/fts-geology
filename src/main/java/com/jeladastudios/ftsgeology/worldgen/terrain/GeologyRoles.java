@@ -81,7 +81,7 @@ public final class GeologyRoles {
         boolean margin = oceanic != s.neighbourKind().isOceanic();
         // Borders between one kind of ground and the next wander, as vanilla's own biome edges do, instead of
         // following a line a set distance from the boundary.
-        double j = EDGE * TerrainFields.jitter(seed, x, z);
+        double j = EDGE * TerrainFields.jitter(seed, p, x, z);
 
         // New sea floor, rising out of the abyss along the line where two ocean plates part.
         if (oceanic) {

@@ -502,7 +502,7 @@ public final class VolcanoField {
             PlateSample s = TectonicMap.sampleCached(level, x, z);
             if (s.stress() < MIN_STRESS) continue;
             // An arc stands on the plate that rides over, back from the trench; the plate going under has none.
-            if (s.faultType() == FaultType.CONVERGENT_SUBDUCTION && !s.onArc(GeyserConfig.FAULT_WIDTH.get())) continue;
+            if (s.faultType() == FaultType.CONVERGENT_SUBDUCTION && !s.onArc(com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().faultWidth())) continue;
             VolcanoType type = switch (s.faultType()) {
                 // A quarter of the arc volcanoes have blown their tops off, as at Crater Lake or Aso.
                 case CONVERGENT_SUBDUCTION -> calderas && rand01(hash(seed, i, 4, 0xCA2DL)) < 0.25
@@ -581,7 +581,7 @@ public final class VolcanoField {
             } else {
                 PlateSample p = TectonicMap.sampleCached(level, sx, sz);
                 if (p.stress() < MIN_STRESS || p.faultType() != fault) continue;
-                if (fault == FaultType.CONVERGENT_SUBDUCTION && !p.onArc(GeyserConfig.FAULT_WIDTH.get())) continue;
+                if (fault == FaultType.CONVERGENT_SUBDUCTION && !p.onArc(com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().faultWidth())) continue;
             }
             // Two height samples rule most of the sea out before a full check is paid for.
             if (centreWet(level, sx, sz)) continue;
@@ -717,7 +717,7 @@ public final class VolcanoField {
         }
         int[] sorted = floors.clone();
         Arrays.sort(sorted);
-        if (sorted[12] - sorted[4] > 40) {
+        if (sorted[12] - sorted[4] > 40 * com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().horizontal()) {
             return refuse(refused, type, RELIEF, x, z, "sea floor relief " + (sorted[12] - sorted[4]));
         }
         // It stands on the deeper part of the floor under it.
@@ -860,11 +860,13 @@ public final class VolcanoField {
         int[] inner = Arrays.copyOf(ground, 9);
         Arrays.sort(inner);
         int relief = inner[7] - inner[1];
-        int allowed = switch (type) {
+        // The tall world type stands its mountains as much higher as it lays them wider, so what counts as level
+        // ground there is scaled with the layout.
+        int allowed = (int) Math.round(switch (type) {
             case SHIELD -> 200;
             case CALDERA -> 96;
             default -> 140;
-        };
+        } * com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().horizontal());
         if (relief > allowed) return refuse(refused, type, RELIEF, x, z, "relief " + relief);
         int[] sorted = ground.clone();
         Arrays.sort(sorted);

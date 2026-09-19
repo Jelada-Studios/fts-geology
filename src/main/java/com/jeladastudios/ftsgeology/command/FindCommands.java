@@ -115,14 +115,12 @@ public final class FindCommands {
             var p = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params();
             double belt = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.field(
                     com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.Field.BELT, seed, p, x, z);
-            double valley = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.field(
-                    com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.Field.VALLEY, seed, p, x, z);
-            // The valley field carries the belt's grip; dividing it out leaves how deep in the valley the column is.
-            // Only a convergent belt has mountains for a valley to lie between; a transform belt keeps the field
-            // for the offset's sake but has no relief to cut.
+            // A valley is a pass of the crest noise (0 in the pass, 1 on the ridge) in a convergent belt's core.
+            double crest = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.field(
+                    com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.Field.CREST, seed, p, x, z);
             FaultType k = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.sampleAt(seed, p, x, z).boundaryType();
             boolean convergent = k == FaultType.CONVERGENT_COLLISION || k == FaultType.CONVERGENT_SUBDUCTION;
-            return convergent && belt >= 0.45 && valley >= 0.9 * belt;
+            return convergent && belt >= 0.45 && crest <= 0.05;
         }
         PlateSample s = TectonicMap.sampleCached(level, x, z);
         // Require decent stress so we land somewhere the setting is actually expressed, not on the

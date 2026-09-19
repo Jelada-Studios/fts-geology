@@ -50,9 +50,9 @@ public final class HotspotMap {
     public static Hotspot sample(ServerLevel level, int blockX, int blockZ) {
         if (!GeyserConfig.HOTSPOTS_ENABLED.get()) return Hotspot.NONE;
 
-        double scale = GeyserConfig.HOTSPOT_SCALE.get();
-        double density = GeyserConfig.HOTSPOT_DENSITY.get();
-        double radius = GeyserConfig.HOTSPOT_RADIUS.get();
+        double scale = GeologyParams.current().hotspotScale();
+        double density = GeologyParams.current().hotspotDensity();
+        double radius = GeologyParams.current().hotspotRadius();
         double trailLength = GeyserConfig.HOTSPOT_TRAIL_LENGTH.get();
         long seed = level.getSeed();
 
@@ -121,7 +121,7 @@ public final class HotspotMap {
         double painted = ThermalBiomes.strength(level, blockX, blockZ);
         if (painted >= 0.8) return painted;
 
-        double scale = GeyserConfig.HOTSPOT_BASIN_SCALE.get();
+        double scale = GeologyParams.current().hotspotBasinScale();
         double density = GeyserConfig.HOTSPOT_BASIN_DENSITY.get();
         if (density <= 0.0) return painted;
         long seed = level.getSeed();
@@ -198,8 +198,8 @@ public final class HotspotMap {
                                                      int maxX, int maxZ) {
         java.util.List<int[]> out = new java.util.ArrayList<>();
         if (!GeyserConfig.HOTSPOTS_ENABLED.get()) return out;
-        double scale = GeyserConfig.HOTSPOT_SCALE.get();
-        double density = GeyserConfig.HOTSPOT_DENSITY.get();
+        double scale = GeologyParams.current().hotspotScale();
+        double density = GeologyParams.current().hotspotDensity();
         long seed = level.getSeed();
         for (int cx = Mth.floor(minX / scale) - 1; cx <= Mth.floor(maxX / scale) + 1; cx++) {
             for (int cz = Mth.floor(minZ / scale) - 1; cz <= Mth.floor(maxZ / scale) + 1; cz++) {
@@ -229,8 +229,8 @@ public final class HotspotMap {
                                                     double length) {
         java.util.List<Trail> out = new java.util.ArrayList<>();
         if (!GeyserConfig.HOTSPOTS_ENABLED.get() || length <= 0.0) return out;
-        double scale = GeyserConfig.HOTSPOT_SCALE.get();
-        double density = GeyserConfig.HOTSPOT_DENSITY.get();
+        double scale = GeologyParams.current().hotspotScale();
+        double density = GeologyParams.current().hotspotDensity();
         long seed = level.getSeed();
         for (int cx = Mth.floor((minX - length) / scale) - 1; cx <= Mth.floor((maxX + length) / scale) + 1; cx++) {
             for (int cz = Mth.floor((minZ - length) / scale) - 1; cz <= Mth.floor((maxZ + length) / scale) + 1; cz++) {
@@ -257,9 +257,9 @@ public final class HotspotMap {
     /** The centre of the live plume whose dome this column is under, or null where there is none. */
     public static double[] plumeCentre(ServerLevel level, int blockX, int blockZ) {
         if (!GeyserConfig.HOTSPOTS_ENABLED.get()) return null;
-        double scale = GeyserConfig.HOTSPOT_SCALE.get();
-        double density = GeyserConfig.HOTSPOT_DENSITY.get();
-        double radius = GeyserConfig.HOTSPOT_RADIUS.get();
+        double scale = GeologyParams.current().hotspotScale();
+        double density = GeologyParams.current().hotspotDensity();
+        double radius = GeologyParams.current().hotspotRadius();
         long seed = level.getSeed();
         int gx = Mth.floor(blockX / scale), gz = Mth.floor(blockZ / scale);
         double[] best = null;

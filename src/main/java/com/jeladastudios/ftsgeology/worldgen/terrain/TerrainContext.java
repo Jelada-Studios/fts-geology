@@ -24,13 +24,29 @@ public final class TerrainContext {
     private static volatile boolean known;
     private static volatile boolean warned;
 
+    /**
+     * How many times wider the tall world type lays its plates, belts and plumes out. As much as its mountains are
+     * taller: scaled up only in height, a 740-block peak stood on a 275-block flank as a wall.
+     */
+    public static final double TALL_HORIZONTAL = 2.5;
+
     @SubscribeEvent
     public static void onServerAboutToStart(ServerAboutToStartEvent event) {
         seed = event.getServer().getWorldData().worldGenOptions().seed();
         known = true;
-        GeologyParams.take();
+        GeologyParams.take(isTall(event.getServer()) ? TALL_HORIZONTAL : 1.0);
         TerrainCache.clear();
         GeologyWorld.clear();
+    }
+
+    /** Whether the overworld about to be made is the tall world type: its stem is in the registry before the levels. */
+    private static boolean isTall(net.minecraft.server.MinecraftServer server) {
+        net.minecraft.world.level.dimension.LevelStem stem = server.registryAccess()
+                .registryOrThrow(net.minecraft.core.registries.Registries.LEVEL_STEM)
+                .get(net.minecraft.world.level.dimension.LevelStem.OVERWORLD);
+        return stem != null
+                && stem.generator() instanceof net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator noise
+                && noise.generatorSettings().is(GeologyWorld.SETTINGS_TALL);
     }
 
     @SubscribeEvent

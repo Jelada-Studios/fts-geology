@@ -1,0 +1,33 @@
+{
+  "type": "minecraft:flat_cache",
+  "argument": {
+    "type": "minecraft:mul",
+    "argument1": {
+      "type": "fts_geology:plate",
+      "field": "ridges"
+    },
+    "argument2": {
+      "type": "minecraft:shifted_noise",
+      "noise": "minecraft:ridge",
+      "shift_x": {
+        "type": "minecraft:add",
+        "argument1": "minecraft:shift_x",
+        "argument2": {
+          "type": "fts_geology:plate",
+          "field": "meander_x"
+        }
+      },
+      "shift_y": 0.0,
+      "shift_z": {
+        "type": "minecraft:add",
+        "argument1": "minecraft:shift_z",
+        "argument2": {
+          "type": "fts_geology:plate",
+          "field": "meander_z"
+        }
+      },
+      "xz_scale": 0.05,
+      "y_scale": 0.0
+    }
+  }
+}

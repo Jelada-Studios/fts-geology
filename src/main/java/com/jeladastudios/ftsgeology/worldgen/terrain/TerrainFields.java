@@ -36,7 +36,7 @@ public final class TerrainFields {
 
     private TerrainFields() {}
 
-    public enum Field { CONTINENTS, EROSION, RIDGES, RELIEF, VARIETY, BELT, VALLEY, MEANDER_X, MEANDER_Z }
+    public enum Field { CONTINENTS, EROSION, RIDGES, RELIEF, VARIETY, BELT, VALLEY, CREST, MEANDER_X, MEANDER_Z }
 
     /** How far the coordinates are pushed about, in blocks, and the size of the pushing. */
     private static final double WARP_AMPLITUDE = 250.0;
@@ -95,18 +95,17 @@ public final class TerrainFields {
     private static final double APRON_LIFT = 0.06;
 
     /**
-     * Valleys through a convergent belt: the zero line of a slow noise, a flat floor {@code VALLEY_FLOOR} of its range
-     * either side and sides climbing out over {@code VALLEY_SIDE} more, cutting {@code VALLEY_DEPTH} of the uplift and
-     * adding {@code VALLEY_FLAT} to the erosion so the floor lies flat between the ridges. Broad and winding, as
-     * Terralith's are, not the sharp cut of a river: a floor that fell off from the zero line at once was a trench.
+     * The broad flat-floored valleys of an earlier round, kept as a field for the record but with no hold on the
+     * ground ({@code VALLEY_DEPTH} and {@code VALLEY_FLAT} are 0): their floors cut across the ridge-and-pass pattern
+     * of {@link #crestShape} and read as benches, not valleys. The V-shaped valleys are the passes of the crest noise.
      */
-    private static final double VALLEY_SCALE = 520.0, VALLEY_FLOOR = 0.15, VALLEY_SIDE = 0.3, VALLEY_DEPTH = 0.8,
-            VALLEY_FLAT = 0.5;
+    private static final double VALLEY_SCALE = 520.0, VALLEY_FLOOR = 0.15, VALLEY_SIDE = 0.3, VALLEY_DEPTH = 0.0,
+            VALLEY_FLAT = 0.0;
     /**
      * How much of a fold belt's uplift stands on its crests: the rest is taken out of the ground between them, so a
      * belt is a range of peaks and passes instead of one raised plateau.
      */
-    private static final double CREST_SHARE = 0.45, CREST_SCALE = 150.0;
+    private static final double CREST_SHARE = 0.75, CREST_SCALE = 220.0, CREST_TOP = 0.08, CREST_RIDGE = 0.35;
     /** How far the ridge noise is pushed about, in its noise units (four blocks each), and the length of a bend. */
     private static final double MEANDER_AMPLITUDE = 12.0, MEANDER_SCALE = 260.0;
 
@@ -125,28 +124,32 @@ public final class TerrainFields {
      */
     public static PlateSample sampleAt(long seed, GeologyParams p, int x, int z) {
         TectonicMap.Edges e = edgesAt(seed, p, x, z);
-        if (e.gap() >= HANDOVER) return e.first();
+        if (e.gap() >= HANDOVER * p.horizontal()) return e.first();
         return relief(e.second(), p, seed, x, z) > relief(e.first(), p, seed, x, z) ? e.second() : e.first();
     }
 
     /** The plate at the warped coordinate against its two nearest boundaries. */
     private static TectonicMap.Edges edgesAt(long seed, GeologyParams p, int x, int z) {
-        double wx = x + WARP_AMPLITUDE * twoOctaves(seed, x, z, WARP_SCALE, 0x77A1L);
-        double wz = z + WARP_AMPLITUDE * twoOctaves(seed, x, z, WARP_SCALE, 0x3B2CL);
+        double h = p.horizontal();
+        double wx = x + WARP_AMPLITUDE * h * twoOctaves(seed, x, z, WARP_SCALE * h, 0x77A1L);
+        double wz = z + WARP_AMPLITUDE * h * twoOctaves(seed, x, z, WARP_SCALE * h, 0x3B2CL);
         return TerrainCache.edges(seed, p, (int) Math.floor(wx), (int) Math.floor(wz));
     }
 
     public static double field(Field field, long seed, GeologyParams p, int x, int z) {
         if (field == Field.MEANDER_X || field == Field.MEANDER_Z) {
-            return MEANDER_AMPLITUDE * twoOctaves(seed, x, z, MEANDER_SCALE, field == Field.MEANDER_X ? 0x3E11L : 0x71C3L);
+            // The amplitude is in the ridge noise's own units, which grow with the world, so it is not scaled.
+            return MEANDER_AMPLITUDE * twoOctaves(seed, x, z, MEANDER_SCALE * p.horizontal(),
+                    field == Field.MEANDER_X ? 0x3E11L : 0x71C3L);
         }
         TectonicMap.Edges e = edgesAt(seed, p, x, z);
         double v = value(field, e.first(), p, seed, x, z);
         // A column almost as near a second boundary is shaped by both. Along the line where one boundary hands over to
         // the next, both sides see the same mean of the two, so the ground cannot jump there: it did, by up to eighty
         // blocks, wherever a fold belt's boundary met a rift's or a quiet coast's.
-        if (e.gap() < HANDOVER) {
-            double w = 0.5 + 0.5 * smooth(Mth.clamp(e.gap() / HANDOVER, 0, 1));
+        double handover = HANDOVER * p.horizontal();
+        if (e.gap() < handover) {
+            double w = 0.5 + 0.5 * smooth(Mth.clamp(e.gap() / handover, 0, 1));
             v = w * v + (1.0 - w) * value(field, e.second(), p, seed, x, z);
         }
         // A belt's floodplain belongs to the belt, whichever boundary is nearer: read off the nearer boundary alone,
@@ -178,13 +181,17 @@ public final class TerrainFields {
             case CONTINENTS -> continents(s, p);
             case EROSION -> erosion(s, p, seed, x, z);
             // No sharp peaks on a valley floor: the ridge noise that makes them is turned down there.
-            case RIDGES -> (0.5 + 0.9 * belt(s, p)) * (1.0 - 0.6 * valley(seed, x, z) * mountainBelt(s, p));
+            case RIDGES -> 0.5 + 0.9 * belt(s, p);
             case RELIEF -> relief(s, p, seed, x, z);
             // A mountain belt's grip, for the offset to scale vanilla's mountain spline down by inside the belt, and
             // how deep in one of the belt's valleys the column lies, for the offset to cut that spline further. A
             // rift keeps vanilla's full spline: halving it there lifted the rift floors out of their lakes.
             case BELT -> mountainBelt(s, p);
-            case VALLEY -> valley(seed, x, z) * mountainBelt(s, p);
+            case VALLEY -> valley(seed, p, x, z) * mountainBelt(s, p);
+            // 1 on a ridge, 0 in the pass between: for the offset to bend vanilla's mountain spline into the same
+            // ridges and V-shaped valleys the mod's own relief follows, or the two cut across each other and the
+            // valleys vanished under vanilla's peaks.
+            case CREST -> crestShape(seed, p, x, z);
             case VARIETY -> variety(s, p);
             case MEANDER_X, MEANDER_Z -> 0.0;
         };
@@ -241,7 +248,7 @@ public final class TerrainFields {
             case INTERIOR -> 0.0;
         };
         boolean convergent = k == FaultType.CONVERGENT_COLLISION || k == FaultType.CONVERGENT_SUBDUCTION;
-        double flat = convergent ? VALLEY_FLAT * valley(seed, x, z) * b : 0.0;
+        double flat = convergent ? VALLEY_FLAT * valley(seed, p, x, z) * b : 0.0;
         return quiet - rugged + flat;
     }
 
@@ -251,9 +258,9 @@ public final class TerrainFields {
         double u = p.uplift() / 128.0 * (0.5 + 0.5 * motion(s));
         double t = Math.min(1.0, a / p.beltFactor());
         // The floodplain's lift ({@link #APRON_LIFT}) is added in {@link #field}, from both boundaries.
-        double cut = 1.0 - VALLEY_DEPTH * valley(seed, x, z);
+        double cut = 1.0 - VALLEY_DEPTH * valley(seed, p, x, z);
         return switch (s.boundaryType()) {
-            case CONVERGENT_COLLISION -> u * bump(t) * crest(seed, x, z) * cut;
+            case CONVERGENT_COLLISION -> u * bump(t) * crest(seed, p, x, z) * cut;
             // The arc stands where the volcanoes do, on a plateau that fades out across the belt and keeps clear of
             // the coast; the trench lies off the coast, on the plate that goes under. The arc's mountains drop
             // steeply to the sea and go down slowly inland, as the Andes do to the altiplano.
@@ -276,7 +283,7 @@ public final class TerrainFields {
         // Off a coast the floor is still shelf; out in the open sea it is already the plain.
         double deep = margin ? ABYSS_DEEP * Mth.clamp((a - SHELF_TO) / SLOPE_OVER, 0, 1) : ABYSS_DEEP;
         if (k == FaultType.DIVERGENT && !margin) {
-            double hills = 1.0 - Math.abs(noise(seed, x, z, HILL_SCALE, 0x4B1DL));
+            double hills = 1.0 - Math.abs(noise(seed, x, z, HILL_SCALE * p.horizontal(), 0x4B1DL));
             deep += RIDGE_RISE * peak(a, 0.0, RIDGE_HALF) + RIDGE_VALLEY * peak(a, 0.0, VALLEY_HALF)
                     + ABYSSAL_HILLS * hills * bump(Math.min(1.0, a / 1.2));
         }
@@ -335,8 +342,8 @@ public final class TerrainFields {
     }
 
     /** A slow wobble in -1..1, for ragging the border between one kind of ground and the next. */
-    public static double jitter(long seed, int x, int z) {
-        return noise(seed, x, z, 40.0, 0x6A17L);
+    public static double jitter(long seed, GeologyParams p, int x, int z) {
+        return noise(seed, x, z, 40.0 * p.horizontal(), 0x6A17L);
     }
 
     /**
@@ -364,8 +371,19 @@ public final class TerrainFields {
     }
 
     /** How much of a fold belt's uplift a column keeps: all of it on a crest, less in the passes between. */
-    private static double crest(long seed, int x, int z) {
-        return 1.0 - CREST_SHARE + CREST_SHARE * (1.0 - Math.abs(twoOctaves(seed, x, z, CREST_SCALE, 0x2F0DL)));
+    private static double crest(long seed, GeologyParams p, int x, int z) {
+        return 1.0 - CREST_SHARE * (1.0 - crestShape(seed, p, x, z));
+    }
+
+    /**
+     * Where a column stands between ridge and pass, 1 to 0. A ridge keeps its full height across a narrow crest,
+     * then the ground falls off in a V to the pass: the noise's zero line is the pass, its extremes the ridges.
+     */
+    private static double crestShape(long seed, GeologyParams p, int x, int z) {
+        // Value noise seldom reaches its extremes: with the ridge at 1 the ground was nearly all pass, a weak
+        // ripple on a uniformly lowered belt. The ridge is reached at CREST_RIDGE, which the noise crosses often.
+        return Mth.clamp((Math.abs(twoOctaves(seed, x, z, CREST_SCALE * p.horizontal(), 0x2F0DL)) - CREST_TOP)
+                / CREST_RIDGE, 0, 1);
     }
 
     private static double motion(PlateSample s) {
@@ -389,8 +407,8 @@ public final class TerrainFields {
     }
 
     /** How deep in a valley a column lies, 0 on the ridges to 1 across the whole floor. */
-    private static double valley(long seed, int x, int z) {
-        double off = Math.abs(twoOctaves(seed, x, z, VALLEY_SCALE, 0x5A11L)) - VALLEY_FLOOR;
+    private static double valley(long seed, GeologyParams p, int x, int z) {
+        double off = Math.abs(twoOctaves(seed, x, z, VALLEY_SCALE * p.horizontal(), 0x5A11L)) - VALLEY_FLOOR;
         return smooth(Mth.clamp(1.0 - off / VALLEY_SIDE, 0, 1));
     }
 

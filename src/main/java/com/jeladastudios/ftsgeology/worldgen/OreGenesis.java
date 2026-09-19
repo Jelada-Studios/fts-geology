@@ -280,7 +280,7 @@ public final class OreGenesis {
     private static boolean coalBasin(Deposit d, int x, int z) {
         PlateSample s = TectonicMap.sampleCached(d.world, x, z);
         if (s.plateKind().isOceanic()) return false;
-        double width = GeyserConfig.FAULT_WIDTH.get();
+        double width = com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().faultWidth();
         // A ragged margin rather than a line at a fixed distance.
         double dist = s.faultDistance() + 0.25 * width * noise(x + 211, z - 211, 60.0);
         boolean headOn = Math.abs(s.convergence()) >= s.shear();
@@ -387,7 +387,7 @@ public final class OreGenesis {
             PlateSample s = TectonicMap.sampleCached(d.world, ax, az);
             if (s.faultType() != FaultType.CONVERGENT_SUBDUCTION || s.stress() < 0.2) return;
             // Around the arc root on the overriding plate, not out on the fore-arc and never on the plate going under.
-            if (s.downGoing() || s.faultDistance() / GeyserConfig.FAULT_WIDTH.get() > 0.65) return;
+            if (s.downGoing() || s.faultDistance() / com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().faultWidth() > 0.65) return;
 
             double core = 4.5 + die(h, 4) * 3.0;
             int ay = d.level.getMinBuildHeight() + 24 + (int) (die(h, 3) * 50);

@@ -67,7 +67,7 @@ public final class GeothermalSuitability {
                 if (plate.downGoing()) {
                     hotSpring = 0.30 * s;
                 } else {
-                    volcano = 1.00 * s * arcBand(plate.across(GeyserConfig.FAULT_WIDTH.get()));
+                    volcano = 1.00 * s * arcBand(plate.across(GeologyParams.current().faultWidth()));
                     geyser = 0.90 * s;
                     hotSpring = 1.00 * s;
                 }

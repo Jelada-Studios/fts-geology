@@ -93,7 +93,7 @@ public final class DeepStructure {
         int hardCeiling = GeyserConfig.RETROGEN_MAX_Y.get();
         boolean outcrop = GeyserConfig.DEEP_SURFACE_OUTCROP.get();
         int soil = GeyserConfig.DEEP_SOIL_DEPTH.get();
-        double faultWidth = GeyserConfig.FAULT_WIDTH.get();
+        double faultWidth = com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().faultWidth();
         // The budget is for the whole chunk, so a resumed pass starts with what is left of it.
         int budget = GeyserConfig.DEEP_STRUCTURE_BUDGET.get() - (report != null ? report.blocks : 0);
         long seed = level.getSeed();

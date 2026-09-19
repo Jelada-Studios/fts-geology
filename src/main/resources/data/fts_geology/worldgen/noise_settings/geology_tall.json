@@ -12,7 +12,7 @@
   "disable_mob_generation": false,
   "legacy_random_source": false,
   "noise": {
-    "height": 864,
+    "height": 960,
     "min_y": -64,
     "size_horizontal": 1,
     "size_vertical": 2
@@ -24,9 +24,9 @@
       "xz_scale": 1.0,
       "y_scale": 0.5
     },
-    "continents": "fts_geology:geology/continents",
+    "continents": "fts_geology:geology_tall/continents",
     "depth": "fts_geology:geology_tall/depth",
-    "erosion": "fts_geology:geology/erosion",
+    "erosion": "fts_geology:geology_tall/erosion",
     "final_density": {
       "type": "minecraft:min",
       "argument1": {
@@ -63,7 +63,7 @@
                           "from_value": 1.0,
                           "from_y": 800,
                           "to_value": 0.0,
-                          "to_y": 832
+                          "to_y": 856
                         },
                         "argument2": {
                           "type": "minecraft:add",
@@ -203,7 +203,7 @@
                 "from_value": 1.0,
                 "from_y": 800,
                 "to_value": 0.0,
-                "to_y": 832
+                "to_y": 856
               },
               "argument2": {
                 "type": "minecraft:add",
@@ -223,7 +223,7 @@
                           "argument1": "fts_geology:geology_tall/depth",
                           "argument2": {
                             "type": "minecraft:cache_2d",
-                            "argument": "fts_geology:geology/factor"
+                            "argument": "fts_geology:geology_tall/factor"
                           }
                         }
                       }
@@ -244,14 +244,14 @@
       "xz_scale": 1.0,
       "y_scale": 1.0
     },
-    "ridges": "fts_geology:geology/ridges",
+    "ridges": "fts_geology:geology_tall/ridges",
     "temperature": {
       "type": "minecraft:shifted_noise",
       "noise": "minecraft:temperature",
       "shift_x": "minecraft:shift_x",
       "shift_y": 0.0,
       "shift_z": "minecraft:shift_z",
-      "xz_scale": 0.125,
+      "xz_scale": 0.05,
       "y_scale": 0.0
     },
     "vegetation": {
@@ -260,7 +260,7 @@
       "shift_x": "minecraft:shift_x",
       "shift_y": 0.0,
       "shift_z": "minecraft:shift_z",
-      "xz_scale": 0.125,
+      "xz_scale": 0.05,
       "y_scale": 0.0
     },
     "vein_gap": {

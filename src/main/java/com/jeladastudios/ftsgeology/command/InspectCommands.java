@@ -356,7 +356,7 @@ public final class InspectCommands {
         // Default zoom shows roughly two plate widths across, so at least one boundary is in view.
         int step = requestedStep > 0
                 ? requestedStep
-                : Math.max(16, (int) (GeyserConfig.PLATE_SCALE.get() * 2.0 / MAP_SIZE));
+                : Math.max(16, (int) (com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().plateScale() * 2.0 / MAP_SIZE));
         int half = MAP_SIZE / 2;
 
         source.sendSuccess(() -> Component.translatable("command.fts_geology.plate_map_s_blocks_per_cell", step).withStyle(ChatFormatting.GOLD), false);
@@ -480,7 +480,7 @@ public final class InspectCommands {
         // Default zoom fits roughly two plate widths across the 128-pixel image.
         int perPixel = requestedPixel > 0
                 ? requestedPixel
-                : Math.max(1, (int) (GeyserConfig.PLATE_SCALE.get() * 2.0 / 128));
+                : Math.max(1, (int) (com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().plateScale() * 2.0 / 128));
         final int fx = at.getX(), fz = at.getZ(), fpp = perPixel;
 
         source.sendSuccess(() -> Component.translatable("command.fts_geology.surveying_the_plates")

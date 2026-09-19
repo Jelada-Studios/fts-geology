@@ -56,7 +56,7 @@ public final class OceanicRidge {
         int centreFloor = TerrainProbe.groundY(level, cp.getMinBlockX() + 8, cp.getMinBlockZ() + 8);
         if (centreFloor == Integer.MIN_VALUE || centreFloor >= level.getSeaLevel() - 6) return;
 
-        double reach = Math.min(GeyserConfig.FAULT_WIDTH.get(), 150.0);
+        double reach = Math.min(com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().faultWidth(), 150.0 * com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().horizontal());
         if (centre.faultDistance() > reach) return;
 
         int sea = level.getSeaLevel();

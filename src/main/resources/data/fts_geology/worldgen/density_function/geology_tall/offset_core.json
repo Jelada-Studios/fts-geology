@@ -2,7 +2,7 @@
   "type": "minecraft:add",
   "argument1": {
     "type": "minecraft:mul",
-    "argument1": "fts_geology:geology/offset_base",
+    "argument1": "fts_geology:geology_tall/offset_base",
     "argument2": {
       "type": "minecraft:mul",
       "argument1": {

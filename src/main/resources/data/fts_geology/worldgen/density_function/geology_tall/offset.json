@@ -2,7 +2,7 @@
   "type": "minecraft:flat_cache",
   "argument": {
     "type": "minecraft:add",
-    "argument1": "fts_geology:geology/offset",
+    "argument1": "fts_geology:geology_tall/offset_core",
     "argument2": {
       "type": "minecraft:mul",
       "argument1": {
@@ -10,16 +10,16 @@
         "argument1": 0.5,
         "argument2": {
           "type": "minecraft:add",
-          "argument1": "fts_geology:geology/offset",
+          "argument1": "fts_geology:geology_tall/offset_core",
           "argument2": {
             "type": "minecraft:abs",
-            "argument": "fts_geology:geology/offset"
+            "argument": "fts_geology:geology_tall/offset_core"
           }
         }
       },
       "argument2": {
         "type": "minecraft:mul",
-        "argument1": 7.0,
+        "argument1": 1.6,
         "argument2": {
           "type": "minecraft:flat_cache",
           "argument": {

@@ -103,16 +103,16 @@ public final class Lithology {
             weight = 1.0;
         }
 
-        double granite = noise(seed, x, z, 90.0, 0x7A11L);
+        double granite = noise(seed, x, z, 90.0 * p.horizontal(), 0x7A11L);
         int plutonTop = granite > 0.1 ? 14 + (int) Math.round(46.0 * (1.0 - granite)) : NO_PLUTON;
         return new Column(setting, weight, fallback, a,
-                s.faultDistance() + 14.0 * noise(seed, x, z, 120.0, 0x2C3DL),
-                18 + (int) Math.round(26.0 * (0.5 + 0.5 * noise(seed, x, z, 700.0, 0x5E71L))),
+                s.faultDistance() + 14.0 * noise(seed, x, z, 120.0 * p.horizontal(), 0x2C3DL),
+                18 + (int) Math.round(26.0 * (0.5 + 0.5 * noise(seed, x, z, 700.0 * p.horizontal(), 0x5E71L))),
                 plutonTop,
-                (int) Math.round(5.0 * noise(seed, x, z, 220.0, 0x3B1FL)),
-                noise(seed, x, z, 160.0, 0x6D0BL) > 0.0 ? Rock.GRANITE : Rock.GNEISS,
-                noise(seed, x, z, 200.0, 0x1E5AL) > 0.0 ? Rock.GRANITE : Rock.DIORITE,
-                noise(seed, x, z, 60.0, 0x44D1L) > 0.2);
+                (int) Math.round(5.0 * noise(seed, x, z, 220.0 * p.horizontal(), 0x3B1FL)),
+                noise(seed, x, z, 160.0 * p.horizontal(), 0x6D0BL) > 0.0 ? Rock.GRANITE : Rock.GNEISS,
+                noise(seed, x, z, 200.0 * p.horizontal(), 0x1E5AL) > 0.0 ? Rock.GRANITE : Rock.DIORITE,
+                noise(seed, x, z, 60.0 * p.horizontal(), 0x44D1L) > 0.2);
     }
 
     /**

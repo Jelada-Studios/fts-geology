@@ -12,21 +12,39 @@
           "argument1": "fts_geology:geology_tall/depth",
           "argument2": {
             "type": "minecraft:mul",
-            "argument1": "fts_geology:geology/jaggedness",
+            "argument1": {
+              "type": "minecraft:mul",
+              "argument1": "fts_geology:geology_tall/jaggedness",
+              "argument2": {
+                "type": "minecraft:add",
+                "argument1": 1.0,
+                "argument2": {
+                  "type": "minecraft:mul",
+                  "argument1": 1.6,
+                  "argument2": {
+                    "type": "minecraft:flat_cache",
+                    "argument": {
+                      "type": "fts_geology:plate",
+                      "field": "belt"
+                    }
+                  }
+                }
+              }
+            },
             "argument2": {
               "type": "minecraft:half_negative",
               "argument": {
                 "type": "minecraft:noise",
                 "noise": "minecraft:jagged",
-                "xz_scale": 1500.0,
+                "xz_scale": 600.0,
                 "y_scale": 0.0
               }
             }
           }
         },
-        "argument2": "fts_geology:geology/factor"
+        "argument2": "fts_geology:geology_tall/factor"
       }
     }
   },
-  "argument2": "minecraft:overworld/base_3d_noise"
+  "argument2": { "type": "minecraft:old_blended_noise", "xz_scale": 0.1, "y_scale": 0.05, "xz_factor": 80.0, "y_factor": 160.0, "smear_scale_multiplier": 8.0 }
 }
