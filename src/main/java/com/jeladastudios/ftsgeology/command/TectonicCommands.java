@@ -118,35 +118,35 @@ public final class TectonicCommands {
                         // The terrain and the biomes the generator makes, measured without loading a chunk.
                         .then(Commands.literal("terrain")
                                 // The generator's ground along a line from here, without loading a chunk.
-                                .then(Commands.literal("here").executes(InspectCommands::terrainHere))
+                                .then(Commands.literal("here").executes(TerrainCommands::terrainHere))
                                 .then(Commands.literal("grid")
                                         .then(Commands.argument("half", IntegerArgumentType.integer(8, 2000))
                                                 .then(Commands.argument("step", IntegerArgumentType.integer(1, 64))
-                                                        .executes(ctx -> InspectCommands.terrainGrid(ctx,
+                                                        .executes(ctx -> TerrainCommands.terrainGrid(ctx,
                                                                 IntegerArgumentType.getInteger(ctx, "half"),
                                                                 IntegerArgumentType.getInteger(ctx, "step"))))))
                                 .then(Commands.literal("biomes")
                                         .then(Commands.argument("half", IntegerArgumentType.integer(64, 16000))
                                                 .then(Commands.argument("step", IntegerArgumentType.integer(16, 1024))
-                                                        .executes(ctx -> InspectCommands.terrainBiomes(ctx,
+                                                        .executes(ctx -> TerrainCommands.terrainBiomes(ctx,
                                                                 IntegerArgumentType.getInteger(ctx, "half"),
                                                                 IntegerArgumentType.getInteger(ctx, "step"))))))
                                 .then(Commands.literal("rivers")
                                         .then(Commands.argument("half", IntegerArgumentType.integer(64, 4000))
                                                 .then(Commands.argument("step", IntegerArgumentType.integer(4, 64))
                                                         .then(Commands.argument("minPath", IntegerArgumentType.integer(0, 10000))
-                                                                .executes(ctx -> InspectCommands.terrainRivers(ctx,
+                                                                .executes(ctx -> TerrainCommands.terrainRivers(ctx,
                                                                         IntegerArgumentType.getInteger(ctx, "half"),
                                                                         IntegerArgumentType.getInteger(ctx, "step"),
                                                                         IntegerArgumentType.getInteger(ctx, "minPath")))))))
                                 .then(Commands.literal("ocean")
                                         .then(Commands.argument("radius", IntegerArgumentType.integer(64, 20000))
-                                                .executes(ctx -> InspectCommands.terrainOcean(ctx,
+                                                .executes(ctx -> TerrainCommands.terrainOcean(ctx,
                                                         IntegerArgumentType.getInteger(ctx, "radius")))))
                                 .then(Commands.argument("dx", IntegerArgumentType.integer(-1, 1))
                                         .then(Commands.argument("dz", IntegerArgumentType.integer(-1, 1))
                                                 .then(Commands.argument("length", IntegerArgumentType.integer(16, 20000))
-                                                        .executes(ctx -> InspectCommands.terrain(ctx,
+                                                        .executes(ctx -> TerrainCommands.terrain(ctx,
                                                                 IntegerArgumentType.getInteger(ctx, "dx"),
                                                                 IntegerArgumentType.getInteger(ctx, "dz"),
                                                                 IntegerArgumentType.getInteger(ctx, "length")))))))
