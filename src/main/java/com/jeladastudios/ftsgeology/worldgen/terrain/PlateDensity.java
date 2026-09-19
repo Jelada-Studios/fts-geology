@@ -43,7 +43,7 @@ public final class PlateDensity implements DensityFunction.SimpleFunction {
     public double minValue() {
         return switch (field) {
             case CONTINENTS, EROSION -> -1.5 * Math.abs(scale);
-            case RIDGES, VARIETY, BELT, VALLEY, CREST, GRIP, SPLINE -> 0.0;
+            case RIDGES, VARIETY, BELT, VALLEY, CREST, GRIP, SPLINE, GRABEN -> 0.0;
             case RELIEF, DEM -> -1.0 * Math.abs(scale);
             case MEANDER_X, MEANDER_Z -> -TerrainFields.MEANDER_REACH * Math.abs(scale);
         };
@@ -54,7 +54,7 @@ public final class PlateDensity implements DensityFunction.SimpleFunction {
         return switch (field) {
             case CONTINENTS, EROSION -> 1.5 * Math.abs(scale);
             case RIDGES -> 2.0 * Math.abs(scale);
-            case VARIETY, BELT, VALLEY, CREST, GRIP, SPLINE -> 1.0 * Math.abs(scale);
+            case VARIETY, BELT, VALLEY, CREST, GRIP, SPLINE, GRABEN -> 1.0 * Math.abs(scale);
             case RELIEF, DEM -> 1.5 * Math.abs(scale);
             case MEANDER_X, MEANDER_Z -> TerrainFields.MEANDER_REACH * Math.abs(scale);
         };

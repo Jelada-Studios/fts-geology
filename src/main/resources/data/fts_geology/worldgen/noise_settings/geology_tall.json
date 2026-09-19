@@ -165,12 +165,12 @@
                                                 "type" : "minecraft:min"
                                              },
                                              "argument2" : {
-                                                "input" : "minecraft:overworld/caves/pillars",
+                                                "input" : {"type":"minecraft:add","argument1":"minecraft:overworld/caves/pillars","argument2":{"type":"minecraft:mul","argument1":-10.0,"argument2":{"type":"minecraft:flat_cache","argument":{"type":"fts_geology:plate","field":"graben"}}}},
                                                 "max_exclusive" : 0.03,
                                                 "min_inclusive" : -1000000,
                                                 "type" : "minecraft:range_choice",
                                                 "when_in_range" : -1000000,
-                                                "when_out_of_range" : "minecraft:overworld/caves/pillars"
+                                                "when_out_of_range" : {"type":"minecraft:add","argument1":"minecraft:overworld/caves/pillars","argument2":{"type":"minecraft:mul","argument1":-10.0,"argument2":{"type":"minecraft:flat_cache","argument":{"type":"fts_geology:plate","field":"graben"}}}}
                                              },
                                              "type" : "minecraft:max"
                                           }

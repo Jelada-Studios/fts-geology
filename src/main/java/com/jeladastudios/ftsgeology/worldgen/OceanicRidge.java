@@ -51,6 +51,10 @@ public final class OceanicRidge {
 
         PlateSample centre = TectonicMap.sampleCached(level.getLevel(), cp.getMinBlockX() + 8, cp.getMinBlockZ() + 8);
         if (centre.faultType() != FaultType.DIVERGENT) return;
+        // A spreading ridge parts two pieces of ocean floor. In a continental rift the same code raised its crest
+        // towards the surface through the lake that fills the graben, and left it there as columns of basalt
+        // standing in open water, water over them and under them.
+        if (!centre.plateKind().isOceanic() || !centre.neighbourKind().isOceanic()) return;
         // Only where this piece of the boundary is under water; a rift on land is the earthquake
         // system's job.
         int centreFloor = TerrainProbe.groundY(level, cp.getMinBlockX() + 8, cp.getMinBlockZ() + 8);

@@ -36,7 +36,7 @@ public final class TerrainFields {
 
     private TerrainFields() {}
 
-    public enum Field { CONTINENTS, EROSION, RIDGES, RELIEF, VARIETY, BELT, VALLEY, CREST, MEANDER_X, MEANDER_Z, DEM, GRIP, SPLINE }
+    public enum Field { CONTINENTS, EROSION, RIDGES, RELIEF, VARIETY, BELT, VALLEY, CREST, MEANDER_X, MEANDER_Z, DEM, GRIP, SPLINE, GRABEN }
 
     /** How far the coordinates are pushed about, in blocks, and the size of the pushing. */
     private static final double WARP_AMPLITUDE = 250.0;
@@ -249,6 +249,10 @@ public final class TerrainFields {
             case DEM -> dem(s, p, seed);
             case GRIP -> demGrip(s, p);
             case SPLINE -> spline(s, p, seed, x, z);
+            // The floor of a rift, where the ground lies under the sea's level and the aquifer fills it: vanilla's
+            // cave pillars stood there as rock columns in open water, water over them and under them.
+            case GRABEN -> s.boundaryType() == FaultType.DIVERGENT && !s.plateKind().isOceanic()
+                    ? smooth(Mth.clamp((GRABEN_STEP + STEP_WIDTH - across(s, p)) / 0.15, 0, 1)) : 0.0;
             case VARIETY -> variety(s, p);
             case MEANDER_X, MEANDER_Z -> 0.0;
         };
