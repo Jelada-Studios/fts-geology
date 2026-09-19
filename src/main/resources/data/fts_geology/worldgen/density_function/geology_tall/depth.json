@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:add",
+  "argument1": {
+    "type": "minecraft:y_clamped_gradient",
+    "from_value": 1.5,
+    "from_y": -64,
+    "to_value": -5.75,
+    "to_y": 864
+  },
+  "argument2": "fts_geology:geology_tall/offset"
+}

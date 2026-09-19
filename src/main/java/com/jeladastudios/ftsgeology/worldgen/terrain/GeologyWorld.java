@@ -23,13 +23,16 @@ public final class GeologyWorld {
 
     public static final ResourceKey<NoiseGeneratorSettings> SETTINGS =
             ResourceKey.create(Registries.NOISE_SETTINGS, new ResourceLocation(GeysersMod.MODID, "geology"));
+    /** The tall world type: the same terrain with its belts scaled up into an 864-block world. */
+    public static final ResourceKey<NoiseGeneratorSettings> SETTINGS_TALL =
+            ResourceKey.create(Registries.NOISE_SETTINGS, new ResourceLocation(GeysersMod.MODID, "geology_tall"));
 
     private static final Map<String, Boolean> OWN = new ConcurrentHashMap<>();
 
     public static boolean isOwn(ServerLevel level) {
         return OWN.computeIfAbsent(level.dimension().location().toString(), k -> {
             if (!(level.getChunkSource().getGenerator() instanceof NoiseBasedChunkGenerator noise)) return false;
-            return noise.generatorSettings().is(SETTINGS);
+            return noise.generatorSettings().is(SETTINGS) || noise.generatorSettings().is(SETTINGS_TALL);
         });
     }
 

@@ -1,6 +1,7 @@
 {
   "replace": false,
   "values": [
-    "fts_geology:geology"
+    "fts_geology:geology",
+    "fts_geology:geology_tall"
   ]
 }
