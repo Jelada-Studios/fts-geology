@@ -47,10 +47,16 @@ public final class TectonicMap {
      * a surface-level concept.
      */
     public static PlateSample sample(ServerLevel level, int blockX, int blockZ) {
-        // In the mod's own terrain the plates shaped the ground, so a plate's crust is the seed's; elsewhere the
-        // plates lie over ground made without them and read their crust from the biomes.
-        boolean own = com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level);
-        return compute(level.getSeed(), blockX, blockZ, own ? null : level, GeologyParams.current());
+        // In the mod's own terrain the plates shaped the ground, so the plate is the one the ground was cut from:
+        // the terrain warps its coordinates and lets the boundary that lifts the ground more speak, and every
+        // system reads that same plate, or the volcanoes, the springs and the quakes stand up to a warp's width
+        // (250 blocks, more than a fault zone) off the mountains they belong to. Elsewhere the plates lie over
+        // ground made without them and read their crust from the biomes.
+        if (com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level)) {
+            return com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.sampleAt(level.getSeed(),
+                    GeologyParams.current(), blockX, blockZ);
+        }
+        return compute(level.getSeed(), blockX, blockZ, level, GeologyParams.current());
     }
 
     /** The same picture from the seed alone, as the terrain generator asks for it: crust from the seed. */
