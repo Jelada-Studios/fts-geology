@@ -19,6 +19,10 @@ public final class ModDensityFunctions {
     public static final DeferredRegister<Codec<? extends DensityFunction>> DENSITY_FUNCTIONS =
             DeferredRegister.create(Registries.DENSITY_FUNCTION_TYPE, GeysersMod.MODID);
 
+    /** The rivers traced down the raw ground. See {@link com.jeladastudios.ftsgeology.worldgen.terrain.RiverDensity}. */
+    public static final RegistryObject<Codec<? extends DensityFunction>> RIVERS =
+            DENSITY_FUNCTIONS.register("rivers", () -> com.jeladastudios.ftsgeology.worldgen.terrain.RiverDensity.CODEC.codec());
+
     /** The plate model's continents, erosion, ridge factor and relief. See {@link PlateDensity}. */
     public static final RegistryObject<Codec<? extends DensityFunction>> PLATE =
             DENSITY_FUNCTIONS.register("plate", () -> PlateDensity.CODEC.codec());

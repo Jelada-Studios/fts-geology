@@ -397,4 +397,46 @@ public final class TerrainCommands {
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
         return 1;
     }
+
+    /** The traced river nearest this column: its channel, the pool over it and the rock bar below it. */
+    public static int terrainTrace(CommandContext<CommandSourceStack> ctx) {
+        ServerLevel level = ctx.getSource().getLevel();
+        BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+        if (!com.jeladastudios.ftsgeology.hydrology.RiverNetwork.ready()) {
+            ctx.getSource().sendSuccess(() -> Component.literal("No river network: this world type traces none."), false);
+            return 0;
+        }
+        var a = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.at(at.getX(), at.getZ());
+        String line;
+        if (a.distance() == Double.MAX_VALUE) {
+            line = String.format(Locale.ROOT, "no channel within reach of %d,%d (%d traces cut)",
+                    at.getX(), at.getZ(), com.jeladastudios.ftsgeology.hydrology.RiverNetwork.tracesCut());
+        } else {
+            line = String.format(Locale.ROOT,
+                    "channel %.1f blocks away, half width %.1f, floor %.0f, water %.0f%s%s; ground here %d (%d traces cut)",
+                    a.distance(), a.halfWidth(), a.bed(), a.water(), a.dry() ? " (dry)" : "",
+                    a.ribTop() == Double.MIN_VALUE ? "" : String.format(Locale.ROOT, ", rock bar to %.0f", a.ribTop()),
+                    level.getChunkSource().getGenerator().getBaseHeight(at.getX(), at.getZ(),
+                            net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG,
+                            level, level.getChunkSource().randomState()),
+                    com.jeladastudios.ftsgeology.hydrology.RiverNetwork.tracesCut());
+        }
+        final String out = line;
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(out);
+        ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+        return 1;
+    }
+
+    /** The rivers over a square round here: how much ground they hold, how they step down and how much they wind. */
+    public static int terrainTraceGrid(CommandContext<CommandSourceStack> ctx, int half, int step) {
+        BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+        if (!com.jeladastudios.ftsgeology.hydrology.RiverNetwork.ready()) {
+            ctx.getSource().sendSuccess(() -> Component.literal("No river network: this world type traces none."), false);
+            return 0;
+        }
+        final String out = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.report(at.getX(), at.getZ(), half, step);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(out);
+        ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+        return 1;
+    }
 }

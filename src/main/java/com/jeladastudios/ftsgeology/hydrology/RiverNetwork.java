@@ -1,0 +1,531 @@
+package com.jeladastudios.ftsgeology.hydrology;
+
+import com.jeladastudios.ftsgeology.util.SeedHash;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * The rivers, traced down the ground the world generator would make if there were none.
+ *
+ * <p>A source is a point on a wide grid, high enough and inland; from it the trace takes the steepest way down,
+ * step by step. It never climbs more than a block or two, and where the ground closes in front of it the trace ends
+ * there rather than cut back uphill, which is what every uphill stretch of the old rivers was.</p>
+ *
+ * <p>The water is still. A trace is cut into pools, each one flat and each one lower than the last, and between two
+ * pools the channel keeps a rib of rock standing a block above the upper pool's surface. Nothing flows, so nothing
+ * overflows and nothing drains into a cave, and a fluid mod that moves water finds every pool already at rest.
+ * Where the ground falls too fast for a pool worth having, the channel is cut dry.</p>
+ *
+ * <p>Every length here is in blocks and scales with the world's layout; the heights do not, both world types
+ * putting the ground at {@code 128 + 128 * offset}.</p>
+ */
+public final class RiverNetwork {
+
+    private RiverNetwork() {}
+
+    /** The ground the generator would make with no river in it, in blocks. */
+    public interface Ground {
+        double heightAt(int x, int z);
+    }
+
+    // === The shape of a river ==============================================
+
+    /** Blocks between the points of a trace. */
+    private static final double STEP = 8.0;
+    /** Blocks between source points, and the share of them that carry a river. */
+    private static final double SOURCE_GRID = 224.0, SOURCE_SHARE = 0.5;
+    /** A source stands at least this far above the sea. */
+    private static final double SOURCE_RISE = 14.0;
+    /** How far a trace may run before it is given up on. */
+    private static final double MAX_LENGTH = 2600.0;
+    /** The least a trace may run and still be a river, where it does not reach the sea. */
+    private static final double MIN_LENGTH = 320.0;
+    /** How much the ground may rise in front of a trace before it stops there. */
+    private static final double CLIMB_OK = 2.0;
+    /** Sea level: where a trace has arrived. */
+    private static final int SEA = 63;
+    /** How far the ground may fall along a pool before the next pool takes over. */
+    private static final double POOL_DROP = 8.0;
+    /** Blocks of water in a channel, and the least length a pool may have before the stretch is left dry. */
+    private static final double DEPTH = 3.0, MIN_POOL = 32.0;
+    /** How far under the ground beside it a channel may be cut: past this the pool ends and the next one starts. */
+    private static final double MAX_CUT = 10.0;
+    /** Channel half width, from a young river to a grown one, and the length it grows over. */
+    private static final double HALF_NEW = 2.0, HALF_GROWN = 7.0, WIDTH_AT = 1600.0;
+    /** How far from the middle of a channel the ground still knows about it, for the caves to keep away. */
+    public static final double CAVE_REACH = 8.0;
+
+    /**
+     * One point of a traced river: where it is, the level of its water, the floor under it and how wide the flat
+     * floor is. A rib carries the top of the rock bar between two pools in {@code water} instead.
+     */
+    public record Point(double x, double z, float water, float bed, float halfWidth, boolean dry, boolean rib) {}
+
+    private record Trace(Point[] points) {}
+
+    /** Blocks a query looks either side of a channel's middle: the widest channel, its banks and the cave reach. */
+    private static final double REACH = HALF_GROWN + CAVE_REACH + 4.0;
+
+    // === State =============================================================
+
+    private static volatile Ground ground;
+    private static volatile long forSeed = Long.MIN_VALUE;
+    private static volatile double horizontal = 1.0;
+    private static final ConcurrentHashMap<Long, Trace> TRACES = new ConcurrentHashMap<>();
+    /** Ground already read, on a four-block grid: a trace and its ways round a hollow ask for the same columns. */
+    private static final ConcurrentHashMap<Long, Double> HEIGHTS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Long, Point[]> INDEX = new ConcurrentHashMap<>();
+    /** Blocks an index square covers. */
+    private static final int BLOCK = 512;
+
+    /** The generator hands the ground over as soon as the noise router is wired, before any column is asked for. */
+    public static void useGround(Ground g, long seed, double h) {
+        if (seed != forSeed || horizontal != h) {
+            TRACES.clear();
+            HEIGHTS.clear();
+            INDEX.clear();
+            forSeed = seed;
+            horizontal = h;
+        }
+        ground = g;
+    }
+
+    public static void clear() {
+        TRACES.clear();
+        HEIGHTS.clear();
+        INDEX.clear();
+        ground = null;
+        forSeed = Long.MIN_VALUE;
+    }
+
+    public static boolean ready() {
+        return ground != null;
+    }
+
+    public static int tracesCut() {
+        return TRACES.size();
+    }
+
+    // === Queries ===========================================================
+
+    /** What a column knows about the nearest channel and the nearest rib. */
+    public record At(double distance, double halfWidth, double water, double bed, boolean dry, double ribTop) {
+        public boolean inChannel() {
+            return distance <= halfWidth;
+        }
+
+        /** The channel floor over this column: flat across the bed, then up two blocks for every block out. */
+        public double floor() {
+            return bed + WALL * Math.max(0.0, distance - halfWidth);
+        }
+    }
+
+    /** How steeply a channel's wall climbs out of its bed. At one for one the bank stood only a block over the
+     * water two columns out, and the noise on top of it let the pool go. */
+    private static final double WALL = 2.0;
+
+    public static final At NOTHING = new At(Double.MAX_VALUE, 0, 0, 0, true, Double.MIN_VALUE);
+    /** The last column asked about: the offset asks three times for every column, and the water again after. */
+    private static final ThreadLocal<long[]> LAST_KEY = ThreadLocal.withInitial(() -> new long[]{Long.MIN_VALUE});
+    private static final ThreadLocal<At> LAST = new ThreadLocal<>();
+
+    public static At at(int x, int z) {
+        long key = (((long) x) << 32) ^ (z & 0xFFFFFFFFL);
+        long[] k = LAST_KEY.get();
+        At hit = LAST.get();
+        if (k[0] == key && hit != null) return hit;
+        At made = look(x, z);
+        k[0] = key;
+        LAST.set(made);
+        return made;
+    }
+
+    private static At look(int x, int z) {
+        if (ground == null) return NOTHING;
+        double reach = REACH * horizontal;
+        Point best = null;
+        double bestD2 = reach * reach;
+        double ribTop = Double.MIN_VALUE;
+        int bx0 = Math.floorDiv(x - (int) reach, BLOCK), bx1 = Math.floorDiv(x + (int) reach, BLOCK);
+        int bz0 = Math.floorDiv(z - (int) reach, BLOCK), bz1 = Math.floorDiv(z + (int) reach, BLOCK);
+        for (int bx = bx0; bx <= bx1; bx++) {
+            for (int bz = bz0; bz <= bz1; bz++) {
+                for (Point p : block(bx, bz)) {
+                    double dx = p.x - x, dz = p.z - z;
+                    double d2 = dx * dx + dz * dz;
+                    if (p.rib) {
+                        double edge = p.halfWidth + 2.0;
+                        if (d2 <= edge * edge) ribTop = Math.max(ribTop, p.water);
+                    } else if (d2 < bestD2) {
+                        bestD2 = d2;
+                        best = p;
+                    }
+                }
+            }
+        }
+        if (best == null) return ribTop == Double.MIN_VALUE ? NOTHING : new At(Double.MAX_VALUE, 0, 0, 0, true, ribTop);
+        return new At(Math.sqrt(bestD2), best.halfWidth, best.water, best.bed, best.dry, ribTop);
+    }
+
+    /** The floor a channel cuts here, in blocks, or {@link Double#MAX_VALUE} where it cuts nothing. */
+    public static double floorAt(int x, int z) {
+        At a = at(x, z);
+        if (a.distance == Double.MAX_VALUE) return Double.MAX_VALUE;
+        return a.floor();
+    }
+
+    /** The top of the rock bar between two pools, or {@link Double#MIN_VALUE} where there is none. */
+    public static double ribAt(int x, int z) {
+        return at(x, z).ribTop;
+    }
+
+    /** 1 over a channel and its banks, fading out over a few blocks: where no cave may open. */
+    public static double near(int x, int z) {
+        At a = at(x, z);
+        if (a.distance == Double.MAX_VALUE) return 0.0;
+        double over = a.distance - a.halfWidth;
+        if (over <= 0) return 1.0;
+        return Math.max(0.0, 1.0 - over / (CAVE_REACH * horizontal));
+    }
+
+    /**
+     * What the rivers round here look like: how much of the ground their channels hold, how much of that is under
+     * water, and for every trace that passes through, its length, how far its pools step down and how much it winds.
+     */
+    public static String report(int cx, int cz, int half, int step) {
+        int samples = 0, channel = 0, wet = 0, ribs = 0;
+        for (int x = cx - half; x <= cx + half; x += step) {
+            for (int z = cz - half; z <= cz + half; z += step) {
+                samples++;
+                At a = at(x, z);
+                if (a.ribTop != Double.MIN_VALUE) ribs++;
+                if (a.distance == Double.MAX_VALUE || !a.inChannel()) continue;
+                channel++;
+                if (!a.dry) wet++;
+            }
+        }
+        int traces = 0, uphill = 0, pools = 0;
+        double length = 0, sinuosity = 0, poolLength = 0, wetShare = 0;
+        for (Trace t : TRACES.values()) {
+            if (t.points.length < 2) continue;
+            boolean here = false;
+            for (Point p : t.points) {
+                if (Math.abs(p.x - cx) <= half && Math.abs(p.z - cz) <= half) { here = true; break; }
+            }
+            if (!here) continue;
+            traces++;
+            double len = 0, last = Double.MAX_VALUE;
+            int inPool = 0, wetPts = 0;
+            Point a = t.points[0], b = t.points[t.points.length - 1];
+            for (int i = 0; i < t.points.length; i++) {
+                Point p = t.points[i];
+                if (p.rib) continue;
+                if (i > 0) {
+                    Point q = t.points[i - 1];
+                    len += Math.sqrt((p.x - q.x) * (p.x - q.x) + (p.z - q.z) * (p.z - q.z));
+                }
+                if (!p.dry) {
+                    wetPts++;
+                    if (p.water > last + 0.01) uphill++;
+                    if (p.water != last) { pools++; inPool = 0; }
+                    last = p.water;
+                    inPool++;
+                    poolLength++;
+                }
+            }
+            length += len;
+            wetShare += wetPts / (double) t.points.length;
+            double straight = Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.z - b.z) * (a.z - b.z));
+            if (straight > 1) sinuosity += len / straight;
+        }
+        return String.format(java.util.Locale.ROOT,
+                "rivers within %d of %d,%d every %d: %d samples, %d in a channel (%.2f%%), %d under water (%.2f%%), %d by a rock bar; "
+                        + "%d traces through, mean length %.0f, mean sinuosity %.2f, %d pools, mean pool %.0f blocks, wet share %.2f, uphill steps %d (%d traces cut)",
+                half, cx, cz, step, samples, channel, 100.0 * channel / samples, wet, 100.0 * wet / samples, ribs,
+                traces, traces == 0 ? 0 : length / traces, traces == 0 ? 0 : sinuosity / traces, pools,
+                pools == 0 ? 0 : poolLength * STEP * horizontal / pools, traces == 0 ? 0 : wetShare / traces, uphill,
+                TRACES.size());
+    }
+
+    // === The index =========================================================
+
+    private static final Point[] NONE = new Point[0];
+
+    private static Point[] block(int bx, int bz) {
+        long key = (((long) bx) << 32) ^ (bz & 0xFFFFFFFFL);
+        Point[] hit = INDEX.get(key);
+        if (hit != null) return hit;
+        Point[] made = buildBlock(bx, bz);
+        INDEX.put(key, made);
+        return made;
+    }
+
+    /** Every traced point that falls in this square, from all the sources whose river could reach it. */
+    private static Point[] buildBlock(int bx, int bz) {
+        double h = horizontal;
+        double grid = SOURCE_GRID * h;
+        double span = MAX_LENGTH * h + BLOCK;
+        int x0 = bx * BLOCK, z0 = bz * BLOCK;
+        int gx0 = (int) Math.floor((x0 - span) / grid), gx1 = (int) Math.floor((x0 + BLOCK + span) / grid);
+        int gz0 = (int) Math.floor((z0 - span) / grid), gz1 = (int) Math.floor((z0 + BLOCK + span) / grid);
+        List<Point> out = new ArrayList<>();
+        double edge = REACH * h;
+        for (int gx = gx0; gx <= gx1; gx++) {
+            for (int gz = gz0; gz <= gz1; gz++) {
+                for (Point p : trace(gx, gz).points) {
+                    if (p.x >= x0 - edge && p.x < x0 + BLOCK + edge && p.z >= z0 - edge && p.z < z0 + BLOCK + edge) {
+                        out.add(p);
+                    }
+                }
+            }
+        }
+        return out.isEmpty() ? NONE : out.toArray(new Point[0]);
+    }
+
+    private static final Trace EMPTY = new Trace(NONE);
+
+    private static Trace trace(int gx, int gz) {
+        long key = (((long) gx) << 32) ^ (gz & 0xFFFFFFFFL);
+        Trace hit = TRACES.get(key);
+        if (hit != null) return hit;
+        Trace made = cut(gx, gz);
+        if (made == null) made = EMPTY;
+        TRACES.put(key, made);
+        return made;
+    }
+
+    // === Tracing ===========================================================
+
+    /** The river from one source cell, or null where that cell has none or its river gets nowhere. */
+    private static Trace cut(int gx, int gz) {
+        Ground g = ground;
+        if (g == null) return null;
+        long seed = forSeed;
+        double h = horizontal;
+        double grid = SOURCE_GRID * h, step = STEP * h;
+        long hash = SeedHash.hash(seed, gx, gz, 0x5217L);
+        if (SeedHash.rand01(hash) > SOURCE_SHARE) return null;
+        double x = (gx + 0.2 + 0.6 * SeedHash.rand01(SeedHash.mix(hash ^ 0xA1L))) * grid;
+        double z = (gz + 0.2 + 0.6 * SeedHash.rand01(SeedHash.mix(hash ^ 0xB2L))) * grid;
+        double y = height(g, x, z);
+        if (y < SEA + SOURCE_RISE) return null;
+
+        // 1. The way down: the steepest of the ways that do not turn back, with the ground two steps on weighed in
+        //    as well, so a hollow one step wide does not end the river.
+        List<double[]> path = new ArrayList<>();
+        path.add(new double[]{x, z, y});
+        double dirX = 0, dirZ = 0;
+        boolean sea = false;
+        int steps = (int) (MAX_LENGTH / STEP);
+        for (int i = 0; i < steps; i++) {
+            double bestScore = Double.MAX_VALUE, bx = 0, bz = 0, by = 0, bdx = 0, bdz = 0;
+            for (int d = 0; d < 8; d++) {
+                double a = d * Math.PI / 4.0;
+                double ux = Math.cos(a), uz = Math.sin(a);
+                double dot = dirX * ux + dirZ * uz;
+                if ((dirX != 0 || dirZ != 0) && dot < -0.3) continue;   // anything but straight back
+                double nx = x + ux * step, nz = z + uz * step;
+                double ny = height(g, nx, nz);
+                double ahead = height(g, x + ux * step * 2, z + uz * step * 2);
+                double score = ny + 0.5 * ahead - 1.5 * dot;
+                if (score < bestScore) {
+                    bestScore = score;
+                    bx = nx;
+                    bz = nz;
+                    by = ny;
+                    bdx = ux;
+                    bdz = uz;
+                }
+            }
+            if (bestScore == Double.MAX_VALUE) break;
+            if (by > y + CLIMB_OK) {
+                // Ground in front of it: a river fills the hollow and leaves by the lowest lip round it, so the
+                // trace looks for a way round before it gives up. Stopping at the first rise left every river a
+                // few hundred blocks long.
+                List<double[]> round = escape(g, x, z, y, step);
+                if (round == null) break;
+                for (double[] q : round) path.add(q);
+                double[] end = round.get(round.size() - 1);
+                double[] before = round.size() > 1 ? round.get(round.size() - 2) : new double[]{x, z, y};
+                dirX = end[0] - before[0];
+                dirZ = end[1] - before[1];
+                double dl = Math.sqrt(dirX * dirX + dirZ * dirZ);
+                if (dl > 1e-6) { dirX /= dl; dirZ /= dl; }
+                x = end[0];
+                z = end[1];
+                y = end[2];
+                i += round.size();
+                if (y <= SEA) { sea = true; break; }
+                continue;
+            }
+            x = bx;
+            z = bz;
+            y = by;
+            dirX = bdx;
+            dirZ = bdz;
+            path.add(new double[]{x, z, y});
+            if (y <= SEA) {
+                sea = true;
+                break;
+            }
+        }
+        if (!sea && (path.size() - 1) * step < MIN_LENGTH * h) return null;
+
+        // 2. Rounded off, and winding where the ground is flat enough to let it.
+        double[][] pts = smooth(path);
+        for (double[] p : pts) p[2] = height(g, p[0], p[1]);
+        meander(g, pts, seed, gx, gz, h);
+        for (double[] p : pts) p[2] = height(g, p[0], p[1]);
+
+        // 3. Pools: each one flat, its surface a block under the lowest ground along it, and a rib of rock between
+        //    one pool and the next.
+        double depth = DEPTH * h, drop = POOL_DROP * h;
+        List<Point> out = new ArrayList<>(pts.length + 8);
+        int i = 0;
+        double lastLevel = Double.MAX_VALUE, lastBed = Double.MAX_VALUE;
+        while (i < pts.length) {
+            int j = i;
+            double low = pts[i][2];
+            // The pool runs on while the ground has neither fallen away under it nor risen over the channel: either way
+            // the next pool takes over, a step lower, rather than the channel cutting a gorge to hold one level.
+            while (j + 1 < pts.length && pts[i][2] - pts[j + 1][2] <= drop
+                    && pts[j + 1][2] <= Math.min(low, pts[j + 1][2]) - 1.0 + MAX_CUT * h) {
+                j++;
+                low = Math.min(low, pts[j][2]);
+            }
+            double level = Math.min(low - 1.0, lastLevel - 1.0);
+            boolean dry = (j - i) * step < MIN_POOL * h || level <= SEA + 1;
+            for (int k = i; k <= j; k++) {
+                double half = (HALF_NEW + (HALF_GROWN - HALF_NEW) * Math.min(1.0, k * STEP / WIDTH_AT)) * h;
+                // A dry stretch cuts a groove that follows the ground; a pool cuts a flat floor under its own level.
+                double bed = dry ? pts[k][2] - 1.0 - depth : level - depth;
+                lastBed = bed;
+                out.add(new Point(pts[k][0], pts[k][1], (float) level, (float) bed, (float) half, dry, false));
+            }
+            if (!dry && j + 1 < pts.length) {
+                // The rib: half a step past the last pool point, standing a block clear of the water.
+                double rx = (pts[j][0] + pts[j + 1][0]) / 2.0, rz = (pts[j][1] + pts[j + 1][1]) / 2.0;
+                double half = out.get(out.size() - 1).halfWidth();
+                out.add(new Point(rx, rz, (float) (level + 1.0), 0, (float) half, false, true));
+            }
+            if (!dry) lastLevel = level;
+            i = j + 1;
+        }
+        return new Trace(out.toArray(new Point[0]));
+    }
+
+    /** How many cells the search round a hollow may look at before the river is given up on. */
+    private static final int ESCAPE_CELLS = 400;
+
+    /**
+     * The way out of a hollow: the cells round it are taken lowest first until one lies below where the river
+     * stopped, and the path to it comes back. Null where there is none within reach, and the river ends.
+     */
+    private static List<double[]> escape(Ground g, double x0, double z0, double y0, double step) {
+        java.util.PriorityQueue<long[]> open = new java.util.PriorityQueue<>(
+                java.util.Comparator.comparingDouble(c -> Double.longBitsToDouble(c[2])));
+        java.util.HashMap<Long, long[]> seen = new java.util.HashMap<>();
+        long start = key(0, 0);
+        open.add(new long[]{0, 0, Double.doubleToRawLongBits(y0), Long.MIN_VALUE});
+        seen.put(start, new long[]{0, 0, Double.doubleToRawLongBits(y0), Long.MIN_VALUE});
+        int looked = 0;
+        while (!open.isEmpty() && looked++ < ESCAPE_CELLS) {
+            long[] cell = open.poll();
+            int ci = (int) cell[0], cj = (int) cell[1];
+            double cy = Double.longBitsToDouble(cell[2]);
+            if (cy < y0 - 0.5 && (ci != 0 || cj != 0)) {
+                java.util.ArrayList<double[]> path = new java.util.ArrayList<>();
+                long[] at = cell;
+                while (at != null && at[3] != Long.MIN_VALUE) {
+                    path.add(0, new double[]{x0 + (int) at[0] * step, z0 + (int) at[1] * step,
+                            Double.longBitsToDouble(at[2])});
+                    at = seen.get(at[3]);
+                }
+                return path.isEmpty() ? null : path;
+            }
+            for (int d = 0; d < 8; d++) {
+                double a = d * Math.PI / 4.0;
+                int ni = ci + (int) Math.round(Math.cos(a)), nj = cj + (int) Math.round(Math.sin(a));
+                if (Math.abs(ni) > 24 || Math.abs(nj) > 24) continue;
+                long k = key(ni, nj);
+                if (seen.containsKey(k)) continue;
+                double ny = height(g, x0 + ni * step, z0 + nj * step);
+                long[] made = new long[]{ni, nj, Double.doubleToRawLongBits(ny), key(ci, cj)};
+                seen.put(k, made);
+                open.add(made);
+            }
+        }
+        return null;
+    }
+
+    /** The ground at a point, on a four-block grid and kept: the same columns are asked for again and again. */
+    private static double height(Ground g, double x, double z) {
+        int ix = ((int) Math.floor(x)) & ~3, iz = ((int) Math.floor(z)) & ~3;
+        long k = key(ix >> 2, iz >> 2);
+        Double hit = HEIGHTS.get(k);
+        if (hit != null) return hit;
+        double y = g.heightAt(ix, iz);
+        if (HEIGHTS.size() < 4_000_000) HEIGHTS.put(k, y);
+        return y;
+    }
+
+    private static long key(int i, int j) {
+        return (((long) i) << 32) ^ (j & 0xFFFFFFFFL);
+    }
+
+    /** Chaikin's corner cutting, twice: a path of steps on a compass turns into a curve. */
+    private static double[][] smooth(List<double[]> path) {
+        double[][] p = path.toArray(new double[0][]);
+        for (int pass = 0; pass < 2 && p.length > 3; pass++) {
+            double[][] q = new double[(p.length - 1) * 2][];
+            for (int i = 0; i < p.length - 1; i++) {
+                q[2 * i] = new double[]{p[i][0] * 0.75 + p[i + 1][0] * 0.25, p[i][1] * 0.75 + p[i + 1][1] * 0.25, 0};
+                q[2 * i + 1] = new double[]{p[i][0] * 0.25 + p[i + 1][0] * 0.75, p[i][1] * 0.25 + p[i + 1][1] * 0.75, 0};
+            }
+            // Every other one kept, so the step between points stays about what it was.
+            double[][] r = new double[q.length / 2 + 1][];
+            for (int i = 0; i < r.length - 1; i++) r[i] = q[i * 2];
+            r[r.length - 1] = q[q.length - 1];
+            p = r;
+        }
+        return p;
+    }
+
+    /**
+     * The winding. On flat ground a river swings well off the line it was traced along; against a slope it would
+     * only cut a trench across the hillside, so the swing is cut back to what the ground either side allows.
+     */
+    private static void meander(Ground g, double[][] pts, long seed, int gx, int gz, double h) {
+        int n = pts.length;
+        if (n < 10) return;
+        double[] ox = new double[n], oz = new double[n];
+        double phase = SeedHash.rand01(SeedHash.hash(seed, gx, gz, 0x3BE1L)) * Math.PI * 2;
+        double wave = 22.0 * STEP * h;                  // blocks of river to a full swing
+        double amp = 7.0 * h;
+        for (int i = 2; i < n - 2; i++) {
+            double px = pts[i + 1][0] - pts[i - 1][0], pz = pts[i + 1][1] - pts[i - 1][1];
+            double len = Math.sqrt(px * px + pz * pz);
+            if (len < 1e-6) continue;
+            double nx = -pz / len, nz = px / len;
+            double s = i * STEP * h;
+            double swing = 0.7 * Math.sin(phase + s * 2 * Math.PI / wave)
+                    + 0.3 * Math.sin(phase * 1.7 + s * 2 * Math.PI / (wave * 0.37));
+            // How much room the swing has: the ground a swing's width either side, against the ground here.
+            double here = pts[i][2];
+            double left = height(g, pts[i][0] + nx * amp, pts[i][1] + nz * amp);
+            double right = height(g, pts[i][0] - nx * amp, pts[i][1] - nz * amp);
+            double rise = Math.max(left, right) - here;
+            double room = rise <= 2.0 ? 1.0 : Math.max(0.0, 1.0 - (rise - 2.0) / 6.0);
+            ox[i] = nx * amp * swing * room;
+            oz[i] = nz * amp * swing * room;
+        }
+        // Eased in at both ends, so the mouth and the source stay where they were traced.
+        for (int i = 0; i < n; i++) {
+            double ease = Math.min(1.0, Math.min(i, n - 1 - i) / 6.0);
+            pts[i][0] += ox[i] * ease;
+            pts[i][1] += oz[i] * ease;
+        }
+    }
+}

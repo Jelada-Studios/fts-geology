@@ -1,11 +1,1 @@
-{
-  "argument" : {
-    "argument" : {
-      "argument1" : "fts_geology:geology/offset_raw",
-      "argument2" : "fts_geology:geology/river_floor",
-      "type" : "minecraft:min"
-    },
-    "type" : "minecraft:cache_2d"
-  },
-  "type" : "minecraft:flat_cache"
-}
+{"type":"minecraft:flat_cache","argument":{"type":"minecraft:cache_2d","argument":{"type":"minecraft:max","argument1":{"type":"minecraft:min","argument1":"fts_geology:geology/offset_raw","argument2":"fts_geology:geology/river_floor"},"argument2":"fts_geology:geology/river_rib"}}}

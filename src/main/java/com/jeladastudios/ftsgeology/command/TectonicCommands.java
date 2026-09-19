@@ -119,6 +119,13 @@ public final class TectonicCommands {
                         .then(Commands.literal("terrain")
                                 // The generator's ground along a line from here, without loading a chunk.
                                 .then(Commands.literal("here").executes(TerrainCommands::terrainHere))
+                                // The traced river nearest here: where its channel runs and what its pool holds.
+                                .then(Commands.literal("trace").executes(TerrainCommands::terrainTrace)
+                                        .then(Commands.argument("half", IntegerArgumentType.integer(64, 8000))
+                                                .then(Commands.argument("step", IntegerArgumentType.integer(2, 64))
+                                                        .executes(ctx -> TerrainCommands.terrainTraceGrid(ctx,
+                                                                IntegerArgumentType.getInteger(ctx, "half"),
+                                                                IntegerArgumentType.getInteger(ctx, "step"))))))
                                 .then(Commands.literal("grid")
                                         .then(Commands.argument("half", IntegerArgumentType.integer(8, 2000))
                                                 .then(Commands.argument("step", IntegerArgumentType.integer(1, 64))
