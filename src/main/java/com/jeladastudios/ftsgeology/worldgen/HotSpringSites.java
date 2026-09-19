@@ -407,18 +407,21 @@ public final class HotSpringSites {
         }
     }
 
-    /** How far above the water line the stained ground climbs a bank. */
-    private static final int BANK_REACH = 10;
+    /**
+     * How far above the water line the stained ground climbs a bank. Ten blocks of orange, red and brown terracotta
+     * up every bank made a basin a patchwork of twenty kinds of block; a basin floor is white and grey with the
+     * colour kept to the water's edge.
+     */
+    private static final int BANK_REACH = 4;
 
-    /** A band's colour as hydrothermally altered ground instead of a mat. The halo's crust stays as it is. */
+    /** A band's colour as hydrothermally altered ground instead of a mat: bleached white, a little sulfur yellow. */
     static Block altered(Block band, net.minecraft.util.RandomSource rng) {
         if (band == ModBlocks.SINTER.get()) return rng.nextBoolean() ? Blocks.CALCITE : Blocks.WHITE_TERRACOTTA;
         if (band == ModBlocks.MICROBIAL_MAT_GREEN.get() || band == ModBlocks.MICROBIAL_MAT_YELLOW.get()) {
-            return Blocks.YELLOW_TERRACOTTA;
+            return rng.nextInt(3) == 0 ? Blocks.YELLOW_TERRACOTTA : Blocks.COARSE_DIRT;
         }
-        if (band == ModBlocks.MICROBIAL_MAT_ORANGE.get()) return Blocks.ORANGE_TERRACOTTA;
-        if (band == ModBlocks.MICROBIAL_MAT_BROWN.get()) {
-            return rng.nextBoolean() ? Blocks.RED_TERRACOTTA : Blocks.BROWN_TERRACOTTA;
+        if (band == ModBlocks.MICROBIAL_MAT_ORANGE.get() || band == ModBlocks.MICROBIAL_MAT_BROWN.get()) {
+            return rng.nextBoolean() ? Blocks.COARSE_DIRT : Blocks.GRAVEL;
         }
         return band;
     }

@@ -63,10 +63,17 @@ public final class SoilProfile {
         double s10 = setting(model, x0 + 16, z0);
         double s01 = setting(model, x0, z0 + 16);
         double s11 = setting(model, x0 + 16, z0 + 16);
+        // A geothermal basin's floor is the basin's to paint: red earth between its sinter flats made a patchwork.
+        double b00 = GeothermalBasin.basin(model, x0, z0);
+        double b10 = GeothermalBasin.basin(model, x0 + 16, z0);
+        double b01 = GeothermalBasin.basin(model, x0, z0 + 16);
+        double b11 = GeothermalBasin.basin(model, x0 + 16, z0 + 16);
         long seed = level.getSeed() ^ SALT;
         for (int dx = 0; dx < 16; dx++) {
             for (int dz = 0; dz < 16; dz++) {
                 double s = Mth.lerp(dz / 16.0, Mth.lerp(dx / 16.0, s00, s10), Mth.lerp(dx / 16.0, s01, s11));
+                double b = Mth.lerp(dz / 16.0, Mth.lerp(dx / 16.0, b00, b10), Mth.lerp(dx / 16.0, b01, b11));
+                if (b > GeothermalBasin.FLOOR_MIN) continue;
                 int x = x0 + dx, z = z0 + dz;
                 RandomSource rng = RandomSource.create(SeedHash.columnSeed(seed, x, z));
                 // A third of the patches in quiet country, rising over the gate band to all of them. Decided a cell
@@ -123,12 +130,11 @@ public final class SoilProfile {
      * why plain stone deliberately does not.
      */
     private static Soil parentRock(BlockState s) {
-        // Iron-rich: the iron oxidises and stains the ground red.
+        // Iron-rich: the iron oxidises and stains the ground red. Not tuff: ash weathers to a dark andosol, and as
+        // laterite it painted every arc, where the rock is mostly ash, red.
         if (s.is(Blocks.BASALT) || s.is(Blocks.SMOOTH_BASALT) || s.is(Blocks.BLACKSTONE)
-                || s.is(Blocks.TUFF)
                 || s.is(ModBlocks.GABBRO.get()) || s.is(ModBlocks.PERIDOTITE.get())
-                || s.is(ModBlocks.SERPENTINITE.get())
-                || s.is(ModBlocks.COOLING_LAVA_CRUST.get())) {
+                || s.is(ModBlocks.SERPENTINITE.get())) {
             return Soil.LATERITE;
         }
         // Carbonate: a thin, pale, alkaline soil that never gets deep.

@@ -43,7 +43,7 @@ public final class GeothermalBasin {
     private static final double PLUME_THRESHOLD = 0.12;
 
     /** Where the floor starts appearing at all, as a fraction of basin depth. */
-    private static final double FLOOR_MIN = 0.30;
+    static final double FLOOR_MIN = 0.30;
 
     /** Where it becomes continuous. Between the two it thins out, so the edge is a fade. */
     private static final double FLOOR_FULL = 0.60;
@@ -129,6 +129,23 @@ public final class GeothermalBasin {
      * a plume under it.
      */
     static double basin(ServerLevel level, int x, int z) {
+        // Asked at chunk corners by this and by the soil painting; a corner is shared by four chunks and two askers.
+        long key = com.jeladastudios.ftsgeology.util.ColumnCache.key(x, z);
+        Double hit = BASIN_CACHE.get(key);
+        if (hit != null) return hit;
+        double v = basinUncached(level, x, z);
+        BASIN_CACHE.put(key, v);
+        return v;
+    }
+
+    private static final com.jeladastudios.ftsgeology.util.ColumnCache<Double> BASIN_CACHE =
+            new com.jeladastudios.ftsgeology.util.ColumnCache<>(14);
+
+    public static void clear() {
+        BASIN_CACHE.clear();
+    }
+
+    private static double basinUncached(ServerLevel level, int x, int z) {
         double p = ThermalBiomes.strength(level, x, z);
         if (p >= 0.8) return p;          // Terralith's Yellowstone and friends, free of charge
 
