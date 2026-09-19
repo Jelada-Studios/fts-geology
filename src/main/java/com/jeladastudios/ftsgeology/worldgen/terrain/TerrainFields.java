@@ -456,7 +456,7 @@ public final class TerrainFields {
         return Math.min(1.0, belt(s, p) / CREST_FULL_BELT);
     }
 
-    private static final double CREST_FULL_BELT = 0.6;
+    private static final double CREST_FULL_BELT = 0.8;
 
     /** How much of a fold belt's uplift a column keeps: all of it on a crest, {@code share} less in the passes between. */
     private static double crest(long seed, GeologyParams p, int x, int z, double share) {
