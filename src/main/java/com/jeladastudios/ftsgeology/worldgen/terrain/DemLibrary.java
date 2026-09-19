@@ -28,7 +28,10 @@ public final class DemLibrary {
 
     private static final String[] YOUNG = {"alps_oetztal", "alps_bernina", "alps_valais", "alps_bernese",
             "alps_montblanc", "cauc_bezengi", "cauc_svaneti", "cauc_kazbek"};
-    /** The high ranges: too tall for the normal world's sky, so the tall world alone takes them. */
+    /**
+     * The high ranges. In the normal world, at twenty-five metres to the block, they would stand through the sky;
+     * in the tall one, at ten, they are the whole of a young belt, and the Alps would be foothills beside them.
+     */
     private static final String[] HIGH = {"him_manaslu", "him_langtang", "him_choyu", "kara_baltoro", "kara_nanga"};
     private static final String[] WORN = {"app_valleyridge", "app_blueridge", "app_newriver"};
 
@@ -40,7 +43,7 @@ public final class DemLibrary {
 
     private static final class Holder {
         static final Crop[] YOUNG_NORMAL = load(YOUNG);
-        static final Crop[] YOUNG_TALL = concat(YOUNG_NORMAL, load(HIGH));
+        static final Crop[] YOUNG_TALL = load(HIGH);
         static final Crop[] WORN_ALL = load(WORN);
     }
 
@@ -120,13 +123,6 @@ public final class DemLibrary {
 
     private static double smooth(double t) {
         return t * t * (3.0 - 2.0 * t);
-    }
-
-    private static Crop[] concat(Crop[] a, Crop[] b) {
-        Crop[] out = new Crop[a.length + b.length];
-        System.arraycopy(a, 0, out, 0, a.length);
-        System.arraycopy(b, 0, out, a.length, b.length);
-        return out;
     }
 
     private static Crop[] load(String[] names) {

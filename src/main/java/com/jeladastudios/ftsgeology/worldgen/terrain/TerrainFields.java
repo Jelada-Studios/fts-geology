@@ -473,6 +473,10 @@ public final class TerrainFields {
     /** How much of vanilla's mountain spline the real ground takes over where it holds. */
     private static final double SPLINE_DEM = 0.9;
 
+    /** How far either side of an arc's line the real ground reaches: wider than the arc's own rise, or the range
+     * would be squeezed into it and stand as cliffs. */
+    private static final double DEM_ARC_SEA = 0.8, DEM_ARC_LAND = 1.8;
+
     /** Metres of real ground a block stands for in the normal world; the tall world is the same ground at ten. */
     private static final double METRES_PER_BLOCK = 25.0;
 
@@ -509,7 +513,7 @@ public final class TerrainFields {
             }
             // An arc stands where its volcanoes do, not on the line: the range is read from there, steep to the sea
             // and long inland.
-            case CONVERGENT_SUBDUCTION -> s.overridingSide() ? peak(a, ARC_AT, ARC_SEA_HALF, ARC_LAND_HALF) : 0.0;
+            case CONVERGENT_SUBDUCTION -> s.overridingSide() ? peak(a, ARC_AT, DEM_ARC_SEA, DEM_ARC_LAND) : 0.0;
             default -> 0.0;
         };
     }

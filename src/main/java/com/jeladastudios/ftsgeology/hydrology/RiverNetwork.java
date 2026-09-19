@@ -410,7 +410,9 @@ public final class RiverNetwork {
                 double half = out.get(out.size() - 1).halfWidth();
                 out.add(new Point(rx, rz, (float) (level + 1.0), 0, (float) half, false, true));
             }
-            if (!dry) lastLevel = level;
+            // A dry stretch is no pool: what follows it starts from the ground there, or a channel that had once been
+            // low cut a canyon to keep its level through every rise in front of it.
+            lastLevel = dry ? pts[j][2] : level;
             i = j + 1;
         }
         return new Trace(out.toArray(new Point[0]));
