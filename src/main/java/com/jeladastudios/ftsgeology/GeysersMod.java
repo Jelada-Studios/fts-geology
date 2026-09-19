@@ -75,7 +75,6 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.quake.Weathering.clear();
         com.jeladastudios.ftsgeology.quake.CaveCollapse.clear();
         com.jeladastudios.ftsgeology.quake.PendingEdits.clear();
-        com.jeladastudios.ftsgeology.hydrology.MeanderScheduler.clear();
         com.jeladastudios.ftsgeology.instrument.SeismicNetwork.clear();
         com.jeladastudios.ftsgeology.command.SiteTeleport.clear();
         com.jeladastudios.ftsgeology.worldgen.LavaTubes.clear();

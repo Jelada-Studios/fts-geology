@@ -179,14 +179,10 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue SPRING_STAGE_THREE_DAYS;
     public static final ForgeConfigSpec.BooleanValue QUAKES_OPEN_NEW_SPRINGS;
     public static final ForgeConfigSpec.DoubleValue QUAKE_SPRING_CHANCE;   // per magnitude over 3
-    public static final ForgeConfigSpec.BooleanValue RIVER_MEANDERS;       // bends migrate over weeks
-    public static final ForgeConfigSpec.DoubleValue RIVER_MEANDER_DAYS;    // days a bend takes to finish its shift
-    public static final ForgeConfigSpec.IntValue RIVER_MEANDER_GENERATIONS; // sets of bends a chunk runs through
     public static final ForgeConfigSpec.DoubleValue OCEAN_SHARE;           // share of plates that are oceanic (own terrain)
     public static final ForgeConfigSpec.DoubleValue TERRAIN_BELT_FACTOR;   // mountain belt width, in fault widths
     public static final ForgeConfigSpec.DoubleValue TERRAIN_UPLIFT;        // blocks a collision lifts the ground
     public static final ForgeConfigSpec.BooleanValue LITHOLOGY;           // rock sequences under the ground (own terrain)
-    public static final ForgeConfigSpec.DoubleValue RIVER_MIGRATION_SCALE; // how far a bend shifts, per curvature
 
     // --- Instruments ---------------------------------------------------------
     public static final ForgeConfigSpec.IntValue SEISMOGRAPH_RANGE;   // blocks a station can hear
@@ -949,28 +945,6 @@ public final class GeyserConfig {
                         "want a world that visibly rearranges itself; set quakesOpenNewSprings to",
                         "false to switch the whole thing off.")
                 .defineInRange("quakeSpringChance", 0.06D, 0.0D, 1.0D);
-        RIVER_MEANDERS = b
-                .comment("Experimental, off by default: rivers are to be laid out by the mod's own terrain generation.",
-                        "On, river bends migrate: the outer bank is cut back and a sand bar grows on",
-                        "the inner one, a block at a time over weeks, until each bend has shifted",
-                        "as far as its curvature and width say and then stops. Each loaded chunk's",
-                        "river is surveyed once; only natural ground moves, never a build, a bridge,",
-                        "a hot spring or a cliff, and the water level never changes.")
-                .define("riverMeanders", false);
-        RIVER_MEANDER_DAYS = b
-                .comment("In-game days a bend takes to complete its shift. A block or two a day.")
-                .defineInRange("riverMeanderDays", 3.0D, 0.01D, 1000.0D);
-        RIVER_MEANDER_GENERATIONS = b
-                .comment("How many sets of bends a chunk's river runs through. When every bend of a set has",
-                        "shifted as far as it will, the chunk rests for one step interval, is surveyed",
-                        "again on the channel as it now is, and a new set is planned on that; a river keeps",
-                        "winding instead of stopping after its first bends. 1 plans each chunk once.")
-                .defineInRange("riverMeanderGenerations", 10, 1, 100);
-        RIVER_MIGRATION_SCALE = b
-                .comment("How far a bend shifts in all, in channel widths per unit of curvature times",
-                        "width. At 1.5 a typical bend (radius three widths) moves half a width;",
-                        "no bend ever moves more than its own width in one set.")
-                .defineInRange("riverMigrationScale", 1.5D, 0.0D, 10.0D);
         b.pop();
 
         b.comment("Terrain: the FT's Geology world type, where the plates shape the ground. Nothing here touches",

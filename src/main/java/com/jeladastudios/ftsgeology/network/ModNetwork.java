@@ -51,16 +51,6 @@ public final class ModNetwork {
                 .decoder(EruptionPacket::decode)
                 .consumerMainThread(EruptionPacket::handle)
                 .add();
-        CHANNEL.messageBuilder(RiverDebugPacket.class, id++)
-                .encoder(RiverDebugPacket::encode)
-                .decoder(RiverDebugPacket::decode)
-                .consumerMainThread(RiverDebugPacket::handle)
-                .add();
-    }
-
-    /** Sends one player the river debug view around them. */
-    public static void sendRiverDebug(ServerPlayer player, RiverDebugPacket packet) {
-        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
     }
 
     /** How far away an eruption is still worth drawing: a column hundreds of blocks tall. */
