@@ -108,6 +108,22 @@ public final class FindCommands {
         if (what.equals("hotspot")) {
             return HotspotMap.sample(level, x, z).strength() > 0.35;
         }
+        if (what.equals("valley")) {
+            // A valley through a mountain belt is the terrain's own field, so only the mod's world type has one.
+            if (!com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level)) return false;
+            long seed = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed();
+            var p = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params();
+            double belt = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.field(
+                    com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.Field.BELT, seed, p, x, z);
+            double valley = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.field(
+                    com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.Field.VALLEY, seed, p, x, z);
+            // The valley field carries the belt's grip; dividing it out leaves how deep in the valley the column is.
+            // Only a convergent belt has mountains for a valley to lie between; a transform belt keeps the field
+            // for the offset's sake but has no relief to cut.
+            FaultType k = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.sampleAt(seed, p, x, z).boundaryType();
+            boolean convergent = k == FaultType.CONVERGENT_COLLISION || k == FaultType.CONVERGENT_SUBDUCTION;
+            return convergent && belt >= 0.45 && valley >= 0.9 * belt;
+        }
         PlateSample s = TectonicMap.sampleCached(level, x, z);
         // Require decent stress so we land somewhere the setting is actually expressed, not on the
         // faint outer edge of the fault zone.

@@ -149,7 +149,24 @@ public final class TerrainFields {
             double w = 0.5 + 0.5 * smooth(Mth.clamp(e.gap() / HANDOVER, 0, 1));
             v = w * v + (1.0 - w) * value(field, e.second(), p, seed, x, z);
         }
-        return field == Field.RELIEF ? v + 0.25 * HotspotMap.plumeStrength(seed, x, z, p) : v;
+        // A belt's floodplain belongs to the belt, whichever boundary is nearer: read off the nearer boundary alone,
+        // it stopped on the line where a quiet coast took over as nearest, and the plain's few blocks of lift ended
+        // there in a dead-straight shore.
+        double apron = apronAt(e, p);
+        return switch (field) {
+            case RELIEF -> v + APRON_LIFT * apron + 0.25 * HotspotMap.plumeStrength(seed, x, z, p);
+            case EROSION -> v + 0.25 * apron;
+            default -> v;
+        };
+    }
+
+    /** How deep into a belt's floodplain a column lies, from whichever of its two boundaries says it is deeper. */
+    public static double apronAt(long seed, GeologyParams p, int x, int z) {
+        return apronAt(edgesAt(seed, p, x, z), p);
+    }
+
+    private static double apronAt(TectonicMap.Edges e, GeologyParams p) {
+        return Math.max(apron(e.first(), p), apron(e.second(), p));
     }
 
     /** How much further than the nearest boundary the next one can be and still shape the ground, in blocks. */
@@ -160,7 +177,8 @@ public final class TerrainFields {
         return switch (field) {
             case CONTINENTS -> continents(s, p);
             case EROSION -> erosion(s, p, seed, x, z);
-            case RIDGES -> 0.5 + 0.9 * belt(s, p);
+            // No sharp peaks on a valley floor: the ridge noise that makes them is turned down there.
+            case RIDGES -> (0.5 + 0.9 * belt(s, p)) * (1.0 - 0.6 * valley(seed, x, z) * mountainBelt(s, p));
             case RELIEF -> relief(s, p, seed, x, z);
             // A mountain belt's grip, for the offset to scale vanilla's mountain spline down by inside the belt, and
             // how deep in one of the belt's valleys the column lies, for the offset to cut that spline further. A
@@ -224,7 +242,7 @@ public final class TerrainFields {
         };
         boolean convergent = k == FaultType.CONVERGENT_COLLISION || k == FaultType.CONVERGENT_SUBDUCTION;
         double flat = convergent ? VALLEY_FLAT * valley(seed, x, z) * b : 0.0;
-        return quiet - rugged + flat + 0.25 * apron(s, p);
+        return quiet - rugged + flat;
     }
 
     private static double relief(PlateSample s, GeologyParams p, long seed, int x, int z) {
@@ -232,10 +250,9 @@ public final class TerrainFields {
         if (s.plateKind().isOceanic()) return oceanRelief(s, p, a, seed, x, z);
         double u = p.uplift() / 128.0 * (0.5 + 0.5 * motion(s));
         double t = Math.min(1.0, a / p.beltFactor());
-        // The floodplain stands a few blocks clear of the sea: sunk below it, it filled with ponds.
-        double lift = APRON_LIFT * apron(s, p);
+        // The floodplain's lift ({@link #APRON_LIFT}) is added in {@link #field}, from both boundaries.
         double cut = 1.0 - VALLEY_DEPTH * valley(seed, x, z);
-        return lift + switch (s.boundaryType()) {
+        return switch (s.boundaryType()) {
             case CONVERGENT_COLLISION -> u * bump(t) * crest(seed, x, z) * cut;
             // The arc stands where the volcanoes do, on a plateau that fades out across the belt and keeps clear of
             // the coast; the trench lies off the coast, on the plate that goes under. The arc's mountains drop
@@ -276,9 +293,18 @@ public final class TerrainFields {
         return s.across(p.faultWidth());
     }
 
+    /**
+     * Over this share of the belt's width, at its outer edge, the grip fades to nothing with a level tangent. The
+     * grip itself is a square root of the distance and stands vertical at the belt's edge, so the erosion left the
+     * quiet ground at a jump there and vanilla's spline stood the belt's front up as a wall along the plain.
+     */
+    private static final double EDGE_TAPER = 0.3;
+
     /** The boundary's grip over the whole mountain belt: 1 on the line, 0 at the belt's edge. */
     public static double belt(PlateSample s, GeologyParams p) {
-        return Mth.clamp(s.belt(p.faultWidth(), p.beltFactor()), 0.0, 1.0);
+        double t = Math.min(1.0, across(s, p) / p.beltFactor());
+        double taper = smooth(Mth.clamp((1.0 - t) / EDGE_TAPER, 0, 1));
+        return Mth.clamp(s.belt(p.faultWidth(), p.beltFactor()) * taper, 0.0, 1.0);
     }
 
     /**

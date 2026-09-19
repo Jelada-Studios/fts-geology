@@ -71,7 +71,7 @@ public final class Lithology {
                 weight = smooth(belt / 0.5);
             }
         } else {
-            double apron = TerrainFields.apron(s, p);
+            double apron = TerrainFields.apronAt(seed, p, x, z);
             switch (k) {
                 case CONVERGENT_COLLISION -> {
                     setting = Setting.FOLD_BELT;

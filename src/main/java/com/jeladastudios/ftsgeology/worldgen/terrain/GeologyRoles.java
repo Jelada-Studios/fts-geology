@@ -96,7 +96,7 @@ public final class GeologyRoles {
         if (k == FaultType.CONVERGENT_COLLISION && (TerrainFields.belt(s, p) > BELT_CORE + j
                 || TerrainFields.field(Field.RELIEF, seed, p, x, z) > HIGH_RELIEF + j)) return Role.OROGENIC_HIGHLAND;
         // The apron of sediment a belt sheds beyond its mountains: flat, low, and the coal country.
-        if (TerrainFields.apron(s, p) > APRON_CORE + 2 * j) return Role.ALLUVIAL_PLAIN;
+        if (TerrainFields.apronAt(seed, p, x, z) > APRON_CORE + 2 * j) return Role.ALLUVIAL_PLAIN;
         return Role.NONE;
     }
 }
