@@ -48,6 +48,8 @@ public final class VolcanoPlan {
          * limit, which is right for anything built in one go into an area that is already loaded.
          */
         int liveReach;
+        /** How much bigger than the size table this volcano is built, every length in blocks: see {@link #largeScale}. */
+        double scale = 1.0;
         int magnitude;
         int x, z, baseY;
         int coneHeight, summitY, craterR, coneBaseR;
@@ -138,6 +140,7 @@ public final class VolcanoPlan {
     static Ctx plan(LevelHeightAccessor level, int x, int baseY, int z, int magnitude, VolcanoType type,
                     VolcanoSize size, RandomSource rng, PlateSample plate, VolcanoActivity activity, double scale) {
         Ctx c = new Ctx();
+        c.scale = scale;
         c.activity = activity;
         c.type = type;
         c.size = size;
@@ -233,9 +236,9 @@ public final class VolcanoPlan {
         // narrow flows cover about a tenth of the flank without breaking a centreline.
         // Flows are thin tongues, not bands that widen with the mountain; a big shield's are broad sheets
         // rather than threads.
-        c.flowWidth = type == VolcanoType.FISSURE || type == VolcanoType.STRATOVOLCANO ? 0.8
+        c.flowWidth = (type == VolcanoType.FISSURE || type == VolcanoType.STRATOVOLCANO ? 0.8
                 : type == VolcanoType.SHIELD ? (size == VolcanoSize.LARGE ? 2.4 : 1.1)
-                : Math.max(1.0, c.coneBaseR / 34.0);
+                : Math.max(1.0, c.coneBaseR / 34.0)) * scale;
         // An extinct mountain's flows weathered into its soil long ago.
         if (activity == VolcanoActivity.EXTINCT) c.flows = 0;
 

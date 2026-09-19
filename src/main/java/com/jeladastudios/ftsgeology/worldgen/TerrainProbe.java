@@ -131,6 +131,16 @@ public final class TerrainProbe {
         int y = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z);
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         int floor = level.getMinBuildHeight();
+        int g = walkDown(level, m, x, y, z, floor);
+        if (g != Integer.MIN_VALUE) return g;
+        // A tree at a chunk's edge, put there by a neighbour that was finished first, can hang its leaves over a column
+        // whose ground is far below: a big cone built the neighbour up sixty blocks and grew a forest on it, and the walk
+        // from the leaves gave up before it reached the ground under them. Start again under the leaves.
+        int under = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+        return under < y ? walkDown(level, m, x, under, z, floor) : Integer.MIN_VALUE;
+    }
+
+    private static int walkDown(LevelReader level, BlockPos.MutableBlockPos m, int x, int y, int z, int floor) {
         for (int steps = 0; steps < MAX_WALK_DOWN && y > floor; steps++, y--) {
             m.set(x, y, z);
             BlockState s = level.getBlockState(m);

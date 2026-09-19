@@ -110,7 +110,7 @@ public final class VolcanoEdifice {
     static double oldLava(Ctx c, int gx, int gz) {
         int dx = gx - c.x, dz = gz - c.z;
         return polarNoise(Math.atan2(dz, dx), Math.sqrt((double) dx * dx + (double) dz * dz),
-                c.coneBaseR * 0.25, (int) (c.phaseA * 4096) + 7919, 4.0, 14.0);
+                c.coneBaseR * 0.25, (int) (c.phaseA * 4096) + 7919, 4.0 * c.scale, 14.0);
     }
 
     /** Radius of the cone's lobed foot at one bearing. The cone and the apron both use it, so they meet. */
@@ -131,8 +131,8 @@ public final class VolcanoEdifice {
      */
     static double surfaceNoise(Ctx c, int gx, int gz) {
         int ox = (int) (c.phaseA * 4096), oz = (int) (c.phaseB * 4096);
-        return (com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + ox, gz + oz, 13.0)
-                + 0.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx - oz, gz + ox, 5.0)) / 1.5;
+        return (com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + ox, gz + oz, 13.0 * c.scale)
+                + 0.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx - oz, gz + ox, 5.0 * c.scale)) / 1.5;
     }
 
     static void buildConeRow(ServerLevel level, Ctx c, int dx) {
@@ -164,8 +164,24 @@ public final class VolcanoEdifice {
 
         int ground = TerrainProbe.groundY(level, gx, gz);
         if (ground == Integer.MIN_VALUE) return;
+        int natural = ground;
         // A hole into a cave is roofed over at its rim, not filled from its floor as a pillar.
         if (floor != Integer.MIN_VALUE) ground = Math.max(ground, floor);
+        // A large cone's profile stands on the local ground, so a shaft a stretched cave opens at the surface put a
+        // pit as deep as the shaft in the flank. The ground it stands on is no lower than the lowest of the ground
+        // four and eight blocks away on each side: a shaft narrower than that is roofed over.
+        if (worldgen && c.size == VolcanoSize.LARGE) {
+            int low = Integer.MAX_VALUE;
+            for (int k = 0; k < 8; k++) {
+                int d = k < 4 ? 4 : 8;
+                int nx = gx + (k % 4 == 0 ? d : k % 4 == 1 ? -d : 0), nz = gz + (k % 4 == 2 ? d : k % 4 == 3 ? -d : 0);
+                int h = TerrainProbe.groundY(level, nx, nz);
+                if (h == Integer.MIN_VALUE) { low = Integer.MIN_VALUE; break; }
+                low = Math.min(low, h);
+            }
+            if (low != Integer.MIN_VALUE && low > ground) ground = low;
+        }
+        boolean roofed = ground > natural;
         int water = 0;
         while (water < 32 && !level.getBlockState(new BlockPos(gx, ground + 1 + water, gz)).getFluidState().isEmpty()) {
             water++;
@@ -173,9 +189,18 @@ public final class VolcanoEdifice {
 
         int target = coneTargetY(c, gx, gz, ground, dist, ang);
         if (target == Integer.MIN_VALUE) return;
+        // A roofed shaft gets its roof whatever the profile adds here: three courses at the rim's level. Near the foot
+        // the profile adds nothing, and raising the ground alone left the hole open under a stretch of nothing.
+        if (roofed) {
+            ground -= 3;
+            if (target < ground + 3) target = ground + 3;
+        }
         int surface = ground + water;
         boolean underWater;
-        if (water >= 4 && worldgen) {
+        // A large cone buries the pools on the ground it is built over: an aquifer pit the tall world's stretched caves
+        // open at the surface stayed as a seventy-block hole in the flank, water at the bottom. The sea is not buried.
+        boolean buried = c.size == VolcanoSize.LARGE && dist <= c.coneBaseR * 1.1 && surface > level.getSeaLevel() + 2;
+        if (water >= 4 && worldgen && !buried) {
             // A lake or the sea: the flank carries on under the water on its own profile and turns to land only
             // where the profile rises above the surface, so the shore slopes instead of standing as a wall.
             underWater = target <= surface + 1;
@@ -189,8 +214,23 @@ public final class VolcanoEdifice {
             // Higher up, a live build stops at the shore rather than walling a lake in.
             else if (water > 0 && !worldgen) return;
         }
-        // Ground already above the mountain's profile is left alone, save for rain standing over it in a dead crater.
         if (ground >= target) {
+            // A large cone buries the country under it: at generation, ground standing more than a couple of blocks
+            // over the profile inside the foot is cut down to it, or the hills it was built over stood out of its
+            // flank as crags. Elsewhere ground above the profile is left alone, save for rain standing over it in
+            // a dead crater.
+            if (worldgen && !underWater && c.size == VolcanoSize.LARGE && dist > c.craterR * 1.6
+                    && dist <= c.coneBaseR * 1.1 && ground > target + 2) {
+                for (int y = ground; y > target; y--) {
+                    level.setBlock(new BlockPos(gx, y, gz), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
+                }
+                BlockState rock = coneRock(rng, c, gx, target, gz);
+                if (c.type == VolcanoType.STRATOVOLCANO) rock = stratoSurface(rng, c, gx, target, gz, rock);
+                else if (c.type == VolcanoType.SHIELD) rock = shieldSurface(rng, c, gx, target, gz, rock);
+                setRock(level, new BlockPos(gx, target, gz), rock);
+                clearCover(level, gx, target, gz);
+                return;
+            }
             if (worldgen && !underWater) craterLake(level, c, gx, gz, ground, dist, ang);
             return;
         }
@@ -448,11 +488,11 @@ public final class VolcanoEdifice {
      */
     static double shieldTongue(Ctx c, int gx, int gz) {
         int ox = (int) (c.phaseB * 4096), oz = (int) (c.phaseC * 4096);
-        int wx = gx + (int) Math.round(24.0 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + ox, gz - oz, 90.0));
-        int wz = gz + (int) Math.round(24.0 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx - oz, gz + ox, 90.0));
+        int wx = gx + (int) Math.round(24.0 * c.scale * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + ox, gz - oz, 90.0 * c.scale));
+        int wz = gz + (int) Math.round(24.0 * c.scale * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx - oz, gz + ox, 90.0 * c.scale));
         int dx = wx - c.x, dz = wz - c.z;
         return polarNoise(Math.atan2(dz, dx), Math.sqrt((double) dx * dx + (double) dz * dz),
-                c.coneBaseR * 0.1, (int) (c.phaseA * 4096) + 4271, 6.0, 16.0);
+                c.coneBaseR * 0.1, (int) (c.phaseA * 4096) + 4271, 6.0 * c.scale, 16.0);
     }
 
     /**
@@ -462,9 +502,9 @@ public final class VolcanoEdifice {
     static double foothillHeight(Ctx c, int gx, int gz, double t) {
         if (c.type != VolcanoType.STRATOVOLCANO || c.size != VolcanoSize.LARGE) return 0.0;
         int ox = (int) (c.phaseB * 4096), oz = (int) (c.phaseC * 4096);
-        double n = com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + ox, gz - oz, 60.0)
-                + 0.4 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx - oz, gz + ox, 23.0);
-        return 14.0 * Math.max(0.0, n) * 4.0 * t * (1.0 - t);
+        double n = com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + ox, gz - oz, 60.0 * c.scale)
+                + 0.4 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx - oz, gz + ox, 23.0 * c.scale);
+        return 14.0 * c.scale * Math.max(0.0, n) * 4.0 * t * (1.0 - t);
     }
 
 
