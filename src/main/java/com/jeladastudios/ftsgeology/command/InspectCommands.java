@@ -266,9 +266,11 @@ public final class InspectCommands {
         }
         var generator = level.getChunkSource().getGenerator();
         int base = generator.getBaseHeight(at.getX(), at.getZ(), net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG, level, level.getChunkSource().randomState());
-        String line = String.format(Locale.ROOT, "terrain at %d,%d: %sbase %d, role %s; level seed %d, terrain seed %d, own %s",
+        var plate = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.sampleAt(com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(), com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params(), at.getX(), at.getZ());
+        String line = String.format(Locale.ROOT, "terrain at %d,%d: %sbase %d, role %s%s; level seed %d, terrain seed %d, own %s",
                 at.getX(), at.getZ(), sb, base,
                 com.jeladastudios.ftsgeology.worldgen.terrain.GeologyRoles.roleAt(at.getX(), at.getZ()),
+                com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.worn(plate, com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed()) ? " (worn belt)" : "",
                 level.getSeed(), com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(),
                 com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level));
         source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);

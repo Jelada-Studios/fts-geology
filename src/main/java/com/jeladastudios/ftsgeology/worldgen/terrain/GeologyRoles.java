@@ -60,7 +60,7 @@ public final class GeologyRoles {
     /** How wide a rift floor is and how far a ridge reaches, in fault widths. */
     private static final double GRABEN_TO = 0.35, RIDGE_TO = TerrainFields.RIDGE_HALF;
     /** How deep into a floodplain ({@link TerrainFields#apron}) the plain begins. */
-    private static final double APRON_CORE = 0.25;
+    private static final double APRON_CORE = 0.28;
     /** How far the border between two kinds of ground wanders, in fault widths or belt grip. */
     private static final double EDGE = 0.05;
 
@@ -95,8 +95,10 @@ public final class GeologyRoles {
         if (s.overridingSide() && a >= ARC_FROM + j && a <= ARC_TO + j) return Role.VOLCANIC_HIGHLAND;
         if (k == FaultType.CONVERGENT_COLLISION && (TerrainFields.belt(s, p) > BELT_CORE + j
                 || TerrainFields.field(Field.RELIEF, seed, p, x, z) > HIGH_RELIEF + j)) return Role.OROGENIC_HIGHLAND;
-        // The apron of sediment a belt sheds beyond its mountains: flat, low, and the coal country.
-        if (TerrainFields.apronAt(seed, p, x, z) > APRON_CORE + 2 * j) return Role.ALLUVIAL_PLAIN;
+        // The apron of sediment a belt sheds beyond its mountains: flat, low, and the coal country. Its border wanders
+        // in and out over a few hundred blocks as well as ragging: at one depth of apron it ran parallel to the belt.
+        if (TerrainFields.apronAt(seed, p, x, z) > APRON_CORE + 2 * j
+                + TerrainFields.APRON_WANDER * TerrainFields.jitterWide(seed, p, x, z)) return Role.ALLUVIAL_PLAIN;
         return Role.NONE;
     }
 }

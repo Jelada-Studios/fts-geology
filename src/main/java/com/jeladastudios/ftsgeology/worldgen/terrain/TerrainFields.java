@@ -57,7 +57,13 @@ public final class TerrainFields {
      */
     private static final double COAST_LOWLAND = 0.05, COAST_FOOTHILLS = 0.5;
     /** Where an arc's volcanoes stand: the middle of {@link PlateSample#onArc}'s band. */
-    private static final double ARC_AT = 0.55, ARC_SEA_HALF = 0.3, ARC_LAND_HALF = 0.9;
+    private static final double ARC_AT = 0.55, ARC_SEA_HALF = 0.4, ARC_LAND_HALF = 1.1;
+    /**
+     * How high an arc stands, in uplift, and how much of that the passes between its massifs give up: an arc is a
+     * chain of volcanic massifs and the saddles between them, along the same crest noise a fold belt follows, not
+     * one level ridge along the coast.
+     */
+    private static final double ARC_RISE = 0.95, ARC_CREST = 0.45;
     /** Where a trench lies off a subduction coast. */
     private static final double TRENCH_AT = 0.3, TRENCH_HALF = 0.35;
     /**
@@ -106,6 +112,18 @@ public final class TerrainFields {
      * belt is a range of peaks and passes instead of one raised plateau.
      */
     private static final double CREST_SHARE = 0.75, CREST_SCALE = 220.0, CREST_TOP = 0.08, CREST_RIDGE = 0.35;
+    /**
+     * An old collision belt, worn down: the Appalachians or the Urals against the Himalaya. This share of the
+     * collision belts, chosen from the two plates' identities so a belt is worn along its whole length. A worn
+     * belt keeps this much of its uplift, gives up this much of it between rounded ridges, takes this much of the
+     * ridge noise, and has vanilla's mountain spline cut to {@code WORN_SPLINE} of it instead of {@link #SPLINE_CUT}.
+     */
+    private static final double WORN_SHARE = 1.0 / 3.0, WORN_RELIEF = 0.5, WORN_CREST_SHARE = 0.35, WORN_RIDGES = 0.4,
+            WORN_SPLINE = 0.7;
+    /** How much of vanilla's mountain spline the offset takes out inside a belt: the data's own {@code -0.5 * belt}. */
+    private static final double SPLINE_CUT = 0.5;
+    /** How far the plain's border wanders in and out, in apron depth, over {@link #jitterWide}'s few hundred blocks. */
+    public static final double APRON_WANDER = 0.3;
     /** How far the ridge noise is pushed about, in its noise units (four blocks each), and the length of a bend. */
     private static final double MEANDER_AMPLITUDE = 12.0, MEANDER_SCALE = 260.0;
 
@@ -181,7 +199,7 @@ public final class TerrainFields {
             case CONTINENTS -> continents(s, p);
             case EROSION -> erosion(s, p, seed, x, z);
             // No sharp peaks on a valley floor: the ridge noise that makes them is turned down there.
-            case RIDGES -> 0.5 + 0.9 * belt(s, p);
+            case RIDGES -> 0.5 + (worn(s, seed) ? WORN_RIDGES : 0.9) * belt(s, p);
             case RELIEF -> relief(s, p, seed, x, z);
             // A mountain belt's grip, for the offset to scale vanilla's mountain spline down by inside the belt, and
             // how deep in one of the belt's valleys the column lies, for the offset to cut that spline further. A
@@ -191,7 +209,7 @@ public final class TerrainFields {
             // 1 on a ridge, 0 in the pass between: for the offset to bend vanilla's mountain spline into the same
             // ridges and V-shaped valleys the mod's own relief follows, or the two cut across each other and the
             // valleys vanished under vanilla's peaks.
-            case CREST -> crestShape(seed, p, x, z);
+            case CREST -> crestField(s, p, seed, x, z);
             case VARIETY -> variety(s, p);
             case MEANDER_X, MEANDER_Z -> 0.0;
         };
@@ -260,12 +278,16 @@ public final class TerrainFields {
         // The floodplain's lift ({@link #APRON_LIFT}) is added in {@link #field}, from both boundaries.
         double cut = 1.0 - VALLEY_DEPTH * valley(seed, p, x, z);
         return switch (s.boundaryType()) {
-            case CONVERGENT_COLLISION -> u * bump(t) * crest(seed, p, x, z) * cut;
+            case CONVERGENT_COLLISION -> worn(s, seed)
+                    ? WORN_RELIEF * u * bump(t) * crest(seed, p, x, z, WORN_CREST_SHARE) * cut
+                    : u * bump(t) * crest(seed, p, x, z, CREST_SHARE) * cut;
             // The arc stands where the volcanoes do, on a plateau that fades out across the belt and keeps clear of
             // the coast; the trench lies off the coast, on the plate that goes under. The arc's mountains drop
-            // steeply to the sea and go down slowly inland, as the Andes do to the altiplano.
+            // steeply to the sea and go down slowly inland, as the Andes do to the altiplano, and rise and fall
+            // along the coast with the crest noise: massifs and the saddles between them.
             case CONVERGENT_SUBDUCTION -> s.overridingSide()
-                    ? u * (0.55 * peak(a, ARC_AT, ARC_SEA_HALF, ARC_LAND_HALF) + 0.3 * bump(t) * calm(s, p)) * cut
+                    ? u * (ARC_RISE * peak(a, ARC_AT, ARC_SEA_HALF, ARC_LAND_HALF)
+                            * (1.0 - ARC_CREST * (1.0 - crestShape(seed, p, x, z))) + 0.3 * bump(t) * calm(s, p)) * cut
                     : -0.25 * peak(a, TRENCH_AT, TRENCH_HALF);
             case DIVERGENT -> graben(a) + SHOULDER_RISE * peak(a, SHOULDER_AT, SHOULDER_HALF);
             case TRANSFORM, INTERIOR -> 0.0;
@@ -303,9 +325,11 @@ public final class TerrainFields {
     /**
      * Over this share of the belt's width, at its outer edge, the grip fades to nothing with a level tangent. The
      * grip itself is a square root of the distance and stands vertical at the belt's edge, so the erosion left the
-     * quiet ground at a jump there and vanilla's spline stood the belt's front up as a wall along the plain.
+     * quiet ground at a jump there and vanilla's spline stood the belt's front up as a wall along the plain. The
+     * outer half: at three tenths the front still fell a spline step in a hundred blocks just inside the taper,
+     * where the square root's grip was steep, and the highland dropped to the plain as a bank.
      */
-    private static final double EDGE_TAPER = 0.3;
+    private static final double EDGE_TAPER = 0.5;
 
     /** The boundary's grip over the whole mountain belt: 1 on the line, 0 at the belt's edge. */
     public static double belt(PlateSample s, GeologyParams p) {
@@ -347,6 +371,25 @@ public final class TerrainFields {
     }
 
     /**
+     * A slower wobble in -1..1, over a few hundred blocks, for a border that wanders in and out instead of running
+     * parallel to the boundary: {@link #jitter} rags a line, this one bends it. The plain's edge, drawn at one depth
+     * of apron, stood as a straight strip of forest along the belt.
+     */
+    public static double jitterWide(long seed, GeologyParams p, int x, int z) {
+        return noise(seed, x, z, 220.0 * p.horizontal(), 0x1D4EL);
+    }
+
+    /**
+     * Whether the collision belt at this boundary is an old one, worn down. Decided from the two plates' identities
+     * alone, so a belt is worn along its whole length and both its sides agree.
+     */
+    public static boolean worn(PlateSample s, long seed) {
+        if (s.boundaryType() != FaultType.CONVERGENT_COLLISION) return false;
+        long lo = Math.min(s.plateId(), s.neighbourId()), hi = Math.max(s.plateId(), s.neighbourId());
+        return SeedHash.rand01(SeedHash.mix(seed ^ 0x57A9L ^ lo * 0x9E3779B97F4A7C15L ^ SeedHash.mix(hi ^ 0x57A9L))) < WORN_SHARE;
+    }
+
+    /**
      * How much of a belt's ruggedness a column takes, 0 to 1. A subduction coast keeps a lowland along the sea before
      * the arc's mountains start; a rift keeps its floor flat and leaves the ruggedness to its scarps and shoulders.
      */
@@ -370,9 +413,25 @@ public final class TerrainFields {
         return GRABEN_DEEP * (1.0 - 0.5 * first - 0.5 * second);
     }
 
-    /** How much of a fold belt's uplift a column keeps: all of it on a crest, less in the passes between. */
-    private static double crest(long seed, GeologyParams p, int x, int z) {
-        return 1.0 - CREST_SHARE * (1.0 - crestShape(seed, p, x, z));
+    /** How much of a fold belt's uplift a column keeps: all of it on a crest, {@code share} less in the passes between. */
+    private static double crest(long seed, GeologyParams p, int x, int z, double share) {
+        return 1.0 - share * (1.0 - crestShape(seed, p, x, z));
+    }
+
+    /**
+     * The crest the offset reads, 1 on a ridge and 0 in a pass. The data bends vanilla's mountain spline by
+     * {@code (1 - SPLINE_CUT*belt) * (1 - CREST_SHARE*belt*(1 - crest))}, one formula for every belt. A worn belt
+     * wants a lower spline and shallower passes, {@code (1 - WORN_SPLINE*belt) * (1 - WORN_CREST_SHARE*belt*(1 - shape))}:
+     * the crest handed over there is the value that brings the data's two factors to that product.
+     */
+    private static double crestField(PlateSample s, GeologyParams p, long seed, int x, int z) {
+        double shape = crestShape(seed, p, x, z);
+        if (!worn(s, seed)) return shape;
+        double b = mountainBelt(s, p);
+        if (b < 1e-6) return shape;
+        double want = (1.0 - WORN_SPLINE * b) * (1.0 - WORN_CREST_SHARE * b * (1.0 - shape));
+        double have = 1.0 - SPLINE_CUT * b;
+        return Mth.clamp(1.0 - (1.0 - want / have) / (CREST_SHARE * b), 0.0, 1.0);
     }
 
     /**

@@ -72,7 +72,9 @@ public final class Lithology {
                 weight = smooth(belt / 0.5);
             }
         } else {
-            double apron = TerrainFields.apronAt(seed, p, x, z);
+            // The plain's border wanders as the biome's does, so the rock and the ground above it change together.
+            double apron = TerrainFields.apronAt(seed, p, x, z)
+                    - TerrainFields.APRON_WANDER * TerrainFields.jitterWide(seed, p, x, z);
             switch (k) {
                 case CONVERGENT_COLLISION -> {
                     setting = Setting.FOLD_BELT;
