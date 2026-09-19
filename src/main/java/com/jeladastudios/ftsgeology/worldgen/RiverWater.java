@@ -114,6 +114,7 @@ public final class RiverWater {
 
         // Banks: every shallow gap beside a pool that stayed, raised to the highest pool beside it.
         int[] bank = new int[SIZE * SIZE];
+        java.util.Arrays.fill(bank, Integer.MIN_VALUE);
         for (int dx = 1; dx < SIZE - 1; dx++) {
             for (int dz = 1; dz < SIZE - 1; dz++) {
                 int w = water[dx * SIZE + dz];
@@ -132,7 +133,7 @@ public final class RiverWater {
         for (int dx = MARGIN; dx < MARGIN + 16; dx++) {
             for (int dz = MARGIN; dz < MARGIN + 16; dz++) {
                 int k = dx * SIZE + dz, x = x0 + dx, z = z0 + dz;
-                if (bank[k] > ground[k]) {
+                if (bank[k] != Integer.MIN_VALUE && ground[k] != Integer.MIN_VALUE && bank[k] > ground[k]) {
                     BlockState rock = level.getBlockState(at.set(x, ground[k], z));
                     BlockState fill = rock.is(BlockTags.DIRT) || rock.isAir() ? Blocks.GRAVEL.defaultBlockState() : rock;
                     for (int y = ground[k] + 1; y <= bank[k]; y++) {
@@ -163,7 +164,7 @@ public final class RiverWater {
                 // Where the next pool down starts beside this one, the water runs over the step once it is loaded.
                 for (int d = 0; d < 4; d++) {
                     int n = (dx + DX[d]) * SIZE + dz + DZ[d];
-                    boolean lower = water[n] != Integer.MIN_VALUE ? water[n] < w : bank[n] < w && ground[n] < w;
+                    boolean lower = water[n] != Integer.MIN_VALUE ? water[n] < w : bank[n] < w && ground[n] != Integer.MIN_VALUE && ground[n] < w;
                     if (lower) {
                         level.scheduleTick(at.set(x, w, z), Fluids.WATER, 4);
                         break;
