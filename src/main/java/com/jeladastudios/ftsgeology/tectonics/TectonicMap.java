@@ -75,7 +75,20 @@ public final class TectonicMap {
      *
      * @param gap how much further away the second boundary is, in blocks
      */
-    public record Edges(PlateSample first, PlateSample second, double gap) {}
+    /**
+     * A column's three nearest boundaries and how much further than the first the other two lie. The terrain blends
+     * all three by distance: a column near where boundaries meet is shaped by every one of them, and the blend has
+     * to stay continuous where the second or third nearest changes identity, and across the first boundary itself,
+     * where the column's own plate and with it the whole set of boundaries change. Where fewer are found the rest
+     * repeat the first with an infinite gap.
+     */
+    public record Edges(PlateSample first, PlateSample second, PlateSample third, double gap, double gap3) {}
+
+    /**
+     * How near its own boundary a column has to be for the plate across it to lend its boundaries, in blocks: the
+     * same distance over which the terrain blends boundaries ({@code TerrainFields.HANDOVER}), scaled with the world.
+     */
+    public static final double NEIGHBOUR_REACH = 160.0;
 
     /** Both boundaries from the seed alone, as the terrain generator asks for them. */
     public static Edges sampleSeededEdges(long seed, int blockX, int blockZ, GeologyParams params) {
@@ -116,50 +129,103 @@ public final class TectonicMap {
         }
         long plateId = plateId(seed, bgx, bgz);
 
-        // 2. Distance to the nearest plate boundary, and which plate lies across it. A Voronoi edge
-        //    is the perpendicular bisector between two centres, so the distance to the nearest edge
-        //    is the smallest distance to any of those bisectors. That is exact, unlike the common
+        // 2. The boundaries of this plate's cell. A Voronoi edge is the perpendicular bisector between two centres,
+        //    so the distance to an edge is the distance to that bisector: exact, unlike the common
         //    second-nearest-minus-nearest approximation, which bulges where three plates meet.
-        double nearestEdge = Double.MAX_VALUE, secondEdge = Double.MAX_VALUE;
-        double nx = 1, nz = 0;                 // unit normal across that nearest boundary
-        double mx = 1, mz = 0;                 // and across the second nearest
-        int ngx = bgx, ngz = bgz, sgx = bgx, sgz = bgz;
+        java.util.List<double[]> edges = new java.util.ArrayList<>();
+        collectEdges(seed, bgx, bgz, bx, bz, bx, bz, px, pz, scale, jitter, false, bgx, bgz, edges);
+        double[] own = edges.get(0);
+        for (double[] e : edges) if (e[0] < own[0]) own = e;
+        double faultDistance = Math.max(0.0, own[0]);
+        PlateKind kind = biomes == null ? seededKind(seed, plateId, params) : plateKind(biomes, seed, bgx, bgz, scale, jitter);
+        PlateSample first = boundary(seed, plateId, kind, (int) own[3], (int) own[4], faultDistance, own[1], own[2], biomes, params);
+        if (!withSecond) return new Edges(first, first, first, Double.MAX_VALUE, Double.MAX_VALUE);
+
+        // 3. Near the boundary, the plate across it has boundaries of its own that reach this column: where three
+        //    plates meet, all three boundaries shape the ground. They are taken in from both sides of the line, as
+        //    that plate sees them, so the ground blended from them is the same on both sides and crossing the line
+        //    is no step. Blending this plate's own two nearest alone jumped by ninety blocks at every junction.
+        // Only near the line: a boundary's bisector runs on past the plates it parts, and taken from further away the
+        // line of one of the neighbour's boundaries passed within ten blocks of a column five hundred blocks inside
+        // its own plate, as a mountain range that was not there.
+        int ngx = (int) own[3], ngz = (int) own[4];
+        if (faultDistance < NEIGHBOUR_REACH * params.horizontal()) {
+            collectEdges(seed, ngx, ngz, siteX(seed, ngx, ngz, scale, jitter), siteZ(seed, ngx, ngz, scale, jitter),
+                    bx, bz, px, pz, scale, jitter, true, bgx, bgz, edges);
+        }
+        edges.remove(own);
+        edges.sort(java.util.Comparator.comparingDouble(e -> e[0]));
+        PlateSample second = edges.isEmpty() ? first : sampleFor(seed, edges.get(0), biomes, params, scale, jitter);
+        PlateSample third = edges.size() < 2 ? first : sampleFor(seed, edges.get(1), biomes, params, scale, jitter);
+        // A neighbour's boundary can lie nearer than this plate's own: the gap is then negative and the blend takes
+        // it in full.
+        double gap2 = edges.isEmpty() ? Double.MAX_VALUE : edges.get(0)[0] - faultDistance;
+        double gap3 = edges.size() < 2 ? Double.MAX_VALUE : edges.get(1)[0] - faultDistance;
+        return new Edges(first, second, third, gap2, gap3);
+    }
+
+    /**
+     * The bisectors between one plate's centre and every centre round it, as candidate boundaries for a column:
+     * {distance, normal x, normal z, the cell across, the cell that owns the edge}. For the column's own plate the
+     * signed offset is the distance, the column lying inside the cell. For the plate across the nearest boundary the
+     * column lies outside the cell, and the bisector runs on past the junction into the column's own plate as a
+     * line that is no boundary there: the distance is to the edge itself, which starts at the junction, the three
+     * centres' circumcentre. Where the foot of the perpendicular falls on the far side of it, nearer the column's
+     * own centre than the neighbour's, the distance is to the junction. The cell to skip is the column's own, whose
+     * edge with the neighbour is the shared line already in the list.
+     */
+    private static void collectEdges(long seed, int cgx, int cgz, double cx, double cz, double ax, double az,
+                                     double px, double pz, double scale, double jitter, boolean absolute,
+                                     int skipGx, int skipGz, java.util.List<double[]> out) {
         for (int ox = -2; ox <= 2; ox++) {
             for (int oz = -2; oz <= 2; oz++) {
-                int cx = bgx + ox, cz = bgz + oz;
-                if (cx == bgx && cz == bgz) continue;
-                double sx = siteX(seed, cx, cz, scale, jitter);
-                double sz = siteZ(seed, cx, cz, scale, jitter);
-                double dx = sx - bx, dz = sz - bz;
+                int gx = cgx + ox, gz = cgz + oz;
+                if ((gx == cgx && gz == cgz) || (absolute && gx == skipGx && gz == skipGz)) continue;
+                double sx = siteX(seed, gx, gz, scale, jitter);
+                double sz = siteZ(seed, gx, gz, scale, jitter);
+                double dx = sx - cx, dz = sz - cz;
                 double len = Math.sqrt(dx * dx + dz * dz);
                 if (len < 1.0e-6) continue;
                 double ux = dx / len, uz = dz / len;
-                double midX = (bx + sx) * 0.5, midZ = (bz + sz) * 0.5;
-                // Signed offset from that bisector. Because our own centre is the closest one, the column
-                // always sits on the near side, so this dot product is negative; negating it gives the
-                // positive perpendicular distance to that edge.
+                double midX = (cx + sx) * 0.5, midZ = (cz + sz) * 0.5;
+                // Signed offset from that bisector: a column inside the cell always sits on the near side, so the
+                // dot product is negative and negating it gives the perpendicular distance to the edge.
                 double d = -((px - midX) * ux + (pz - midZ) * uz);
-                if (d < nearestEdge) {
-                    secondEdge = nearestEdge;
-                    mx = nx; mz = nz; sgx = ngx; sgz = ngz;
-                    nearestEdge = d;
-                    nx = ux; nz = uz;
-                    ngx = cx; ngz = cz;
-                } else if (d < secondEdge) {
-                    secondEdge = d;
-                    mx = ux; mz = uz; sgx = cx; sgz = cz;
+                if (absolute) {
+                    d = Math.abs(d);
+                    // The foot of the perpendicular on the bisector, and whether it lies past the junction.
+                    double along = (px - midX) * -uz + (pz - midZ) * ux;
+                    double fx = midX - uz * along, fz = midZ + ux * along;
+                    if (sq(fx - ax) + sq(fz - az) < sq(fx - cx) + sq(fz - cz)) {
+                        double[] v = circumcentre(ax, az, cx, cz, sx, sz);
+                        if (v != null) d = Math.sqrt(sq(px - v[0]) + sq(pz - v[1]));
+                    }
                 }
+                out.add(new double[]{d, ux, uz, gx, gz, cgx, cgz});
             }
         }
-        double faultDistance = Math.max(0.0, nearestEdge);
+    }
 
-        PlateKind kind = biomes == null ? seededKind(seed, plateId, params) : plateKind(biomes, seed, bgx, bgz, scale, jitter);
-        PlateSample first = boundary(seed, plateId, kind, ngx, ngz, faultDistance, nx, nz, biomes, params);
-        if (!withSecond || secondEdge == Double.MAX_VALUE || (sgx == bgx && sgz == bgz)) {
-            return new Edges(first, first, Double.MAX_VALUE);
-        }
-        PlateSample second = boundary(seed, plateId, kind, sgx, sgz, Math.max(0.0, secondEdge), mx, mz, biomes, params);
-        return new Edges(first, second, second.faultDistance() - first.faultDistance());
+    private static double sq(double d) {
+        return d * d;
+    }
+
+    /** The point equally far from three centres, where their three boundaries meet; null when they are in a line. */
+    private static double[] circumcentre(double ax, double az, double bx, double bz, double cx, double cz) {
+        double d = 2.0 * (ax * (bz - cz) + bx * (cz - az) + cx * (az - bz));
+        if (Math.abs(d) < 1.0e-6) return null;
+        double a2 = ax * ax + az * az, b2 = bx * bx + bz * bz, c2 = cx * cx + cz * cz;
+        return new double[]{(a2 * (bz - cz) + b2 * (cz - az) + c2 * (az - bz)) / d,
+                (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d};
+    }
+
+    /** The sample a candidate edge makes, as the plate that owns the edge sees it. */
+    private static PlateSample sampleFor(long seed, double[] e, ServerLevel biomes, GeologyParams params, double scale,
+                                         double jitter) {
+        int ogx = (int) e[5], ogz = (int) e[6];
+        long ownerId = plateId(seed, ogx, ogz);
+        PlateKind ownerKind = biomes == null ? seededKind(seed, ownerId, params) : plateKind(biomes, seed, ogx, ogz, scale, jitter);
+        return boundary(seed, ownerId, ownerKind, (int) e[3], (int) e[4], Math.max(0.0, e[0]), e[1], e[2], biomes, params);
     }
 
     /** A column's plate against one of its boundaries, the plate across it lying in grid cell (ngx, ngz). */

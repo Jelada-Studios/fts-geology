@@ -57,13 +57,20 @@ public final class TerrainFields {
      */
     private static final double COAST_LOWLAND = 0.05, COAST_FOOTHILLS = 0.5;
     /** Where an arc's volcanoes stand: the middle of {@link PlateSample#onArc}'s band. */
-    private static final double ARC_AT = 0.55, ARC_SEA_HALF = 0.4, ARC_LAND_HALF = 1.1;
+    private static final double ARC_AT = 0.55, ARC_SEA_HALF = 0.5, ARC_LAND_HALF = 1.3;
     /**
      * How high an arc stands, in uplift, and how much of that the passes between its massifs give up: an arc is a
      * chain of volcanic massifs and the saddles between them, along the same crest noise a fold belt follows, not
      * one level ridge along the coast.
      */
-    private static final double ARC_RISE = 0.95, ARC_CREST = 0.45;
+    private static final double ARC_RISE = 1.05, ARC_CREST = 0.45;
+    /**
+     * Vanilla's mountain regime starts where erosion falls under about -0.4. A belt's erosion fell there in its outer
+     * half, before the mod's own uplift had begun, and vanilla stood the front of every range and arc up as a bank
+     * over the plain. Out to FRONT_TO belt widths the erosion is held at FRONT_EROSION (hills, no peaks), and the
+     * floor is let go over FRONT_OVER inside that, where the uplift is already half its height.
+     */
+    private static final double FRONT_EROSION = -0.3, FRONT_TO = 0.5, FRONT_OVER = 0.2;
     /** Where a trench lies off a subduction coast. */
     private static final double TRENCH_AT = 0.3, TRENCH_HALF = 0.35;
     /**
@@ -148,7 +155,9 @@ public final class TerrainFields {
      */
     public static PlateSample sampleAt(long seed, GeologyParams p, int x, int z) {
         TectonicMap.Edges e = edgesAt(seed, p, x, z);
-        if (e.gap() >= HANDOVER * p.horizontal()) return e.first();
+        // Only this plate's own second boundary: the second may be the plate across the line's, which would put
+        // the column's rock and role on the wrong plate.
+        if (e.gap() >= HANDOVER * p.horizontal() || e.second().plateId() != e.first().plateId()) return e.first();
         return relief(e.second(), p, seed, x, z) > relief(e.first(), p, seed, x, z) ? e.second() : e.first();
     }
 
@@ -171,15 +180,22 @@ public final class TerrainFields {
             return push;
         }
         TectonicMap.Edges e = edgesAt(seed, p, x, z);
-        double v = value(field, e.first(), p, seed, x, z);
-        // A column almost as near a second boundary is shaped by both. Along the line where one boundary hands over to
-        // the next, both sides see the same mean of the two, so the ground cannot jump there: it did, by up to eighty
-        // blocks, wherever a fold belt's boundary met a rift's or a quiet coast's.
+        // A column near more than one boundary is shaped by all of them: its own plate's two nearest and, near the
+        // line, the boundaries of the plate across it (see TectonicMap.computeEdges), each fading in over HANDOVER
+        // as it comes as near as the nearest. Two boundaries at the same distance take the same share, so the
+        // second or third changing identity is continuous; both sides of a line see the same set, so crossing it is.
         double handover = HANDOVER * p.horizontal();
-        if (e.gap() < handover) {
-            double w = 0.5 + 0.5 * smooth(Mth.clamp(e.gap() / handover, 0, 1));
-            v = w * v + (1.0 - w) * value(field, e.second(), p, seed, x, z);
-        }
+        double w2 = e.gap() < handover ? smooth(1.0 - Math.max(0.0, e.gap()) / handover) : 0.0;
+        double w3 = e.gap3() < handover ? smooth(1.0 - Math.max(0.0, e.gap3()) / handover) : 0.0;
+        // The plate across the line lends its boundaries only near the line, and their share goes out as the column
+        // goes in, so that they neither switch on at a set distance nor reach, as lines, deep into this plate.
+        double lend = smooth(1.0 - Math.min(1.0, e.first().faultDistance() / handover));
+        if (e.second().plateId() != e.first().plateId()) w2 *= lend;
+        if (e.third().plateId() != e.first().plateId()) w3 *= lend;
+        double v = value(field, e.first(), p, seed, x, z);
+        if (w2 > 0) v += w2 * value(field, e.second(), p, seed, x, z);
+        if (w3 > 0) v += w3 * value(field, e.third(), p, seed, x, z);
+        v /= 1.0 + w2 + w3;
         // A belt's floodplain belongs to the belt, whichever boundary is nearer: read off the nearer boundary alone,
         // it stopped on the line where a quiet coast took over as nearest, and the plain's few blocks of lift ended
         // there in a dead-straight shore.
@@ -197,11 +213,17 @@ public final class TerrainFields {
     }
 
     private static double apronAt(TectonicMap.Edges e, GeologyParams p) {
-        return Math.max(apron(e.first(), p), apron(e.second(), p));
+        return Math.max(apron(e.first(), p), Math.max(apron(e.second(), p), apron(e.third(), p)));
     }
 
-    /** How much further than the nearest boundary the next one can be and still shape the ground, in blocks. */
-    private static final double HANDOVER = 64.0;
+
+    /**
+     * How much further than the nearest boundary the next can be and still shape the ground, in blocks. A mountain
+     * belt ends where its boundary meets another at a junction, and its full height has to come down to the other
+     * boundary's ground over this distance: at sixty-four the end of a collision belt was a four-to-one wall.
+     * {@link TectonicMap#NEIGHBOUR_REACH} is the same distance.
+     */
+    private static final double HANDOVER = TectonicMap.NEIGHBOUR_REACH;
 
     /** One field from one boundary. */
     private static double value(Field field, PlateSample s, GeologyParams p, long seed, int x, int z) {
@@ -277,7 +299,11 @@ public final class TerrainFields {
         };
         boolean convergent = k == FaultType.CONVERGENT_COLLISION || k == FaultType.CONVERGENT_SUBDUCTION;
         double flat = convergent ? VALLEY_FLAT * valley(seed, p, x, z) * b : 0.0;
-        return quiet - rugged + flat;
+        double e = quiet - rugged + flat;
+        if (k == FaultType.DIVERGENT || k == FaultType.INTERIOR) return e;
+        double t = Math.min(1.0, across(s, p) / p.beltFactor());
+        double floor = FRONT_EROSION - (1.5 + FRONT_EROSION) * smooth(Mth.clamp((FRONT_TO - t) / FRONT_OVER, 0, 1));
+        return Math.max(e, floor);
     }
 
     private static double relief(PlateSample s, GeologyParams p, long seed, int x, int z) {
@@ -288,9 +314,11 @@ public final class TerrainFields {
         // The floodplain's lift ({@link #APRON_LIFT}) is added in {@link #field}, from both boundaries.
         double cut = 1.0 - VALLEY_DEPTH * valley(seed, p, x, z);
         return switch (s.boundaryType()) {
+            // The ridges and passes fade out at the belt's edge with its grip: at full share out to the edge the first
+            // ridge stood up from the plain as a bank.
             case CONVERGENT_COLLISION -> worn(s, seed)
-                    ? WORN_RELIEF * u * bump(t) * crest(seed, p, x, z, WORN_CREST_SHARE) * cut
-                    : u * bump(t) * crest(seed, p, x, z, CREST_SHARE) * cut;
+                    ? WORN_RELIEF * u * bump(t) * crest(seed, p, x, z, WORN_CREST_SHARE * crestGrip(s, p)) * cut
+                    : u * bump(t) * crest(seed, p, x, z, CREST_SHARE * crestGrip(s, p)) * cut;
             // The arc stands where the volcanoes do, on a plateau that fades out across the belt and keeps clear of
             // the coast; the trench lies off the coast, on the plate that goes under. The arc's mountains drop
             // steeply to the sea and go down slowly inland, as the Andes do to the altiplano, and rise and fall
@@ -422,6 +450,13 @@ public final class TerrainFields {
         double second = smooth(Mth.clamp((a - GRABEN_STEP) / STEP_WIDTH, 0, 1));
         return GRABEN_DEEP * (1.0 - 0.5 * first - 0.5 * second);
     }
+
+    /** How much of the crest share a column takes: all of it inside CREST_FULL_BELT of grip, less towards the edge. */
+    private static double crestGrip(PlateSample s, GeologyParams p) {
+        return Math.min(1.0, belt(s, p) / CREST_FULL_BELT);
+    }
+
+    private static final double CREST_FULL_BELT = 0.6;
 
     /** How much of a fold belt's uplift a column keeps: all of it on a crest, {@code share} less in the passes between. */
     private static double crest(long seed, GeologyParams p, int x, int z, double share) {
