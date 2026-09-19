@@ -14,8 +14,8 @@ public final class GenCost {
 
     private GenCost() {}
 
-    public static final int DEEP = 0, RIDGE = 1, ORE = 2, TUBES = 3, SIGNS = 4, BASIN = 5, SOIL = 6, VOLCANO = 7, SEAMOUNT = 8;
-    private static final String[] NAMES = {"deep", "ridge", "ore", "tubes", "signs", "basin", "soil", "volcano", "seamount"};
+    public static final int DEEP = 0, RIDGE = 1, ORE = 2, TUBES = 3, SIGNS = 4, BASIN = 5, SOIL = 6, VOLCANO = 7, SEAMOUNT = 8, RIVER = 9;
+    private static final String[] NAMES = {"deep", "ridge", "ore", "tubes", "signs", "basin", "soil", "volcano", "seamount", "river"};
 
     /** Chunks between log lines. */
     private static final int EVERY = 2000;

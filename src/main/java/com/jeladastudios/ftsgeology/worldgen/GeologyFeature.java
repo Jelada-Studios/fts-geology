@@ -60,10 +60,13 @@ public class GeologyFeature extends Feature<NoneFeatureConfiguration> {
             long t3 = System.nanoTime();
             placed += LavaTubes.generate(level, cp);
             long t4 = System.nanoTime();
+            RiverWater.generate(level, cp);
+            long t5 = System.nanoTime();
             GenCost.add(GenCost.DEEP, t1 - t0);
             GenCost.add(GenCost.RIDGE, t2 - t1);
             GenCost.add(GenCost.ORE, t3 - t2);
             GenCost.add(GenCost.TUBES, t4 - t3);
+            GenCost.add(GenCost.RIVER, t5 - t4);
             GenCost.chunkDone();
         } catch (RuntimeException e) {
             // Never take world generation down with it. Left unmarked, the chunk simply gets its

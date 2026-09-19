@@ -1,0 +1,39 @@
+{
+  "argument" : {
+    "argument" : {
+      "argument" : {
+        "argument1" : "fts_geology:geology_tall/offset_core",
+        "argument2" : {
+          "argument1" : {
+            "argument1" : 0.5,
+            "argument2" : {
+              "argument1" : "fts_geology:geology_tall/offset_core",
+              "argument2" : {
+                "argument" : "fts_geology:geology_tall/offset_core",
+                "type" : "minecraft:abs"
+              },
+              "type" : "minecraft:add"
+            },
+            "type" : "minecraft:mul"
+          },
+          "argument2" : {
+            "argument1" : 2,
+            "argument2" : {
+              "argument" : {
+                "field" : "belt",
+                "type" : "fts_geology:plate"
+              },
+              "type" : "minecraft:flat_cache"
+            },
+            "type" : "minecraft:mul"
+          },
+          "type" : "minecraft:mul"
+        },
+        "type" : "minecraft:add"
+      },
+      "type" : "minecraft:flat_cache"
+    },
+    "type" : "minecraft:cache_2d"
+  },
+  "type" : "minecraft:flat_cache"
+}
