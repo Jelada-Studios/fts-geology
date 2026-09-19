@@ -280,6 +280,20 @@ final class SiteCheck {
      * Whether a large volcano of this type can stand here, from the generator's own terrain rather than
      * the world, which for most of these cells does not exist yet.
      */
+    /** How many of the columns sampled inside this radius hold a traced river's water. */
+    private static int tracedRiver(int x, int z, int radius) {
+        if (!com.jeladastudios.ftsgeology.hydrology.RiverNetwork.ready()) return 0;
+        int hits = 0;
+        for (int dx = -radius; dx <= radius; dx += 24) {
+            for (int dz = -radius; dz <= radius; dz += 24) {
+                if (dx * dx + dz * dz > radius * radius) continue;
+                var at = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.at(x + dx, z + dz);
+                if (!at.dry() && at.distance() <= at.halfWidth() + 8) hits++;
+            }
+        }
+        return hits;
+    }
+
     static Site check(ServerLevel level, int x, int z, VolcanoType type, long seed, int[] refused,
                               Map<StructureKey, Boolean> structures) {
         int magnitude = magnitudeAt(seed, x, z);

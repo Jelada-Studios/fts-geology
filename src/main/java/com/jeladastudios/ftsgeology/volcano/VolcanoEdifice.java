@@ -167,20 +167,9 @@ public final class VolcanoEdifice {
         int natural = ground;
         // A hole into a cave is roofed over at its rim, not filled from its floor as a pillar.
         if (floor != Integer.MIN_VALUE) ground = Math.max(ground, floor);
-        // A large cone's profile stands on the local ground, so a shaft a stretched cave opens at the surface put a
-        // pit as deep as the shaft in the flank. The ground it stands on is no lower than the lowest of the ground
-        // four and eight blocks away on each side: a shaft narrower than that is roofed over.
-        if (worldgen && c.size == VolcanoSize.LARGE) {
-            int low = Integer.MAX_VALUE;
-            for (int k = 0; k < 8; k++) {
-                int d = k < 4 ? 4 : 8;
-                int nx = gx + (k % 4 == 0 ? d : k % 4 == 1 ? -d : 0), nz = gz + (k % 4 == 2 ? d : k % 4 == 3 ? -d : 0);
-                int h = TerrainProbe.groundY(level, nx, nz);
-                if (h == Integer.MIN_VALUE) { low = Integer.MIN_VALUE; break; }
-                low = Math.min(low, h);
-            }
-            if (low != Integer.MIN_VALUE && low > ground) ground = low;
-        }
+        // The ground a column stands on is its own, not its neighbours' raised to meet it: reading the lowest ground
+        // four and eight blocks away raised some columns of a trench and not the ones beside them, and stood the
+        // difference up as the pillars the rift was full of. A hole into a cave is still roofed over by its rim.
         boolean roofed = ground > natural;
         int water = 0;
         while (water < 32 && !level.getBlockState(new BlockPos(gx, ground + 1 + water, gz)).getFluidState().isEmpty()) {
