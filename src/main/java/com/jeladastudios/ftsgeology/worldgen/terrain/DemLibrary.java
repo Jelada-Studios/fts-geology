@@ -128,9 +128,9 @@ public final class DemLibrary {
     private static Crop[] load(String[] names) {
         List<Crop> out = new ArrayList<>();
         for (String n : names) {
-            try (InputStream in = DemLibrary.class.getResourceAsStream("/data/fts_geology/dem/" + n + ".dem")) {
+            try (InputStream in = open(n)) {
                 if (in == null) {
-                    GeysersMod.LOGGER.warn("DEM crop {} is missing from the jar", n);
+                    GeysersMod.LOGGER.warn("Mountain crop {} is missing from the jar", n);
                     continue;
                 }
                 DataInputStream d = new DataInputStream(in);
@@ -152,9 +152,24 @@ public final class DemLibrary {
                 }
                 out.add(new Crop(n, v, w, h, mpp, sum / (double) v.length));
             } catch (IOException e) {
-                GeysersMod.LOGGER.warn("DEM crop {} could not be read: {}", n, e.toString());
+                GeysersMod.LOGGER.warn("Mountain crop {} could not be read: {}", n, e.toString());
             }
         }
+        GeysersMod.LOGGER.info("Real mountain ground: {} of {} crops read", out.size(), names.length);
         return out.toArray(new Crop[0]);
+    }
+
+    /**
+     * The crop's bytes. The class path serves them in the development environment and from most jars; a mod jar is
+     * its own module, which may keep a resource under a package-shaped path to itself, so the mod file is asked too.
+     */
+    private static InputStream open(String name) throws IOException {
+        String path = "data/fts_geology/dem/" + name + ".dem";
+        InputStream in = DemLibrary.class.getResourceAsStream("/" + path);
+        if (in != null) return in;
+        var file = net.minecraftforge.fml.ModList.get().getModFileById("fts_geology");
+        if (file == null) return null;
+        java.nio.file.Path p = file.getFile().findResource(path);
+        return java.nio.file.Files.exists(p) ? java.nio.file.Files.newInputStream(p) : null;
     }
 }
