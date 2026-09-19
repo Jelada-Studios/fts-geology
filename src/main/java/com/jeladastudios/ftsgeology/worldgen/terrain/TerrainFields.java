@@ -124,8 +124,14 @@ public final class TerrainFields {
     private static final double SPLINE_CUT = 0.5;
     /** How far the plain's border wanders in and out, in apron depth, over {@link #jitterWide}'s few hundred blocks. */
     public static final double APRON_WANDER = 0.3;
-    /** How far the ridge noise is pushed about, in its noise units (four blocks each), and the length of a bend. */
-    private static final double MEANDER_AMPLITUDE = 12.0, MEANDER_SCALE = 260.0;
+    /**
+     * How far the ridge noise is pushed about, in its noise units (four blocks each), and the length of a bend, at
+     * three sizes: the sweep of a whole reach, the bends in it, and the wobble of the bank. One bend length gave a
+     * river the same gentle curve everywhere; a real river turns on every scale at once.
+     */
+    private static final double[] MEANDER_AMPLITUDE = {24.0, 12.0, 5.0}, MEANDER_SCALE = {700.0, 260.0, 80.0};
+    /** The furthest the ridge noise is ever pushed: the three amplitudes together, for the density function's bounds. */
+    public static final double MEANDER_REACH = 41.0;
 
     /** How rugged ground is where no boundary reaches it: vanilla's erosion, where higher is flatter. */
     private static final double OCEAN_EROSION = 0.5, INTERIOR_EROSION = 0.45;
@@ -157,8 +163,12 @@ public final class TerrainFields {
     public static double field(Field field, long seed, GeologyParams p, int x, int z) {
         if (field == Field.MEANDER_X || field == Field.MEANDER_Z) {
             // The amplitude is in the ridge noise's own units, which grow with the world, so it is not scaled.
-            return MEANDER_AMPLITUDE * twoOctaves(seed, x, z, MEANDER_SCALE * p.horizontal(),
-                    field == Field.MEANDER_X ? 0x3E11L : 0x71C3L);
+            long salt = field == Field.MEANDER_X ? 0x3E11L : 0x71C3L;
+            double push = 0.0;
+            for (int i = 0; i < MEANDER_SCALE.length; i++) {
+                push += MEANDER_AMPLITUDE[i] * twoOctaves(seed, x, z, MEANDER_SCALE[i] * p.horizontal(), salt + i * 0x9F1L);
+            }
+            return push;
         }
         TectonicMap.Edges e = edgesAt(seed, p, x, z);
         double v = value(field, e.first(), p, seed, x, z);

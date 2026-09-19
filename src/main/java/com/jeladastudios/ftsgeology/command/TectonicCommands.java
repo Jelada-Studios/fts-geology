@@ -131,6 +131,14 @@ public final class TectonicCommands {
                                                         .executes(ctx -> InspectCommands.terrainBiomes(ctx,
                                                                 IntegerArgumentType.getInteger(ctx, "half"),
                                                                 IntegerArgumentType.getInteger(ctx, "step"))))))
+                                .then(Commands.literal("rivers")
+                                        .then(Commands.argument("half", IntegerArgumentType.integer(64, 4000))
+                                                .then(Commands.argument("step", IntegerArgumentType.integer(4, 64))
+                                                        .then(Commands.argument("minPath", IntegerArgumentType.integer(0, 10000))
+                                                                .executes(ctx -> InspectCommands.terrainRivers(ctx,
+                                                                        IntegerArgumentType.getInteger(ctx, "half"),
+                                                                        IntegerArgumentType.getInteger(ctx, "step"),
+                                                                        IntegerArgumentType.getInteger(ctx, "minPath")))))))
                                 .then(Commands.literal("ocean")
                                         .then(Commands.argument("radius", IntegerArgumentType.integer(64, 20000))
                                                 .executes(ctx -> InspectCommands.terrainOcean(ctx,

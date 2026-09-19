@@ -278,6 +278,100 @@ public final class InspectCommands {
         return 1;
     }
 
+    /**
+     * How much the generator's rivers wind, on a square grid round here asked of the biome source above the ground:
+     * the river cells joined eight ways into rivers, and for each river the longest path through it (the farthest
+     * cell from the farthest cell, diagonals at root two) against the straight distance between that path's ends.
+     * A straight river is 1. Rivers shorter than {@code minPath} cells are left out of the median. Loads no chunk.
+     */
+    static int terrainRivers(CommandContext<CommandSourceStack> ctx, int half, int step, int minPath) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        int n = 2 * (half / step) + 1;
+        if ((long) n * n > 250_000) {
+            source.sendFailure(Component.literal("Too many samples: " + (long) n * n + ", keep it under 250000"));
+            return 0;
+        }
+        var biomes = level.getChunkSource().getGenerator().getBiomeSource();
+        var sampler = level.getChunkSource().randomState().sampler();
+        int qy = net.minecraft.core.QuartPos.fromBlock(level.getMaxBuildHeight() - 16);
+        boolean[] river = new boolean[n * n];
+        int rivers = 0;
+        for (int j = 0; j < n; j++) {
+            for (int i = 0; i < n; i++) {
+                int x = at.getX() + (i - n / 2) * step, z = at.getZ() + (j - n / 2) * step;
+                var biome = biomes.getNoiseBiome(net.minecraft.core.QuartPos.fromBlock(x), qy, net.minecraft.core.QuartPos.fromBlock(z), sampler);
+                if (biome.is(net.minecraft.tags.BiomeTags.IS_RIVER)) { river[j * n + i] = true; rivers++; }
+            }
+        }
+        int[] comp = new int[n * n], queue = new int[n * n];
+        double[] dist = new double[n * n];
+        java.util.List<Double> ratios = new java.util.ArrayList<>();
+        java.util.List<String> longest = new java.util.ArrayList<>();
+        int components = 0;
+        for (int start = 0; start < n * n; start++) {
+            if (!river[start] || comp[start] != 0) continue;
+            components++;
+            int head = 0, tail = 0;
+            queue[tail++] = start; comp[start] = components;
+            while (head < tail) {
+                int c = queue[head++];
+                int cx = c % n, cz = c / n;
+                for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) {
+                    int nx = cx + dx, nz = cz + dz;
+                    if (nx < 0 || nz < 0 || nx >= n || nz >= n) continue;
+                    int m = nz * n + nx;
+                    if (river[m] && comp[m] == 0) { comp[m] = components; queue[tail++] = m; }
+                }
+            }
+            int[] cells = java.util.Arrays.copyOf(queue, tail);
+            int far = riverFarthest(river, n, cells, start, dist);
+            int end = riverFarthest(river, n, cells, far, dist);
+            double along = dist[end], straight = Math.hypot(end % n - far % n, end / n - far / n);
+            if (along < minPath) continue;
+            double ratio = straight < 1 ? 1.0 : along / straight;
+            ratios.add(ratio);
+            longest.add(String.format(Locale.ROOT, "%d cells, path %.0f, straight %.0f, sinuosity %.2f at %d,%d",
+                    tail, along * step, straight * step, ratio,
+                    at.getX() + (far % n - n / 2) * step, at.getZ() + (far / n - n / 2) * step));
+        }
+        java.util.Collections.sort(ratios);
+        double median = ratios.isEmpty() ? 0 : ratios.get(ratios.size() / 2);
+        double mean = ratios.stream().mapToDouble(d -> d).average().orElse(0);
+        String line = String.format(Locale.ROOT, "rivers within %d of %d,%d every %d: %d samples, %d river (%.2f%%), %d rivers, %d of %d+ cells: sinuosity median %.2f, mean %.2f",
+                half, at.getX(), at.getZ(), step, n * n, rivers, 100.0 * rivers / (n * n), components, ratios.size(), minPath, median, mean);
+        source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
+        for (String l : longest) com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("   {}", l);
+        return 1;
+    }
+
+    /** The river cell farthest along the river from {@code from}, by a search with root-two diagonals; fills dist. */
+    private static int riverFarthest(boolean[] river, int n, int[] cells, int from, double[] dist) {
+        for (int c : cells) dist[c] = Double.MAX_VALUE;
+        java.util.PriorityQueue<double[]> pq = new java.util.PriorityQueue<>((a, b) -> Double.compare(a[0], b[0]));
+        dist[from] = 0; pq.add(new double[]{0, from});
+        int best = from;
+        while (!pq.isEmpty()) {
+            double[] top = pq.poll();
+            int c = (int) top[1];
+            if (top[0] > dist[c]) continue;
+            if (dist[c] > dist[best]) best = c;
+            int cx = c % n, cz = c / n;
+            for (int dz = -1; dz <= 1; dz++) for (int dx = -1; dx <= 1; dx++) {
+                if (dx == 0 && dz == 0) continue;
+                int nx = cx + dx, nz = cz + dz;
+                if (nx < 0 || nz < 0 || nx >= n || nz >= n) continue;
+                int m = nz * n + nx;
+                if (!river[m]) continue;
+                double nd = dist[c] + (dx != 0 && dz != 0 ? Math.sqrt(2) : 1);
+                if (nd < dist[m]) { dist[m] = nd; pq.add(new double[]{nd, m}); }
+            }
+        }
+        return best;
+    }
+
     /** The share of the generator's ground under the sea within a radius, on a 64-block grid. */
     static int terrainOcean(CommandContext<CommandSourceStack> ctx, int radius) {
         CommandSourceStack source = ctx.getSource();
