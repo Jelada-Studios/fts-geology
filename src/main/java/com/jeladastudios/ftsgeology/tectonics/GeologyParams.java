@@ -28,8 +28,10 @@ public record GeologyParams(
         double hotspotBasinScale,
         /** How far the terrain's shapes reach from a boundary, in fault widths. */
         double beltFactor,
-        /** Blocks a collision lifts the ground at the boundary. */
+        /** Blocks a collision lifts the ground at the boundary, where no real mountain ground shapes it. */
         double uplift,
+        /** What the real mountain crops' heights are multiplied by: 1 is true scale, higher exaggerates. */
+        double demScale,
         /**
          * How many times wider than the config says the whole picture is laid out: plates, fault zones, plumes and
          * the terrain's own noises. 1 in the normal world type; the tall one is scaled up sideways as much as its
@@ -40,13 +42,13 @@ public record GeologyParams(
     private static final GeologyParams DEFAULTS = new GeologyParams(
             3000.0, 0.8, 220.0, 0.4,
             true, 8500.0, 0.18, 700.0, 320.0,
-            2.5, 140.0, 1.0);
+            2.5, 140.0, 1.0, 1.0);
 
     /** The same picture {@code h} times wider: every length in blocks scaled, every share and height kept. */
     public GeologyParams scaled(double h) {
         return new GeologyParams(plateScale * h, plateJitter, faultWidth * h, oceanShare,
                 hotspots, hotspotScale * h, hotspotDensity, hotspotRadius * h, hotspotBasinScale * h,
-                beltFactor, uplift, horizontal * h);
+                beltFactor, uplift, demScale, horizontal * h);
     }
 
     /** The numbers with no config behind them: the config's own defaults, for tests and tools. */
@@ -67,6 +69,7 @@ public record GeologyParams(
                 GeyserConfig.HOTSPOT_BASIN_SCALE.get(),
                 GeyserConfig.TERRAIN_BELT_FACTOR.get(),
                 GeyserConfig.TERRAIN_UPLIFT.get(),
+                GeyserConfig.DEM_HEIGHT_SCALE.get(),
                 1.0);
     }
 

@@ -138,7 +138,7 @@ public final class TectonicMap {
         for (double[] e : edges) if (e[0] < own[0]) own = e;
         double faultDistance = Math.max(0.0, own[0]);
         PlateKind kind = biomes == null ? seededKind(seed, plateId, params) : plateKind(biomes, seed, bgx, bgz, scale, jitter);
-        PlateSample first = boundary(seed, plateId, kind, (int) own[3], (int) own[4], faultDistance, own[1], own[2], biomes, params);
+        PlateSample first = boundary(seed, plateId, kind, (int) own[3], (int) own[4], faultDistance, own[1], own[2], own[7], biomes, params);
         if (!withSecond) return new Edges(first, first, first, Double.MAX_VALUE, Double.MAX_VALUE);
 
         // 3. Near the boundary, the plate across it has boundaries of its own that reach this column: where three
@@ -191,17 +191,20 @@ public final class TectonicMap {
                 // Signed offset from that bisector: a column inside the cell always sits on the near side, so the
                 // dot product is negative and negating it gives the perpendicular distance to the edge.
                 double d = -((px - midX) * ux + (pz - midZ) * uz);
+                // How far down the boundary the column lies. The two plates order themselves by their cells, so both
+                // sides of a line measure from the same end and read the same ground.
+                double along = (px - midX) * -uz + (pz - midZ) * ux;
+                double alongOne = (cgx < gx || (cgx == gx && cgz < gz)) ? along : -along;
                 if (absolute) {
                     d = Math.abs(d);
                     // The foot of the perpendicular on the bisector, and whether it lies past the junction.
-                    double along = (px - midX) * -uz + (pz - midZ) * ux;
                     double fx = midX - uz * along, fz = midZ + ux * along;
                     if (sq(fx - ax) + sq(fz - az) < sq(fx - cx) + sq(fz - cz)) {
                         double[] v = circumcentre(ax, az, cx, cz, sx, sz);
                         if (v != null) d = Math.sqrt(sq(px - v[0]) + sq(pz - v[1]));
                     }
                 }
-                out.add(new double[]{d, ux, uz, gx, gz, cgx, cgz});
+                out.add(new double[]{d, ux, uz, gx, gz, cgx, cgz, alongOne});
             }
         }
     }
@@ -225,12 +228,12 @@ public final class TectonicMap {
         int ogx = (int) e[5], ogz = (int) e[6];
         long ownerId = plateId(seed, ogx, ogz);
         PlateKind ownerKind = biomes == null ? seededKind(seed, ownerId, params) : plateKind(biomes, seed, ogx, ogz, scale, jitter);
-        return boundary(seed, ownerId, ownerKind, (int) e[3], (int) e[4], Math.max(0.0, e[0]), e[1], e[2], biomes, params);
+        return boundary(seed, ownerId, ownerKind, (int) e[3], (int) e[4], Math.max(0.0, e[0]), e[1], e[2], e[7], biomes, params);
     }
 
     /** A column's plate against one of its boundaries, the plate across it lying in grid cell (ngx, ngz). */
     private static PlateSample boundary(long seed, long plateId, PlateKind kind, int ngx, int ngz, double faultDistance,
-                                        double nx, double nz, ServerLevel biomes, GeologyParams params) {
+                                        double nx, double nz, double along, ServerLevel biomes, GeologyParams params) {
         long neighbourId = plateId(seed, ngx, ngz);
         // 3. Plate drift, and therefore what this boundary is doing.
         double[] vA = plateVelocity(seed, plateId);
@@ -249,11 +252,11 @@ public final class TectonicMap {
         //    sample is built once without them and then again with what it said about itself.
         double faultWidth = params.faultWidth();
         PlateSample bare = new PlateSample(plateId, kind, vA[0], vA[1], neighbourId, neighbourKind,
-                FaultType.INTERIOR, faultDistance, convergence, shear, nx, nz, 0.0);
+                FaultType.INTERIOR, faultDistance, convergence, shear, nx, nz, 0.0, along);
         double stress = bare.belt(faultWidth, 1.0);
         FaultType type = faultDistance > faultWidth ? FaultType.INTERIOR : bare.boundaryType();
         return new PlateSample(plateId, kind, vA[0], vA[1], neighbourId, neighbourKind,
-                type, faultDistance, convergence, shear, nx, nz, stress);
+                type, faultDistance, convergence, shear, nx, nz, stress, along);
     }
 
     /**

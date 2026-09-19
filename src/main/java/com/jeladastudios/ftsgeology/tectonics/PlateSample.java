@@ -32,7 +32,10 @@ public record PlateSample(
         double shear,
         double faultNormalX,
         double faultNormalZ,
-        double stress) {
+        double stress,
+        // Blocks along the boundary, from the midpoint between the two plates' centres, the same from either side
+        // of the line: where a mountain belt reads its ground along the range.
+        double along) {
 
     /** True when this column is close enough to a boundary for tectonic features to belong here. */
     public boolean onFault() {

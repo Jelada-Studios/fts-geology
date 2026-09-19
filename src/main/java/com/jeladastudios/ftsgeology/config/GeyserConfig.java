@@ -182,6 +182,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue OCEAN_SHARE;           // share of plates that are oceanic (own terrain)
     public static final ForgeConfigSpec.DoubleValue TERRAIN_BELT_FACTOR;   // mountain belt width, in fault widths
     public static final ForgeConfigSpec.DoubleValue TERRAIN_UPLIFT;        // blocks a collision lifts the ground
+    public static final ForgeConfigSpec.DoubleValue DEM_HEIGHT_SCALE;      // how much the real mountain crops are exaggerated
     public static final ForgeConfigSpec.BooleanValue LITHOLOGY;           // rock sequences under the ground (own terrain)
 
     // --- Instruments ---------------------------------------------------------
@@ -965,6 +966,13 @@ public final class GeyserConfig {
                         "the ridge noise adds on top. The crests of a belt get all of it, the passes between them",
                         "about half; too much and the highest crests reach the top of the terrain and flatten out.")
                 .defineInRange("terrainUplift", 140.0D, 0.0D, 400.0D);
+        DEM_HEIGHT_SCALE = b
+                .comment("How tall the real mountains are laid out, against the ground they were measured on.",
+                        "The mod carries crops of the Alps, the Caucasus, the Himalaya, the Karakoram and the",
+                        "Appalachians, and lays a mountain belt out from them at true scale: twenty-five metres to",
+                        "the block in the normal world, ten in the tall one. 1 is that true scale; higher makes the",
+                        "ranges taller and steeper than the real ones, lower flattens them.")
+                .defineInRange("demHeightScale", 1.0D, 0.1D, 4.0D);
         LITHOLOGY = b
                 .comment("Lay the rock the plates imply under the ground: a platform's beds over its basement, a fold",
                         "belt's gneiss and marble, an arc's ash over its plutons. Off leaves plain stone, and chunks",

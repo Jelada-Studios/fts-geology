@@ -17,6 +17,13 @@ into fixes, and encouragement at the right moment.
 All from the r/feedthebeast launch thread. If you are listed here and would rather not be, say so
 and you come straight off.
 
+## Data
+
+The mountain belts are laid out from crops of real ranges: elevation data from the DEM3 set published by
+Jonathan de Ferranti at [viewfinderpanoramas.org](http://viewfinderpanoramas.org/dem3.html), built on NASA's
+SRTM and other public sources, reproduced here with acknowledgement under the terms given on that site. The
+crops and their provenance are listed in `data/fts_geology/dem/README.txt`.
+
 ## Built on
 
 - Minecraft Forge, and the MDK it ships with.

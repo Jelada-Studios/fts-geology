@@ -36,7 +36,7 @@ public final class TerrainFields {
 
     private TerrainFields() {}
 
-    public enum Field { CONTINENTS, EROSION, RIDGES, RELIEF, VARIETY, BELT, VALLEY, CREST, MEANDER_X, MEANDER_Z, PASS, RIVER_BED, RIVER_GATE, STREAM }
+    public enum Field { CONTINENTS, EROSION, RIDGES, RELIEF, VARIETY, BELT, VALLEY, CREST, MEANDER_X, MEANDER_Z, DEM, GRIP, SPLINE }
 
     /** How far the coordinates are pushed about, in blocks, and the size of the pushing. */
     private static final double WARP_AMPLITUDE = 250.0;
@@ -78,7 +78,7 @@ public final class TerrainFields {
      * across and half the drop, the second starting at {@code GRABEN_STEP}. The floor used to rise to the rim as a
      * square root, which stands vertical at the rim.
      */
-    private static final double GRABEN_FLOOR = 0.16, GRABEN_STEP = 0.30, STEP_WIDTH = 0.06;
+    private static final double GRABEN_FLOOR = 0.112, GRABEN_STEP = 0.21, STEP_WIDTH = 0.042;
     private static final double SHOULDER_AT = 0.7, SHOULDER_HALF = 0.4;
     /** Where a rift's floor starts to take the ruggedness of its shoulders, and over how far. */
     private static final double RIFT_CALM_FROM = 0.1, RIFT_CALM_OVER = 0.6;
@@ -181,9 +181,6 @@ public final class TerrainFields {
             }
             return push * (1.0 + MEANDER_PLAIN * apronAt(seed, p, x, z));
         }
-        if (field == Field.RIVER_BED) return riverBed(seed, p, x, z);
-        if (field == Field.RIVER_GATE) return Mth.clamp((field(Field.CONTINENTS, seed, p, x, z) - RIVER_GATE_FROM) / RIVER_GATE_OVER, 0.0, 1.0);
-        if (field == Field.STREAM) return streamDistance(seed, p, x, z);
         TectonicMap.Edges e = edgesAt(seed, p, x, z);
         // A column near more than one boundary is shaped by all of them: its own plate's two nearest and, near the
         // line, the boundaries of the plate across it (see TectonicMap.computeEdges), each fading in over HANDOVER
@@ -207,8 +204,6 @@ public final class TerrainFields {
         double apron = apronAt(e, p);
         return switch (field) {
             case RELIEF -> v + APRON_LIFT * apron + 0.25 * HotspotMap.plumeStrength(seed, x, z, p);
-            // A river runs down to the sea across its plain: the plain's few blocks of lift are left out of its level.
-            case PASS -> v + 0.25 * HotspotMap.plumeStrength(seed, x, z, p);
             case EROSION -> v + 0.25 * apron;
             default -> v;
         };
@@ -239,9 +234,7 @@ public final class TerrainFields {
             case EROSION -> erosion(s, p, seed, x, z);
             // No sharp peaks on a valley floor: the ridge noise that makes them is turned down there.
             case RIDGES -> 0.5 + (worn(s, seed) ? WORN_RIDGES : 0.9) * belt(s, p);
-            case RELIEF -> relief(s, p, seed, x, z, false);
-            // The ground a mountain belt keeps in its passes, all along: the level its rivers run below.
-            case PASS -> relief(s, p, seed, x, z, true);
+            case RELIEF -> relief(s, p, seed, x, z);
             // A mountain belt's grip, for the offset to scale vanilla's mountain spline down by inside the belt, and
             // how deep in one of the belt's valleys the column lies, for the offset to cut that spline further. A
             // rift keeps vanilla's full spline: halving it there lifted the rift floors out of their lakes.
@@ -251,8 +244,13 @@ public final class TerrainFields {
             // ridges and V-shaped valleys the mod's own relief follows, or the two cut across each other and the
             // valleys vanished under vanilla's peaks.
             case CREST -> crestField(s, p, seed, x, z);
+            // Real mountain ground for the belts that take their shape from it, how much of the column it shapes,
+            // and what is left of vanilla's own mountain spline there.
+            case DEM -> dem(s, p, seed);
+            case GRIP -> demGrip(s, p);
+            case SPLINE -> spline(s, p, seed, x, z);
             case VARIETY -> variety(s, p);
-            case MEANDER_X, MEANDER_Z, RIVER_BED, RIVER_GATE, STREAM -> 0.0;
+            case MEANDER_X, MEANDER_Z -> 0.0;
         };
     }
 
@@ -315,31 +313,30 @@ public final class TerrainFields {
         return Math.max(e, floor);
     }
 
+    /** The relief the plates themselves make, where no real mountain ground shapes the column. */
     private static double relief(PlateSample s, GeologyParams p, long seed, int x, int z) {
-        return relief(s, p, seed, x, z, false);
-    }
-
-    /** The relief; with {@code pass}, at the level of the passes rather than the ridges, so without the crest's rise and fall. */
-    private static double relief(PlateSample s, GeologyParams p, long seed, int x, int z, boolean pass) {
         double a = across(s, p);
         if (s.plateKind().isOceanic()) return oceanRelief(s, p, a, seed, x, z);
         double u = p.uplift() / 128.0 * (0.5 + 0.5 * motion(s));
         double t = Math.min(1.0, a / p.beltFactor());
         // The floodplain's lift ({@link #APRON_LIFT}) is added in {@link #field}, from both boundaries.
         double cut = 1.0 - VALLEY_DEPTH * valley(seed, p, x, z);
-        return switch (s.boundaryType()) {
+        // Where real mountain ground shapes the column it is the relief: the plates' own uplift fades out under it,
+        // and comes back at the belt's edge and wherever the crops are not read (an ocean, a rift, no crops at all).
+        double own = 1.0 - demGrip(s, p);
+        return own * switch (s.boundaryType()) {
             // The ridges and passes fade out at the belt's edge with its grip: at full share out to the edge the first
             // ridge stood up from the plain as a bank.
             case CONVERGENT_COLLISION -> worn(s, seed)
-                    ? WORN_RELIEF * u * bump(t) * (pass ? 1.0 - WORN_CREST_SHARE * crestGrip(s, p) : crest(seed, p, x, z, WORN_CREST_SHARE * crestGrip(s, p))) * cut
-                    : u * bump(t) * (pass ? 1.0 - CREST_SHARE * crestGrip(s, p) : crest(seed, p, x, z, CREST_SHARE * crestGrip(s, p))) * cut;
+                    ? WORN_RELIEF * u * bump(t) * crest(seed, p, x, z, WORN_CREST_SHARE * crestGrip(s, p)) * cut
+                    : u * bump(t) * crest(seed, p, x, z, CREST_SHARE * crestGrip(s, p)) * cut;
             // The arc stands where the volcanoes do, on a plateau that fades out across the belt and keeps clear of
             // the coast; the trench lies off the coast, on the plate that goes under. The arc's mountains drop
             // steeply to the sea and go down slowly inland, as the Andes do to the altiplano, and rise and fall
             // along the coast with the crest noise: massifs and the saddles between them.
             case CONVERGENT_SUBDUCTION -> s.overridingSide()
                     ? u * (ARC_RISE * peak(a, ARC_AT, ARC_SEA_HALF, ARC_LAND_HALF)
-                            * (1.0 - ARC_CREST * (1.0 - (pass ? 0.0 : crestShape(seed, p, x, z)))) + 0.3 * bump(t) * calm(s, p)) * cut
+                            * (1.0 - ARC_CREST * (1.0 - crestShape(seed, p, x, z))) + 0.3 * bump(t) * calm(s, p)) * cut
                     : -0.25 * peak(a, TRENCH_AT, TRENCH_HALF);
             case DIVERGENT -> graben(a) + SHOULDER_RISE * peak(a, SHOULDER_AT, SHOULDER_HALF);
             case TRANSFORM, INTERIOR -> 0.0;
@@ -465,56 +462,72 @@ public final class TerrainFields {
         return GRABEN_DEEP * (1.0 - 0.5 * first - 0.5 * second);
     }
 
+    // === Real mountains ======================================================
+
+    /**
+     * Over this share of a belt, from the boundary out, the real ground shapes it in full; over the rest it fades to
+     * nothing, so a range comes down to the plain instead of ending at a cliff where the crop does.
+     */
+    private static final double DEM_FADE = 0.6;
+
+    /** How much of vanilla's mountain spline the real ground takes over where it holds. */
+    private static final double SPLINE_DEM = 0.9;
+
+    /** Metres of real ground a block stands for in the normal world; the tall world is the same ground at ten. */
+    private static final double METRES_PER_BLOCK = 25.0;
+
+    /**
+     * The real mountains, in offset units: a crop of the Alps, the Caucasus, the Himalaya, the Karakoram or the
+     * Appalachians, read at the column's place along and across the boundary and laid on the ground at true scale,
+     * twenty-five metres to the block in the normal world and ten in the tall one.
+     */
+    private static double dem(PlateSample s, GeologyParams p, long seed) {
+        double env = demGrip(s, p);
+        if (env <= 0.0) return 0.0;
+        double mpb = METRES_PER_BLOCK / p.horizontal();
+        double a = across(s, p);
+        double acrossM = s.boundaryType() == FaultType.CONVERGENT_SUBDUCTION
+                ? (a - ARC_AT) * p.faultWidth() * mpb
+                : (Long.compareUnsigned(s.plateId(), s.neighbourId()) < 0 ? a : -a) * p.faultWidth() * mpb;
+        long lo = Math.min(s.plateId(), s.neighbourId()), hi = Math.max(s.plateId(), s.neighbourId());
+        long pair = SeedHash.mix(lo * 0x9E3779B97F4A7C15L ^ SeedHash.mix(hi ^ 0x0DE31L));
+        DemLibrary.Kind kind = worn(s, seed) ? DemLibrary.Kind.WORN : DemLibrary.Kind.YOUNG;
+        double metres = DemLibrary.metres(seed, pair, kind, p.horizontal() > 1.5, s.along() * mpb, acrossM);
+        // A belt that is barely closing keeps a lower range, as the plates' own uplift did.
+        double drive = 0.6 + 0.4 * motion(s);
+        return env * drive * p.demScale() * metres / mpb / 128.0;
+    }
+
+    /** How much of the column the real ground shapes: 1 in the belt's core, 0 at its edge, 0 where it has none. */
+    private static double demGrip(PlateSample s, GeologyParams p) {
+        if (s.plateKind().isOceanic() || !DemLibrary.available()) return 0.0;
+        double a = across(s, p);
+        return switch (s.boundaryType()) {
+            case CONVERGENT_COLLISION -> {
+                double t = Math.min(1.0, a / p.beltFactor());
+                yield smooth(Mth.clamp((1.0 - t) / DEM_FADE, 0, 1));
+            }
+            // An arc stands where its volcanoes do, not on the line: the range is read from there, steep to the sea
+            // and long inland.
+            case CONVERGENT_SUBDUCTION -> s.overridingSide() ? peak(a, ARC_AT, ARC_SEA_HALF, ARC_LAND_HALF) : 0.0;
+            default -> 0.0;
+        };
+    }
+
+    /**
+     * What the offset keeps of vanilla's mountain spline: less of it inside a belt, which has its own relief, and
+     * almost none where the real ground shapes the column, or vanilla's peaks cut across the range's own.
+     */
+    private static double spline(PlateSample s, GeologyParams p, long seed, int x, int z) {
+        double b = mountainBelt(s, p);
+        double shape = crestShape(seed, p, x, z);
+        double cut = worn(s, seed)
+                ? (1.0 - WORN_SPLINE * b) * (1.0 - WORN_CREST_SHARE * b * (1.0 - shape))
+                : (1.0 - SPLINE_CUT * b) * (1.0 - CREST_SHARE * b * (1.0 - shape));
+        return cut * (1.0 - SPLINE_DEM * demGrip(s, p));
+    }
+
     /** How much of the crest share a column takes: all of it inside CREST_FULL_BELT of grip, less towards the edge. */
-    // === Rivers ===============================================================
-
-    /**
-     * The lowest a river's bed goes, in the offset's units (the offset is 0 at y 128, a block is 1/128 of it): the sea's
-     * own top at the coast, so across a plain the channel reaches under the sea's level and vanilla fills it, rising
-     * inland with a share of the ground a belt keeps in its passes. Only the slow parts of the ground go in, the belt's
-     * profile, the arc and the plume, never the crest, the noise or the plain's lift. The data carves a river no deeper
-     * than {@link #RIVER_INCISION} into the ground; where the ground comes down to this, the bed lies flat on it and the
-     * river runs in still pools.
-     */
-    private static double riverBed(long seed, GeologyParams p, int x, int z) {
-        return RIVER_SEA + RIVER_SHARE * field(Field.PASS, seed, p, x, z);
-    }
-
-    /** The bed at the sea's top (y 62) at the coast, and the share of the pass level it rises with inland. */
-    private static final double RIVER_SEA = -66.0 / 128.0, RIVER_SHARE = 0.7;
-    /** Rivers are carved only on land well in from the coast: continentalness from here, full over this much. */
-    private static final double RIVER_GATE_FROM = -0.11, RIVER_GATE_OVER = 0.1;
-    /**
-     * A river's channel: a floor this far each side of the ridge noise's zero line, the line vanilla lays its rivers on.
-     * A stream's: this far each side of the crest noise's zero line, a belt valley's floor, inside a belt. Both are cut at
-     * most {@link #RIVER_INCISION} blocks into the ground, with walls steep enough to meet it within a few blocks: cut
-     * down to a level instead, sixty blocks under a belt's passes, the valleys needed walls hundreds of blocks wide and
-     * took the mountains down with them. Both floors span two of the terrain's 4-block cells at least: a narrower one fell
-     * between the corners the ground is interpolated from and was never cut.
-     */
-    public static final double RIVER_FLOOR = 0.035, STREAM_FLOOR = 0.03, RIVER_INCISION = 6.0;
-    /** Far off any stream: the distance a column outside a belt reads, so no stream is carved there. */
-    private static final double NO_STREAM = 10.0;
-
-    /**
-     * How far a column is from a mountain stream's line, in the crest noise's units: the stream runs down the floor of a
-     * belt's V valleys, the crest noise's zero line, and only inside a belt.
-     */
-    private static double streamDistance(long seed, GeologyParams p, int x, int z) {
-        double grip = smooth(Mth.clamp(field(Field.BELT, seed, p, x, z) / 0.4, 0.0, 1.0));
-        if (grip <= 0.0) return NO_STREAM;
-        return Math.abs(twoOctaves(seed, x, z, CREST_SCALE * p.horizontal(), 0x2F0DL)) + (1.0 - grip) * NO_STREAM;
-    }
-
-    /**
-     * How far inside a river's or a stream's floor a column lies, positive inside, from the ridge noise there, the same
-     * noise the data carves with; negative outside or off the land.
-     */
-    public static double riverChannel(long seed, GeologyParams p, int x, int z, double ridges) {
-        if (field(Field.RIVER_GATE, seed, p, x, z) < 0.5) return -1.0;
-        return Math.max(RIVER_FLOOR - Math.abs(ridges), STREAM_FLOOR - streamDistance(seed, p, x, z));
-    }
-
     private static double crestGrip(PlateSample s, GeologyParams p) {
         return Math.min(1.0, belt(s, p) / CREST_FULL_BELT);
     }
