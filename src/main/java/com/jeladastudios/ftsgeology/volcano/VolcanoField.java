@@ -854,6 +854,14 @@ public final class VolcanoField {
                 boolean crossing = false;
                 for (int b = 0; b < 4; b++) crossing |= riverAt[b] && riverAt[b + 4];
                 if (crossing || rivers >= 3) return refuse(refused, type, WATER, x, z, "river through the body");
+                // A few small lakes under the body are built over; one lake along a whole side is not: the flank ran into it
+                // on its own profile and buried half a rift lake. Three wet probes in a row half way out is such a lake.
+                int run = 0, longest = 0;
+                for (int k = 0; k < 16; k++) {
+                    run = wetAt[1][k % 8] ? run + 1 : 0;
+                    longest = Math.max(longest, Math.min(run, 8));
+                }
+                if (longest >= 3) return refuse(refused, type, WATER, x, z, "lake along one side, " + longest + " mid");
             }
             // Deep water on opposite sides is a lake or a river valley the mountain would fill from shore to shore.
             for (int b = 0; ring > 0 && b < 4; b++) {
