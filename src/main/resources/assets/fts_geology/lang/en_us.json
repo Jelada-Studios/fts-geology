@@ -393,6 +393,9 @@
   "biome.fts_geology.rift_valley": "Rift Valley",
   "biome.fts_geology.volcanic_highland": "Volcanic Highland",
   "biome.fts_geology.orogenic_highland": "Orogenic Highland",
+  "biome.fts_geology.everest": "Everest",
+  "biome.fts_geology.k2": "K2",
+  "biome.fts_geology.matterhorn": "Matterhorn",
   "biome.fts_geology.alluvial_plain": "Alluvial Plain",
   "biome.fts_geology.oceanic_ridge": "Oceanic Ridge"
 }

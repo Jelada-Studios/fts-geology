@@ -35,6 +35,8 @@ public class GeologyBiomeSource extends BiomeSource {
     private final Holder<Biome>[] roles;
     /** The biome a river runs in, under the map key {@code river}. Null in a preset that does not name one. */
     private final Holder<Biome> river;
+    /** Everest, K2 and the Matterhorn, in the order {@link DemLibrary#LANDMARKS} counts them. */
+    private final Holder<Biome>[] landmarks;
 
     @SuppressWarnings("unchecked")
     public GeologyBiomeSource(BiomeSource parent, Map<String, Holder<Biome>> byRole) {
@@ -43,6 +45,10 @@ public class GeologyBiomeSource extends BiomeSource {
         this.roles = new Holder[Role.values().length];
         for (Role r : Role.values()) roles[r.ordinal()] = byRole.get(r.key);
         this.river = byRole.get("river");
+        @SuppressWarnings("unchecked")
+        Holder<Biome>[] marks = new Holder[DemLibrary.LANDMARKS.length];
+        for (int i = 0; i < marks.length; i++) marks[i] = byRole.get(DemLibrary.LANDMARKS[i]);
+        this.landmarks = marks;
     }
 
     @Override
@@ -57,6 +63,8 @@ public class GeologyBiomeSource extends BiomeSource {
 
     /** How much of a channel has to reach a column before the river biome follows it there. */
     private static final double ON_CHANNEL = 0.5;
+    /** How much of a named mountain's height a column has to carry before it is called by that mountain's name. */
+    private static final double ON_LANDMARK = 0.18;
     /** How far out, in quarts, a stranded river biome looks for the land it should have been. */
     private static final int[][] ASHORE = {{12, 0}, {-12, 0}, {0, 12}, {0, -12}, {24, 0}, {0, 24}};
 
@@ -69,6 +77,16 @@ public class GeologyBiomeSource extends BiomeSource {
         // noise field's zero line is a closed curve -- which is how a river came to run in a ring round an island
         // and how two of them came to run side by side. So the biome follows the channel that was actually traced
         // down the ground: over one, it is a river wherever it is; away from one, whatever the land beside it is.
+        // A named mountain takes its own name wherever its ground is most of what a column stands on. The share is
+        // the crop's own height here against the tallest it reaches, so the name belongs to the mountain and not to
+        // the whole square the crop covers -- the valleys round it stay the country they were.
+        if (!sea && !underground(base) && landmarks.length > 0) {
+            LandmarkSites.Site site = LandmarkSites.near(TerrainContext.seed(), TerrainContext.params(), bx, bz);
+            if (site != null && landmarks[site.which()] != null
+                    && TerrainFields.landmarkShare(TerrainContext.seed(), TerrainContext.params(), bx, bz) > ON_LANDMARK) {
+                return landmarks[site.which()];
+            }
+        }
         if (!sea && !underground(base)) {
             boolean onChannel = river != null
                     && com.jeladastudios.ftsgeology.hydrology.RiverNetwork.near(bx, bz) >= ON_CHANNEL;

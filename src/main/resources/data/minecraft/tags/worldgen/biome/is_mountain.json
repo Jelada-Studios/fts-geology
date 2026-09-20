@@ -1,6 +1,9 @@
 {
   "replace": false,
   "values": [
+    "fts_geology:everest",
+    "fts_geology:k2",
+    "fts_geology:matterhorn",
     "fts_geology:orogenic_highland",
     "fts_geology:volcanic_highland"
   ]

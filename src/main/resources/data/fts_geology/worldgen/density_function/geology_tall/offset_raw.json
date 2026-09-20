@@ -55,10 +55,14 @@
         }
       },
       "argument2": {
-        "type": "minecraft:flat_cache",
-        "argument": {
-          "type": "fts_geology:plate",
-          "field": "dem"
+        "type": "minecraft:add",
+        "argument1": {
+          "type": "minecraft:flat_cache",
+          "argument": { "type": "fts_geology:plate", "field": "dem" }
+        },
+        "argument2": {
+          "type": "minecraft:flat_cache",
+          "argument": { "type": "fts_geology:plate", "field": "landmark" }
         }
       }
     }

@@ -502,7 +502,10 @@
                      {
                         "if_true" : {
                            "biome_is" : [
-                              "fts_geology:orogenic_highland"
+                              "fts_geology:orogenic_highland",
+                              "fts_geology:everest",
+                              "fts_geology:k2",
+                              "fts_geology:matterhorn"
                            ],
                            "type" : "minecraft:biome"
                         },

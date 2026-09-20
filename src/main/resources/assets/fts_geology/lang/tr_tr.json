@@ -383,6 +383,9 @@
   "biome.fts_geology.rift_valley": "Rift Vadisi",
   "biome.fts_geology.volcanic_highland": "Volkanik Yayla",
   "biome.fts_geology.orogenic_highland": "Orojenik Yayla",
+  "biome.fts_geology.everest": "Everest",
+  "biome.fts_geology.k2": "K2",
+  "biome.fts_geology.matterhorn": "Matterhorn",
   "biome.fts_geology.alluvial_plain": "Alüvyon Ovası",
   "biome.fts_geology.oceanic_ridge": "Okyanus Sırtı"
 }

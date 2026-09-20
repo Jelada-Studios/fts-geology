@@ -12,6 +12,9 @@
           },
           "biomes": {
             "river": "minecraft:river",
+            "everest": "fts_geology:everest",
+            "k2": "fts_geology:k2",
+            "matterhorn": "fts_geology:matterhorn",
             "geothermal_basin": "fts_geology:geothermal_basin",
             "rift_valley": "fts_geology:rift_valley",
             "volcanic_highland": "fts_geology:volcanic_highland",

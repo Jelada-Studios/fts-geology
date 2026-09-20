@@ -91,6 +91,15 @@ public final class FindCommands {
             return s == null ? null : new Hit(s[0], s[1], (int) Math.round(Math.hypot(s[0] - at.getX(), s[1] - at.getZ())));
         }
         if (what.equals("valley")) return searchValley(level, at);
+        // A named mountain stands in one place in a world, worked out from the seed: there is nothing to spiral for.
+        for (String name : com.jeladastudios.ftsgeology.worldgen.terrain.DemLibrary.LANDMARKS) {
+            if (!what.equals(name)) continue;
+            var site = com.jeladastudios.ftsgeology.worldgen.terrain.LandmarkSites.of(
+                    com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(),
+                    com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params(), name);
+            return site == null ? null : new Hit(site.x(), site.z(),
+                    (int) Math.round(Math.hypot(site.x() - at.getX(), site.z() - at.getZ())));
+        }
         int step = 96;
         int maxRings = 220;                 // reaches out about 21k blocks
         for (int ring = 1; ring <= maxRings; ring++) {

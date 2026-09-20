@@ -172,7 +172,8 @@ public final class TectonicCommands {
         return 1;
     }
 
-    static final String[] SETTINGS = {"subduction", "rift", "collision", "transform", "hotspot", "tube", "valley"};
+    static final String[] SETTINGS = {"subduction", "rift", "collision", "transform", "hotspot", "tube", "valley",
+            "everest", "k2", "matterhorn"};
     static final String[] FAULTS = {"subduction", "rift", "collision", "transform"};
     static final String[] VOLCANO_TYPES = {"strato", "shield", "fissure", "caldera", "island", "flooded", "eroded", "atoll",
             "guyot", "active", "dormant", "extinct"};

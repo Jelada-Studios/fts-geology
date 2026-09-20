@@ -35,16 +35,56 @@ public final class DemLibrary {
     private static final String[] HIGH = {"him_manaslu", "him_langtang", "him_choyu", "kara_baltoro", "kara_nanga"};
     private static final String[] WORN = {"app_valleyridge", "app_blueridge", "app_newriver"};
 
+    /**
+     * The three named mountains, in the order the rest of the mod counts them. Unlike every other crop these are
+     * not tiled along a belt: each is laid down once in a world, at its own place, the way it stands on Earth.
+     */
+    public static final String[] LANDMARKS = {"everest", "k2", "matterhorn"};
+    private static final String[] LANDMARK_FILES = {"land_everest", "land_k2", "land_matterhorn"};
+
     /** A crop's length along the range, less its overlap, in metres. */
     private static final double PERIOD = 400 * 90.0;
     private static final double OVERLAP = 0.1;
 
-    private record Crop(String name, short[] v, int w, int h, double mpp, double mean) {}
+    private record Crop(String name, short[] v, int w, int h, double mpp, double mean, double peak) {}
 
     private static final class Holder {
         static final Crop[] YOUNG_NORMAL = load(YOUNG);
         static final Crop[] YOUNG_TALL = load(HIGH);
         static final Crop[] WORN_ALL = load(WORN);
+        static final Crop[] LANDMARK = load(LANDMARK_FILES);
+    }
+
+    /** Whether the three named mountains are all there; without them nothing is placed at all. */
+    public static boolean landmarksReady() {
+        return Holder.LANDMARK.length == LANDMARKS.length;
+    }
+
+    /** How far a named mountain's crop reaches from its middle, in metres: half its short side and half its long one. */
+    public static double landmarkHalfAcross(int which) {
+        Crop c = Holder.LANDMARK[which];
+        return (c.h - 1) / 2.0 * c.mpp;
+    }
+
+    public static double landmarkHalfAlong(int which) {
+        Crop c = Holder.LANDMARK[which];
+        return (c.w - 1) / 2.0 * c.mpp;
+    }
+
+    /** The tallest of the three over its own valley floor, in metres: what the lift is measured against. */
+    public static double landmarkTallest() {
+        double top = 0.0;
+        for (Crop c : Holder.LANDMARK) top = Math.max(top, c.peak);
+        return top;
+    }
+
+    /** One named mountain's height in metres over its own valley floor, at a point measured from its middle. */
+    public static double landmark(int which, double along, double across) {
+        Crop c = Holder.LANDMARK[which];
+        double u = (c.w - 1) / 2.0 + along / c.mpp;
+        double v = (c.h - 1) / 2.0 - across / c.mpp;
+        if (u < 0 || v < 0 || u > c.w - 1 || v > c.h - 1) return 0.0;
+        return bicubic(c, u, v);
     }
 
     /** Whether the crops loaded, for the terrain to fall back on its own relief if they did not. */
@@ -157,11 +197,13 @@ public final class DemLibrary {
                 java.util.Arrays.sort(sorted);
                 int base = sorted[(int) (0.01 * sorted.length)];
                 long sum = 0;
+                int top = 0;
                 for (int i = 0; i < v.length; i++) {
                     v[i] = (short) (v[i] - base);
                     sum += v[i];
+                    top = Math.max(top, v[i]);
                 }
-                out.add(new Crop(n, v, w, h, mpp, sum / (double) v.length));
+                out.add(new Crop(n, v, w, h, mpp, sum / (double) v.length, top));
             } catch (IOException e) {
                 GeysersMod.LOGGER.warn("Mountain crop {} could not be read: {}", n, e.toString());
             }

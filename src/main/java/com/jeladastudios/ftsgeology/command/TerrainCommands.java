@@ -331,7 +331,7 @@ public final class TerrainCommands {
         record Pos(int blockX, int blockY, int blockZ) implements net.minecraft.world.level.levelgen.DensityFunction.FunctionContext {}
         Pos pos = new Pos(at.getX(), 64, at.getZ());
         StringBuilder sb = new StringBuilder();
-        for (String f : new String[] {"continents", "erosion", "ridges", "relief", "spline", "grip", "dem", "range", "valley", "crest", "graben"}) {
+        for (String f : new String[] {"continents", "erosion", "ridges", "relief", "spline", "grip", "dem", "range", "landmark", "valley", "crest", "graben"}) {
             sb.append(f).append(' ').append(String.format(Locale.ROOT, "%.3f", com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.field(com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.Field.valueOf(f.toUpperCase(Locale.ROOT)), com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(), com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params(), at.getX(), at.getZ()))).append("; ");
         }
         var generator = level.getChunkSource().getGenerator();

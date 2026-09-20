@@ -36,7 +36,7 @@ public final class TerrainFields {
 
     private TerrainFields() {}
 
-    public enum Field { CONTINENTS, EROSION, RIDGES, RELIEF, VARIETY, BELT, RANGE, VALLEY, CREST, MEANDER_X, MEANDER_Z, DEM, GRIP, SPLINE, GRABEN }
+    public enum Field { CONTINENTS, EROSION, RIDGES, RELIEF, VARIETY, BELT, RANGE, VALLEY, CREST, MEANDER_X, MEANDER_Z, DEM, GRIP, SPLINE, GRABEN, LANDMARK }
 
     /** How far the coordinates are pushed about, in blocks, and the size of the pushing. */
     private static final double WARP_AMPLITUDE = 250.0;
@@ -218,6 +218,9 @@ public final class TerrainFields {
             }
             return push * (1.0 + MEANDER_PLAIN * apronAt(seed, p, x, z));
         }
+        // A named mountain is not read off a boundary: it stands where it was put, and the blend below would only
+        // dilute it with the country round it.
+        if (field == Field.LANDMARK) return landmark(seed, p, x, z);
         TectonicMap.Edges e = edgesAt(seed, p, x, z);
         // A column near more than one boundary is shaped by all of them: its own plate's two nearest and, near the
         // line, the boundaries of the plate across it (see TectonicMap.computeEdges), each fading in over HANDOVER
@@ -283,6 +286,8 @@ public final class TerrainFields {
     /** One field from one boundary. */
     private static double value(Field field, PlateSample s, GeologyParams p, long seed, int x, int z) {
         return switch (field) {
+            // Answered before the blend, from where it stands rather than from a boundary; never asked here.
+            case LANDMARK -> 0.0;
             case CONTINENTS -> continents(s, p);
             case EROSION -> erosion(s, p, seed, x, z);
             // No sharp peaks on a valley floor: the ridge noise that makes them is turned down there.
@@ -589,7 +594,52 @@ public final class TerrainFields {
     private static final double DEM_ARC_SEA = 0.8, DEM_ARC_LAND = 1.8;
 
     /** Metres of real ground a block stands for in the normal world; the tall world is the same ground at ten. */
-    private static final double METRES_PER_BLOCK = 25.0;
+    static final double METRES_PER_BLOCK = 25.0;
+
+    /**
+     * How tall the highest of the three named mountains stands over its own valley floor, in blocks.
+     *
+     * <p>Everest's crop is four and a half kilometres from its floor to its summit, which at ten metres to the
+     * block is four hundred and fifty. Asked for eight hundred, so all three are lifted by the one factor that
+     * gets the tallest of them there -- about one and three quarters. They keep their heights relative to each
+     * other, which is the part worth keeping: K2 comes out a little under Everest and the Matterhorn a good deal
+     * under both, as they are.</p>
+     */
+    private static final double LANDMARK_BLOCKS = 800.0;
+
+    /** Over what share of its crop a named mountain comes down to the ground it stands on. */
+    private static final double LANDMARK_FADE = 0.3;
+
+    /**
+     * The three named mountains: Everest, K2 and the Matterhorn, laid on the ground where {@link LandmarkSites}
+     * put them, at their own shape and at a height the whole of which is the same lift.
+     */
+    private static double landmark(long seed, GeologyParams p, int x, int z) {
+        if (p.horizontal() < 1.5 || !DemLibrary.landmarksReady()) return 0.0;
+        LandmarkSites.Site s = LandmarkSites.near(seed, p, x, z);
+        if (s == null) return 0.0;
+        double mpb = METRES_PER_BLOCK / p.horizontal();
+        double dx = (x - s.x()) * mpb, dz = (z - s.z()) * mpb;
+        double c = Math.cos(s.bearing()), sn = Math.sin(s.bearing());
+        double along = dx * c + dz * sn, across = -dx * sn + dz * c;
+        double m = DemLibrary.landmark(s.which(), along, across);
+        if (m <= 0.0) return 0.0;
+        double env = fade(Math.abs(along) / DemLibrary.landmarkHalfAlong(s.which()))
+                * fade(Math.abs(across) / DemLibrary.landmarkHalfAcross(s.which()));
+        if (env <= 0.0) return 0.0;
+        double lift = LANDMARK_BLOCKS * mpb / DemLibrary.landmarkTallest();
+        return env * m * lift / mpb / 128.0;
+    }
+
+    /** One over the middle of a crop, nothing at its edge: the mountain has to meet the country it stands in. */
+    private static double fade(double t) {
+        return smooth(Mth.clamp((1.0 - t) / LANDMARK_FADE, 0, 1));
+    }
+
+    /** How much of a named mountain a column carries, for the biome to take its name from it. */
+    public static double landmarkShare(long seed, GeologyParams p, int x, int z) {
+        return landmark(seed, p, x, z) * 128.0 / LANDMARK_BLOCKS;
+    }
 
     /**
      * How much of its range a belt raises at a standstill, and how much the rest of the closing adds. The crops are
