@@ -59,7 +59,7 @@ public final class ModBlocks {
     /** The deep, unreachable end of a hot spring. Unbreakable and blast-proof, so a quake cannot take it. */
     /**
      * The water standing in a traced river. Water in every way a player can feel, but it never moves, so a river's
-     * surface may come down a valley a block at a time; see {@link com.jeladastudios.ftsgeology.fluid.RiverWaterType}.
+     * surface may come down a valley a block at a time; see {@link com.jeladastudios.ftsgeology.registry.ModFluids}.
      */
     public static final RegistryObject<Block> RIVER_WATER = BLOCKS.register("river_water",
             () -> new net.minecraft.world.level.block.LiquidBlock(

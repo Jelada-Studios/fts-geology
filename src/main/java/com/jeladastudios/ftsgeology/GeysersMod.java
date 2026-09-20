@@ -32,7 +32,6 @@ public class GeysersMod {
 
         ModBlocks.BLOCKS.register(modBus);
         ModItems.ITEMS.register(modBus);
-        com.jeladastudios.ftsgeology.registry.ModFluids.FLUID_TYPES.register(modBus);
         com.jeladastudios.ftsgeology.registry.ModFluids.FLUIDS.register(modBus);
         ModBlockEntities.BLOCK_ENTITIES.register(modBus);
         com.jeladastudios.ftsgeology.registry.ModSounds.SOUNDS.register(modBus);

@@ -1,7 +1,7 @@
 {
   "variants": {
     "": {
-      "model": "minecraft:block/water"
+      "model": "fts_geology:block/river_water"
     }
   }
 }
