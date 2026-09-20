@@ -43,7 +43,12 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
     /** How much the ground must climb across two blocks for a column to count as a cliff. */
     private static final int STEEP_RISE = 3;
 
-    /** How far past a channel's flat bed the river still owns the ground it runs on. */
+    /**
+     * How far past a channel's flat bed the river still owns the ground it runs on, in fault widths of the
+     * preset. The cut band itself scales with the world, so this has to as well: at three flat blocks the tall
+     * world's band reached six and a quarter and the outer stretch of every channel wall fell through to the
+     * cliff rule and came out as bare rock. That is why the bare stripe along a river was a tall-world thing.
+     */
     private static final double RIVER_BANK = 3.0;
 
     @Override
@@ -103,14 +108,21 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
 
         /**
          * Whether the ground climbs {@link #STEEP_RISE} within two blocks of this column along either axis, either
-         * way. Neighbours past the chunk's edge are read at the edge, as vanilla reads them, so a cliff right on a
-         * border is judged a little gently.
+         * way.
+         *
+         * <p>A neighbour past the chunk's edge cannot be read, so the column there is compared with itself and the
+         * rise comes out over one block instead of two. Left as it was, that made the two columns of every chunk
+         * border judge themselves half as steep as their neighbours: down a long cliff face the soil survived in
+         * stripes sixteen blocks apart, which is most of why the face read as columns. Doubling the one-sided rise
+         * puts them on the same ruler without reaching outside the chunk.</p>
          */
         private boolean steepAt(int i, int lx, int lz) {
             if (steep[i] == 0) {
                 int west = height(lx - 1, lz), east = height(lx + 1, lz);
                 int north = height(lx, lz - 1), south = height(lx, lz + 1);
-                boolean cliff = Math.abs(east - west) >= STEEP_RISE || Math.abs(south - north) >= STEEP_RISE;
+                int spanX = (east - west) * (lx == 0 || lx == 15 ? 2 : 1);
+                int spanZ = (south - north) * (lz == 0 || lz == 15 ? 2 : 1);
+                boolean cliff = Math.abs(spanX) >= STEEP_RISE || Math.abs(spanZ) >= STEEP_RISE;
                 steep[i] = (byte) (cliff ? 2 : 1);
             }
             return steep[i] == 2;
@@ -121,7 +133,7 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
             if (river[i] == 0) {
                 RiverNetwork.At a = RiverNetwork.at(x, z);
                 boolean wet = a.distance() != Double.MAX_VALUE
-                        && a.distance() <= a.halfWidth() + RIVER_BANK;
+                        && a.distance() <= a.halfWidth() + RIVER_BANK * TerrainContext.params().horizontal();
                 river[i] = (byte) (wet ? 2 : 1);
             }
             return river[i] == 2;

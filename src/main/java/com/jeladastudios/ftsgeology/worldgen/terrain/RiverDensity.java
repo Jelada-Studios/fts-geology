@@ -35,6 +35,22 @@ public final class RiverDensity implements DensityFunction {
     /** How far under the terrain a channel floor may ever lie, for the function to declare its range. */
     private static final double FLOOR_LOW = -4.0;
 
+    /**
+     * How far under its own raw ground a channel may cut, in blocks.
+     *
+     * <p>Without it the cut ended in a cliff. {@code floorAt} shaves the hillside down to a couple of blocks over
+     * the water and then stops dead, so the face left standing at the edge of the shave is as tall as whatever
+     * happened to be there -- fifty-eight blocks where it was measured, running the whole length of the river,
+     * and picked out in bare rock because the wall is a cliff by construction. The same subtraction is behind
+     * the jump between two traces at a confluence and the quarter-wide stair down the wall, so one clamp binds
+     * all three to the same number.</p>
+     *
+     * <p>It cannot close a channel: {@code cut} holds the water a block under the lower of the two banks, so at
+     * least one side always stands about a block over the water and is cut to its full depth. The high side is
+     * pinched instead, which is what a river against a hillside looks like.</p>
+     */
+    private static final double MAX_SHAVE = 12.0;
+
     public static final MapCodec<RiverDensity> DATA_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             DensityFunction.HOLDER_HELPER_CODEC.fieldOf("argument").forGetter(f -> f.raw),
             Codec.STRING.fieldOf("mode").forGetter(f -> f.mode.name().toLowerCase(Locale.ROOT))
@@ -60,7 +76,11 @@ public final class RiverDensity implements DensityFunction {
         return switch (mode) {
             case FLOOR -> {
                 double y = RiverNetwork.floorAt(x, z);
-                yield y == Double.MAX_VALUE ? NONE_HIGH : (y - 128.0) / 128.0;
+                if (y == Double.MAX_VALUE) yield NONE_HIGH;
+                // The raw ground is a flat cache the chunk filled when it was built, and the router hands the same
+                // function to both this and the offset's min, so reading it here is an array lookup.
+                double ground = 128.0 + 128.0 * raw.compute(ctx);
+                yield (Math.max(y, ground - MAX_SHAVE) - 128.0) / 128.0;
             }
             case NEAR -> RiverNetwork.near(x, z);
         };
@@ -93,7 +113,8 @@ public final class RiverDensity implements DensityFunction {
 
     @Override
     public double minValue() {
-        return mode == Mode.NEAR ? 0.0 : FLOOR_LOW;
+        // The clamp can answer a shave under the raw ground, so the declared range has to reach there.
+        return mode == Mode.NEAR ? 0.0 : Math.min(FLOOR_LOW, raw.minValue() - MAX_SHAVE / 128.0);
     }
 
     @Override

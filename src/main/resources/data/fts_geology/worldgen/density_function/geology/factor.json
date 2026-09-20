@@ -3,7 +3,7 @@
     "argument" : {
       "argument1" : "fts_geology:geology/factor_raw",
       "argument2" : {
-        "argument1" : 10,
+        "argument1" : 5,
         "argument2" : {
           "input" : {
             "argument1" : 32,
