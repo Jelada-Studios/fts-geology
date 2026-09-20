@@ -44,13 +44,13 @@ public final class RiverWater {
      * and the melons a player found in the middle of a river: vanilla planted them at the vegetation step, quite
      * correctly, on ground we had left dry. Inside the channel the floor is ours to set, so it is shaved instead.
      */
-    private static final int LEVEL_SHAVE = 3;
+    private static final int LEVEL_SHAVE = 4;
 
     /** How deep a spring's bore runs under the bed it rises through, and how much of it may be cut short. */
-    private static final int SPRING_DEEP = 10, SPRING_VARY = 8, SPRING_LEAST = 5;
+    private static final int SPRING_DEEP = 18, SPRING_VARY = 12, SPRING_LEAST = 5;
 
     private static final LongAdder CANDIDATES = new LongAdder(), KEPT = new LongAdder(), BLOCKS = new LongAdder(),
-            DROPPED = new LongAdder(), LEVELLED = new LongAdder(), SPRINGS = new LongAdder();
+            DROPPED = new LongAdder(), LEVELLED = new LongAdder(), SPRINGS = new LongAdder(), WET = new LongAdder();
     private static final AtomicLong CHUNKS = new AtomicLong();
 
     public static int generate(WorldGenLevel level, ChunkPos cp) {
@@ -91,13 +91,19 @@ public final class RiverWater {
                     DROPPED.increment();
                     continue;
                 }
+                int here = 0;
                 for (int y = g + 1; y <= w; y++) {
                     BlockState was = level.getBlockState(at.set(x, y, z));
                     if (!was.isAir() && was.getFluidState().isEmpty() && !TerrainProbe.isVegetation(was)) break;
                     level.setBlock(at, water, FLAGS);
                     placed++;
+                    here++;
                 }
                 KEPT.increment();
+                // Counted apart: a column can be kept, have its bed swapped for gravel, and still take no water
+                // because the first block over its floor turned out to be solid. That is a dry gravel stripe
+                // beside the river, and the old single counter called it filled.
+                if (here > 0) WET.increment();
                 // A river bed is gravel in the mountains and sand lower down, not the meadow the surface rules laid.
                 BlockState bed = level.getBlockState(at.set(x, g, z));
                 if (bed.is(BlockTags.DIRT)) {
@@ -108,10 +114,11 @@ public final class RiverWater {
         }
         BLOCKS.add(placed);
         if (CHUNKS.incrementAndGet() % 100 == 0) {
-            GeysersMod.LOGGER.info("River water over {} chunks: {} columns in a channel, {} filled, {} levelled, "
-                            + "{} let go, {} springs, {} blocks, {} traces cut",
-                    CHUNKS.get(), CANDIDATES.sum(), KEPT.sum(), LEVELLED.sum(), DROPPED.sum(), SPRINGS.sum(),
-                    BLOCKS.sum(), RiverNetwork.tracesCut());
+            GeysersMod.LOGGER.info("River water over {} chunks: {} columns in a channel, {} kept, {} of them wet, "
+                            + "{} levelled, {} let go, {} springs, {} blocks, {} traces cut, {} joined, {} looped",
+                    CHUNKS.get(), CANDIDATES.sum(), KEPT.sum(), WET.sum(), LEVELLED.sum(), DROPPED.sum(),
+                    SPRINGS.sum(), BLOCKS.sum(), RiverNetwork.tracesCut(), RiverNetwork.joined(),
+                    RiverNetwork.looped());
         }
         return placed;
     }
@@ -124,11 +131,14 @@ public final class RiverWater {
      */
     private static int level(WorldGenLevel level, BlockPos.MutableBlockPos at, int x, int z, int g, int w,
                              RiverNetwork.At a) {
-        if (!a.inChannel() || g - w > LEVEL_SHAVE) return Integer.MIN_VALUE;
-        int bedY = Math.min(w - 1, (int) Math.floor(a.bed()));
-        if (bedY < level.getMinBuildHeight() + 1 || g - bedY > LEVEL_SHAVE + (int) Math.ceil(a.water() - a.bed())) {
-            return Integer.MIN_VALUE;
-        }
+        // The bank ring counts too. The water is laid out to where the channel's own wall reaches the surface,
+        // about a block past the flat bed, but the shave used to stop at the bed -- so every column in that ring
+        // whose floor the noise left high was dropped, and the river got a ragged stair down both its sides.
+        // That ring is a quarter of the channel, and it is exactly where the factor boost that pins the noise
+        // has decayed to nothing.
+        if (g - w > LEVEL_SHAVE) return Integer.MIN_VALUE;
+        int bedY = Math.min(w - 1, (int) Math.floor(a.floor()));
+        if (bedY < level.getMinBuildHeight() + 1) return Integer.MIN_VALUE;
         // The floor of the channel has to be there to stand on, and everything over it has to be ours to take.
         if (!level.getBlockState(at.set(x, bedY, z)).isSolidRender(level, at)) return Integer.MIN_VALUE;
         for (int y = bedY + 1; y <= g; y++) {

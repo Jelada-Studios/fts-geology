@@ -86,8 +86,8 @@ public final class RiverNetwork {
      * grows would hold on to every river the generator has ever passed. A line is a pure function of the seed and
      * its cell, so an entry that falls out is worked out again to the block.
      */
-    private static final ColumnCache<double[][]> RAWS = new ColumnCache<>(12);
-    private static final ColumnCache<LongOpenHashSet> SPREAD = new ColumnCache<>(11);
+    private static final ColumnCache<double[][]> RAWS = new ColumnCache<>(14);
+    private static final ColumnCache<LongOpenHashSet> SPREAD = new ColumnCache<>(13);
     /** Blocks an index square covers. */
     private static final int BLOCK = 512;
 
@@ -366,7 +366,7 @@ public final class RiverNetwork {
         double[] level = new double[pts.length];
         int last = -1;
         for (int i = 0; i < pts.length; i++) {
-            double want = pts[i][2] - 1.0;
+            double want = Math.min(pts[i][2] - 1.0, rim(g, pts, i, h) - 1.0);
             double lv = i == 0 ? want : Math.min(level[i - 1], want);
             if (i > 0 && want > lv + cut) break;
             level[i] = lv;
@@ -393,7 +393,7 @@ public final class RiverNetwork {
      */
     private static final double MERGE_DIST = 12.0;
     /** How far out, in source cells, a river looks for the one it might be a tributary of. */
-    private static final int MERGE_CELLS = 3;
+    private static final int MERGE_CELLS = 8;
     /** How far apart along its own line a river has to be before it may be said to have met itself. */
     private static final int LOOP_GAP = 8;
 
@@ -415,13 +415,16 @@ public final class RiverNetwork {
         int at = -1;
         double[] onto = null;
 
-        // Itself first: a ring is a line that came back to ground it had already covered.
+        // Itself first: a ring is a line that came back to ground it had already covered. The river ends where it
+        // came back -- at the point it returned TO, not the one it returned WITH. Cutting at the returning end
+        // left the whole ring in the line, and since the two arms are nearer than a grown channel is wide they
+        // then ran into one another and closed it: a river round an island.
         outer:
         for (int i = LOOP_GAP; i < source.length; i++) {
             for (int k = 0; k <= i - LOOP_GAP; k++) {
                 double dx = source[k][0] - source[i][0], dz = source[k][1] - source[i][1];
                 if (dx * dx + dz * dz <= cell * cell) {
-                    at = i;
+                    at = k;
                     break outer;
                 }
             }
@@ -600,6 +603,28 @@ public final class RiverNetwork {
         meander(g, pts, seed, gx, gz, h);
         for (double[] p : pts) p[2] = height(g, p[0], p[1]);
         return pts;
+    }
+
+    /**
+     * The lower of the two banks beside a traced point, in blocks of ground.
+     *
+     * <p>The offset takes the lower of the land and the channel, so a channel only ever cuts and never fills. On a
+     * hillside that means the downhill side of a river is whatever the hill happened to be -- and where the hill
+     * is under the water the river is left standing in the air with nothing holding it in. The water may stand no
+     * higher than the lower of its two banks, and this is where that is read. It is read from the same analytic
+     * ground the trace is cut from, so it costs a cached lookup and stays a pure function of the seed: a block
+     * read would have had to cross a chunk line, and then the answer would depend on which chunk came first.</p>
+     */
+    private static double rim(Ground g, double[][] pts, int i, double h) {
+        double half = (HALF_NEW + (HALF_GROWN - HALF_NEW) * Math.min(1.0, i * STEP / WIDTH_AT)) * h;
+        double out = half + BANK_RISE * h;
+        int a = Math.max(i - 1, 0), b = Math.min(i + 1, pts.length - 1);
+        double ax = pts[b][0] - pts[a][0], az = pts[b][1] - pts[a][1];
+        double len = Math.sqrt(ax * ax + az * az);
+        if (len < 1e-6) return Double.MAX_VALUE;
+        double nx = -az / len * out, nz = ax / len * out;
+        return Math.min(height(g, pts[i][0] + nx, pts[i][1] + nz),
+                height(g, pts[i][0] - nx, pts[i][1] - nz));
     }
 
     /** How many cells the search round a hollow may look at before the river is given up on. */
