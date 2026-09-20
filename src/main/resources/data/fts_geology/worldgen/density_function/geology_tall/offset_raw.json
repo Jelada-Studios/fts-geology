@@ -1,1 +1,66 @@
-{"type":"minecraft:flat_cache","argument":{"type":"minecraft:cache_2d","argument":{"type":"minecraft:add","argument1":{"type":"minecraft:add","argument1":"fts_geology:geology_tall/offset_core","argument2":{"type":"minecraft:mul","argument1":{"type":"minecraft:mul","argument1":0.5,"argument2":{"type":"minecraft:add","argument1":"fts_geology:geology_tall/offset_core","argument2":{"type":"minecraft:abs","argument":"fts_geology:geology_tall/offset_core"}}},"argument2":{"type":"minecraft:mul","argument1":2.0,"argument2":{"type":"minecraft:mul","argument1":{"type":"minecraft:flat_cache","argument":{"type":"fts_geology:plate","field":"belt"}},"argument2":{"type":"minecraft:add","argument1":1.0,"argument2":{"type":"minecraft:mul","argument1":-1.0,"argument2":{"type":"minecraft:flat_cache","argument":{"type":"fts_geology:plate","field":"grip"}}}}}}}},"argument2":{"type":"minecraft:flat_cache","argument":{"type":"fts_geology:plate","field":"dem"}}}}}
+{
+  "type": "minecraft:flat_cache",
+  "argument": {
+    "type": "minecraft:cache_2d",
+    "argument": {
+      "type": "minecraft:add",
+      "argument1": {
+        "type": "minecraft:add",
+        "argument1": "fts_geology:geology_tall/offset_core",
+        "argument2": {
+          "type": "minecraft:mul",
+          "argument1": {
+            "type": "minecraft:mul",
+            "argument1": "fts_geology:geology_tall/offset_core",
+            "argument2": {
+              "type": "minecraft:clamp",
+              "min": 0.0,
+              "max": 1.0,
+              "input": {
+                "type": "minecraft:mul",
+                "argument1": 2.0,
+                "argument2": "fts_geology:geology_tall/offset_core"
+              }
+            }
+          },
+          "argument2": {
+            "type": "minecraft:mul",
+            "argument1": 2.0,
+            "argument2": {
+              "type": "minecraft:mul",
+              "argument1": {
+                "type": "minecraft:flat_cache",
+                "argument": {
+                  "type": "fts_geology:plate",
+                  "field": "range"
+                }
+              },
+              "argument2": {
+                "type": "minecraft:add",
+                "argument1": 1.0,
+                "argument2": {
+                  "type": "minecraft:mul",
+                  "argument1": -1.0,
+                  "argument2": {
+                    "type": "minecraft:flat_cache",
+                    "argument": {
+                      "type": "fts_geology:plate",
+                      "field": "grip"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "argument2": {
+        "type": "minecraft:flat_cache",
+        "argument": {
+          "type": "fts_geology:plate",
+          "field": "dem"
+        }
+      }
+    }
+  }
+}

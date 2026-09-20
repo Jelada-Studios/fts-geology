@@ -20,12 +20,30 @@
                 "argument1": 1.0,
                 "argument2": {
                   "type": "minecraft:mul",
-                  "argument1": 2.0,
+                  "argument1": 0.5,
                   "argument2": {
-                    "type": "minecraft:flat_cache",
-                    "argument": {
-                      "type": "fts_geology:plate",
-                      "field": "belt"
+                    "type": "minecraft:mul",
+                    "argument1": {
+                      "type": "minecraft:flat_cache",
+                      "argument": {
+                        "type": "fts_geology:plate",
+                        "field": "range"
+                      }
+                    },
+                    "argument2": {
+                      "type": "minecraft:add",
+                      "argument1": 1.0,
+                      "argument2": {
+                        "type": "minecraft:mul",
+                        "argument1": -1.0,
+                        "argument2": {
+                          "type": "minecraft:flat_cache",
+                          "argument": {
+                            "type": "fts_geology:plate",
+                            "field": "grip"
+                          }
+                        }
+                      }
                     }
                   }
                 }

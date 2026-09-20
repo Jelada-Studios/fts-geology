@@ -95,7 +95,11 @@ public final class GeologyRoles {
         double erosion = TerrainFields.field(Field.EROSION, seed, p, x, z);
         // A plume's basin: wide, flat, and hot underneath, whatever the boundary nearest it happens to be doing.
         if (HotspotMap.plumeStrength(seed, x, z, p) >= BASIN_PLUME && erosion > FLAT) return Role.GEOTHERMAL_BASIN;
-        if (k == FaultType.DIVERGENT && a < GRABEN_TO + j) return Role.RIFT_VALLEY;
+        // The rift's own ruler, so the biome narrows with the landform it names. See TerrainFields.riftAcross.
+        if (k == FaultType.DIVERGENT
+                && (p.horizontal() > 1.5 ? a : a / 0.75) < GRABEN_TO + j) {
+            return Role.RIFT_VALLEY;
+        }
         if (s.overridingSide() && a >= ARC_FROM + j && a <= ARC_TO + j) return Role.VOLCANIC_HIGHLAND;
         if (k == FaultType.CONVERGENT_COLLISION && (TerrainFields.belt(s, p) > BELT_CORE + j
                 || TerrainFields.field(Field.RELIEF, seed, p, x, z)

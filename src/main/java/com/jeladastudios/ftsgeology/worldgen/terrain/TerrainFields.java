@@ -36,7 +36,7 @@ public final class TerrainFields {
 
     private TerrainFields() {}
 
-    public enum Field { CONTINENTS, EROSION, RIDGES, RELIEF, VARIETY, BELT, VALLEY, CREST, MEANDER_X, MEANDER_Z, DEM, GRIP, SPLINE, GRABEN }
+    public enum Field { CONTINENTS, EROSION, RIDGES, RELIEF, VARIETY, BELT, RANGE, VALLEY, CREST, MEANDER_X, MEANDER_Z, DEM, GRIP, SPLINE, GRABEN }
 
     /** How far the coordinates are pushed about, in blocks, and the size of the pushing. */
     private static final double WARP_AMPLITUDE = 250.0;
@@ -82,6 +82,22 @@ public final class TerrainFields {
     private static final double SHOULDER_AT = 0.7, SHOULDER_HALF = 0.4;
     /** Where a rift's floor starts to take the ruggedness of its shoulders, and over how far. */
     private static final double RIFT_CALM_FROM = 0.1, RIFT_CALM_OVER = 0.6;
+
+    /** How much narrower a rift is in the normal world. The tall one keeps its full width. */
+    private static final double RIFT_NARROW = 0.75;
+
+    /**
+     * A column's distance from a rift's axis, in fault widths, measured on a shorter ruler in the normal world.
+     *
+     * <p>Nine numbers set a rift's shape -- the graben floor, the two fault steps, the shoulder and its width, the
+     * two ends of the quiet ramp, the fade of the graben field and the biome's own half width -- and narrowing it
+     * by hand means changing all nine together. Dividing the distance instead does the same arithmetic in one
+     * place and cannot drift out of step.</p>
+     */
+    private static double riftAcross(PlateSample s, GeologyParams p) {
+        double a = across(s, p);
+        return p.horizontal() > 1.5 ? a : a / RIFT_NARROW;
+    }
     /** How far out the continental shelf runs before the floor falls away to the abyss. */
     private static final double SHELF_TO = 0.15, SLOPE_OVER = 1.5;
     /** How far a spreading ridge's rise reaches either side of its axis, and its axial valley. */
@@ -239,6 +255,7 @@ public final class TerrainFields {
             // how deep in one of the belt's valleys the column lies, for the offset to cut that spline further. A
             // rift keeps vanilla's full spline: halving it there lifted the rift floors out of their lakes.
             case BELT -> mountainBelt(s, p);
+            case RANGE -> rangeBelt(s, p);
             case VALLEY -> valley(seed, p, x, z) * mountainBelt(s, p);
             // 1 on a ridge, 0 in the pass between: for the offset to bend vanilla's mountain spline into the same
             // ridges and V-shaped valleys the mod's own relief follows, or the two cut across each other and the
@@ -252,7 +269,7 @@ public final class TerrainFields {
             // The floor of a rift, where the ground lies under the sea's level and the aquifer fills it: vanilla's
             // cave pillars stood there as rock columns in open water, water over them and under them.
             case GRABEN -> s.boundaryType() == FaultType.DIVERGENT && !s.plateKind().isOceanic()
-                    ? smooth(Mth.clamp((GRABEN_STEP + STEP_WIDTH - across(s, p)) / 0.15, 0, 1)) : 0.0;
+                    ? smooth(Mth.clamp((GRABEN_STEP + STEP_WIDTH - riftAcross(s, p)) / 0.15, 0, 1)) : 0.0;
             case VARIETY -> variety(s, p);
             case MEANDER_X, MEANDER_Z -> 0.0;
         };
@@ -342,7 +359,10 @@ public final class TerrainFields {
                     ? u * (ARC_RISE * peak(a, ARC_AT, ARC_SEA_HALF, ARC_LAND_HALF)
                             * (1.0 - ARC_CREST * (1.0 - crestShape(seed, p, x, z))) + 0.3 * bump(t) * calm(s, p)) * cut
                     : -0.25 * peak(a, TRENCH_AT, TRENCH_HALF);
-            case DIVERGENT -> graben(a) + SHOULDER_RISE * peak(a, SHOULDER_AT, SHOULDER_HALF);
+            case DIVERGENT -> {
+                double r = riftAcross(s, p);
+                yield graben(r) + SHOULDER_RISE * peak(r, SHOULDER_AT, SHOULDER_HALF);
+            }
             case TRANSFORM, INTERIOR -> 0.0;
         };
     }
@@ -402,6 +422,24 @@ public final class TerrainFields {
         return k == FaultType.DIVERGENT || k == FaultType.INTERIOR ? 0.0 : belt(s, p);
     }
 
+    /** Where a subduction margin's own mountains stand: the arc and its front, not the country behind it. */
+    private static final double RANGE_ARC_TO = 0.75;
+
+    /**
+     * The belt of a range that is really there, as against {@link #mountainBelt}, which also answers along a
+     * transform fault and out behind a subduction arc. The tall world multiplies its ground by this, so it has to
+     * mean "a range stands here": on the broader belt it was raising vanilla's badlands two and a half times as
+     * well, and that is how a mesa came to stand at y 500 with its top stripped to bare rock.
+     */
+    private static double rangeBelt(PlateSample s, GeologyParams p) {
+        FaultType k = s.boundaryType();
+        if (k == FaultType.CONVERGENT_COLLISION) return belt(s, p);
+        if (k == FaultType.CONVERGENT_SUBDUCTION && s.overridingSide() && across(s, p) <= RANGE_ARC_TO) {
+            return belt(s, p);
+        }
+        return 0.0;
+    }
+
     /**
      * How deep into a belt's floodplain a column lies, 0 to 1: the flat country beyond the mountains that their rivers
      * spread their sediment over. The broad one lies on the side pushed down and so kept low: under the thrust in a
@@ -455,7 +493,9 @@ public final class TerrainFields {
         }
         // Vanilla turns erosion into height steeply, so the rift's flat floor hands over to its rugged shoulders slowly:
         // over a third of a fault width the change stood as a fifty-block step.
-        if (k == FaultType.DIVERGENT) return smooth(Mth.clamp((a - RIFT_CALM_FROM) / RIFT_CALM_OVER, 0, 1));
+        if (k == FaultType.DIVERGENT) {
+            return smooth(Mth.clamp((riftAcross(s, p) - RIFT_CALM_FROM) / RIFT_CALM_OVER, 0, 1));
+        }
         return 1.0;
     }
 
