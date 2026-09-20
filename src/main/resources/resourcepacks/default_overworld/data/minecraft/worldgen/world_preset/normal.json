@@ -11,6 +11,7 @@
             "preset": "minecraft:overworld"
           },
           "biomes": {
+            "river": "minecraft:river",
             "geothermal_basin": "fts_geology:geothermal_basin",
             "rift_valley": "fts_geology:rift_valley",
             "volcanic_highland": "fts_geology:volcanic_highland",

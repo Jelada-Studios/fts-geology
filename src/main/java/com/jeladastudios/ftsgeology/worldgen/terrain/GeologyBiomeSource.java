@@ -33,6 +33,8 @@ public class GeologyBiomeSource extends BiomeSource {
     private final BiomeSource parent;
     private final Map<String, Holder<Biome>> byRole;
     private final Holder<Biome>[] roles;
+    /** The biome a river runs in, under the map key {@code river}. Null in a preset that does not name one. */
+    private final Holder<Biome> river;
 
     @SuppressWarnings("unchecked")
     public GeologyBiomeSource(BiomeSource parent, Map<String, Holder<Biome>> byRole) {
@@ -40,6 +42,7 @@ public class GeologyBiomeSource extends BiomeSource {
         this.byRole = byRole;
         this.roles = new Holder[Role.values().length];
         for (Role r : Role.values()) roles[r.ordinal()] = byRole.get(r.key);
+        this.river = byRole.get("river");
     }
 
     @Override
@@ -52,10 +55,27 @@ public class GeologyBiomeSource extends BiomeSource {
         return Stream.concat(parent.possibleBiomes().stream(), byRole.values().stream()).distinct();
     }
 
+    /** How much of a channel has to reach a column before the river biome follows it there. */
+    private static final double ON_CHANNEL = 0.5;
+    /** How far out, in quarts, a stranded river biome looks for the land it should have been. */
+    private static final int[][] ASHORE = {{12, 0}, {-12, 0}, {0, 12}, {0, -12}, {24, 0}, {0, 24}};
+
     @Override
     public Holder<Biome> getNoiseBiome(int qx, int qy, int qz, Climate.Sampler sampler) {
         Holder<Biome> base = parent.getNoiseBiome(qx, qy, qz, sampler);
-        Role role = GeologyRoles.roleAt(QuartPos.toBlock(qx), QuartPos.toBlock(qz));
+        int bx = QuartPos.toBlock(qx), bz = QuartPos.toBlock(qz);
+        boolean sea = TfcCompat.ocean(base);
+        // The rivers are the mod's own now. Vanilla puts its river biome on the zero line of a noise field, and a
+        // noise field's zero line is a closed curve -- which is how a river came to run in a ring round an island
+        // and how two of them came to run side by side. So the biome follows the channel that was actually traced
+        // down the ground: over one, it is a river wherever it is; away from one, whatever the land beside it is.
+        if (!sea && !underground(base)) {
+            boolean onChannel = river != null
+                    && com.jeladastudios.ftsgeology.hydrology.RiverNetwork.near(bx, bz) >= ON_CHANNEL;
+            if (onChannel && !TfcCompat.beach(base)) return river;
+            if (TfcCompat.river(base)) return ashore(qx, qy, qz, sampler, base);
+        }
+        Role role = GeologyRoles.roleAt(bx, bz);
         Holder<Biome> ours = roles[role.ordinal()];
         if (ours == null) return base;
         // Every one of ours is a biome of the surface. The same column underground is a cave biome, and putting
@@ -64,11 +84,26 @@ public class GeologyBiomeSource extends BiomeSource {
         // The plates decide the rock, never the weather. The bare ones can stand in any climate, but a warm
         // green valley laid over the tundra would only look wrong, so up there the snow keeps its own biome.
         if (WARM.contains(role) && frozen(base)) return base;
-        boolean sea = TfcCompat.ocean(base);
         if (role == Role.OCEANIC_RIDGE) return sea ? ours : base;
-        // The water is the parent's to place: a river, a beach or the sea keeps whatever it was.
-        if (sea || TfcCompat.river(base) || TfcCompat.beach(base)) return base;
+        // The coast is still the parent's to place; only the rivers were taken over, above.
+        if (sea || TfcCompat.beach(base)) return base;
         return ours;
+    }
+
+    /**
+     * What a column would have been if vanilla had not called it a river. The river line is a contour, so a step
+     * to either side of it leaves it; the first neighbour that is not water is the land this column belongs to.
+     * Falls back to the river itself, which is no worse than before.
+     */
+    private Holder<Biome> ashore(int qx, int qy, int qz, Climate.Sampler sampler, Holder<Biome> base) {
+        for (int[] o : ASHORE) {
+            Holder<Biome> near = parent.getNoiseBiome(qx + o[0], qy, qz + o[1], sampler);
+            if (!TfcCompat.river(near) && !TfcCompat.ocean(near) && !TfcCompat.beach(near)
+                    && !underground(near)) {
+                return near;
+            }
+        }
+        return base;
     }
 
     /** The ones of ours that are green and warm, and so out of place under snow. */
