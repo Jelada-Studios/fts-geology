@@ -119,6 +119,19 @@ public final class Lithology {
     }
 
     /**
+     * What a setting gives way to at its edge.
+     *
+     * <p>Everything on land fell back to the platform cover, and three fifths of that cover's bands are sandstone.
+     * A fold belt's weight is one only in its core, so the whole outer half of every range was interfingered with
+     * platform cover: sandstone in the middle of a mountain, which is not where sandstone is. What a range gives
+     * way to is its own apron -- the shale, chert and marble of a foreland basin, with sandstone only in the bands
+     * that belong there -- and a molasse basin against a range is exactly that.</p>
+     */
+    private static Setting give(Setting setting, Setting fallback) {
+        return setting == Setting.FOLD_BELT ? Setting.FORELAND : fallback;
+    }
+
+    /**
      * The rock at one block of a column whose ground stands at {@code surface}. Only called for blocks the generator
      * left as plain stone, so soil, water and air are never asked about.
      */
@@ -132,9 +145,10 @@ public final class Lithology {
         if (c.weight() < 1.0) {
             // Where one setting gives way to the next, their rocks interfinger in blobs rather than meet at a line.
             double pick = 0.5 + 0.5 * ValueNoise.noise3D(x + shiftX(seed) + 4096, y, z + shiftZ(seed), POD_SCALE, POD_SCALE);
-            if (pick >= c.weight()) setting = c.fallback();
+            if (pick >= c.weight()) setting = give(setting, c.fallback());
         }
-        long salt = SeedHash.mix(seed ^ 0x117E5L);
+        long salt = SeedHash.mix(setting == Setting.FORELAND && c.setting() == Setting.FOLD_BELT
+                ? seed ^ 0x117E6L : seed ^ 0x117E5L);
         return switch (setting) {
             case PLATFORM -> depth < c.cover() ? bed(salt, y + c.bedShift(), PLATFORM_BEDS, PLATFORM_BANDS)
                     : basement(seed, c, x, y, z, depth - c.cover());

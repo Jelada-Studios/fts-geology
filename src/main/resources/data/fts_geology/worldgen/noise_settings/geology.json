@@ -678,7 +678,7 @@
                               },
                               {
                                  "result_state" : {
-                                    "Name" : "minecraft:coarse_dirt"
+                                    "Name" : "minecraft:gravel"
                                  },
                                  "type" : "minecraft:block"
                               }

@@ -418,10 +418,12 @@ public final class HotSpringSites {
     static Block altered(Block band, net.minecraft.util.RandomSource rng) {
         if (band == ModBlocks.SINTER.get()) return rng.nextBoolean() ? Blocks.CALCITE : Blocks.WHITE_TERRACOTTA;
         if (band == ModBlocks.MICROBIAL_MAT_GREEN.get() || band == ModBlocks.MICROBIAL_MAT_YELLOW.get()) {
-            return rng.nextInt(3) == 0 ? Blocks.YELLOW_TERRACOTTA : Blocks.COARSE_DIRT;
+            int r = rng.nextInt(3);
+            return r == 0 ? Blocks.COARSE_DIRT : r == 1 ? Blocks.YELLOW_TERRACOTTA : ModBlocks.SINTER_CRUST.get();
         }
         if (band == ModBlocks.MICROBIAL_MAT_ORANGE.get() || band == ModBlocks.MICROBIAL_MAT_BROWN.get()) {
-            return rng.nextBoolean() ? Blocks.COARSE_DIRT : Blocks.GRAVEL;
+            int r = rng.nextInt(4);
+            return r == 0 ? Blocks.COARSE_DIRT : r < 3 ? Blocks.GRAVEL : ModBlocks.SINTER_CRUST.get();
         }
         return band;
     }
@@ -446,9 +448,9 @@ public final class HotSpringSites {
     /** Halo crust: pale, dry, broken ground made of existing blocks. */
     static Block haloBlock(net.minecraft.util.RandomSource rng) {
         int r = rng.nextInt(10);
-        if (r < 4) return Blocks.COARSE_DIRT;
-        if (r < 7) return Blocks.GRAVEL;
-        if (r < 9) return ModBlocks.SINTER.get();
+        if (r < 2) return Blocks.COARSE_DIRT;
+        if (r < 5) return Blocks.GRAVEL;
+        if (r < 8) return ModBlocks.SINTER.get();
         return Blocks.TUFF;
     }
 

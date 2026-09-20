@@ -184,8 +184,8 @@ public final class SoilProfile {
                     : r < 9 ? Blocks.BROWN_TERRACOTTA
                     : Blocks.COARSE_DIRT;
             // Pale and thin, with the parent carbonate showing through where it is thinnest.
-            case RENDZINA -> r < 5 ? Blocks.COARSE_DIRT
-                    : r < 8 ? Blocks.CALCITE
+            case RENDZINA -> r < 3 ? Blocks.COARSE_DIRT
+                    : r < 7 ? Blocks.CALCITE
                     : Blocks.WHITE_TERRACOTTA;
             // Leached: the grey-brown horizon of a podzol, over stony ground.
             case PODZOL -> r < 6 ? Blocks.PODZOL
