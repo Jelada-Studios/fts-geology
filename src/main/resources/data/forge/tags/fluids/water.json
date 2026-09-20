@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:river_water",
+    "fts_geology:flowing_river_water"
+  ]
+}

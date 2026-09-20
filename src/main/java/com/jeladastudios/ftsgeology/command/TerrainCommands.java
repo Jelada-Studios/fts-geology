@@ -416,9 +416,8 @@ public final class TerrainCommands {
                     at.getX(), at.getZ(), com.jeladastudios.ftsgeology.hydrology.RiverNetwork.tracesCut());
         } else {
             line = String.format(Locale.ROOT,
-                    "channel %.1f blocks away, half width %.1f, floor %.0f, water %.0f%s%s; ground here %d (%d traces cut)",
-                    a.distance(), a.halfWidth(), a.bed(), a.water(), a.dry() ? " (dry)" : "",
-                    a.ribTop() == Double.MIN_VALUE ? "" : String.format(Locale.ROOT, ", rock bar to %.0f", a.ribTop()),
+                    "channel %.1f blocks away, half width %.1f, floor %.1f, water %.1f; ground here %d (%d traces cut)",
+                    a.distance(), a.halfWidth(), a.bed(), a.water(),
                     level.getChunkSource().getGenerator().getBaseHeight(at.getX(), at.getZ(),
                             net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG,
                             level, level.getChunkSource().randomState()),

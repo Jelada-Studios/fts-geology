@@ -11,20 +11,21 @@ import java.util.Locale;
 
 /**
  * The rivers, as the offset sees them. The function is given the raw ground — the offset with no river cut into it —
- * and hands it to {@link RiverNetwork}, which traces the rivers down it. Three things come back:
+ * and hands it to {@link RiverNetwork}, which traces the rivers down it. Two things come back:
  *
  * <ul>
  *   <li>{@code floor}: the channel's floor, for the offset to take the lower of;</li>
- *   <li>{@code rib}: the top of the rock bar between two pools, for the offset to take the higher of;</li>
  *   <li>{@code near}: 1 over a channel and its banks, for the caves to keep away from it.</li>
  * </ul>
  */
 public final class RiverDensity implements DensityFunction {
 
-    public enum Mode { FLOOR, RIB, NEAR }
+    public enum Mode { FLOOR, NEAR }
 
-    /** Offset units for "no river here": beyond anything the terrain reaches, either way. */
-    private static final double NONE_HIGH = 4.0, NONE_LOW = -4.0;
+    /** Offset units for "no river here": beyond anything the terrain reaches. */
+    private static final double NONE_HIGH = 4.0;
+    /** How far under the terrain a channel floor may ever lie, for the function to declare its range. */
+    private static final double FLOOR_LOW = -4.0;
 
     public static final MapCodec<RiverDensity> DATA_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             DensityFunction.HOLDER_HELPER_CODEC.fieldOf("argument").forGetter(f -> f.raw),
@@ -46,16 +47,12 @@ public final class RiverDensity implements DensityFunction {
 
     @Override
     public double compute(FunctionContext ctx) {
-        if (!RiverNetwork.ready()) return mode == Mode.FLOOR ? NONE_HIGH : mode == Mode.RIB ? NONE_LOW : 0.0;
+        if (!RiverNetwork.ready()) return mode == Mode.FLOOR ? NONE_HIGH : 0.0;
         int x = ctx.blockX(), z = ctx.blockZ();
         return switch (mode) {
             case FLOOR -> {
                 double y = RiverNetwork.floorAt(x, z);
                 yield y == Double.MAX_VALUE ? NONE_HIGH : (y - 128.0) / 128.0;
-            }
-            case RIB -> {
-                double y = RiverNetwork.ribAt(x, z);
-                yield y == Double.MIN_VALUE ? NONE_LOW : (y - 128.0) / 128.0;
             }
             case NEAR -> RiverNetwork.near(x, z);
         };
@@ -81,7 +78,7 @@ public final class RiverDensity implements DensityFunction {
 
     @Override
     public double minValue() {
-        return mode == Mode.NEAR ? 0.0 : NONE_LOW;
+        return mode == Mode.NEAR ? 0.0 : FLOOR_LOW;
     }
 
     @Override

@@ -288,7 +288,7 @@ final class SiteCheck {
             for (int dz = -radius; dz <= radius; dz += 24) {
                 if (dx * dx + dz * dz > radius * radius) continue;
                 var at = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.at(x + dx, z + dz);
-                if (!at.dry() && at.distance() <= at.halfWidth() + 8) hits++;
+                if (at.distance() <= at.halfWidth() + 8) hits++;
             }
         }
         return hits;
