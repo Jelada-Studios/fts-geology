@@ -22,6 +22,25 @@ public final class ClientSetup {
 
     private ClientSetup() {}
 
+    /**
+     * The river's water is drawn like water. Without this the fluid falls back on the solid render type and a river
+     * comes out as a blue wall: opaque, unlit underneath and with nothing visible through it.
+     */
+    @SubscribeEvent
+    public static void clientSetup(net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent event) {
+        event.enqueueWork(() -> {
+            net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
+                    com.jeladastudios.ftsgeology.registry.ModFluids.RIVER_WATER.get(),
+                    net.minecraft.client.renderer.RenderType.translucent());
+            net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
+                    com.jeladastudios.ftsgeology.registry.ModFluids.FLOWING_RIVER_WATER.get(),
+                    net.minecraft.client.renderer.RenderType.translucent());
+            net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
+                    com.jeladastudios.ftsgeology.registry.ModBlocks.RIVER_WATER.get(),
+                    net.minecraft.client.renderer.RenderType.translucent());
+        });
+    }
+
     @SubscribeEvent
     public static void registerParticles(RegisterParticleProvidersEvent event) {
         event.registerSpriteSet(ModParticles.GEYSER_MIST.get(), GeothermalParticles.MistProvider::new);
