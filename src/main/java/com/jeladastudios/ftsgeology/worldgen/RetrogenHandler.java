@@ -290,10 +290,11 @@ public final class RetrogenHandler {
                 // it has to stay inside retrogen's slice now that a chunk can stop part way through.
                 GeysersMod.LOGGER.info("retrogen: {} chunks in the last 10s, {} blocks placed, {} still queued, "
                                 + "longest step {} ms; {} chunks got their deep geology at generation ({} blocks, {} of them ore), "
-                                + "{} their ground paint",
+                                + "{} their ground paint; {} groundwater noise columns so far",
                         doneSinceReport, blocksSinceReport, QUEUE.size(), ms(longestStepNanos), generated,
                         GENERATED_BLOCKS.getAndSet(0) + GENERATED_ORE.get(), GENERATED_ORE.getAndSet(0),
-                        PAINTED.getAndSet(0));
+                        PAINTED.getAndSet(0),
+                        com.jeladastudios.ftsgeology.hydrology.WaterTable.noiseColumns());
             }
             if (surfaceNanos > 0) {
                 long[] p = SurfaceFeatures.PART_NANOS;

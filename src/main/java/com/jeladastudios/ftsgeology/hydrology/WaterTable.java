@@ -1,6 +1,7 @@
 package com.jeladastudios.ftsgeology.hydrology;
 
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
+import com.jeladastudios.ftsgeology.util.ColumnCache;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
 import net.minecraft.server.level.ServerChunkCache;
@@ -10,9 +11,6 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.levelgen.Heightmap;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Where the groundwater is.
@@ -96,7 +94,7 @@ public final class WaterTable {
                     {d, 0}, {-d, 0}, {0, d}, {0, -d},
                     {diag, diag}, {diag, -diag}, {-diag, diag}, {-diag, -diag}};
             for (int[] o : ring) {
-                int h = surfaceAt(chunkSource, level, blockX + o[0], blockZ + o[1]);
+                int h = regionalAt(chunkSource, level, blockX + o[0], blockZ + o[1]);
                 sum += h;
                 base = Math.min(base, h);
             }
@@ -126,16 +124,22 @@ public final class WaterTable {
     }
 
     /**
-     * Cached {@link #sample}, rounded to four blocks. A sample costs nine generator height lookups,
-     * so anything that walks a chunk calls this one.
+     * Cached {@link #sample}, on a {@link #SAMPLE_GRID} grid. A sample costs a stack of generator height
+     * lookups and each of those runs a whole noise column, so anything that walks a chunk calls this one.
+     *
+     * <p>Measured on the two worlds of the twenty-second round: this call was three quarters of everything
+     * the mod spent on the server thread, and near enough all of it was misses. The grid was four blocks and
+     * the ring reaches ninety-six, so no two neighbouring cells shared a single reading -- about a hundred
+     * and forty noise columns for one chunk. The ring is a regional field by its own definition, so it is
+     * read on a coarse lattice and kept; only the column at the middle, which is what decides a spring line,
+     * is still read where it stands.</p>
      */
     public static Sample sampleCached(ServerLevel level, int blockX, int blockZ) {
-        int gx = blockX & ~3, gz = blockZ & ~3;
-        long key = (((long) gx) << 32) ^ (gz & 0xFFFFFFFFL);
+        int gx = blockX & ~(SAMPLE_GRID - 1), gz = blockZ & ~(SAMPLE_GRID - 1);
+        long key = ColumnCache.key(gx, gz);
         Sample hit = CACHE.get(key);
         if (hit != null) return hit;
         Sample s = sample(level, gx, gz);
-        if (CACHE.size() > CACHE_MAX) CACHE.clear();
         CACHE.put(key, s);
         return s;
     }
@@ -153,17 +157,49 @@ public final class WaterTable {
     /** Dropped alongside the other tectonic caches when a server stops. */
     public static void clearCache() {
         CACHE.clear();
+        REGIONAL.clear();
     }
 
     // === Internals ==========================================================
 
-    private static final Map<Long, Sample> CACHE = new ConcurrentHashMap<>();
-    private static final int CACHE_MAX = 60000;
+    /** Blocks to a cached reading: one for a whole sample, a coarser one for the ring it averages. */
+    private static final int SAMPLE_GRID = 16, REGIONAL_GRID = 32;
+
+    /** Fixed tables, not maps that empty themselves when they fill: a distant-horizon mod fills them all day. */
+    private static final ColumnCache<Sample> CACHE = new ColumnCache<>(14);
+    private static final ColumnCache<int[]> REGIONAL = new ColumnCache<>(16);
+
+    /** Counted so this class's cost can be read off a run: it was three quarters of the mod's tick. */
+    private static final java.util.concurrent.atomic.LongAdder COLUMNS =
+            new java.util.concurrent.atomic.LongAdder();
+
+    /** How many whole noise columns the groundwater model has asked the generator for. */
+    public static long noiseColumns() {
+        return COLUMNS.sum();
+    }
 
     /** Generator surface height, answered without loading or generating the chunk. */
     private static int surfaceAt(ServerChunkCache chunkSource, ServerLevel level, int x, int z) {
+        COLUMNS.increment();
         return chunkSource.getGenerator().getBaseHeight(
                 x, z, Heightmap.Types.WORLD_SURFACE_WG, level, chunkSource.randomState());
+    }
+
+    /**
+     * The same height on a coarse lattice and kept. The ring is what recharges the aquifer and what it drains
+     * to -- land measured a hundred blocks out, deliberately blunt -- so reading it every four blocks bought
+     * nothing but noise columns. On this lattice a chunk's own cells share their readings with each other and
+     * with the chunks round them.
+     */
+    private static int regionalAt(ServerChunkCache chunkSource, ServerLevel level, int x, int z) {
+        int gx = Math.floorDiv(x, REGIONAL_GRID) * REGIONAL_GRID;
+        int gz = Math.floorDiv(z, REGIONAL_GRID) * REGIONAL_GRID;
+        long key = ColumnCache.key(gx, gz);
+        int[] hit = REGIONAL.get(key);
+        if (hit != null) return hit[0];
+        int h = surfaceAt(chunkSource, level, gx, gz);
+        REGIONAL.put(key, new int[]{h});
+        return h;
     }
 
     /**
