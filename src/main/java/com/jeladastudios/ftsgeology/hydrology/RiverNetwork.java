@@ -430,9 +430,15 @@ public final class RiverNetwork {
         }
 
         List<Point> out = new ArrayList<>(last + 1);
+        double step = STEP * h;
         for (int i = 0; i < last; i++) {
+            // How fast the water is falling over this length, in blocks of drop per block of run.
+            double fall = (level[i] - level[i + 1]) / step;
+            double t = Math.max(0.0, Math.min(1.0, 1.0 - (fall - STEEP_FROM) / STEEP_OVER));
+            double gentle = t * t * (3.0 - 2.0 * t);
+            double narrow = STEEP_NARROW + (1.0 - STEEP_NARROW) * gentle;
             double half = (HALF_NEW + (HALF_GROWN - HALF_NEW) * Math.min(1.0, i * STEP / WIDTH_AT)) * h
-                    * Math.max(wide[i], wide[i + 1]);
+                    * narrow * Math.max(wide[i], wide[i + 1]);
             double d0 = depth * deep[i], d1 = depth * deep[i + 1];
             out.add(new Point((float) pts[i][0], (float) pts[i][1], (float) pts[i + 1][0], (float) pts[i + 1][1],
                     (float) level[i], (float) level[i + 1],
@@ -448,6 +454,16 @@ public final class RiverNetwork {
      */
     private static final double FALL_MIN = 10.0, POOL_WIDE = 1.8, POOL_DEEP = 1.6;
     private static final int POOL_RUN = 3;
+
+    /**
+     * How much of its width a river keeps where it is running steeply, and the two gradients that ramp between.
+     *
+     * <p>A channel's width came from its length alone, so a river that had run far enough to be wide stayed that
+     * wide when it went over the edge of a mountain: thirty-five blocks of water in a straight band down a face,
+     * the same width all the way, which is the one thing no river does. A torrent is narrow and a lowland river
+     * is wide, and the difference is the gradient it runs at.</p>
+     */
+    private static final double STEEP_NARROW = 0.35, STEEP_FROM = 0.15, STEEP_OVER = 0.5;
 
     /**
      * The lake a river ends in when it ends inland: how far over the sea its last water has to stand for there to

@@ -46,7 +46,20 @@ public final class Lithology {
      * @param dyke         whether a dyke swarm runs through here
      */
     public record Column(Setting setting, double weight, Setting fallback, double across, double folded, int cover,
-                         int plutonTop, int bedShift, Rock basement, Rock pluton, boolean dyke) {}
+                         int plutonTop, int bedShift, Rock basement, Rock pluton, boolean dyke, double highFrom,
+                         double highOver) {
+
+        /**
+         * How far up a mountain a column stands, 0 at the foot and 1 at the top.
+         *
+         * <p>Soft cover does not survive on a summit. Rain, frost and gravity take the sandstone and the red beds
+         * off a mountain long before they touch what is under them, which is why a peak is bare rock and a plain
+         * is not, and why the rock a summit shows is the hard part of the sequence.</p>
+         */
+        public double high(int surface) {
+            return Math.max(0.0, Math.min(1.0, (surface - highFrom) / highOver));
+        }
+    }
 
     /** A pluton this deep or deeper is none at all. */
     private static final int NO_PLUTON = 10_000;
@@ -108,6 +121,7 @@ public final class Lithology {
 
         double granite = noise(seed, x, z, 90.0 * p.horizontal(), 0x7A11L);
         int plutonTop = granite > 0.1 ? 14 + (int) Math.round(46.0 * (1.0 - granite)) : NO_PLUTON;
+        double highFrom = 63.0 + 60.0 * p.horizontal(), highOver = 110.0 * p.horizontal();
         return new Column(setting, weight, fallback, a,
                 s.faultDistance() + 14.0 * noise(seed, x, z, 120.0 * p.horizontal(), 0x2C3DL),
                 18 + (int) Math.round(26.0 * (0.5 + 0.5 * noise(seed, x, z, 700.0 * p.horizontal(), 0x5E71L))),
@@ -115,7 +129,8 @@ public final class Lithology {
                 (int) Math.round(5.0 * noise(seed, x, z, 220.0 * p.horizontal(), 0x3B1FL)),
                 noise(seed, x, z, 160.0 * p.horizontal(), 0x6D0BL) > 0.0 ? Rock.GRANITE : Rock.GNEISS,
                 noise(seed, x, z, 200.0 * p.horizontal(), 0x1E5AL) > 0.0 ? Rock.GRANITE : Rock.DIORITE,
-                noise(seed, x, z, 60.0 * p.horizontal(), 0x44D1L) > 0.2);
+                noise(seed, x, z, 60.0 * p.horizontal(), 0x44D1L) > 0.2,
+                highFrom, highOver);
     }
 
     /**
@@ -149,7 +164,7 @@ public final class Lithology {
         }
         long salt = SeedHash.mix(setting == Setting.FORELAND && c.setting() == Setting.FOLD_BELT
                 ? seed ^ 0x117E6L : seed ^ 0x117E5L);
-        return switch (setting) {
+        return weathered(c, surface, h, switch (setting) {
             case PLATFORM -> depth < c.cover() ? bed(salt, y + c.bedShift(), PLATFORM_BEDS, PLATFORM_BANDS)
                     : basement(seed, c, x, y, z, depth - c.cover());
             case FOLD_BELT -> depth > c.plutonTop() ? Rock.GRANITE
@@ -172,7 +187,26 @@ public final class Lithology {
             case OCEAN_FLOOR -> depth < 8 ? ((h >>> 5) & 3) == 0 ? Rock.SMOOTH_BASALT : Rock.BASALT
                     : depth < 30 ? body(seed, x, y, z, Rock.GABBRO)
                     : body(seed, x, y, z, pick(MANTLE, salt ^ 0xB0L, SeedHash.hash(seed ^ 0xB0L, x >> 3, z >> 3, y >> 3)));
-        };
+        });
+    }
+
+    /** What a summit shows in place of soft cover: stone, and the two carbonates that stand as well as it does. */
+    private static final Rock[] HARD = {Rock.STONE, Rock.STONE, Rock.STONE, Rock.CALCITE, Rock.CHERT, Rock.MARBLE};
+
+    /**
+     * Sandstone and red beds give way to hard rock as a column climbs.
+     *
+     * <p>Asked for more rock and less sand towards the tops, and that is what a mountain is: the soft members of a
+     * sequence are the ones that go. Calcite and marble count as rock here -- a bare karst summit is limestone and
+     * travertine -- so a top stays pale rather than turning uniformly grey.</p>
+     */
+    private static Rock weathered(Column c, int surface, long h, Rock r) {
+        if (r != Rock.SANDSTONE && r != Rock.RED_BEDS) return r;
+        double high = c.high(surface);
+        if (high <= 0.0) return r;
+        // Drawn from the block's own hash, so a bed goes over as a bed rather than as grit through one.
+        return SeedHash.rand01(SeedHash.mix(h ^ 0x51D7L)) < high
+                ? HARD[(int) Math.floorMod(h >>> 9, (long) HARD.length)] : r;
     }
 
     /** A rift's floor holds basalt flows and sediment, deepest on the axis; its shoulders are basement, cut by dykes. */
