@@ -55,6 +55,10 @@ public final class GeologyRoles {
      * the belt's grip says: over a slow collision the grip stays under {@link #BELT_CORE} while the mountains stand
      * as high as anywhere, and they were left as no role at all, under a vanilla biome, with the rock and the rule
      * that bares it their own.
+     *
+     * <p>The lift counted is the plates' own relief and the real mountain ground together. Where a crop shapes the
+     * column the plates' relief is multiplied out to nothing, so relief alone left the very core of a belt -- the
+     * part the Alps shape -- under a vanilla biome, and badlands laid its terracotta bands down an alpine flank.</p>
      */
     private static final double HIGH_RELIEF = 0.24;
     /** How wide a rift floor is and how far a ridge reaches, in fault widths. */
@@ -94,7 +98,8 @@ public final class GeologyRoles {
         if (k == FaultType.DIVERGENT && a < GRABEN_TO + j) return Role.RIFT_VALLEY;
         if (s.overridingSide() && a >= ARC_FROM + j && a <= ARC_TO + j) return Role.VOLCANIC_HIGHLAND;
         if (k == FaultType.CONVERGENT_COLLISION && (TerrainFields.belt(s, p) > BELT_CORE + j
-                || TerrainFields.field(Field.RELIEF, seed, p, x, z) > HIGH_RELIEF + j)) return Role.OROGENIC_HIGHLAND;
+                || TerrainFields.field(Field.RELIEF, seed, p, x, z)
+                        + TerrainFields.field(Field.DEM, seed, p, x, z) > HIGH_RELIEF + j)) return Role.OROGENIC_HIGHLAND;
         // The apron of sediment a belt sheds beyond its mountains: flat, low, and the coal country. Its border wanders
         // in and out over a few hundred blocks as well as ragging: at one depth of apron it ran parallel to the belt.
         if (TerrainFields.apronAt(seed, p, x, z) > APRON_CORE + 2 * j

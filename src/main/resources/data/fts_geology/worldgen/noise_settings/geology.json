@@ -50,9 +50,9 @@
                                  "argument2" : {
                                     "argument1" : {
                                        "from_value" : 1,
-                                       "from_y" : 288,
+                                       "from_y" : 296,
                                        "to_value" : 0,
-                                       "to_y" : 304,
+                                       "to_y" : 312,
                                        "type" : "minecraft:y_clamped_gradient"
                                     },
                                     "argument2" : {
@@ -235,9 +235,9 @@
                   "argument2" : {
                      "argument1" : {
                         "from_value" : 1,
-                        "from_y" : 288,
+                        "from_y" : 296,
                         "to_value" : 0,
-                        "to_y" : 304,
+                        "to_y" : 312,
                         "type" : "minecraft:y_clamped_gradient"
                      },
                      "argument2" : {

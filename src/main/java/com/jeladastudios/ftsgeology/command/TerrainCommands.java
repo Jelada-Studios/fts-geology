@@ -76,7 +76,9 @@ public final class TerrainCommands {
     /**
      * The generator's ground on a square grid round here, for the shape of a mountain or a slope: the highest and
      * lowest ground, how much of the square lies within three blocks of the top (a flat-topped mountain has a lot),
-     * how the high ground spreads, and how many neighbouring samples differ by more than twice their spacing.
+     * how the high ground spreads, how many neighbouring samples stand at exactly the same height (ground stepped
+     * into contour terraces has a lot, and shows them as lines up a hillside), and how many differ by more than
+     * twice their spacing.
      */
     static int terrainGrid(CommandContext<CommandSourceStack> ctx, int half, int step) {
         CommandSourceStack source = ctx.getSource();
@@ -98,7 +100,7 @@ public final class TerrainCommands {
                 sum += y;
             }
         }
-        int nearTop = 0, steep = 0, walls = 0, pairs = 0;
+        int nearTop = 0, steep = 0, walls = 0, pairs = 0, flat = 0;
         int[] bands = new int[8];   // 160-179, 180-199, ... 300-319
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
@@ -109,6 +111,7 @@ public final class TerrainCommands {
                     if (a >= n || b >= n) continue;
                     int rise = Math.abs(h[i][j] - h[a][b]);
                     pairs++;
+                    if (rise == 0) flat++;
                     if (rise >= step) steep++;
                     if (rise >= 2 * step) walls++;
                 }
@@ -118,8 +121,8 @@ public final class TerrainCommands {
         for (int b = 0; b < bands.length; b++) {
             if (bands[b] > 0) spread.append(' ').append(160 + 20 * b).append('+').append(':').append(bands[b]);
         }
-        String line = String.format(Locale.ROOT, "terrain grid at %d,%d, half %d every %d: %d samples, max %d, min %d, mean %.1f, within 3 of the top %d, slope 1+ %.1f%%, slope 2+ %.1f%%, high ground%s",
-                at.getX(), at.getZ(), half, step, n * n, max, min, (double) sum / (n * n), nearTop,
+        String line = String.format(Locale.ROOT, "terrain grid at %d,%d, half %d every %d: %d samples, max %d, min %d, mean %.1f, within 3 of the top %d, level pairs %.1f%%, slope 1+ %.1f%%, slope 2+ %.1f%%, high ground%s",
+                at.getX(), at.getZ(), half, step, n * n, max, min, (double) sum / (n * n), nearTop, 100.0 * flat / Math.max(1, pairs),
                 100.0 * steep / Math.max(1, pairs), 100.0 * walls / Math.max(1, pairs), spread.length() == 0 ? " none" : spread);
         source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);

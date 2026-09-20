@@ -246,7 +246,7 @@ public final class TerrainFields {
             case CREST -> crestField(s, p, seed, x, z);
             // Real mountain ground for the belts that take their shape from it, how much of the column it shapes,
             // and what is left of vanilla's own mountain spline there.
-            case DEM -> dem(s, p, seed);
+            case DEM -> dem(s, p, seed, x, z);
             case GRIP -> demGrip(s, p);
             case SPLINE -> spline(s, p, seed, x, z);
             // The floor of a rift, where the ground lies under the sea's level and the aquifer fills it: vanilla's
@@ -485,11 +485,26 @@ public final class TerrainFields {
     private static final double METRES_PER_BLOCK = 25.0;
 
     /**
+     * How much of its range a belt raises at a standstill, and how much the rest of the closing adds. The crops are
+     * measured from their own valley floor, so this scales the height of the mountains over their valleys and not,
+     * as it once did, the whole range together with its floor: at six tenths a slow collision had the Alps squashed
+     * to three fifths and read as a plateau at one height.
+     */
+    private static final double DRIVE_STILL = 0.8;
+
+    /**
+     * The roughness a ninety-metre grid cannot carry: scree, gullies and crags, in metres, over a wavelength in
+     * metres. Without it the crop is a smooth height field, and a smooth height field rounded to whole blocks is a
+     * contour map -- flats a dozen blocks wide with a one-block riser between them, all the way up the mountain.
+     */
+    private static final double ROUGH_METRES = 50.0, ROUGH_WAVE = 900.0;
+
+    /**
      * The real mountains, in offset units: a crop of the Alps, the Caucasus, the Himalaya, the Karakoram or the
      * Appalachians, read at the column's place along and across the boundary and laid on the ground at true scale,
      * twenty-five metres to the block in the normal world and ten in the tall one.
      */
-    private static double dem(PlateSample s, GeologyParams p, long seed) {
+    private static double dem(PlateSample s, GeologyParams p, long seed, int x, int z) {
         double env = demGrip(s, p);
         if (env <= 0.0) return 0.0;
         double mpb = METRES_PER_BLOCK / p.horizontal();
@@ -502,7 +517,8 @@ public final class TerrainFields {
         DemLibrary.Kind kind = worn(s, seed) ? DemLibrary.Kind.WORN : DemLibrary.Kind.YOUNG;
         double metres = DemLibrary.metres(seed, pair, kind, p.horizontal() > 1.5, s.along() * mpb, acrossM);
         // A belt that is barely closing keeps a lower range, as the plates' own uplift did.
-        double drive = 0.6 + 0.4 * motion(s);
+        double drive = DRIVE_STILL + (1.0 - DRIVE_STILL) * motion(s);
+        metres += ROUGH_METRES * twoOctaves(seed, x, z, ROUGH_WAVE / mpb, 0x70C4L);
         return env * drive * p.demScale() * metres / mpb / 128.0;
     }
 

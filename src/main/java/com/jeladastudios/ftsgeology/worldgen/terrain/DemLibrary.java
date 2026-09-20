@@ -54,7 +54,9 @@ public final class DemLibrary {
 
     /**
      * The ground's height in metres at {@code along} metres down a boundary and {@code across} metres off its line,
-     * for the boundary between the two plates {@code pair} names.
+     * for the boundary between the two plates {@code pair} names. Measured from the crop's own valley floor, not
+     * from the sea: laid on the ground absolute, a range's floor stood a thousand metres up and the whole belt sat
+     * on a pedestal above the plain instead of rising out of it.
      */
     public static double metres(long seed, long pair, Kind kind, boolean tall, double along, double across) {
         Crop[] pool = kind == Kind.WORN ? Holder.WORN_ALL : tall ? Holder.YOUNG_TALL : Holder.YOUNG_NORMAL;
@@ -139,7 +141,6 @@ public final class DemLibrary {
                 d.readShort();
                 DataInputStream z = new DataInputStream(new InflaterInputStream(d));
                 short[] v = new short[w * h];
-                long sum = 0;
                 for (int j = 0; j < h; j++) {
                     int prev = 0;
                     for (int i = 0; i < w; i++) {
@@ -147,8 +148,18 @@ public final class DemLibrary {
                         int val = i == 0 ? x : prev + x;
                         v[j * w + i] = (short) val;
                         prev = val;
-                        sum += val;
                     }
+                }
+                // Down to the crop's own valley floor, so that the belt's valleys come out at the height of the
+                // country round them. A percentile rather than the least sample: one hole in the data would put the
+                // whole range a hundred metres up.
+                short[] sorted = v.clone();
+                java.util.Arrays.sort(sorted);
+                int base = sorted[(int) (0.01 * sorted.length)];
+                long sum = 0;
+                for (int i = 0; i < v.length; i++) {
+                    v[i] = (short) (v[i] - base);
+                    sum += v[i];
                 }
                 out.add(new Crop(n, v, w, h, mpp, sum / (double) v.length));
             } catch (IOException e) {
