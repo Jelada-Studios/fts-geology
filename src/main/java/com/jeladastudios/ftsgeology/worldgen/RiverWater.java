@@ -46,8 +46,13 @@ public final class RiverWater {
      */
     private static final int LEVEL_SHAVE = 4;
 
-    /** How deep a spring's bore runs under the bed it rises through, and how much of it may be cut short. */
-    private static final int SPRING_DEEP = 18, SPRING_VARY = 12, SPRING_LEAST = 5;
+    /**
+     * How deep a spring's bore runs under the bed it rises through, and how much of it may be cut short.
+     *
+     * <p>The bore still stops at the first block under it that is not solid, so a spring never opens into a cave;
+     * asking for more only means it gets as much of what it asked for as the rock under it will give.</p>
+     */
+    private static final int SPRING_DEEP = 40, SPRING_VARY = 24, SPRING_LEAST = 5;
 
     private static final LongAdder CANDIDATES = new LongAdder(), KEPT = new LongAdder(), BLOCKS = new LongAdder(),
             DROPPED = new LongAdder(), LEVELLED = new LongAdder(), SPRINGS = new LongAdder(), WET = new LongAdder();
@@ -67,7 +72,13 @@ public final class RiverWater {
                 RiverNetwork.At a = RiverNetwork.at(x, z);
                 if (a.distance() == Double.MAX_VALUE) continue;
                 int w = (int) Math.floor(a.water());
-                if (w <= sea) continue;                    // below the sea the ocean fills the channel itself
+                // At the mouth the ocean is the river's surface. The fill used to stop the moment the traced water
+                // reached sea level, which left the last stretch of channel -- tens of blocks of it on a flat
+                // shore -- with nothing in it: the ocean's own top block is one under sea level, the last river
+                // column stood one over it, and the block between was air. Below the line the fill drops to the
+                // ocean's own level and patches only what the generator left dry, so the two waters meet.
+                boolean mouth = w <= sea;
+                if (mouth) w = sea - 1;
                 // Out to where the channel's own floor climbs to the surface, and no further: past that the bank
                 // stands over the water and the water would be lying on the hillside.
                 if (a.floor() > w - 0.5) continue;
@@ -95,6 +106,11 @@ public final class RiverWater {
                 for (int y = g + 1; y <= w; y++) {
                     BlockState was = level.getBlockState(at.set(x, y, z));
                     if (!was.isAir() && was.getFluidState().isEmpty() && !TerrainProbe.isVegetation(was)) break;
+                    // The sea has already filled what it could, and it is the same water: only the gap is ours.
+                    if (mouth && !was.isAir()) {
+                        here++;
+                        continue;
+                    }
                     level.setBlock(at, water, FLAGS);
                     placed++;
                     here++;
@@ -115,10 +131,9 @@ public final class RiverWater {
         BLOCKS.add(placed);
         if (CHUNKS.incrementAndGet() % 100 == 0) {
             GeysersMod.LOGGER.info("River water over {} chunks: {} columns in a channel, {} kept, {} of them wet, "
-                            + "{} levelled, {} let go, {} springs, {} blocks, {} traces cut, {} joined, {} looped",
+                            + "{} levelled, {} let go, {} springs, {} blocks, {} traces cut; {}",
                     CHUNKS.get(), CANDIDATES.sum(), KEPT.sum(), WET.sum(), LEVELLED.sum(), DROPPED.sum(),
-                    SPRINGS.sum(), BLOCKS.sum(), RiverNetwork.tracesCut(), RiverNetwork.joined(),
-                    RiverNetwork.looped());
+                    SPRINGS.sum(), BLOCKS.sum(), RiverNetwork.tracesCut(), RiverNetwork.endings());
         }
         return placed;
     }

@@ -39,9 +39,9 @@ public final class RiverNetwork {
     /** Blocks between the points of a trace. */
     private static final double STEP = 8.0;
     /** Blocks between source points, and the share of them that carry a river. */
-    private static final double SOURCE_GRID = 224.0, SOURCE_SHARE = 0.5;
+    private static final double SOURCE_GRID = 224.0, SOURCE_SHARE = 0.65;
     /** A source stands at least this far above the sea. */
-    private static final double SOURCE_RISE = 14.0;
+    private static final double SOURCE_RISE = 20.0;
     /** How far a trace may run before it is given up on. */
     private static final double MAX_LENGTH = 2600.0;
     /** The least a trace may run and still be a river, where it does not reach the sea. */
@@ -126,6 +126,25 @@ public final class RiverNetwork {
     /** How many rivers have been cut short: into a bigger one, and back into themselves. */
     private static final LongAdder JOINED = new LongAdder(), LOOPED = new LongAdder();
 
+    /**
+     * Why a river stopped, and how long the ones that made it to the sea were. Asked for longer rivers, the first
+     * thing to know is what is actually ending them: the length budget is 2600 blocks a trace and the traces come
+     * out at a fifth of that, so the budget is not the answer and guessing at the constants would be.
+     */
+    private static final LongAdder TO_SEA = new LongAdder(), DAMMED = new LongAdder(), RAN_OUT = new LongAdder(),
+            TOO_SHORT = new LongAdder(), SEA_BLOCKS = new LongAdder(), POOLS = new LongAdder(),
+            LAKES = new LongAdder();
+
+    /** Why the traces ended and what they ran, for the log line. */
+    public static String endings() {
+        long sea = TO_SEA.sum();
+        return String.format(java.util.Locale.ROOT,
+                "%d reached the sea (mean %d blocks), %d dammed, %d ran out, %d too short, %d joined, %d looped; "
+                        + "%d falls pooled, %d lakes",
+                sea, sea == 0 ? 0 : SEA_BLOCKS.sum() / sea, DAMMED.sum(), RAN_OUT.sum(), TOO_SHORT.sum(),
+                JOINED.sum(), LOOPED.sum(), POOLS.sum(), LAKES.sum());
+    }
+
     public static long joined() {
         return JOINED.sum();
     }
@@ -138,9 +157,16 @@ public final class RiverNetwork {
 
     /** What a column knows about the nearest channel. */
     public record At(double distance, double halfWidth, double water, double bed, double fromHead) {
-        /** True at the one column a river rises from: where the ground first gives its water up. */
+        /**
+         * True at the few columns a river rises from: where the ground first gives its water up.
+         *
+         * <p>A block along was too fine a target. The source is jittered to a fractional place inside its cell and
+         * then moved again by the smoothing and the meander, so a window a block and a half by one often had no
+         * whole column in it at all: ten springs in fourteen hundred chunks, most rivers with none. Half a traced
+         * step along is still a spring mouth rather than a line of them, and a river almost always has one.</p>
+         */
         public boolean isHead() {
-            return distance <= 0.75 && fromHead <= 1.0;
+            return distance <= 0.75 && fromHead <= STEP * horizontal * 0.5;
         }
 
         public boolean inChannel() {
@@ -357,7 +383,9 @@ public final class RiverNetwork {
         double[][] source = raw(gx, gz);
         if (source == null) return null;
         double h = horizontal;
-        double[][] pts = join(g, gx, gz, source);
+        Joined joined = join(g, gx, gz, source);
+        double[][] pts = joined.pts();
+        boolean merged = joined.merged();
         if (pts.length < 2) return null;
 
         // 3. The surface: a block under the ground, and never higher than it already was. Where the ground rises
@@ -373,17 +401,65 @@ public final class RiverNetwork {
             last = i;
         }
         if (last < 1) return null;
+        boolean dammed = last < pts.length - 1;
+        if (dammed) DAMMED.increment();
+
+        // 4. Where the water falls, it lands in something; where a river simply ends inland, it ends in a lake.
+        //    Both only ever widen and deepen the channel and never lift the water, so neither can leave water
+        //    standing over the ground: the level a point was given is the one it keeps.
+        double[] wide = new double[pts.length], deep = new double[pts.length];
+        java.util.Arrays.fill(wide, 1.0);
+        java.util.Arrays.fill(deep, 1.0);
+        for (int i = 0; i < last; i++) {
+            if (level[i] - level[i + 1] < FALL_MIN) continue;
+            POOLS.increment();
+            for (int k = i + 1; k <= Math.min(last, i + POOL_RUN); k++) {
+                wide[k] = Math.max(wide[k], POOL_WIDE);
+                deep[k] = Math.max(deep[k], POOL_DEEP);
+            }
+        }
+        // A river the ground dammed is the one that most needs a lake: that is what the rise in front of it is.
+        if (!merged && level[last] > SEA + LAKE_OVER) {
+            LAKES.increment();
+            double lake = level[last];
+            for (int k = Math.max(1, last - LAKE_RUN); k <= last; k++) {
+                level[k] = lake;
+                wide[k] = Math.max(wide[k], LAKE_WIDE);
+                deep[k] = Math.max(deep[k], LAKE_DEEP);
+            }
+        }
 
         List<Point> out = new ArrayList<>(last + 1);
         for (int i = 0; i < last; i++) {
-            double half = (HALF_NEW + (HALF_GROWN - HALF_NEW) * Math.min(1.0, i * STEP / WIDTH_AT)) * h;
+            double half = (HALF_NEW + (HALF_GROWN - HALF_NEW) * Math.min(1.0, i * STEP / WIDTH_AT)) * h
+                    * Math.max(wide[i], wide[i + 1]);
+            double d0 = depth * deep[i], d1 = depth * deep[i + 1];
             out.add(new Point((float) pts[i][0], (float) pts[i][1], (float) pts[i + 1][0], (float) pts[i + 1][1],
                     (float) level[i], (float) level[i + 1],
-                    (float) (level[i] - depth), (float) (level[i + 1] - depth), (float) half,
+                    (float) (level[i] - d0), (float) (level[i + 1] - d1), (float) half,
                     (float) (i * STEP * h)));
         }
         return new Trace(out.toArray(new Point[0]));
     }
+
+    /**
+     * A fall and what it lands in: a drop of this many blocks between two traced points, the points below it that
+     * are given a plunge pool, and how much wider and deeper that pool is than the channel.
+     */
+    private static final double FALL_MIN = 10.0, POOL_WIDE = 1.8, POOL_DEEP = 1.6;
+    private static final int POOL_RUN = 3;
+
+    /**
+     * The lake a river ends in when it ends inland: how far over the sea its last water has to stand for there to
+     * be one, how many of its last points become the lake, and how much wider and deeper they are.
+     *
+     * <p>A river that reaches the sea has somewhere to go; one that runs out of ground does not, and before this
+     * it simply stopped in its own trench. The lake only ever lowers the water to the level of the last point and
+     * widens the channel, so it can hold nothing higher than the ground already allowed, and the shave clamp in
+     * {@code RiverDensity} keeps it from biting a basin out of a hillside that has none.</p>
+     */
+    private static final double LAKE_OVER = 1.0, LAKE_WIDE = 3.0, LAKE_DEEP = 1.8;
+    private static final int LAKE_RUN = 4;
 
     // === Joining ===========================================================
 
@@ -409,7 +485,10 @@ public final class RiverNetwork {
      * <p>Which of two rivers gives way is decided by length, then by cell, so it is the tributary that ends at the
      * trunk and never the other way about, and the answer does not depend on which was traced first.</p>
      */
-    private static double[][] join(Ground g, int gx, int gz, double[][] source) {
+    /** A raw line after joining, and whether it was cut short into another river or back into itself. */
+    private record Joined(double[][] pts, boolean merged) {}
+
+    private static Joined join(Ground g, int gx, int gz, double[][] source) {
         double h = horizontal;
         double cell = MERGE_DIST * h;
         int at = -1;
@@ -457,7 +536,7 @@ public final class RiverNetwork {
             }
         }
 
-        if (at < 0) return source;
+        if (at < 0) return new Joined(source, false);
         if (onto == null) LOOPED.increment(); else JOINED.increment();
         // The joining point is kept and the last stretch to the river itself is walked out in the trace's own
         // steps, so the two channels meet instead of stopping a dozen blocks short of each other. The ground is
@@ -467,7 +546,7 @@ public final class RiverNetwork {
         if (onto == null) {
             double[][] shut = new double[keep][];
             System.arraycopy(source, 0, shut, 0, keep);
-            return shut;
+            return new Joined(shut, true);
         }
         double step = STEP * h;
         double gap = Math.hypot(onto[0] - source[at][0], onto[1] - source[at][1]);
@@ -480,7 +559,7 @@ public final class RiverNetwork {
             double pz = source[at][1] + (onto[1] - source[at][1]) * f;
             out[keep + k - 1] = new double[]{px, pz, height(g, px, pz)};
         }
-        return out;
+        return new Joined(out, true);
     }
 
     /** True where the first river is the one that gives way: the shorter, or on a tie the one with the lower cell. */
@@ -595,7 +674,16 @@ public final class RiverNetwork {
                 break;
             }
         }
-        if (!sea && (path.size() - 1) * step < MIN_LENGTH * h) return null;
+        if (!sea && (path.size() - 1) * step < MIN_LENGTH * h) {
+            TOO_SHORT.increment();
+            return null;
+        }
+        if (sea) {
+            TO_SEA.increment();
+            SEA_BLOCKS.add((long) ((path.size() - 1) * step));
+        } else {
+            RAN_OUT.increment();
+        }
 
         // 2. Rounded off, and winding where the ground is flat enough to let it.
         double[][] pts = smooth(path);
