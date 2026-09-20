@@ -37,6 +37,7 @@ public final class TerrainContext {
         GeologyParams.take(isTall(event.getServer()) ? TALL_HORIZONTAL : 1.0);
         TerrainCache.clear();
         GeologyWorld.clear();
+        LandmarkSites.clear();
     }
 
     /** Whether the overworld about to be made is the tall world type: its stem is in the registry before the levels. */
@@ -55,6 +56,7 @@ public final class TerrainContext {
         GeologyParams.forget();
         TerrainCache.clear();
         GeologyWorld.clear();
+        LandmarkSites.clear();
     }
 
     /** The current world's seed, or 0 with one warning when no server has announced one. */
