@@ -167,6 +167,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue STALL_REPORT_SECONDS;       // default 30, 0 = off
 
     // --- Hydrology (groundwater) ---------------------------------------------
+    public static final ForgeConfigSpec.BooleanValue RIVERS;                 // default ON, experimental
     public static final ForgeConfigSpec.BooleanValue WATER_TABLE_ENABLED;
     public static final ForgeConfigSpec.DoubleValue WATER_TABLE_SUBDUAL;      // relief it copies, 0..1
     public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_TEMPERATE; // blocks below the land
@@ -863,6 +864,15 @@ public final class GeyserConfig {
         b.pop();
 
         b.push("hydrology");
+        RIVERS = b
+                .comment("Trace rivers down the raw ground and fill them, in the mod's own world types only.",
+                        "This is the newest and least settled thing in the mod. A river is cut by the",
+                        "terrain itself, so turning this off changes the shape of the land as well as",
+                        "taking the water away - in a world you have already played, the chunks you",
+                        "have been to keep their channels and the ones past them do not, which leaves",
+                        "a seam. Set it before a world is made, not after.",
+                        "Off, the world keeps vanilla's own rivers and nothing else.")
+                .define("rivers", true);
         WATER_TABLE_ENABLED = b
                 .comment("Model a groundwater table under the world.",
                         "Nothing here places or edits a block on its own. It answers one question -",

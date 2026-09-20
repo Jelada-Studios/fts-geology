@@ -1,5 +1,6 @@
 package com.jeladastudios.ftsgeology.worldgen.terrain;
 
+import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.hydrology.RiverNetwork;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
@@ -22,8 +23,15 @@ public final class RiverDensity implements DensityFunction {
 
     public enum Mode { FLOOR, NEAR }
 
-    /** Offset units for "no river here": beyond anything the terrain reaches. */
-    private static final double NONE_HIGH = 4.0;
+    /**
+     * Offset units for "no river here": beyond anything the terrain reaches.
+     *
+     * <p>Four was beyond the normal world, whose tallest crop lands at 1,23, and nowhere near beyond the tall one,
+     * whose Manaslu crop reaches 4,72. The offset is {@code min(raw, river_floor)}, so four capped the tall world's
+     * ground at y 640: a dead flat table with ninety blocks of summit sliced off it, and a knife edge round it
+     * because {@code factor} takes a full ten wherever the cap bites. Eight is y 1152, over either ceiling.</p>
+     */
+    private static final double NONE_HIGH = 8.0;
     /** How far under the terrain a channel floor may ever lie, for the function to declare its range. */
     private static final double FLOOR_LOW = -4.0;
 
@@ -69,6 +77,13 @@ public final class RiverDensity implements DensityFunction {
      */
     @Override
     public DensityFunction mapAll(Visitor visitor) {
+        // Only the floor carries the ground: the near field reads nothing but the finished network, so walking the
+        // whole raw offset tree for it would be a second copy of the same work on every chunk the generator builds.
+        if (mode != Mode.FLOOR) return visitor.apply(this);
+        // Switched off, the ground is never handed over, so the network never opens: no channel is cut into the
+        // offset, no cave is pushed away from one and no water is laid. The world keeps vanilla's rivers and
+        // nothing else -- which is the point of the switch, since half a river is worse than none.
+        if (!GeyserConfig.RIVERS.get()) return visitor.apply(new RiverDensity(raw.mapAll(visitor), mode));
         DensityFunction wired = raw.mapAll(visitor);
         RiverDensity made = new RiverDensity(wired, mode);
         RiverNetwork.useGround((x, z) -> 128.0 + 128.0 * wired.compute(new SinglePointContext(x, 0, z)),

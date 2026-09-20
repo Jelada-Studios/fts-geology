@@ -1,1 +1,1 @@
-{"type":"minecraft:flat_cache","argument":{"type":"minecraft:cache_2d","argument":{"type":"fts_geology:rivers","mode":"near","argument":"fts_geology:geology_tall/offset_raw"}}}
+{"type":"minecraft:flat_cache","argument":{"type":"minecraft:cache_2d","argument":{"type":"fts_geology:rivers","mode":"near","argument":{"type":"minecraft:constant","argument":0}}}}
