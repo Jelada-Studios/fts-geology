@@ -1,6 +1,7 @@
 package com.jeladastudios.ftsgeology.worldgen.lithology;
 
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
+import com.jeladastudios.ftsgeology.hydrology.RiverNetwork;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.Column;
 import com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.Rock;
@@ -42,6 +43,9 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
     /** How much the ground must climb across two blocks for a column to count as a cliff. */
     private static final int STEEP_RISE = 3;
 
+    /** How far past a channel's flat bed the river still owns the ground it runs on. */
+    private static final double RIVER_BANK = 3.0;
+
     @Override
     public KeyDispatchDataCodec<? extends SurfaceRules.RuleSource> codec() {
         return CODEC;
@@ -63,6 +67,8 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
         private final int[] grounds = new int[256];
         /** 0 not yet looked at, 1 gentle, 2 a cliff. */
         private final byte[] steep = new byte[256];
+        /** 0 not yet looked at, 1 dry land, 2 a river's own ground. */
+        private final byte[] river = new byte[256];
 
         Pass(ChunkAccess chunk, long seed, boolean steepOnly, boolean bare) {
             this.chunk = chunk;
@@ -74,6 +80,11 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
         @Override
         public BlockState tryApply(int x, int y, int z) {
             int i = ((x & 15) << 4) | (z & 15);
+            // A river's bed and banks belong to the river. Both bare rules answer for every block they are
+            // asked about, so without this the channel wall -- which climbs two blocks for every block out,
+            // and so is a cliff by construction -- came out as whatever rock lay behind it, and a river
+            // through arc or hotspot ground ran in a blackstone trough with no gravel bed at all.
+            if ((steepOnly || bare) && riverAt(i, x, z)) return null;
             if (steepOnly && !steepAt(i, x & 15, z & 15)) return null;
             Column c = columns[i];
             if (c == null) {
@@ -103,6 +114,17 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
                 steep[i] = (byte) (cliff ? 2 : 1);
             }
             return steep[i] == 2;
+        }
+
+        /** Whether a traced river's channel or bank covers this column. */
+        private boolean riverAt(int i, int x, int z) {
+            if (river[i] == 0) {
+                RiverNetwork.At a = RiverNetwork.at(x, z);
+                boolean wet = a.distance() != Double.MAX_VALUE
+                        && a.distance() <= a.halfWidth() + RIVER_BANK;
+                river[i] = (byte) (wet ? 2 : 1);
+            }
+            return river[i] == 2;
         }
 
         private int height(int lx, int lz) {
