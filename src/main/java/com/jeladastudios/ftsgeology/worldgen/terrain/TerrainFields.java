@@ -162,6 +162,27 @@ public final class TerrainFields {
     private static final double OCEAN_EROSION = 0.5, INTERIOR_EROSION = 0.45;
 
     /**
+     * Over how many fault widths the two crusts' quiet ground meets across a boundary.
+     *
+     * <p>A column reads the boundary from the plate it stands on, and crossing the line changes that plate: on one
+     * side the quiet ground is a flat sea floor, on the other a worn interior. Nothing smoothed the change. The
+     * blend in {@link #field} is for junctions -- it fades the second and third boundaries in as they come as near
+     * as the nearest -- and at a plain margin the next boundary is over a thousand blocks away and takes no share
+     * at all, so the field simply stepped by the difference between the two numbers above.</p>
+     *
+     * <p>A twentieth of erosion sounds like nothing, and it is, except that 0.45 and 0.5 sit on either side of a
+     * break in vanilla's offset spline. Measured at a subduction margin in the tall world, four blocks across the
+     * line took the ground from 182 to 103: a sheer face eighty blocks tall, dead straight, running the length of
+     * the boundary, and picked out in bare rock because a face that steep is a cliff to the surface rules. That is
+     * the wall reported from three test rounds running.</p>
+     *
+     * <p>Blending to the halfway point on the line makes both sides agree there, so the margin comes down over a
+     * fault width instead of over four blocks. Where both sides are the same crust -- a collision belt, an ocean
+     * ridge -- the two numbers are equal and nothing changes at all.</p>
+     */
+    private static final double CRUST_BLEND = 1.0;
+
+    /**
      * The plate the terrain sees at a column: the sample at the warped coordinate, which is where the coast, the
      * belt and the arc all really are. Cached on a four-block grid.
      */
@@ -223,6 +244,22 @@ public final class TerrainFields {
             case EROSION -> v + 0.25 * apron;
             default -> v;
         };
+    }
+
+    /** The three boundaries a column is blended from and the share each takes, for finding a step in a field. */
+    public static String debugAt(long seed, GeologyParams p, int x, int z) {
+        TectonicMap.Edges e = edgesAt(seed, p, x, z);
+        double handover = HANDOVER * p.horizontal();
+        double w2 = e.gap() < handover ? smooth(1.0 - Math.max(0.0, e.gap()) / handover) : 0.0;
+        double w3 = e.gap3() < handover ? smooth(1.0 - Math.max(0.0, e.gap3()) / handover) : 0.0;
+        double lend = smooth(1.0 - Math.min(1.0, e.first().faultDistance() / handover));
+        if (e.second().plateId() != e.first().plateId()) w2 *= lend;
+        if (e.third().plateId() != e.first().plateId()) w3 *= lend;
+        return String.format(java.util.Locale.ROOT,
+                "first %s d %.0f plate %d e %.3f | second %s gap %.0f w %.3f plate %d e %.3f | third %s gap %.0f w %.3f plate %d e %.3f",
+                e.first().boundaryType(), e.first().faultDistance(), e.first().plateId(), erosion(e.first(), p, seed, x, z),
+                e.second().boundaryType(), e.gap(), w2, e.second().plateId(), erosion(e.second(), p, seed, x, z),
+                e.third().boundaryType(), e.gap3(), w3, e.third().plateId(), erosion(e.third(), p, seed, x, z));
     }
 
     /** How deep into a belt's floodplain a column lies, from whichever of its two boundaries says it is deeper. */
@@ -309,8 +346,12 @@ public final class TerrainFields {
 
     private static double erosion(PlateSample s, GeologyParams p, long seed, int x, int z) {
         boolean oceanic = s.plateKind().isOceanic();
-        // The quiet ground a plate has away from its edge: a flat sea floor, a worn interior.
-        double quiet = oceanic ? OCEAN_EROSION : INTERIOR_EROSION;
+        // The quiet ground a plate has away from its edge: a flat sea floor, a worn interior, and on the line the
+        // two crusts meet halfway, which is the one thing that makes the field the same from both sides.
+        double mine = oceanic ? OCEAN_EROSION : INTERIOR_EROSION;
+        double theirs = s.neighbourKind().isOceanic() ? OCEAN_EROSION : INTERIOR_EROSION;
+        double quiet = mine + (theirs - mine)
+                * 0.5 * smooth(Mth.clamp(1.0 - across(s, p) / CRUST_BLEND, 0, 1));
         FaultType k = s.boundaryType();
         // A sea floor is flat except where it is being made or destroyed: the hills of a spreading ridge and the
         // islands of an arc are the exceptions.
@@ -426,6 +467,30 @@ public final class TerrainFields {
     private static final double RANGE_ARC_TO = 0.75;
 
     /**
+     * How far a column lies across a subduction boundary, signed: positive on the plate riding over, negative on
+     * the one going down.
+     *
+     * <p>An arc's range is read from the overriding plate, and the test for which plate that is was a boolean. A
+     * column reads the boundary from the plate it stands on, so crossing the line flipped the answer, and with it
+     * the whole real-ground envelope: on one side the crop stood at its full height, on the other it was not there
+     * at all. Nothing blended the two, because the blend in {@link #field} fades in the <em>second and third</em>
+     * boundaries at a junction and at a plain margin they are a thousand blocks away.</p>
+     *
+     * <p>Measured in the tall world at a subduction margin: four blocks across the line took the real ground from
+     * 0.549 to 0, the range field from 0.79 to 0 and the ground from 182 to 103. An eighty-block sheer face, dead
+     * straight, running the length of the boundary, and bare rock because a face that steep is a cliff to the
+     * surface rules. That is the wall reported from three test rounds running, and it is not a river.</p>
+     *
+     * <p>Signing the distance instead lets the arc's sea-side flank carry on across the line and die out over the
+     * trench, which is what a margin does. On the line itself both sides read the same number, so the field is
+     * continuous there by construction rather than by a tuned width.</p>
+     */
+    private static double arcAcross(PlateSample s, GeologyParams p) {
+        double a = across(s, p);
+        return s.overridingSide() ? a : -a;
+    }
+
+    /**
      * The belt of a range that is really there, as against {@link #mountainBelt}, which also answers along a
      * transform fault and out behind a subduction arc. The tall world multiplies its ground by this, so it has to
      * mean "a range stands here": on the broader belt it was raising vanilla's badlands two and a half times as
@@ -434,8 +499,10 @@ public final class TerrainFields {
     private static double rangeBelt(PlateSample s, GeologyParams p) {
         FaultType k = s.boundaryType();
         if (k == FaultType.CONVERGENT_COLLISION) return belt(s, p);
-        if (k == FaultType.CONVERGENT_SUBDUCTION && s.overridingSide() && across(s, p) <= RANGE_ARC_TO) {
-            return belt(s, p);
+        if (k == FaultType.CONVERGENT_SUBDUCTION) {
+            // The same envelope the real ground uses, so the two rise and fall together instead of one of them
+            // ending at a line the other carries straight through.
+            return belt(s, p) * peak(arcAcross(s, p), ARC_AT, DEM_ARC_SEA, DEM_ARC_LAND);
         }
         return 0.0;
     }
@@ -550,7 +617,7 @@ public final class TerrainFields {
         double mpb = METRES_PER_BLOCK / p.horizontal();
         double a = across(s, p);
         double acrossM = s.boundaryType() == FaultType.CONVERGENT_SUBDUCTION
-                ? (a - ARC_AT) * p.faultWidth() * mpb
+                ? (arcAcross(s, p) - ARC_AT) * p.faultWidth() * mpb
                 : (Long.compareUnsigned(s.plateId(), s.neighbourId()) < 0 ? a : -a) * p.faultWidth() * mpb;
         long lo = Math.min(s.plateId(), s.neighbourId()), hi = Math.max(s.plateId(), s.neighbourId());
         long pair = SeedHash.mix(lo * 0x9E3779B97F4A7C15L ^ SeedHash.mix(hi ^ 0x0DE31L));
@@ -564,7 +631,11 @@ public final class TerrainFields {
 
     /** How much of the column the real ground shapes: 1 in the belt's core, 0 at its edge, 0 where it has none. */
     private static double demGrip(PlateSample s, GeologyParams p) {
-        if (s.plateKind().isOceanic() || !DemLibrary.available()) return 0.0;
+        if (!DemLibrary.available()) return 0.0;
+        // An ocean floor has no range of its own -- except the one on the margin it is diving under, whose sea-side
+        // flank comes down over the trench. Reading this off the plate the column stands on is what cut the crop
+        // in half along the line: the ocean plate answered no before the envelope was ever asked.
+        if (s.plateKind().isOceanic() && s.boundaryType() != FaultType.CONVERGENT_SUBDUCTION) return 0.0;
         double a = across(s, p);
         return switch (s.boundaryType()) {
             case CONVERGENT_COLLISION -> {
@@ -573,7 +644,7 @@ public final class TerrainFields {
             }
             // An arc stands where its volcanoes do, not on the line: the range is read from there, steep to the sea
             // and long inland.
-            case CONVERGENT_SUBDUCTION -> s.overridingSide() ? peak(a, ARC_AT, DEM_ARC_SEA, DEM_ARC_LAND) : 0.0;
+            case CONVERGENT_SUBDUCTION -> peak(arcAcross(s, p), ARC_AT, DEM_ARC_SEA, DEM_ARC_LAND);
             default -> 0.0;
         };
     }

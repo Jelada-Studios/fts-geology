@@ -74,6 +74,60 @@ public final class TerrainCommands {
     }
 
     /**
+     * The router's density down one column, for telling a two-dimensional spike from a three-dimensional one.
+     *
+     * <p>A cliff in the offset shows here as a column that is solid all the way from its top; a lump of the
+     * blended noise standing on its own shows as solid, then air, then solid again. The slope of the density
+     * between two heights is {@code -4 * factor / 128}, so the factor the column is actually being built with
+     * can be read off it, and that is the number that decides how far the noise may move the surface.</p>
+     */
+    static int terrainColumn(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        record Pos(int blockX, int blockY, int blockZ) implements net.minecraft.world.level.levelgen.DensityFunction.FunctionContext {}
+        var router = level.getChunkSource().randomState().router();
+        // The offset, read off the depth: depth = a gradient in y plus the offset, and the gradient at 64 is
+        // known from the preset's own slope of one over a hundred and twenty-eight.
+        double dep = router.depth().compute(new Pos(at.getX(), 64, at.getZ()));
+        double span = level.getMaxBuildHeight() - level.getMinBuildHeight();
+        double grad = 1.5 - (64.0 - level.getMinBuildHeight()) * (8.0 / span);
+        int flat = (int) Math.round(128.0 + 128.0 * (dep - grad));
+        StringBuilder row = new StringBuilder();
+        int noCave = Integer.MIN_VALUE, withCave = Integer.MIN_VALUE, gaps = 0, eaten = 0;
+        boolean wasSolid = false;
+        for (int y = Math.min(level.getMaxBuildHeight() - 8, flat + 24); y >= Math.max(level.getMinBuildHeight() + 8, flat - 120); y -= 4) {
+            double i0 = router.initialDensityWithoutJaggedness().compute(new Pos(at.getX(), y, at.getZ()));
+            double d = router.finalDensity().compute(new Pos(at.getX(), y, at.getZ()));
+            if (i0 > 0 && noCave == Integer.MIN_VALUE) noCave = y;
+            if (d > 0 && withCave == Integer.MIN_VALUE) withCave = y;
+            if (i0 > 0 && d <= 0) eaten++;
+            if (d <= 0 && wasSolid) gaps++;
+            wasSolid = d > 0;
+            if (row.length() < 760) {
+                row.append(y).append(':').append(String.format(Locale.ROOT, "%.2f/%.2f", i0, d)).append(' ');
+            }
+        }
+        String line = String.format(Locale.ROOT,
+                "terrain column at %d,%d: offset ground %d, first solid without caves %d, with them %d, samples caves ate %d, gaps %d",
+                at.getX(), at.getZ(), flat, noCave, withCave, eaten, gaps);
+        source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
+        source.sendSuccess(() -> Component.literal(row.toString()).withStyle(ChatFormatting.GRAY), false);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("terrain density: {}", row);
+        return 1;
+    }
+
+    /** What the river network says about a column, for telling a channel's own wall from the hillside's. */
+    private static String channelAt(int x, int z) {
+        com.jeladastudios.ftsgeology.hydrology.RiverNetwork.At a =
+                com.jeladastudios.ftsgeology.hydrology.RiverNetwork.at(x, z);
+        if (a.distance() == Double.MAX_VALUE) return "no channel";
+        return String.format(Locale.ROOT, "channel %.1f out of a %.1f bed, water %.1f, floor %.1f",
+                a.distance(), a.halfWidth(), a.water(), a.floor());
+    }
+
+    /**
      * The generator's ground on a square grid round here, for the shape of a mountain or a slope: the highest and
      * lowest ground, how much of the square lies within three blocks of the top (a flat-topped mountain has a lot),
      * how the high ground spreads, how many neighbouring samples stand at exactly the same height (ground stepped
@@ -100,6 +154,10 @@ public final class TerrainCommands {
                 sum += y;
             }
         }
+        // The biggest rise between two neighbouring samples, and how many of them are cliffs: a shaved hillside
+        // that stops dead shows up here and nowhere else in this line, because a single sheer face is a handful
+        // of pairs out of tens of thousands and vanishes into every share.
+        int tallest = 0, faces = 0, tallX = 0, tallZ = 0;
         int nearTop = 0, steep = 0, walls = 0, pairs = 0, flat = 0;
         int[] bands = new int[8];   // 160-179, 180-199, ... 300-319
         for (int i = 0; i < n; i++) {
@@ -114,6 +172,12 @@ public final class TerrainCommands {
                     if (rise == 0) flat++;
                     if (rise >= step) steep++;
                     if (rise >= 2 * step) walls++;
+                    if (rise > tallest) {
+                        tallest = rise;
+                        tallX = at.getX() + (i - n / 2) * step;
+                        tallZ = at.getZ() + (j - n / 2) * step;
+                    }
+                    if (rise >= 8) faces++;
                 }
             }
         }
@@ -121,9 +185,10 @@ public final class TerrainCommands {
         for (int b = 0; b < bands.length; b++) {
             if (bands[b] > 0) spread.append(' ').append(160 + 20 * b).append('+').append(':').append(bands[b]);
         }
-        String line = String.format(Locale.ROOT, "terrain grid at %d,%d, half %d every %d: %d samples, max %d, min %d, mean %.1f, within 3 of the top %d, level pairs %.1f%%, slope 1+ %.1f%%, slope 2+ %.1f%%, high ground%s",
+        String line = String.format(Locale.ROOT, "terrain grid at %d,%d, half %d every %d: %d samples, max %d, min %d, mean %.1f, within 3 of the top %d, level pairs %.1f%%, slope 1+ %.1f%%, slope 2+ %.1f%%, tallest step %d at %d,%d (%s), 8+ steps %d, high ground%s",
                 at.getX(), at.getZ(), half, step, n * n, max, min, (double) sum / (n * n), nearTop, 100.0 * flat / Math.max(1, pairs),
-                100.0 * steep / Math.max(1, pairs), 100.0 * walls / Math.max(1, pairs), spread.length() == 0 ? " none" : spread);
+                100.0 * steep / Math.max(1, pairs), 100.0 * walls / Math.max(1, pairs), tallest, tallX, tallZ,
+                channelAt(tallX, tallZ), faces, spread.length() == 0 ? " none" : spread);
         source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
         return 1;
@@ -266,11 +331,19 @@ public final class TerrainCommands {
         record Pos(int blockX, int blockY, int blockZ) implements net.minecraft.world.level.levelgen.DensityFunction.FunctionContext {}
         Pos pos = new Pos(at.getX(), 64, at.getZ());
         StringBuilder sb = new StringBuilder();
-        for (String f : new String[] {"continents", "erosion", "ridges", "relief"}) {
+        for (String f : new String[] {"continents", "erosion", "ridges", "relief", "spline", "grip", "dem", "range", "valley", "crest", "graben"}) {
             sb.append(f).append(' ').append(String.format(Locale.ROOT, "%.3f", com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.field(com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.Field.valueOf(f.toUpperCase(Locale.ROOT)), com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(), com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params(), at.getX(), at.getZ()))).append("; ");
         }
         var generator = level.getChunkSource().getGenerator();
         int base = generator.getBaseHeight(at.getX(), at.getZ(), net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG, level, level.getChunkSource().randomState());
+        sb.append(String.format(Locale.ROOT, "apron %.3f; belt %.3f; ",
+                com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.apronAt(
+                        com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(),
+                        com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params(), at.getX(), at.getZ()),
+                com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.field(
+                        com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.Field.BELT,
+                        com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(),
+                        com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params(), at.getX(), at.getZ())));
         var plate = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.sampleAt(com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(), com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params(), at.getX(), at.getZ());
         String line = String.format(Locale.ROOT, "terrain at %d,%d: %sbase %d, role %s%s; level seed %d, terrain seed %d, own %s",
                 at.getX(), at.getZ(), sb, base,
@@ -279,7 +352,12 @@ public final class TerrainCommands {
                 level.getSeed(), com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(),
                 com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level));
         source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
+        String edges = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.debugAt(
+                com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(),
+                com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params(), at.getX(), at.getZ());
+        source.sendSuccess(() -> Component.literal(edges).withStyle(ChatFormatting.GRAY), false);
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("edges: {}", edges);
         return 1;
     }
 

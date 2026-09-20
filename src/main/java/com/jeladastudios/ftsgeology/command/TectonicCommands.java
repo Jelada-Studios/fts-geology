@@ -119,6 +119,8 @@ public final class TectonicCommands {
                         .then(Commands.literal("terrain")
                                 // The generator's ground along a line from here, without loading a chunk.
                                 .then(Commands.literal("here").executes(TerrainCommands::terrainHere))
+                                // The router's density down this column: a cliff in the offset, or a lump of noise.
+                                .then(Commands.literal("column").executes(TerrainCommands::terrainColumn))
                                 // The traced river nearest here: where its channel runs and what its pool holds.
                                 .then(Commands.literal("trace").executes(TerrainCommands::terrainTrace)
                                         .then(Commands.argument("half", IntegerArgumentType.integer(64, 8000))
