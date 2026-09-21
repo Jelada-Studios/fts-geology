@@ -57,7 +57,13 @@ public final class RiverWater {
 
     private static final LongAdder CANDIDATES = new LongAdder(), KEPT = new LongAdder(), BLOCKS = new LongAdder(),
             DROPPED = new LongAdder(), LEVELLED = new LongAdder(), SPRINGS = new LongAdder(), WET = new LongAdder(),
-            BANKED = new LongAdder(), CLIFFS = new LongAdder();
+            BANKED = new LongAdder(), CLIFFS = new LongAdder(), ICED = new LongAdder(), GLACIERS = new LongAdder();
+
+    /**
+     * The tongue of ice a mountain river comes out from under, where it rises high enough to snow: how far it reaches
+     * up the valley, how wide and how thick it is, at the normal world's layout and grown with a wider one.
+     */
+    private static final double TONGUE_LONG = 10.0, TONGUE_WIDE = 5.0, TONGUE_THICK = 3.0;
 
     /**
      * How much a bank may be built up to hold the water beside it, in blocks.
@@ -136,6 +142,14 @@ public final class RiverWater {
                 // because the first block over its floor turned out to be solid. That is a dry gravel stripe
                 // beside the river, and the old single counter called it filled.
                 if (here > 0) WET.increment();
+                // A lake where it snows freezes over, as vanilla's water does there; a river keeps running. The
+                // river's water is its own fluid, which vanilla's freezing does not know, so the ice is laid here.
+                if (a.lake() && !mouth && here > 0 && g + here >= w
+                        && level.getBiome(at.set(x, w, z)).value().coldEnoughToSnow(at)
+                        && level.getBlockState(at).is(ModBlocks.RIVER_WATER.get())) {
+                    level.setBlock(at, Blocks.ICE.defaultBlockState(), FLAGS);
+                    ICED.increment();
+                }
                 // A river bed is gravel in the mountains and sand lower down, not the meadow the surface rules laid.
                 BlockState bed = level.getBlockState(at.set(x, g, z));
                 if (bed.is(BlockTags.DIRT)) {
@@ -145,13 +159,67 @@ public final class RiverWater {
             }
         }
         placed += banks(level, cp, sea, at);
+        placed += glaciers(level, cp, at);
         BLOCKS.add(placed);
         if (CHUNKS.incrementAndGet() % 100 == 0) {
             GeysersMod.LOGGER.info("River water over {} chunks: {} columns in a channel, {} kept, {} of them wet, "
-                            + "{} levelled, {} let go, {} springs, {} blocks, {} banks built up, {} left as cliffs; {}; {}",
+                            + "{} levelled, {} let go, {} springs, {} blocks, {} banks built up, {} left as cliffs, "
+                            + "{} lake columns iced, {} glacier columns; {}; {}",
                     CHUNKS.get(), CANDIDATES.sum(), KEPT.sum(), WET.sum(), LEVELLED.sum(), DROPPED.sum(),
-                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), RiverNetwork.summary(),
-                    GeologyChunkGenerator.summary());
+                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(),
+                    RiverNetwork.summary(), GeologyChunkGenerator.summary());
+        }
+        return placed;
+    }
+
+    /**
+     * Where a river rises over the snow line, the ice it comes out from under: a tongue lying up the valley from the
+     * spring, thickest up the valley and thinning to its snout, packed ice round a core of blue, with a low mouth at
+     * the snout where the water leaves. Worked out from the spring alone, so every chunk lays its own share of it.
+     */
+    private static int glaciers(WorldGenLevel level, ChunkPos cp, BlockPos.MutableBlockPos at) {
+        double hz = RiverNetwork.horizontal();
+        double longest = TONGUE_LONG * (1.0 + 0.4 * (hz - 1.0)) * 1.2;
+        int cx = cp.getMinBlockX() + 8, cz = cp.getMinBlockZ() + 8;
+        int placed = 0;
+        for (RiverNetwork.Head head : RiverNetwork.headsNear(cx, cz, longest + 12.0)) {
+            int hx = (int) Math.floor(head.x()), hzb = (int) Math.floor(head.z());
+            if (!level.getBiome(at.set(hx, (int) Math.floor(head.water()), hzb)).value().coldEnoughToSnow(at)) continue;
+            long hash = SeedHash.hash(level.getSeed(), hx, hzb, 0x61AC1L);
+            double grow = 1.0 + 0.4 * (hz - 1.0);
+            double len = TONGUE_LONG * grow * (0.8 + 0.4 * SeedHash.rand01(hash));
+            double wide = TONGUE_WIDE * grow * (0.8 + 0.4 * SeedHash.rand01(SeedHash.mix(hash ^ 1)));
+            double thick = TONGUE_THICK * (0.8 + 0.4 * SeedHash.rand01(SeedHash.mix(hash ^ 2))) + 0.4 * (hz - 1.0);
+            // Up the valley is against the way the water sets off.
+            double ux = -head.dx(), uz = -head.dz();
+            for (int dx = 0; dx < 16; dx++) {
+                for (int dz = 0; dz < 16; dz++) {
+                    int x = cp.getMinBlockX() + dx, z = cp.getMinBlockZ() + dz;
+                    double px = x + 0.5 - head.x(), pz = z + 0.5 - head.z();
+                    double up = px * ux + pz * uz, side = -px * uz + pz * ux;
+                    if (up < -1.0 || up > len) continue;
+                    double grown = Math.min(1.0, (up + 1.0) / (0.35 * len));
+                    double halfWide = wide * 0.5 * (0.55 + 0.45 * grown);
+                    if (Math.abs(side) > halfWide) continue;
+                    double across = side / halfWide;
+                    double body = Math.min(1.0, (up + 1.0) / (0.5 * len));
+                    int t = (int) Math.round((1.0 + (thick - 1.0) * body) * Math.sqrt(1.0 - across * across));
+                    if (t < 1) continue;
+                    int g = TerrainProbe.groundY(level, x, z);
+                    if (g == Integer.MIN_VALUE) continue;
+                    // The mouth: a low opening at the snout, over the spring, that the river runs out of.
+                    int mouth = up < 2.0 && Math.abs(side) < 1.25 ? 2 : 0;
+                    for (int y = g + 1; y <= g + t + mouth; y++) {
+                        if (y <= g + mouth) continue;
+                        BlockState was = level.getBlockState(at.set(x, y, z));
+                        if (!was.isAir() && !was.is(Blocks.SNOW) && !TerrainProbe.isVegetation(was)) break;
+                        boolean core = Math.abs(across) < 0.45 && y < g + t + mouth;
+                        level.setBlock(at, core ? Blocks.BLUE_ICE.defaultBlockState() : Blocks.PACKED_ICE.defaultBlockState(), FLAGS);
+                        placed++;
+                    }
+                    GLACIERS.increment();
+                }
+            }
         }
         return placed;
     }
