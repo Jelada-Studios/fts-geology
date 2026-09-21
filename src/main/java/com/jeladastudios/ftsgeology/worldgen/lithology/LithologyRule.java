@@ -5,6 +5,7 @@ import com.jeladastudios.ftsgeology.hydrology.RiverNetwork;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.Column;
 import com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.Rock;
+import com.jeladastudios.ftsgeology.util.ValueNoise;
 import com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -27,7 +28,7 @@ import net.minecraft.world.level.levelgen.SurfaceRules;
  * every block, stone included. Placed before the soil rules, that leaves a cliff face bare in any biome, the way a real
  * cliff sheds its soil, and the rock it shows is the rock behind it. Vanilla's own steep test looks one way along each
  * axis, so it would have stripped a cliff that faced north and left the one facing south under grass; this one looks
- * both ways.</p>
+ * both ways. Not all of it is face: see {@link #TALUS_SHARE}.</p>
  *
  * <p>With {@code bare} it answers in every column, stone included, whatever the slope: the rule above the tree line,
  * where a mountain carries no soil at all.</p>
@@ -42,6 +43,19 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
 
     /** How much the ground must climb across two blocks for a column to count as a cliff. */
     private static final int STEEP_RISE = 3;
+
+    /**
+     * How much of a steep slope is loose debris rather than bare face, low down, and how wide those patches are.
+     *
+     * <p>Measured against real Alpine ground in the twenty-first round: at ten metres to the block almost every
+     * column of a mountainside climbs three within two, so the cliff rule fired on all of them and the whole flank
+     * came out as one grey wall. A rock face does not run unbroken down a mountain. It breaks off, and what breaks
+     * off piles at the foot at the angle of repose, so a real flank is bands of bare rock with scree between them.
+     * The patch is a field rather than a die a column at a time, so the bare stretches are that many blocks across
+     * and some of them are whole; and it fades out with {@link Column#high}, because debris gathers low and the
+     * summits stay the bare rock the twenty-fourth round asked for.</p>
+     */
+    private static final double TALUS_SHARE = 0.75, TALUS_SCALE = 20.0, TALUS_GRAIN = 4.0;
 
     /**
      * How far past a channel's flat bed the river still owns the ground it runs on, in fault widths of the
@@ -74,6 +88,8 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
         private final byte[] steep = new byte[256];
         /** 0 not yet looked at, 1 dry land, 2 a river's own ground. */
         private final byte[] river = new byte[256];
+        /** 0 not yet looked at, 1 bare face, 2 scree. */
+        private final byte[] talus = new byte[256];
 
         Pass(ChunkAccess chunk, long seed, boolean steepOnly, boolean bare) {
             this.chunk = chunk;
@@ -99,6 +115,13 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
                 grounds[i] = chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x & 15, z & 15) - 1;
             }
             Rock r = Lithology.rockAt(seed, c, x, y, z, grounds[i]);
+            // Scree, where the face has broken off: mostly gravel, with fragments of the very rock above it. The
+            // grain is a slow field rather than a die a block at a time, so it reads as rubble and not as confetti.
+            if (steepOnly && talusAt(i, x, z, c, grounds[i])) {
+                return ValueNoise.noise(x + 313, z - 571, TALUS_GRAIN) > 0.35
+                        ? States.ALL[(r == Rock.KEEP ? Rock.STONE : r).ordinal()]
+                        : States.GRAVEL;
+            }
             // On a cliff or above the tree line the block asked about would have become soil, so plain stone has to be
             // said out loud. Anywhere else it is what the block already is, and answering it would only pay for
             // writing it again.
@@ -128,6 +151,40 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
             return steep[i] == 2;
         }
 
+        /**
+         * Whether this steep column carries scree instead of a bare face.
+         *
+         * <p>The share is the most a slope can be debris and it falls to nothing at the tree line, so a summit is
+         * the bare rock it should be and the foot of the mountain is the rubble it should be. The patch field is a
+         * pure function of the place, so no chunk boundary shows in it -- the sixteen-block striping the steep test
+         * itself once had came from reading the chunk, and this reads none.</p>
+         */
+        private boolean talusAt(int i, int x, int z, Column c, int ground) {
+            if (talus[i] == 0) {
+                double share = TALUS_SHARE * (1.0 - c.high(ground));
+                boolean scree = share > 0.0 && ValueNoise.noise(x + 8171, z + 2333, TALUS_SCALE) > screeCut(share);
+                talus[i] = (byte) (scree ? 2 : 1);
+            }
+            return talus[i] == 2;
+        }
+
+        /**
+         * The value the field has to beat for a column to be scree, for a wanted share of the ground.
+         *
+         * <p>It is the field's own quantile, not a fraction of its range. Smoothed value noise bunches round zero:
+         * counted over four million points, a fifth of the ground is above 0.33, half of it above 0.00 and three
+         * fifths above -0.12, so asking for a third by halving the range gave an eighth, and the first cut of this
+         * rule put scree on fourteen per cent of the steep ground where it meant to put it on a third. The curve
+         * below follows the measured quantile to within three points of share, and reaches one at share zero, so
+         * a summit stays whole.</p>
+         */
+        private static double screeCut(double share) {
+            // Held at three fifths: past that the curve turns back up and would ask for less scree the more it
+            // wanted, and half a slope of rubble is as far as this should go in any case.
+            double s = Math.min(share, 0.60);
+            return 1.0 - 3.30 * s + 2.51 * s * s;
+        }
+
         /** Whether a traced river's channel or bank covers this column. */
         private boolean riverAt(int i, int x, int z) {
             if (river[i] == 0) {
@@ -147,6 +204,7 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
     /** The blocks the rocks are, looked up once the blocks exist. */
     private static final class States {
         static final BlockState[] ALL = new BlockState[Rock.values().length];
+        static final BlockState GRAVEL = Blocks.GRAVEL.defaultBlockState();
 
         static {
             put(Rock.STONE, Blocks.STONE);
