@@ -2,6 +2,8 @@ package com.jeladastudios.ftsgeology.hydrology;
 
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.util.ColumnCache;
+import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld;
+import com.jeladastudios.ftsgeology.worldgen.terrain.RawGround;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
 import net.minecraft.server.level.ServerChunkCache;
@@ -178,8 +180,18 @@ public final class WaterTable {
         return COLUMNS.sum();
     }
 
-    /** Generator surface height, answered without loading or generating the chunk. */
+    /**
+     * Generator surface height, answered without loading or generating the chunk.
+     *
+     * <p>In the mod's own world types the ground is read off the raw offset instead, the same pure function the rivers
+     * are traced down. A base-height query builds a whole noise chunk for one column -- the spark put seven tenths of
+     * this class's cost in that constructor alone -- and the groundwater is a blunt regional field that has no use for
+     * the few blocks of three-dimensional noise the full query adds.</p>
+     */
     private static int surfaceAt(ServerChunkCache chunkSource, ServerLevel level, int x, int z) {
+        if (RawGround.ready() && GeologyWorld.isOwn(level)) {
+            return (int) Math.floor(RawGround.heightAt(x, z)) + 1;
+        }
         COLUMNS.increment();
         return chunkSource.getGenerator().getBaseHeight(
                 x, z, Heightmap.Types.WORLD_SURFACE_WG, level, chunkSource.randomState());
