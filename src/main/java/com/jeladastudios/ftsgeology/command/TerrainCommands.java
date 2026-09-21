@@ -589,4 +589,17 @@ public final class TerrainCommands {
         ctx.getSource().sendSuccess(() -> Component.literal(out), false);
         return 1;
     }
+
+    /** A fingerprint of the rivers round here, to check that the same world gives the same rivers every time. */
+    public static int terrainRiversHash(CommandContext<CommandSourceStack> ctx, int half) {
+        BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+        if (!com.jeladastudios.ftsgeology.hydrology.RiverNetwork.ready()) {
+            ctx.getSource().sendSuccess(() -> Component.literal("No river network: this world type traces none."), false);
+            return 0;
+        }
+        final String out = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.hash(at.getX(), at.getZ(), half);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(out);
+        ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+        return 1;
+    }
 }

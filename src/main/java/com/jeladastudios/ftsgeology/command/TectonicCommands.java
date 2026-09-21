@@ -146,6 +146,11 @@ public final class TectonicCommands {
                                                                 IntegerArgumentType.getInteger(ctx, "half"),
                                                                 IntegerArgumentType.getInteger(ctx, "step"))))))
                                 .then(Commands.literal("rivers")
+                                        // A fingerprint of the rivers round here: the same world, the same number.
+                                        .then(Commands.literal("hash")
+                                                .then(Commands.argument("half", IntegerArgumentType.integer(64, 8000))
+                                                        .executes(ctx -> TerrainCommands.terrainRiversHash(ctx,
+                                                                IntegerArgumentType.getInteger(ctx, "half")))))
                                         .then(Commands.argument("half", IntegerArgumentType.integer(64, 4000))
                                                 .then(Commands.argument("step", IntegerArgumentType.integer(4, 64))
                                                         .then(Commands.argument("minPath", IntegerArgumentType.integer(0, 10000))

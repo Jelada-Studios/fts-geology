@@ -77,8 +77,11 @@ public final class RiverNetwork {
     private static volatile long forSeed = Long.MIN_VALUE;
     private static volatile double horizontal = 1.0;
     private static final ConcurrentHashMap<Long, Trace> TRACES = new ConcurrentHashMap<>();
-    /** Ground already read, on a four-block grid: a trace and its ways round a hollow ask for the same columns. */
-    private static final ConcurrentHashMap<Long, Double> HEIGHTS = new ConcurrentHashMap<>();
+    /**
+     * Ground already read, on a four-block grid, in tiles of thirty-two points a side: a trace and its ways round a
+     * hollow ask for the same columns. A fixed table, so it holds what is near and not everything ever asked for.
+     */
+    private static final ColumnCache<float[]> HEIGHTS = new ColumnCache<>(12);
     private static final ConcurrentHashMap<Long, Point[]> INDEX = new ConcurrentHashMap<>();
     /**
      * The raw lines and the cells they cover. Fixed tables rather than maps: joining walks every source cell for a
@@ -91,17 +94,15 @@ public final class RiverNetwork {
     /** Blocks an index square covers. */
     private static final int BLOCK = 512;
 
-    /** The generator hands the ground over as soon as the noise router is wired, before any column is asked for. */
-    public static void useGround(Ground g, long seed, double h) {
-        if (seed != forSeed || horizontal != h) {
-            TRACES.clear();
-            HEIGHTS.clear();
-            INDEX.clear();
-            RAWS.clear();
-            SPREAD.clear();
-            forSeed = seed;
-            horizontal = h;
-        }
+    /** The ground is handed over once a server, as the noise router is first wired and before any column is asked for. */
+    public static void open(Ground g, long seed, double h) {
+        TRACES.clear();
+        HEIGHTS.clear();
+        INDEX.clear();
+        RAWS.clear();
+        SPREAD.clear();
+        forSeed = seed;
+        horizontal = h;
         ground = g;
     }
 
@@ -328,6 +329,30 @@ public final class RiverNetwork {
                 channel == 0 ? 0 : wet / (double) channel, traces, traces == 0 ? 0 : length / traces,
                 traces == 0 ? 0 : sinuosity / traces, steps == 0 ? 0 : fall / steps, biggest, uphill,
                 TRACES.size(), joined(), looped());
+    }
+
+    /**
+     * A fingerprint of every traced length that starts in a square round here. The same world has to give the same
+     * number whichever order its chunks were made in and however many threads made them; counters cannot say that,
+     * since two threads working out the same cell at once count it twice.
+     */
+    public static String hash(int cx, int cz, int half) {
+        long h = 0xcbf29ce484222325L;
+        int n = 0;
+        for (int bx = Math.floorDiv(cx - half, BLOCK); bx <= Math.floorDiv(cx + half, BLOCK); bx++) {
+            for (int bz = Math.floorDiv(cz - half, BLOCK); bz <= Math.floorDiv(cz + half, BLOCK); bz++) {
+                for (Point p : block(bx, bz)) {
+                    // A length is listed in every square it reaches; it is counted in the one it starts in.
+                    if (Math.floorDiv((int) Math.floor(p.x), BLOCK) != bx || Math.floorDiv((int) Math.floor(p.z), BLOCK) != bz) continue;
+                    if (Math.abs(p.x - cx) > half || Math.abs(p.z - cz) > half) continue;
+                    n++;
+                    for (float v : new float[]{p.x, p.z, p.ex, p.ez, p.water, p.waterEnd, p.bed, p.bedEnd, p.halfWidth, p.fromHead}) {
+                        h = (h ^ Float.floatToIntBits(v)) * 0x100000001b3L;
+                    }
+                }
+            }
+        }
+        return String.format(java.util.Locale.ROOT, "rivers hash within %d of %d,%d: %d lengths, %016x", half, cx, cz, n, h);
     }
 
     // === The index =========================================================
@@ -786,14 +811,26 @@ public final class RiverNetwork {
         return null;
     }
 
-    /** The ground at a point, on a four-block grid and kept: the same columns are asked for again and again. */
+    /**
+     * The ground at a point, on a four-block grid and kept: the same columns are asked for again and again. Kept as a
+     * float and handed back as one every time, so a height worked out again after it fell out of the table is the
+     * same number as before.
+     */
     private static double height(Ground g, double x, double z) {
-        int ix = ((int) Math.floor(x)) & ~3, iz = ((int) Math.floor(z)) & ~3;
-        long k = key(ix >> 2, iz >> 2);
-        Double hit = HEIGHTS.get(k);
-        if (hit != null) return hit;
-        double y = g.heightAt(ix, iz);
-        if (HEIGHTS.size() < 4_000_000) HEIGHTS.put(k, y);
+        int gx = ((int) Math.floor(x)) >> 2, gz = ((int) Math.floor(z)) >> 2;
+        long k = ColumnCache.key(gx >> 5, gz >> 5);
+        float[] tile = HEIGHTS.get(k);
+        if (tile == null) {
+            tile = new float[32 * 32];
+            java.util.Arrays.fill(tile, Float.NaN);
+            HEIGHTS.put(k, tile);
+        }
+        int l = (gx & 31) + 32 * (gz & 31);
+        float y = tile[l];
+        if (Float.isNaN(y)) {
+            y = (float) g.heightAt(gx << 2, gz << 2);
+            tile[l] = y;
+        }
         return y;
     }
 

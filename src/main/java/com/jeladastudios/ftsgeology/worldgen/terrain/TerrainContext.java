@@ -1,6 +1,7 @@
 package com.jeladastudios.ftsgeology.worldgen.terrain;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
+import com.jeladastudios.ftsgeology.hydrology.RiverNetwork;
 import com.jeladastudios.ftsgeology.tectonics.GeologyParams;
 import net.minecraftforge.event.server.ServerAboutToStartEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
@@ -38,6 +39,10 @@ public final class TerrainContext {
         TerrainCache.clear();
         GeologyWorld.clear();
         LandmarkSites.clear();
+        // The ground and the rivers of the last world go with it: a second world opened in the same game, with the
+        // rivers switched off, cut the first one's channels into its terrain.
+        RawGround.clear();
+        RiverNetwork.clear();
     }
 
     /** Whether the overworld about to be made is the tall world type: its stem is in the registry before the levels. */
@@ -57,6 +62,8 @@ public final class TerrainContext {
         TerrainCache.clear();
         GeologyWorld.clear();
         LandmarkSites.clear();
+        RawGround.clear();
+        RiverNetwork.clear();
     }
 
     /** The current world's seed, or 0 with one warning when no server has announced one. */

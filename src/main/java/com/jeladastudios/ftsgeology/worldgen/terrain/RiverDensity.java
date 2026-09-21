@@ -1,6 +1,5 @@
 package com.jeladastudios.ftsgeology.worldgen.terrain;
 
-import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.hydrology.RiverNetwork;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
@@ -92,23 +91,17 @@ public final class RiverDensity implements DensityFunction {
     }
 
     /**
-     * The router is wired here: the raw ground comes back with its noises bound, and the network is handed it, so
-     * that a trace reads the same ground the chunk will be built from.
+     * The router is wired here. The first wiring of a server hands the raw ground over, so that a trace reads the
+     * ground the chunks will be built from; every later one, a chunk binding its caches, only binds this copy's.
      */
     @Override
     public DensityFunction mapAll(Visitor visitor) {
         // Only the floor carries the ground: the near field reads nothing but the finished network, so walking the
         // whole raw offset tree for it would be a second copy of the same work on every chunk the generator builds.
         if (mode != Mode.FLOOR) return visitor.apply(this);
-        // Switched off, the ground is never handed over, so the network never opens: no channel is cut into the
-        // offset, no cave is pushed away from one and no water is laid. The world keeps vanilla's rivers and
-        // nothing else -- which is the point of the switch, since half a river is worse than none.
-        if (!GeyserConfig.RIVERS.get()) return visitor.apply(new RiverDensity(raw.mapAll(visitor), mode));
         DensityFunction wired = raw.mapAll(visitor);
-        RiverDensity made = new RiverDensity(wired, mode);
-        RiverNetwork.useGround((x, z) -> 128.0 + 128.0 * wired.compute(new SinglePointContext(x, 0, z)),
-                TerrainContext.seed(), TerrainContext.params().horizontal());
-        return visitor.apply(made);
+        RawGround.offer(wired);
+        return visitor.apply(new RiverDensity(wired, mode));
     }
 
     @Override
