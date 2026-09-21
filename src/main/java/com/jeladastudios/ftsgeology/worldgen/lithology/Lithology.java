@@ -199,13 +199,18 @@ public final class Lithology {
      * <p>Asked for more rock and less sand towards the tops, and that is what a mountain is: the soft members of a
      * sequence are the ones that go. Calcite and marble count as rock here -- a bare karst summit is limestone and
      * travertine -- so a top stays pale rather than turning uniformly grey.</p>
+     *
+     * <p>A bed survives with the square of what is left of the climb, not with the climb itself: half way up a range
+     * one sandstone bed in four is still sandstone rather than one in two. Asked for half as much sand on the
+     * mountains, and the foot of a range and its summit stay what they were.</p>
      */
     private static Rock weathered(Column c, int surface, long h, Rock r) {
         if (r != Rock.SANDSTONE && r != Rock.RED_BEDS) return r;
         double high = c.high(surface);
         if (high <= 0.0) return r;
+        double kept = (1.0 - high) * (1.0 - high);
         // Drawn from the block's own hash, so a bed goes over as a bed rather than as grit through one.
-        return SeedHash.rand01(SeedHash.mix(h ^ 0x51D7L)) < high
+        return SeedHash.rand01(SeedHash.mix(h ^ 0x51D7L)) >= kept
                 ? HARD[(int) Math.floorMod(h >>> 9, (long) HARD.length)] : r;
     }
 
