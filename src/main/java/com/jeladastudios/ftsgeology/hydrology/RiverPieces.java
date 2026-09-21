@@ -1,46 +1,54 @@
 package com.jeladastudios.ftsgeology.hydrology;
 
+import com.jeladastudios.ftsgeology.util.ColumnCache;
+import com.jeladastudios.ftsgeology.util.SeedHash;
 import com.jeladastudios.ftsgeology.util.SetCache;
+import it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
  * The channels and lakes drawn over the drainage lattice, as the lengths a column is measured against.
  *
- * <p>A node that enough ground drains through carries a river. Its length of river runs from half way along the edge
- * the water came in by, past the node, to half way along the edge it leaves by, as a curve that the node pulls
- * towards itself. Every point of that curve stays in the corner of the node's own triangles, so the curves of
- * different nodes cannot cross; where a curve would leave that corner it is drawn straight along the two half edges
- * instead. A node under a lake is drawn as a disc of water at the lake's level, and so is every edge between two of
- * them.</p>
+ * <p>Every node owns a cell: the points nearer to it, in the barycentric sense, than to the other two corners of the
+ * triangle they lie in. The cells cover the ground without overlapping, and whatever a node draws stays inside its own
+ * cell, so the rivers of different nodes cannot cross. Water passes from one cell to the next at the lowest point of
+ * the line between them -- where the valley crosses it, not half way along the edge -- and inside a cell it follows
+ * the valley, traced over the ground on a fine grid.</p>
  *
- * <p>The water comes down the river and never goes up. At every point it is a block under the filled surface, and a
- * block under the lower of the two banks, and no higher than it was just upstream -- where two rivers meet, no higher
- * than the lower of the two.</p>
+ * <p>A river ends where another water begins. A river that joins a bigger one is carried on through the bigger one's
+ * cell to its channel; a river running into a lake, to the lake's water; into the sea, to where the ground goes under
+ * the sea. The node that receives the water draws those last reaches, so two rivers joining the same channel meet it one
+ * after the other and never cross. A lake is not drawn from its nodes but from the hollow itself: the ground under its
+ * water, flooded out from its deepest points and no further than a few steps past its own cells.</p>
+ *
+ * <p>The water comes down the river and never goes up. At every point it is under the filled surface and a block under
+ * the lower of the two banks, and no higher than it was just upstream.</p>
  */
 final class RiverPieces {
 
-    static final byte CHANNEL = 0, LAKE = 1;
+    static final byte CHANNEL = 0, LAKE = 1, JOIN = 2;
 
-    /** Blocks between the points of a length. */
+    /** Blocks between the points of a length, at the normal world's layout. */
     static final double STEP = 8.0;
-    /** Blocks of water in a channel. */
+    /** The deepest a channel is cut under its water, in blocks at the normal world's layout. */
     static final double DEPTH = 3.0;
-    /** Channel half width, from a new river to a grown one. */
-    static final double HALF_NEW = 2.0, HALF_GROWN = 7.0;
+    /** A new stream's half width in blocks, in any layout: a rill a block or two across. */
+    static final double HALF_MIN = 0.5;
+    /** A grown river's half width, at the normal world's layout. */
+    static final double HALF_GROWN = 7.0;
+    /** How deep a stream runs for its width: a rill a block deep, a river its full depth. */
+    static final double DEPTH_LEAST = 1.0, DEPTH_BASE = 0.6, DEPTH_PER_HALF = 0.6;
     /** How steeply a channel's wall climbs out of its bed, and how far over the water it is carried. */
     static final double WALL = 2.0, BANK_RISE = 2.0;
-    /**
-     * The half width of a lake's disc, as a share of the lattice cell: wide enough that neighbouring discs meet and
-     * reach the shore half way to the next node. A lake cuts almost nothing ({@code RiverDensity}'s lake shave), so
-     * the water only fills the hollow that is there and a wide disc costs nothing on the hillside.
-     */
-    static final double LAKE_HALF = 0.55;
-    /** How far under its water a lake's floor is cut, where the hollow is not already deeper. */
+    /** How far under its water a lake's floor lies, where the hollow is not already deeper. */
     static final double LAKE_BED = 2.0;
     /**
      * A hollow shallower than this is not a lake: the river cuts through its rim instead. Most of the hollows the
@@ -55,31 +63,68 @@ final class RiverPieces {
     static final int POOL_RUN = 3;
     /** How much of its width a torrent keeps, and the gradients that ramp between a torrent and a lowland river. */
     static final double STEEP_NARROW = 0.35, STEEP_FROM = 0.15, STEEP_OVER = 0.5;
+    /** A river that the ground closes round ends in a pond this wide, as a share of the lattice cell. */
+    static final double SINK_HALF = 0.33;
     /** Where a river's length is counted from, for a river that leaves a lake: far enough that no spring opens there. */
     private static final float FROM_LAKE = 1.0e4f;
+
+    /**
+     * How a way through a cell is weighed. A step costs its length, times one more for every VALLEY blocks (at the
+     * normal layout) it stands over the lower end of the way, times a slow noise that lets a way across flat ground
+     * wander; climbing costs UPHILL a block on top. Water keeps to the floor of its valley and, where there is none,
+     * meanders.
+     */
+    private static final double VALLEY = 3.0, UPHILL = 2.0, WIGGLE = 1.5, WIGGLE_WAVE = 3.0;
+    /**
+     * Blocks of height a slow noise adds to the line between two cells when the crossing is picked. On a slope the
+     * ground settles where the water crosses; on flat ground every point of the line is as low as the next, the middle
+     * won every time, and a river crossing a plain ran from the middle of one edge to the middle of the next in a
+     * straight row of cells.
+     */
+    private static final double HANDOFF_WANDER = 2.0;
+    /** Grid points to a height tile. */
+    private static final int TILE = 8;
+    /** A node's neighbour slots in turn round it: east, north-east, north, and on. */
+    private static final int[] RING = {0, 4, 1, 5, 2, 6, 3, 7};
+    /** Where the water crosses from one cell to the next: this far along the line between them, either way of middle. */
+    private static final double HANDOFF_SPAN = 0.8;
+    private static final int HANDOFF_SAMPLES = 6;
+    /** How far past its own cells a lake's water may reach, in grid steps, following the hollow. */
+    private static final int LAKE_REACH = 3;
 
     private final DrainageLattice lat;
     private final DrainageLattice.Ground ground;
     private final double h;
     final int areaMin;
+    /** Blocks between the points a way is traced over and a lake is flooded on. */
+    final int grid;
+    private final long seed;
 
     private final SetCache<RiverNetwork.Point[]> made = new SetCache<>(13);
     private final SetCache<Boolean> drawn = new SetCache<>(10), deep = new SetCache<>(10);
+    private final SetCache<Cell> cells = new SetCache<>(12);
+    private final SetCache<Handoff> handoffs = new SetCache<>(12);
+    private final SetCache<float[]> heights = new SetCache<>(13);
+    private final SetCache<LakeMask> masks = new SetCache<>(10);
 
-    final LongAdder channels = new LongAdder(), straightened = new LongAdder(), drySamples = new LongAdder(),
-            bankClamps = new LongAdder(), lakePoints = new LongAdder(), sinks = new LongAdder(),
-            mouths = new LongAdder();
+    final LongAdder channels = new LongAdder(), joins = new LongAdder(), fallbacks = new LongAdder(),
+            dams = new LongAdder(), bankClamps = new LongAdder(), lakeMasks = new LongAdder(), sinks = new LongAdder(),
+            mouths = new LongAdder(), dryJoins = new LongAdder(), gridReads = new LongAdder();
 
     RiverPieces(DrainageLattice lat, DrainageLattice.Ground ground, double horizontal, int areaMin) {
         this.lat = lat;
         this.ground = ground;
         this.h = horizontal;
         this.areaMin = areaMin;
+        // Eight grid steps to a cell. Every grid point is a read of the ground, and a finer grid made the rivers cost
+        // several times what the lattice did; the ground itself is no finer than this in either world.
+        this.grid = Math.max(3, (int) Math.round(4.0 * horizontal));
+        this.seed = lat.seed();
     }
 
     static final RiverNetwork.Point[] NONE = new RiverNetwork.Point[0];
 
-    /** Whatever this node draws: its length of river, its share of a lake, or nothing. */
+    /** Whatever this node draws: its length of river, the rivers it takes in, a lake's ways in and out, or nothing. */
     RiverNetwork.Point[] of(long u) {
         RiverNetwork.Point[] hit = made.get(u);
         if (hit != null) return hit;
@@ -96,9 +141,9 @@ final class RiverPieces {
                 continue;
             }
             long pending = Long.MIN_VALUE;
-            if (isChannel(v)) {
+            if (takesRivers(v)) {
                 for (long d : lat.donors(v)) {
-                    if (lat.area(d) < areaMin || underLake(d)) continue;
+                    if (!isRiver(d)) continue;
                     if (!local.containsKey(d) && made.get(d) == null) {
                         pending = d;
                         break;
@@ -118,13 +163,19 @@ final class RiverPieces {
         return out != null ? out : made.get(u);
     }
 
-    private boolean isChannel(long v) {
+    /** A node that carries a river of its own. */
+    boolean isRiver(long v) {
         return lat.g(v) > lat.sea && !underLake(v) && lat.area(v) >= areaMin;
     }
 
+    /** A node that rivers can end in: a river, the sea, or a lake. */
+    private boolean takesRivers(long v) {
+        return lat.g(v) <= lat.sea || underLake(v) || isRiver(v);
+    }
+
     private RiverNetwork.Point[] build(long v, Long2ObjectOpenHashMap<RiverNetwork.Point[]> local) {
-        if (lat.g(v) <= lat.sea) return NONE;
-        if (underLake(v)) return lake(v);
+        if (lat.g(v) <= lat.sea) return sea(v, local);
+        if (underLake(v)) return lake(v, local);
         if (lat.area(v) < areaMin) return NONE;
         return channel(v, local);
     }
@@ -169,9 +220,7 @@ final class RiverPieces {
         if (hit != null) return hit;
         boolean yes = false;
         for (long m : lake.members) {
-            long out = lake.next.get(m);
-            if (out == Long.MIN_VALUE) continue;
-            if (java.util.Arrays.binarySearch(lake.members, out) < 0 && lat.area(m) >= areaMin) {
+            if (outlet(lake, m) != Long.MIN_VALUE) {
                 yes = true;
                 break;
             }
@@ -180,183 +229,543 @@ final class RiverPieces {
         return yes;
     }
 
-    private RiverNetwork.Point[] lake(long v) {
-        DrainageLattice.Lake lake = lat.lakeOf(v);
-        if (lake == null || !deep(lake) || !drawn(lake)) return NONE;
-        float w = (float) (lake.level - 1.0);
-        float bed = (float) (lake.level - 1.0 - LAKE_BED * h);
-        float half = (float) (LAKE_HALF * lat.cell);
-        List<RiverNetwork.Point> out = new ArrayList<>(5);
-        float x = (float) lat.x(v), z = (float) lat.z(v);
-        out.add(new RiverNetwork.Point(x, z, x, z, w, w, bed, bed, half, FROM_LAKE, LAKE));
-        // The edges between two nodes under the same lake, drawn once each, so the discs close up into one sheet.
-        for (int s = 0; s < 8; s++) {
-            if (!lat.has(v, s)) continue;
-            long n = DrainageLattice.step(v, s);
-            if (n <= v || lat.weight(v, s) > lake.level) continue;
-            if (java.util.Arrays.binarySearch(lake.members, n) < 0) continue;
-            float mx = (float) ((lat.x(v) + lat.x(n)) * 0.5), mz = (float) ((lat.z(v) + lat.z(n)) * 0.5);
-            out.add(new RiverNetwork.Point(mx, mz, mx, mz, w, w, bed, bed, half, FROM_LAKE, LAKE));
+    /** Where a river leaves a lake from this member, or {@link Long#MIN_VALUE}. */
+    private long outlet(DrainageLattice.Lake lake, long m) {
+        long out = lake.next.get(m);
+        if (out == Long.MIN_VALUE || Arrays.binarySearch(lake.members, out) >= 0 || lat.area(m) < areaMin) {
+            return Long.MIN_VALUE;
         }
-        lakePoints.add(out.size());
+        return out;
+    }
+
+    /** The water a drawn lake stands in, for the index; null for a node under no drawn lake. */
+    LakeMask maskOf(long v) {
+        if (!lat.flooded(v)) return null;
+        DrainageLattice.Lake lake = lat.lakeOf(v);
+        if (lake == null || !deep(lake) || !drawn(lake)) return null;
+        return mask(lake);
+    }
+
+    /** A lake member's share of the drawing: the river out of the lake, if it leaves here, and the rivers into it. */
+    private RiverNetwork.Point[] lake(long m, Long2ObjectOpenHashMap<RiverNetwork.Point[]> local) {
+        DrainageLattice.Lake lake = lat.lakeOf(m);
+        if (lake == null || !deep(lake) || !drawn(lake)) return NONE;
+        LakeMask mask = mask(lake);
+        Cell c = cell(m);
+        // The water, and where the cell has none -- a node the lattice put under the lake whose own ground stands a
+        // little over the water -- the points beside it, so a river still has somewhere to come in and go out.
+        boolean[] wet = new boolean[c.in.length];
+        boolean any = false;
+        for (int i = 0; i < wet.length; i++) {
+            wet[i] = c.in[i] && mask.wet(c.gi(i), c.gk(i));
+            any |= wet[i];
+        }
+        if (!any) {
+            for (int i = 0; i < wet.length; i++) {
+                wet[i] = c.in[i] && mask.besideWater(c.gi(i), c.gk(i));
+                any |= wet[i];
+            }
+        }
+        // A node whose whole cell stands over the water, the lake's shallow edge: the points of the cell nearest the
+        // water, and from there a last short step over the lake's own shore into it.
+        boolean hop = false;
+        if (!any) {
+            double[] far = new double[c.in.length];
+            double least = Double.MAX_VALUE;
+            for (int i = 0; i < far.length; i++) {
+                far[i] = c.in[i] ? mask.distanceToWater(c.x(i), c.z(i), lat.cell) : Double.MAX_VALUE;
+                least = Math.min(least, far[i]);
+            }
+            if (least < Double.MAX_VALUE) {
+                hop = true;
+                for (int i = 0; i < far.length; i++) wet[i] = far[i] <= least + grid;
+            }
+        }
+        List<RiverNetwork.Point> out = new ArrayList<>();
+        List<double[]> segs = new ArrayList<>();
+        long n = outlet(lake, m);
+        if (n != Long.MIN_VALUE) {
+            // The way out: from the water to where it crosses into the next cell, at the lake's own level.
+            List<double[]> path = route(c, handoff(m, n), null, wet);
+            if (path == null) {
+                dryJoins.increment();
+            } else {
+                if (hop) {
+                    double[] last = path.get(path.size() - 1);
+                    double[] water = mask.nearestWater(last[0], last[1], lat.cell);
+                    if (water != null) path.add(water);
+                }
+                java.util.Collections.reverse(path);
+                double w = mask.water;
+                List<RiverNetwork.Point> pts = lay(tidy(c, path), w, w, w, FROM_LAKE, halfFor(lat.area(m)), JOIN);
+                out.addAll(pts);
+                segments(pts, segs);
+                joins.increment();
+            }
+        }
+        for (long d : riverDonors(m, lake)) join(c, d, m, segs, out, local, wet, mask.water, hop ? mask : null);
+        return out.toArray(NONE);
+    }
+
+    /**
+     * The lake's water: flooded outwards from the deepest point of each of its nodes' cells over every grid point
+     * whose ground lies under the water, through the lake's own cells and no more than a few steps past them. A
+     * rim the ground holds stops it; a rim the lattice's sill only assumed -- half way along an edge, eight blocks
+     * under the ground -- does too, because the ground is read, so the water never runs out over an outlet onto
+     * the hillside below.
+     */
+    private LakeMask mask(DrainageLattice.Lake lake) {
+        LakeMask hit = masks.get(lake.owner);
+        if (hit != null && hit.owner == lake.owner) return hit;
+        double water = lake.level - 1.0;
+        LongOpenHashSet own = new LongOpenHashSet();
+        LongArrayList seeds = new LongArrayList();
+        for (long m : lake.members) {
+            Cell c = cell(m);
+            int low = -1;
+            for (int i = 0; i < c.in.length; i++) {
+                if (!c.in[i]) continue;
+                own.add(ColumnCache.key(c.gi(i), c.gk(i)));
+                if (low < 0 || c.hgt[i] < c.hgt[low]) low = i;
+            }
+            if (low >= 0 && c.hgt[low] < water) seeds.add(ColumnCache.key(c.gi(low), c.gk(low)));
+        }
+        Long2FloatOpenHashMap depth = new Long2FloatOpenHashMap();
+        Long2FloatOpenHashMap shore = new Long2FloatOpenHashMap();
+        Long2IntOpenHashMap outside = new Long2IntOpenHashMap();
+        LongArrayList queue = new LongArrayList();
+        for (int i = 0; i < seeds.size(); i++) {
+            long k = seeds.getLong(i);
+            if (depth.containsKey(k)) continue;
+            int gi = (int) k, gk = (int) (k >>> 32);
+            depth.put(k, (float) (water - height(gi, gk)));
+            outside.put(k, 0);
+            queue.add(k);
+        }
+        for (int q = 0; q < queue.size(); q++) {
+            long k = queue.getLong(q);
+            int gi = (int) k, gk = (int) (k >>> 32), steps = outside.get(k);
+            for (int di = -1; di <= 1; di++) {
+                for (int dk = -1; dk <= 1; dk++) {
+                    if (di == 0 && dk == 0) continue;
+                    long nk = ColumnCache.key(gi + di, gk + dk);
+                    if (depth.containsKey(nk)) continue;
+                    int st = own.contains(nk) ? 0 : steps + 1;
+                    // The shore is kept too, as how far the ground stands over the water, so the edge of the water is
+                    // read off the ground between a wet point and a dry one instead of stopping short at the wet one.
+                    if (st > LAKE_REACH) {
+                        shore.putIfAbsent(nk, -1.0f);
+                        continue;
+                    }
+                    double gh = height(gi + di, gk + dk);
+                    if (gh >= water) {
+                        shore.putIfAbsent(nk, (float) (water - gh));
+                        continue;
+                    }
+                    depth.put(nk, (float) (water - gh));
+                    outside.put(nk, st);
+                    queue.add(nk);
+                }
+            }
+        }
+        if (!depth.isEmpty()) {
+            for (Long2FloatOpenHashMap.Entry e : shore.long2FloatEntrySet()) depth.putIfAbsent(e.getLongKey(), e.getFloatValue());
+        }
+        int gi0 = Integer.MAX_VALUE, gk0 = Integer.MAX_VALUE, gi1 = Integer.MIN_VALUE, gk1 = Integer.MIN_VALUE;
+        for (long k : depth.keySet()) {
+            int gi = (int) k, gk = (int) (k >>> 32);
+            gi0 = Math.min(gi0, gi);
+            gk0 = Math.min(gk0, gk);
+            gi1 = Math.max(gi1, gi);
+            gk1 = Math.max(gk1, gk);
+        }
+        LakeMask made;
+        if (depth.isEmpty()) {
+            made = new LakeMask(lake.owner, water, water - LAKE_BED * h, grid, 0, 0, 0, 0, new float[0]);
+        } else {
+            int wi = gi1 - gi0 + 1, wk = gk1 - gk0 + 1;
+            float[] d = new float[wi * wk];
+            Arrays.fill(d, Float.NaN);
+            for (Long2FloatOpenHashMap.Entry e : depth.long2FloatEntrySet()) {
+                long k = e.getLongKey();
+                d[((int) k - gi0) + wi * ((int) (k >>> 32) - gk0)] = e.getFloatValue();
+            }
+            made = new LakeMask(lake.owner, water, water - LAKE_BED * h, grid, gi0, gk0, wi, wk, d);
+        }
+        masks.put(lake.owner, made);
+        lakeMasks.increment();
+        return made;
+    }
+
+    /**
+     * A drawn lake's water on the grid: how deep it stands over each point it covers. Between the points the depth is
+     * read off the four round the column, so the shore follows the ground between them.
+     */
+    static final class LakeMask {
+        final long owner;
+        final double water, bed;
+        final int grid, gi0, gk0, wi, wk;
+        private final float[] depth;
+
+        LakeMask(long owner, double water, double bed, int grid, int gi0, int gk0, int wi, int wk, float[] depth) {
+            this.owner = owner;
+            this.water = water;
+            this.bed = bed;
+            this.grid = grid;
+            this.gi0 = gi0;
+            this.gk0 = gk0;
+            this.wi = wi;
+            this.wk = wk;
+            this.depth = depth;
+        }
+
+        boolean covers(double x0, double z0, double x1, double z1) {
+            if (wi == 0) return false;
+            return (gi0 - 1.0) * grid < x1 && (gi0 + wi) * (double) grid > x0
+                    && (gk0 - 1.0) * grid < z1 && (gk0 + wk) * (double) grid > z0;
+        }
+
+        boolean wet(int gi, int gk) {
+            return raw(gi, gk) > 0;
+        }
+
+        /** How far the nearest water is from here, looking no further than {@code reach}; MAX_VALUE where none is. */
+        double distanceToWater(double x, double z, double reach) {
+            double[] w = nearestWater(x, z, reach);
+            return w == null ? Double.MAX_VALUE : Math.hypot(w[0] - x, w[1] - z);
+        }
+
+        /** The nearest grid point under the water, no further than {@code reach}, or null. */
+        double[] nearestWater(double x, double z, double reach) {
+            int r = (int) Math.ceil(reach / grid);
+            int ci = (int) Math.round(x / grid), ck = (int) Math.round(z / grid);
+            double best = Double.MAX_VALUE;
+            double[] out = null;
+            for (int gk = ck - r; gk <= ck + r; gk++) {
+                for (int gi = ci - r; gi <= ci + r; gi++) {
+                    if (!wet(gi, gk)) continue;
+                    double d = Math.hypot(gi * (double) grid - x, gk * (double) grid - z);
+                    if (d < best) {
+                        best = d;
+                        out = new double[]{gi * (double) grid, gk * (double) grid};
+                    }
+                }
+            }
+            return best <= reach ? out : null;
+        }
+
+        /** Water on this grid point or on one of the eight round it. */
+        boolean besideWater(int gi, int gk) {
+            for (int di = -1; di <= 1; di++) {
+                for (int dk = -1; dk <= 1; dk++) if (wet(gi + di, gk + dk)) return true;
+            }
+            return false;
+        }
+
+        private double raw(int gi, int gk) {
+            int a = gi - gi0, b = gk - gk0;
+            if (a < 0 || b < 0 || a >= wi || b >= wk) return -grid;
+            float v = depth[a + wi * b];
+            return Float.isNaN(v) ? -grid : v;
+        }
+
+        /** How deep the water stands here, from the four grid points round the column; at or under 0 it is dry. */
+        double depthAt(double x, double z) {
+            if (wi == 0) return -grid;
+            double fx = x / grid, fz = z / grid;
+            int i0 = (int) Math.floor(fx), k0 = (int) Math.floor(fz);
+            if (i0 < gi0 - 1 || k0 < gk0 - 1 || i0 >= gi0 + wi || k0 >= gk0 + wk) return -grid;
+            double tx = fx - i0, tz = fz - k0;
+            double a = raw(i0, k0), b = raw(i0 + 1, k0), c = raw(i0, k0 + 1), d = raw(i0 + 1, k0 + 1);
+            double top = a + (b - a) * tx, bottom = c + (d - c) * tx;
+            return top + (bottom - top) * tz;
+        }
+
+        /** A fingerprint of the water, for the determinism check. */
+        long hash(long h) {
+            h = (h ^ Double.doubleToLongBits(water)) * 0x100000001b3L;
+            h = (h ^ gi0) * 0x100000001b3L;
+            h = (h ^ gk0) * 0x100000001b3L;
+            for (float v : depth) h = (h ^ Float.floatToIntBits(v)) * 0x100000001b3L;
+            return h;
+        }
+    }
+
+    // === The sea ============================================================
+
+    /** A sea node's share: every river that reaches it, carried on to where its ground goes under the sea. */
+    private RiverNetwork.Point[] sea(long s, Long2ObjectOpenHashMap<RiverNetwork.Point[]> local) {
+        long[] ds = riverDonors(s, null);
+        if (ds.length == 0) return NONE;
+        Cell c = cell(s);
+        boolean[] wet = new boolean[c.in.length];
+        boolean any = false;
+        for (int i = 0; i < wet.length; i++) {
+            wet[i] = c.in[i] && c.hgt[i] <= lat.sea - 2.0;
+            any |= wet[i];
+        }
+        // A sea node on a shore that stands a little over the water everywhere in its cell: its lowest ground, then.
+        if (!any) {
+            for (int i = 0; i < wet.length; i++) wet[i] = c.in[i] && c.hgt[i] <= c.low + 1.0;
+        }
+        List<RiverNetwork.Point> out = new ArrayList<>();
+        List<double[]> segs = new ArrayList<>();
+        for (long d : ds) {
+            join(c, d, s, segs, out, local, wet, lat.sea, null);
+            mouths.increment();
+        }
         return out.toArray(NONE);
     }
 
     // === Channels ===========================================================
 
+    /** The rivers that come into a node, biggest first: rivers of their own, and lakes that spill into it. */
+    private long[] riverDonors(long u, DrainageLattice.Lake ownLake) {
+        LongArrayList out = new LongArrayList();
+        for (long d : lat.donors(u)) {
+            if (lat.area(d) < areaMin) continue;
+            if (ownLake != null && Arrays.binarySearch(ownLake.members, d) >= 0) continue;
+            if (isRiver(d) || (underLake(d) && maskOf(d) != null)) out.add(d);
+        }
+        long[] ds = out.toLongArray();
+        // Biggest first, and the lower key first between two the same size: every thread draws them in one order.
+        Long[] boxed = new Long[ds.length];
+        for (int i = 0; i < ds.length; i++) boxed[i] = ds[i];
+        Arrays.sort(boxed, (a, b) -> lat.area(a) != lat.area(b) ? Integer.compare(lat.area(b), lat.area(a)) : Long.compare(a, b));
+        for (int i = 0; i < ds.length; i++) ds[i] = boxed[i];
+        return ds;
+    }
+
+    /** Where a river that comes in ends: its water, its width and how far down its river it is. */
+    private record End(double water, double half, double length) {}
+
+    private End end(long d, Long2ObjectOpenHashMap<RiverNetwork.Point[]> local) {
+        if (underLake(d)) {
+            LakeMask mask = maskOf(d);
+            return mask == null ? null : new End(mask.water, halfFor(lat.area(d)), FROM_LAKE);
+        }
+        RiverNetwork.Point[] ps = get(d, local);
+        RiverNetwork.Point last = null;
+        for (RiverNetwork.Point p : ps) if (p.kind() == CHANNEL) last = p;
+        if (last == null) return null;
+        return new End(last.waterEnd(), last.halfWidth(),
+                last.fromHead() + Math.hypot(last.ex() - last.x(), last.ez() - last.z()));
+    }
+
     private RiverNetwork.Point[] channel(long u, Long2ObjectOpenHashMap<RiverNetwork.Point[]> local) {
         channels.increment();
         double fu = level(u);
         long r = lat.receiver(u);
+        long[] ds = riverDonors(u, null);
         // Where the water comes in: the biggest of the rivers above, and the lowest water any of them brings.
         long main = Long.MIN_VALUE;
-        int mainArea = -1;
-        double wIn = Double.MAX_VALUE, lenIn = 0;
-        for (long d : lat.donors(u)) {
-            int a = lat.area(d);
-            if (a < areaMin) continue;
-            double wd, ld;
-            if (underLake(d)) {
-                wd = level(d) - 1.0;
-                ld = FROM_LAKE;
-            } else {
-                RiverNetwork.Point[] ps = get(d, local);
-                if (ps.length == 0) continue;
-                RiverNetwork.Point last = ps[ps.length - 1];
-                wd = last.waterEnd();
-                ld = last.fromHead() + Math.hypot(last.ex() - last.x(), last.ez() - last.z());
-            }
-            wIn = Math.min(wIn, wd);
-            if (a > mainArea || (a == mainArea && d < main)) {
-                mainArea = a;
+        double wIn = fu - 1.0, lenIn = 0;
+        for (long d : ds) {
+            End e = end(d, local);
+            if (e == null) continue;
+            if (main == Long.MIN_VALUE) {
                 main = d;
-                lenIn = ld;
+                lenIn = e.length();
+                wIn = e.water();
+            } else {
+                wIn = Math.min(wIn, e.water());
             }
         }
-        double ux = lat.x(u), uz = lat.z(u);
-        double sx = ux, sz = uz, tS = fu - 1.0;
-        if (main != Long.MIN_VALUE) {
-            sx = (lat.x(main) + ux) * 0.5;
-            sz = (lat.z(main) + uz) * 0.5;
-            tS = (level(main) + fu) * 0.5 - 1.0;
-        } else {
-            wIn = fu - 1.0;
-        }
-        double ex = ux, ez = uz, tE = fu - 1.0;
+        Cell c = cell(u);
+        double[] s = main == Long.MIN_VALUE ? new double[]{lat.x(u), lat.z(u)} : handoff(main, u);
+        double tS = main == Long.MIN_VALUE ? fu - 1.0 : (level(main) + fu) * 0.5 - 1.0;
+        double[] e;
+        double tE;
         if (r != Long.MIN_VALUE) {
-            ex = (ux + lat.x(r)) * 0.5;
-            ez = (uz + lat.z(r)) * 0.5;
+            e = handoff(u, r);
             tE = (fu + level(r)) * 0.5 - 1.0;
-            if (lat.g(r) <= lat.sea) mouths.increment();
+        } else {
+            e = new double[]{lat.x(u), lat.z(u)};
+            tE = fu - 1.0;
         }
-        double half = halfFor(lat.area(u));
-        List<RiverNetwork.Point> pts = lay(u, true, sx, sz, ux, uz, ex, ez, tS, fu - 1.0, tE, wIn, lenIn, half);
-        if (pts == null) {
-            straightened.increment();
-            pts = lay(u, false, sx, sz, ux, uz, ex, ez, tS, fu - 1.0, tE, wIn, lenIn, half);
+        List<double[]> path = route(c, s, e, null);
+        if (path == null) {
+            fallbacks.increment();
+            path = new ArrayList<>(List.of(s, new double[]{lat.x(u), lat.z(u)}, e));
+        } else {
+            path = tidy(c, path);
         }
+        List<RiverNetwork.Point> pts = lay(path, tS, tE, wIn, lenIn, halfFor(lat.area(u)), CHANNEL);
         if (r == Long.MIN_VALUE) {
             // A river the ground closes round: it ends in a pond of its own.
             sinks.increment();
             RiverNetwork.Point last = pts.get(pts.size() - 1);
             float w = last.waterEnd();
             float bed = (float) (w - LAKE_BED * h);
-            pts.add(new RiverNetwork.Point((float) ux, (float) uz, (float) ux, (float) uz, w, w, bed, bed,
-                    (float) (LAKE_HALF * lat.cell * 0.6), FROM_LAKE, LAKE));
+            float ux = (float) lat.x(u), uz = (float) lat.z(u);
+            pts.add(new RiverNetwork.Point(ux, uz, ux, uz, w, w, bed, bed, (float) (SINK_HALF * lat.cell), FROM_LAKE, LAKE));
+        }
+        // The other rivers that come in, biggest first, each carried to the nearest water already drawn in this cell.
+        List<double[]> segs = new ArrayList<>();
+        segments(pts, segs);
+        for (long d : ds) {
+            if (d == main) continue;
+            join(c, d, u, segs, pts, local, null, 0, null);
         }
         return pts.toArray(NONE);
     }
 
-    /** Half width from the ground a river drains: a new river at the threshold, a grown one at the cap. */
-    private double halfFor(int area) {
-        double t = (Math.sqrt(area / (double) areaMin) - 1.0) / (Math.sqrt(lat.areaCap / (double) areaMin) - 1.0);
-        t = Math.max(0.0, Math.min(1.0, t));
-        return (HALF_NEW + (HALF_GROWN - HALF_NEW) * t) * h;
+    /**
+     * One more river brought into this cell's water, from where it crosses into the cell to the nearest water drawn
+     * here or, where {@code wet} is given, to any of those points. It is a way through the cell like any other, so it
+     * follows the ground; and it ends at the first point beside water already drawn, so it cannot cross any.
+     */
+    private void join(Cell c, long d, long owner, List<double[]> segs, List<RiverNetwork.Point> out,
+                      Long2ObjectOpenHashMap<RiverNetwork.Point[]> local, boolean[] wet, double wetWater,
+                      LakeMask hopTo) {
+        End from = end(d, local);
+        if (from == null) return;
+        double[] s = handoff(d, owner);
+        boolean[] target = new boolean[c.in.length];
+        boolean any = false;
+        for (int i = 0; i < target.length; i++) {
+            if (!c.in[i]) continue;
+            target[i] = (wet != null && wet[i]) || nearSegs(segs, c.x(i), c.z(i), grid);
+            any |= target[i];
+        }
+        if (!any) {
+            dryJoins.increment();
+            return;
+        }
+        List<double[]> path = route(c, s, null, target);
+        if (path == null) {
+            dryJoins.increment();
+            return;
+        }
+        double[] last = path.get(path.size() - 1);
+        double endWater = wetWater;
+        double[] snap = nearestOnSegs(segs, last[0], last[1]);
+        boolean ontoWater = wet != null && c.in.length > 0 && isWetPoint(c, wet, last);
+        if (!ontoWater && snap != null) {
+            path.add(new double[]{snap[0], snap[1]});
+            endWater = snap[2];
+        } else if (ontoWater && hopTo != null) {
+            // Over the lake's dry edge into its water.
+            double[] w = hopTo.nearestWater(last[0], last[1], lat.cell);
+            if (w != null) path.add(w);
+        }
+        path = tidy(c, path);
+        List<RiverNetwork.Point> pts = lay(path, from.water(), Math.min(from.water(), endWater), from.water(),
+                from.length(), from.half(), JOIN);
+        out.addAll(pts);
+        segments(pts, segs);
+        joins.increment();
+    }
+
+    private boolean isWetPoint(Cell c, boolean[] wet, double[] p) {
+        int i = c.index((int) Math.round(p[0] / grid), (int) Math.round(p[1] / grid));
+        return i >= 0 && wet[i] && Math.abs(c.x(i) - p[0]) < 1e-6 && Math.abs(c.z(i) - p[1]) < 1e-6;
+    }
+
+    /** The lengths as segments with their water, for joins to find. */
+    private static void segments(List<RiverNetwork.Point> pts, List<double[]> segs) {
+        for (RiverNetwork.Point p : pts) {
+            if (p.kind() == LAKE) continue;
+            segs.add(new double[]{p.x(), p.z(), p.ex(), p.ez(), p.water(), p.waterEnd()});
+        }
+    }
+
+    private static boolean nearSegs(List<double[]> segs, double x, double z, double reach) {
+        for (double[] s : segs) {
+            if (distToSeg(s, x, z) <= reach) return true;
+        }
+        return false;
+    }
+
+    /** The nearest point on the segments and the water there, or null. */
+    private static double[] nearestOnSegs(List<double[]> segs, double x, double z) {
+        double best = Double.MAX_VALUE;
+        double[] out = null;
+        for (double[] s : segs) {
+            double ax = s[2] - s[0], az = s[3] - s[1], len2 = ax * ax + az * az;
+            double t = len2 < 1e-12 ? 0 : Math.max(0, Math.min(1, ((x - s[0]) * ax + (z - s[1]) * az) / len2));
+            double px = s[0] + ax * t, pz = s[1] + az * t, d = Math.hypot(px - x, pz - z);
+            if (d < best) {
+                best = d;
+                out = new double[]{px, pz, s[4] + (s[5] - s[4]) * t};
+            }
+        }
+        return out;
+    }
+
+    private static double distToSeg(double[] s, double x, double z) {
+        double ax = s[2] - s[0], az = s[3] - s[1], len2 = ax * ax + az * az;
+        double t = len2 < 1e-12 ? 0 : Math.max(0, Math.min(1, ((x - s[0]) * ax + (z - s[1]) * az) / len2));
+        return Math.hypot(s[0] + ax * t - x, s[1] + az * t - z);
     }
 
     /**
-     * The points of one length, along the curve or, with {@code curved} off, straight along the two half edges.
-     * Null where the curve leaves the node's own triangles or runs over ground the channel cannot be cut through.
+     * Half width from the ground a river drains: a rill a block or two across where it rises, whatever the layout,
+     * and a grown river at the cap. It stays narrow a good way down, as a stream does until it has gathered a valley's
+     * worth of water.
      */
-    private List<RiverNetwork.Point> lay(long u, boolean curved, double sx, double sz, double ux, double uz,
-                                         double ex, double ez, double tS, double tU, double tE, double wIn,
-                                         double lenIn, double half) {
-        // Sample the path finely enough to measure it, then set points every STEP blocks along it.
-        int fine = 32;
-        double[] px = new double[fine + 1], pz = new double[fine + 1], pt = new double[fine + 1];
-        for (int k = 0; k <= fine; k++) {
-            double t = k / (double) fine;
-            double x, z, target;
-            if (curved) {
-                double a = (1 - t) * (1 - t), b = 2 * t * (1 - t), c = t * t;
-                x = a * sx + b * ux + c * ex;
-                z = a * sz + b * uz + c * ez;
-                target = a * tS + b * tU + c * tE;
-            } else if (t <= 0.5) {
-                double f = t * 2;
-                x = sx + (ux - sx) * f;
-                z = sz + (uz - sz) * f;
-                target = tS + (tU - tS) * f;
-            } else {
-                double f = (t - 0.5) * 2;
-                x = ux + (ex - ux) * f;
-                z = uz + (ez - uz) * f;
-                target = tU + (tE - tU) * f;
-            }
-            px[k] = x;
-            pz[k] = z;
-            pt[k] = target;
-            if (curved && k > 0 && k < fine && !inStar(u, x, z)) return null;
+    private double halfFor(int area) {
+        double t = (Math.sqrt(area / (double) areaMin) - 1.0) / (Math.sqrt(lat.areaCap / (double) areaMin) - 1.0);
+        t = Math.max(0.0, Math.min(1.0, t));
+        return HALF_MIN + (HALF_GROWN * h - HALF_MIN) * Math.pow(t, 1.5);
+    }
+
+    /** How deep a channel this wide runs: a rill a block, a grown river the full depth. */
+    private double depthFor(double half) {
+        return Math.max(DEPTH_LEAST, Math.min(DEPTH * h, DEPTH_BASE + DEPTH_PER_HALF * half));
+    }
+
+    /**
+     * The points of one length along a path, every STEP blocks: the water at each, held under the target and a block
+     * under the lower bank, and never higher than just upstream.
+     */
+    private List<RiverNetwork.Point> lay(List<double[]> path, double tS, double tE, double wIn, double lenIn,
+                                         double half, byte kind) {
+        int m = path.size();
+        double[] cum = new double[m];
+        for (int k = 1; k < m; k++) {
+            cum[k] = cum[k - 1] + Math.hypot(path.get(k)[0] - path.get(k - 1)[0], path.get(k)[1] - path.get(k - 1)[1]);
         }
-        double[] cum = new double[fine + 1];
-        for (int k = 1; k <= fine; k++) cum[k] = cum[k - 1] + Math.hypot(px[k] - px[k - 1], pz[k] - pz[k - 1]);
-        double len = cum[fine];
+        double len = cum[m - 1];
         int n = Math.max(1, (int) Math.ceil(len / (STEP * h)));
         double[] qx = new double[n + 1], qz = new double[n + 1], qw = new double[n + 1];
         int seg = 0;
         double w = wIn;
-        int dry = 0;
         for (int q = 0; q <= n; q++) {
             double want = len * q / n;
-            while (seg < fine - 1 && cum[seg + 1] < want) seg++;
-            double span = cum[seg + 1] - cum[seg];
+            while (seg < m - 2 && cum[seg + 1] < want) seg++;
+            int nextSeg = Math.min(m - 1, seg + 1);
+            double span = cum[nextSeg] - cum[seg];
             double f = span < 1e-9 ? 0 : (want - cum[seg]) / span;
-            double x = px[seg] + (px[seg + 1] - px[seg]) * f, z = pz[seg] + (pz[seg + 1] - pz[seg]) * f;
-            double target = pt[seg] + (pt[seg + 1] - pt[seg]) * f;
+            double[] a = path.get(seg), b = path.get(nextSeg);
+            double x = a[0] + (b[0] - a[0]) * f, z = a[1] + (b[1] - a[1]) * f;
+            double target = tS + (tE - tS) * q / n;
             // The banks: the lowest ground either side, just past where the cut wall stops. How wide the channel is
             // drawn depends on how fast the water falls, which is what is being worked out, so both the narrowest
             // and the widest it can be drawn are read.
-            double dx, dz;
-            double tx = px[Math.min(fine, seg + 1)] - px[seg], tz = pz[Math.min(fine, seg + 1)] - pz[seg];
-            double tl = Math.hypot(tx, tz);
-            if (tl < 1e-9) { dx = 0; dz = 0; } else { dx = -tz / tl; dz = tx / tl; }
-            double in = half * STEEP_NARROW + BANK_RISE * h + 1.0, out = half * POOL_WIDE + BANK_RISE * h + 1.0;
+            double tx = b[0] - a[0], tz = b[1] - a[1], tl = Math.hypot(tx, tz);
+            double dx = tl < 1e-9 ? 0 : -tz / tl, dz = tl < 1e-9 ? 0 : tx / tl;
+            double narrowest = Math.max(HALF_MIN, half * STEEP_NARROW), widest = half * POOL_WIDE;
+            double in = narrowest + BANK_RISE * h + 1.0, out = widest + BANK_RISE * h + 1.0;
             double rim = Math.min(Math.min(read(x + dx * out, z + dz * out), read(x - dx * out, z - dz * out)),
                     Math.min(read(x + dx * in, z + dz * in), read(x - dx * in, z - dz * in)));
             double lw = Math.min(w, Math.min(target, rim - 1.0));
             if (rim - 1.0 < Math.min(w, target)) bankClamps.increment();
             w = lw;
-            // Where the ground stands too high over the water for the cut to reach, the curve has wandered off the
-            // valley: the straight path through the node keeps to it.
-            if (read(x, z) > w + MAX_SHAVE - 2.0) dry++;
+            if (read(x, z) > w + MAX_SHAVE) dams.increment();
             qx[q] = x;
             qz[q] = z;
             qw[q] = w;
         }
-        if (dry > 0) {
-            if (curved) return null;
-            drySamples.add(dry);
-        }
-        List<RiverNetwork.Point> pts = new ArrayList<>(n + 1);
-        double depth = DEPTH * h;
-        double[] wide = new double[n + 1], deep = new double[n + 1];
-        java.util.Arrays.fill(wide, 1.0);
-        java.util.Arrays.fill(deep, 1.0);
+        List<RiverNetwork.Point> pts = new ArrayList<>(n);
+        double[] wide = new double[n + 1], deeper = new double[n + 1];
+        Arrays.fill(wide, 1.0);
+        Arrays.fill(deeper, 1.0);
         for (int q = 0; q < n; q++) {
             if (qw[q] - qw[q + 1] < FALL_MIN) continue;
             for (int k = q + 1; k <= Math.min(n, q + POOL_RUN); k++) {
                 wide[k] = POOL_WIDE;
-                deep[k] = POOL_DEEP;
+                deeper[k] = POOL_DEEP;
             }
         }
         double step = len / n;
@@ -365,11 +774,12 @@ final class RiverPieces {
             double t = Math.max(0.0, Math.min(1.0, 1.0 - (fall - STEEP_FROM) / STEEP_OVER));
             double gentle = t * t * (3.0 - 2.0 * t);
             double narrow = STEEP_NARROW + (1.0 - STEEP_NARROW) * gentle;
-            double hw = half * narrow * Math.max(wide[q], wide[q + 1]);
+            double hw = Math.max(HALF_MIN, half * narrow) * Math.max(wide[q], wide[q + 1]);
+            double depth = depthFor(hw);
             pts.add(new RiverNetwork.Point((float) qx[q], (float) qz[q], (float) qx[q + 1], (float) qz[q + 1],
                     (float) qw[q], (float) qw[q + 1],
-                    (float) (qw[q] - depth * deep[q]), (float) (qw[q + 1] - depth * deep[q + 1]),
-                    (float) hw, (float) (lenIn + step * q), CHANNEL));
+                    (float) (qw[q] - depth * deeper[q]), (float) (qw[q + 1] - depth * deeper[q + 1]),
+                    (float) hw, (float) (lenIn + step * q), kind));
         }
         return pts;
     }
@@ -378,47 +788,385 @@ final class RiverPieces {
         return ground.heightAt((int) Math.floor(x), (int) Math.floor(z));
     }
 
-    /** Whether a point lies in one of the node's own triangles. */
-    private boolean inStar(long u, double x, double z) {
-        double ux = lat.x(u), uz = lat.z(u);
-        double ang = Math.atan2(z - uz, x - ux);
-        // The neighbours round the node, in order of their bearing; the point lies between two consecutive ones.
-        double[] bx = new double[8], bz = new double[8], ba = new double[8];
+    // === Cells ==============================================================
+
+    /** The node's neighbour slots in turn round it; each two in a row make one of its triangles. */
+    private int[] ring(long u) {
+        int[] out = new int[8];
         int n = 0;
-        for (int s = 0; s < 8; s++) {
-            if (!lat.has(u, s)) continue;
-            long k = DrainageLattice.step(u, s);
-            bx[n] = lat.x(k);
-            bz[n] = lat.z(k);
-            ba[n] = Math.atan2(bz[n] - uz, bx[n] - ux);
-            n++;
-        }
-        for (int a = 0; a < n; a++) {
-            for (int b = 0; b < n; b++) {
-                if (a == b) continue;
-                // b follows a going anticlockwise with nothing between them.
-                double span = norm(ba[b] - ba[a]);
-                boolean next = true;
-                for (int c = 0; c < n; c++) {
-                    if (c == a || c == b) continue;
-                    double o = norm(ba[c] - ba[a]);
-                    if (o > 0 && o < span) { next = false; break; }
-                }
-                if (!next) continue;
-                double o = norm(ang - ba[a]);
-                if (o < 0 || o > span) continue;
-                // Inside the triangle u, a, b: on u's side of the edge a-b.
-                double cx = bx[b] - bx[a], cz = bz[b] - bz[a];
-                double su = cx * (uz - bz[a]) - cz * (ux - bx[a]);
-                double sp = cx * (z - bz[a]) - cz * (x - bx[a]);
-                return su * sp > 0 || Math.abs(sp) < 1e-9;
-            }
-        }
-        return false;
+        for (int s : RING) if (lat.has(u, s)) out[n++] = s;
+        return Arrays.copyOf(out, n);
     }
 
-    private static double norm(double a) {
-        double t = a % (2 * Math.PI);
-        return t < 0 ? t + 2 * Math.PI : t;
+    private Cell cell(long u) {
+        Cell hit = cells.get(u);
+        if (hit != null && hit.u == u) return hit;
+        Cell c = new Cell(u);
+        cells.put(u, c);
+        return c;
+    }
+
+    /** A node's cell and the grid points inside it, with the ground at each. */
+    final class Cell {
+        final long u;
+        final double ux, uz;
+        final double[] ax, az;
+        final int gi0, gk0, wi, wk;
+        final boolean[] in;
+        final float[] hgt;
+        final float low;
+
+        Cell(long u) {
+            this.u = u;
+            ux = lat.x(u);
+            uz = lat.z(u);
+            int[] slots = ring(u);
+            int n = slots.length;
+            ax = new double[n];
+            az = new double[n];
+            double minx = ux, maxx = ux, minz = uz, maxz = uz;
+            for (int i = 0; i < n; i++) {
+                long a = DrainageLattice.step(u, slots[i]);
+                ax[i] = lat.x(a);
+                az[i] = lat.z(a);
+            }
+            for (int i = 0; i < n; i++) {
+                int j = (i + 1) % n;
+                double mx = (ux + ax[i]) * 0.5, mz = (uz + az[i]) * 0.5;
+                double cx = (ux + ax[i] + ax[j]) / 3.0, cz = (uz + az[i] + az[j]) / 3.0;
+                minx = Math.min(minx, Math.min(mx, cx));
+                maxx = Math.max(maxx, Math.max(mx, cx));
+                minz = Math.min(minz, Math.min(mz, cz));
+                maxz = Math.max(maxz, Math.max(mz, cz));
+            }
+            gi0 = (int) Math.ceil(minx / grid);
+            gk0 = (int) Math.ceil(minz / grid);
+            wi = Math.max(0, (int) Math.floor(maxx / grid) - gi0 + 1);
+            wk = Math.max(0, (int) Math.floor(maxz / grid) - gk0 + 1);
+            in = new boolean[wi * wk];
+            hgt = new float[wi * wk];
+            float lo = Float.MAX_VALUE;
+            for (int i = 0; i < in.length; i++) {
+                in[i] = contains(x(i), z(i));
+                hgt[i] = in[i] ? height(gi(i), gk(i)) : Float.NaN;
+                if (in[i]) lo = Math.min(lo, hgt[i]);
+            }
+            low = lo;
+        }
+
+        int gi(int i) {
+            return gi0 + i % wi;
+        }
+
+        int gk(int i) {
+            return gk0 + i / wi;
+        }
+
+        double x(int i) {
+            return gi(i) * (double) grid;
+        }
+
+        double z(int i) {
+            return gk(i) * (double) grid;
+        }
+
+        int index(int gi, int gk) {
+            int a = gi - gi0, b = gk - gk0;
+            return a < 0 || b < 0 || a >= wi || b >= wk ? -1 : a + wi * b;
+        }
+
+        /** Whether a point lies in this node's cell: in one of its triangles, and nearer to it than to the other two. */
+        boolean contains(double x, double z) {
+            int n = ax.length;
+            for (int i = 0; i < n; i++) {
+                int j = (i + 1) % n;
+                double det = (ax[i] - ux) * (az[j] - uz) - (ax[j] - ux) * (az[i] - uz);
+                if (Math.abs(det) < 1e-9) continue;
+                double la = ((x - ux) * (az[j] - uz) - (ax[j] - ux) * (z - uz)) / det;
+                double lb = ((ax[i] - ux) * (z - uz) - (x - ux) * (az[i] - uz)) / det;
+                double lu = 1.0 - la - lb;
+                if (la < -1e-9 || lb < -1e-9 || lu < -1e-9) continue;
+                return lu > la + 1e-9 && lu > lb + 1e-9;
+            }
+            return false;
+        }
+    }
+
+    private float height(int gi, int gk) {
+        int ti = Math.floorDiv(gi, TILE), tk = Math.floorDiv(gk, TILE);
+        long key = ColumnCache.key(ti, tk);
+        float[] t = heights.get(key);
+        if (t == null || t.length != TILE * TILE + 2 || t[TILE * TILE] != ti || t[TILE * TILE + 1] != tk) {
+            t = new float[TILE * TILE + 2];
+            for (int b = 0; b < TILE; b++) {
+                for (int a = 0; a < TILE; a++) {
+                    t[a + TILE * b] = (float) ground.heightAt((ti * TILE + a) * grid, (tk * TILE + b) * grid);
+                }
+            }
+            t[TILE * TILE] = ti;
+            t[TILE * TILE + 1] = tk;
+            gridReads.add(TILE * TILE);
+            heights.put(key, t);
+        }
+        return t[Math.floorMod(gi, TILE) + TILE * Math.floorMod(gk, TILE)];
+    }
+
+    // === Where water crosses between cells ==================================
+
+    private record Handoff(long lo, long hi, double x, double z) {}
+
+    /**
+     * Where water crosses from one node's cell into its neighbour's: the lowest ground on the line between the two
+     * cells, which runs from the middle of their edge to the middle of each triangle either side. Both nodes work it
+     * out alike -- from the lower key, in one order -- so a river leaves one cell exactly where it enters the next.
+     */
+    double[] handoff(long a, long b) {
+        long lo = Math.min(a, b), hi = Math.max(a, b);
+        long key = SeedHash.mix(lo * 0x9E3779B97F4A7C15L + hi);
+        Handoff hit = handoffs.get(key);
+        if (hit != null && hit.lo == lo && hit.hi == hi) return new double[]{hit.x, hit.z};
+        double mx = (lat.x(lo) + lat.x(hi)) * 0.5, mz = (lat.z(lo) + lat.z(hi)) * 0.5;
+        double bx = mx, bz = mz;
+        int[] slots = ring(lo);
+        int at = -1;
+        for (int i = 0; i < slots.length; i++) {
+            if (DrainageLattice.step(lo, slots[i]) == hi) {
+                at = i;
+                break;
+            }
+        }
+        if (at >= 0) {
+            int n = slots.length;
+            double[] c1 = centroid(lo, hi, DrainageLattice.step(lo, slots[(at - 1 + n) % n]));
+            double[] c2 = centroid(lo, hi, DrainageLattice.step(lo, slots[(at + 1) % n]));
+            double best = Double.MAX_VALUE;
+            for (int k = -HANDOFF_SAMPLES; k <= HANDOFF_SAMPLES; k++) {
+                double f = Math.abs(k) / (double) HANDOFF_SAMPLES * HANDOFF_SPAN;
+                double[] c = k < 0 ? c1 : c2;
+                double x = mx + (c[0] - mx) * f, z = mz + (c[1] - mz) * f;
+                double score = read(x, z) + HANDOFF_WANDER * wiggle(x / grid, z / grid) + 1e-3 * Math.abs(k);
+                if (score < best) {
+                    best = score;
+                    bx = x;
+                    bz = z;
+                }
+            }
+        }
+        handoffs.put(key, new Handoff(lo, hi, bx, bz));
+        return new double[]{bx, bz};
+    }
+
+    /** A triangle's middle, summed in the order of its keys so every node that asks gets the same number. */
+    private double[] centroid(long a, long b, long c) {
+        long[] k = {a, b, c};
+        Arrays.sort(k);
+        return new double[]{(lat.x(k[0]) + lat.x(k[1]) + lat.x(k[2])) / 3.0,
+                (lat.z(k[0]) + lat.z(k[1]) + lat.z(k[2])) / 3.0};
+    }
+
+    // === Ways through a cell ================================================
+
+    /**
+     * The cheapest way through a cell over its grid, from a point on its edge (or the node) to a point on its edge, or,
+     * with {@code target}, to the first grid point it marks. The points are the start, the grid points on the way and
+     * the end; null where the cell gives no way.
+     */
+    private List<double[]> route(Cell c, double[] s, double[] e, boolean[] target) {
+        int n = c.in.length;
+        if (n == 0) return null;
+        boolean[] end = target;
+        if (end == null) {
+            end = near(c, e[0], e[1]);
+            if (end == null) return null;
+        }
+        boolean[] start = near(c, s[0], s[1]);
+        if (start == null) return null;
+        double base = e != null ? Math.min(read(s[0], s[1]), read(e[0], e[1])) : c.low;
+        double[] dist = new double[n];
+        int[] prev = new int[n];
+        Arrays.fill(dist, Double.MAX_VALUE);
+        Arrays.fill(prev, -1);
+        Heap heap = new Heap(n);
+        for (int i = 0; i < n; i++) {
+            if (!start[i]) continue;
+            dist[i] = Math.hypot(c.x(i) - s[0], c.z(i) - s[1]) * factor(c, i, base);
+            heap.push(dist[i], i);
+        }
+        int hit = -1;
+        while (!heap.empty()) {
+            double d = heap.topKey();
+            int i = heap.pop();
+            if (d > dist[i]) continue;
+            if (end[i]) {
+                hit = i;
+                break;
+            }
+            int gi = c.gi(i), gk = c.gk(i);
+            for (int di = -1; di <= 1; di++) {
+                for (int dk = -1; dk <= 1; dk++) {
+                    if (di == 0 && dk == 0) continue;
+                    int j = c.index(gi + di, gk + dk);
+                    if (j < 0 || !c.in[j]) continue;
+                    double len = (di != 0 && dk != 0) ? grid * Math.sqrt(2.0) : grid;
+                    double nd = d + len * factor(c, j, base) + UPHILL * Math.max(0.0, c.hgt[j] - c.hgt[i]);
+                    if (nd < dist[j]) {
+                        dist[j] = nd;
+                        prev[j] = i;
+                        heap.push(nd, j);
+                    }
+                }
+            }
+        }
+        if (hit < 0) return null;
+        List<double[]> path = new ArrayList<>();
+        for (int i = hit; i >= 0; i = prev[i]) path.add(new double[]{c.x(i), c.z(i)});
+        path.add(s);
+        java.util.Collections.reverse(path);
+        if (e != null) path.add(e);
+        return path;
+    }
+
+    /** What a step onto a grid point costs, per block. */
+    private double factor(Cell c, int i, double base) {
+        double valley = 1.0 + Math.max(0.0, c.hgt[i] - base) / (VALLEY * h);
+        return valley * (1.0 + WIGGLE * wiggle(c.gi(i), c.gk(i)));
+    }
+
+    /** A slow noise over the grid, 0 to 1, for a way across flat ground to wander by. */
+    private double wiggle(double gi, double gk) {
+        double fx = gi / WIGGLE_WAVE, fz = gk / WIGGLE_WAVE;
+        int x0 = (int) Math.floor(fx), z0 = (int) Math.floor(fz);
+        double tx = fx - x0, tz = fz - z0;
+        tx = tx * tx * (3 - 2 * tx);
+        tz = tz * tz * (3 - 2 * tz);
+        double a = SeedHash.rand01(SeedHash.hash(seed, x0, z0, 0x61A7L)), b = SeedHash.rand01(SeedHash.hash(seed, x0 + 1, z0, 0x61A7L));
+        double cc = SeedHash.rand01(SeedHash.hash(seed, x0, z0 + 1, 0x61A7L)), d = SeedHash.rand01(SeedHash.hash(seed, x0 + 1, z0 + 1, 0x61A7L));
+        double top = a + (b - a) * tx, bottom = cc + (d - cc) * tx;
+        return top + (bottom - top) * tz;
+    }
+
+    /** The grid points of the cell near a point on its edge, where a way can start or end. Null where there are none. */
+    private boolean[] near(Cell c, double x, double z) {
+        for (double reach : new double[]{1.6 * grid, 3.2 * grid}) {
+            boolean[] out = new boolean[c.in.length];
+            boolean any = false;
+            int i0 = (int) Math.floor((x - reach) / grid), i1 = (int) Math.ceil((x + reach) / grid);
+            int k0 = (int) Math.floor((z - reach) / grid), k1 = (int) Math.ceil((z + reach) / grid);
+            for (int gk = k0; gk <= k1; gk++) {
+                for (int gi = i0; gi <= i1; gi++) {
+                    int i = c.index(gi, gk);
+                    if (i < 0 || !c.in[i]) continue;
+                    if (Math.hypot(c.x(i) - x, c.z(i) - z) > reach) continue;
+                    out[i] = true;
+                    any = true;
+                }
+            }
+            if (any) return out;
+        }
+        return null;
+    }
+
+    /**
+     * A way made fit to draw: the grid's zigzags straightened where they stray less than half a step from a straight
+     * line, then the corners cut once. A corner is only cut where both new points stay in the cell.
+     */
+    private List<double[]> tidy(Cell c, List<double[]> path) {
+        if (path.size() <= 2) return path;
+        boolean[] keep = new boolean[path.size()];
+        keep[0] = true;
+        keep[path.size() - 1] = true;
+        simplify(path, 0, path.size() - 1, 0.5 * grid, keep);
+        List<double[]> p = new ArrayList<>();
+        for (int i = 0; i < path.size(); i++) if (keep[i]) p.add(path.get(i));
+        if (p.size() <= 2) return p;
+        List<double[]> out = new ArrayList<>();
+        out.add(p.get(0));
+        for (int i = 1; i < p.size() - 1; i++) {
+            double[] a = p.get(i - 1), b = p.get(i), d = p.get(i + 1);
+            double[] q = {b[0] + (a[0] - b[0]) * 0.25, b[1] + (a[1] - b[1]) * 0.25};
+            double[] r = {b[0] + (d[0] - b[0]) * 0.25, b[1] + (d[1] - b[1]) * 0.25};
+            if (c.contains(q[0], q[1]) && c.contains(r[0], r[1])) {
+                out.add(q);
+                out.add(r);
+            } else {
+                out.add(b);
+            }
+        }
+        out.add(p.get(p.size() - 1));
+        return out;
+    }
+
+    private static void simplify(List<double[]> p, int a, int b, double tol, boolean[] keep) {
+        if (b - a < 2) return;
+        double[] s = {p.get(a)[0], p.get(a)[1], p.get(b)[0], p.get(b)[1]};
+        double worst = -1;
+        int at = -1;
+        for (int i = a + 1; i < b; i++) {
+            double d = distToSeg(s, p.get(i)[0], p.get(i)[1]);
+            if (d > worst) {
+                worst = d;
+                at = i;
+            }
+        }
+        if (worst <= tol) return;
+        keep[at] = true;
+        simplify(p, a, at, tol, keep);
+        simplify(p, at, b, tol, keep);
+    }
+
+    /** A plain binary heap of grid points by cost. */
+    private static final class Heap {
+        private double[] key;
+        private int[] val;
+        private int size;
+
+        Heap(int n) {
+            key = new double[Math.max(16, n)];
+            val = new int[Math.max(16, n)];
+        }
+
+        boolean empty() {
+            return size == 0;
+        }
+
+        double topKey() {
+            return key[0];
+        }
+
+        void push(double k, int v) {
+            if (size == key.length) {
+                key = Arrays.copyOf(key, size * 2);
+                val = Arrays.copyOf(val, size * 2);
+            }
+            int i = size++;
+            while (i > 0) {
+                int p = (i - 1) / 2;
+                if (key[p] <= k) break;
+                key[i] = key[p];
+                val[i] = val[p];
+                i = p;
+            }
+            key[i] = k;
+            val[i] = v;
+        }
+
+        int pop() {
+            int top = val[0];
+            double k = key[--size];
+            int v = val[size];
+            int i = 0;
+            while (true) {
+                int l = 2 * i + 1;
+                if (l >= size) break;
+                int m = l + 1 < size && key[l + 1] < key[l] ? l + 1 : l;
+                if (key[m] >= k) break;
+                key[i] = key[m];
+                val[i] = val[m];
+                i = m;
+            }
+            key[i] = k;
+            val[i] = v;
+            return top;
+        }
     }
 }

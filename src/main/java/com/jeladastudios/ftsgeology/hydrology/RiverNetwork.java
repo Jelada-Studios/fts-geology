@@ -65,9 +65,13 @@ public final class RiverNetwork {
     private static volatile RiverPieces pieces;
     private static volatile DrainageLattice.Ground ground;
     private static volatile double horizontal = 1.0;
-    private static final ColumnCache<Point[]> INDEX = new ColumnCache<>(12);
+    /** What an index square holds: the lengths that start in it, and the lakes that reach it. */
+    record Square(Point[] points, RiverPieces.LakeMask[] lakes) {}
+
+    private static final Square EMPTY = new Square(new Point[0], new RiverPieces.LakeMask[0]);
+    private static final ColumnCache<Square> INDEX = new ColumnCache<>(12);
     /** A square being worked out, so a second thread that asks for it waits for the first instead of repeating it. */
-    private static final ConcurrentHashMap<Long, CompletableFuture<Point[]>> BUILDING = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Long, CompletableFuture<Square>> BUILDING = new ConcurrentHashMap<>();
     /** Squares worked out, the time they took and the longest one, for the log line. */
     private static final java.util.concurrent.atomic.LongAdder SQUARES = new java.util.concurrent.atomic.LongAdder(),
             SQUARE_NANOS = new java.util.concurrent.atomic.LongAdder();
@@ -94,13 +98,24 @@ public final class RiverNetwork {
         return lattice != null;
     }
 
-    /** Blocks a query looks either side of a channel's middle: the widest channel or lake disc, and the cave reach. */
+    /** How much wider than the normal world's this world is laid out. */
+    public static double horizontal() {
+        return horizontal;
+    }
+
+    /** Blocks a query looks either side of a channel's middle: the widest channel or sink pond, and the cave reach. */
     private static double reach() {
         DrainageLattice l = lattice;
         double cell = l == null ? CELL * horizontal : l.cell;
-        return Math.max(RiverPieces.HALF_GROWN * RiverPieces.POOL_WIDE * horizontal, RiverPieces.LAKE_HALF * cell)
+        return Math.max(RiverPieces.HALF_GROWN * RiverPieces.POOL_WIDE * horizontal, RiverPieces.SINK_HALF * cell)
                 + CAVE_REACH * horizontal + 4.0 * horizontal;
     }
+
+    /**
+     * How wide a channel has to be before the river biome follows it, in blocks either side of its middle. A rill a
+     * block across is a stream in the meadow, not a river; the biome would have painted a sandy stripe down every one.
+     */
+    private static final double RIVER_BIOME_HALF = 2.5;
 
     // === Queries ============================================================
 
@@ -139,6 +154,17 @@ public final class RiverNetwork {
 
     private static At look(int x, int z) {
         if (lattice == null) return NOTHING;
+        // A lake is its hollow: a column under a drawn lake's water is the lake's, whatever channel is near.
+        RiverPieces.LakeMask lake = null;
+        double lakeDepth = 0;
+        for (RiverPieces.LakeMask m : block(Math.floorDiv(x, BLOCK), Math.floorDiv(z, BLOCK)).lakes()) {
+            double d = m.depthAt(x, z);
+            if (d > 0 && (lake == null || m.water < lake.water)) {
+                lake = m;
+                lakeDepth = d;
+            }
+        }
+        if (lake != null) return new At(0.0, lake.grid, lake.water, Math.min(lake.bed, lake.water - lakeDepth), 1.0e4, true);
         double reach = reach();
         double reach2 = reach * reach;
         double bestD2 = reach2;
@@ -153,7 +179,7 @@ public final class RiverNetwork {
         int bz0 = Math.floorDiv(z - (int) reach, BLOCK), bz1 = Math.floorDiv(z + (int) reach, BLOCK);
         for (int bx = bx0; bx <= bx1; bx++) {
             for (int bz = bz0; bz <= bz1; bz++) {
-                for (Point p : block(bx, bz)) {
+                for (Point p : block(bx, bz).points()) {
                     double sx = p.x - x, sz = p.z - z;
                     if (sx * sx + sz * sz > far2) continue;
                     double ax = p.ex - p.x, az = p.ez - p.z;
@@ -206,26 +232,49 @@ public final class RiverNetwork {
         return Math.max(0.0, 1.0 - over / (CAVE_REACH * horizontal));
     }
 
-    /** Whether a column is on a river, for the river biome: a lake is not one. */
+    /** Whether a column is on a river, for the river biome: a lake is not one, and neither is a rill. */
     public static boolean onRiver(int x, int z, double share) {
         At a = at(x, z);
-        return !a.lake && near(x, z) >= share;
+        return !a.lake && a.halfWidth >= RIVER_BIOME_HALF && near(x, z) >= share;
+    }
+
+    /** A spring: where a river rises, which way its water sets off, and the water there. */
+    public record Head(double x, double z, double dx, double dz, double water) {}
+
+    /** The springs within reach of a column, for the ice a mountain river rises from. */
+    public static List<Head> headsNear(int x, int z, double reach) {
+        List<Head> out = new ArrayList<>();
+        if (lattice == null) return out;
+        double r2 = reach * reach;
+        for (int bx = Math.floorDiv(x - (int) reach, BLOCK); bx <= Math.floorDiv(x + (int) reach, BLOCK); bx++) {
+            for (int bz = Math.floorDiv(z - (int) reach, BLOCK); bz <= Math.floorDiv(z + (int) reach, BLOCK); bz++) {
+                for (Point p : block(bx, bz).points()) {
+                    if (p.kind != RiverPieces.CHANNEL || p.fromHead > 1e-3f) continue;
+                    double dx = p.x - x, dz = p.z - z;
+                    if (dx * dx + dz * dz > r2) continue;
+                    double ax = p.ex - p.x, az = p.ez - p.z, len = Math.hypot(ax, az);
+                    if (len < 1e-6) continue;
+                    out.add(new Head(p.x, p.z, ax / len, az / len, p.water));
+                }
+            }
+        }
+        return out;
     }
 
     // === The index ==========================================================
 
     static final Point[] NONE = new Point[0];
 
-    private static Point[] block(int bx, int bz) {
+    private static Square block(int bx, int bz) {
         long key = ColumnCache.key(bx, bz);
-        Point[] hit = INDEX.get(key);
+        Square hit = INDEX.get(key);
         if (hit != null) return hit;
-        CompletableFuture<Point[]> mine = new CompletableFuture<>();
-        CompletableFuture<Point[]> other = BUILDING.putIfAbsent(key, mine);
+        CompletableFuture<Square> mine = new CompletableFuture<>();
+        CompletableFuture<Square> other = BUILDING.putIfAbsent(key, mine);
         if (other != null) return other.join();
         try {
             long t0 = System.nanoTime();
-            Point[] made = buildBlock(bx, bz);
+            Square made = buildBlock(bx, bz);
             long spent = System.nanoTime() - t0;
             SQUARES.increment();
             SQUARE_NANOS.add(spent);
@@ -241,27 +290,38 @@ public final class RiverNetwork {
         }
     }
 
-    /** Every length and disc that starts within reach of this square. */
-    private static Point[] buildBlock(int bx, int bz) {
+    /** Every length that starts within reach of this square, and every lake whose water reaches it. */
+    private static Square buildBlock(int bx, int bz) {
         DrainageLattice l = lattice;
         RiverPieces pc = pieces;
-        if (l == null || pc == null) return NONE;
+        if (l == null || pc == null) return EMPTY;
         double edge = reach() + RiverPieces.STEP * horizontal + 1.0;
         double x0 = bx * (double) BLOCK - edge, x1 = (bx + 1) * (double) BLOCK + edge;
         double z0 = bz * (double) BLOCK - edge, z1 = (bz + 1) * (double) BLOCK + edge;
-        // A node's length reaches no further from it than half its longest edge, well inside two cells.
+        // What a node draws stays in its own cell, well inside two lattice cells of it; a lake's water reaches a few
+        // grid steps past its own cells.
         double m = 1.7 * l.cell;
         int i0 = (int) Math.floor((x0 - m) / l.cell), i1 = (int) Math.floor((x1 + m) / l.cell);
         int j0 = (int) Math.floor((z0 - m) / l.cell), j1 = (int) Math.floor((z1 + m) / l.cell);
         List<Point> out = new ArrayList<>();
+        List<RiverPieces.LakeMask> lakes = new ArrayList<>();
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        double lx0 = bx * (double) BLOCK, lx1 = (bx + 1) * (double) BLOCK;
+        double lz0 = bz * (double) BLOCK, lz1 = (bz + 1) * (double) BLOCK;
         for (int j = j0; j <= j1; j++) {
             for (int i = i0; i <= i1; i++) {
-                for (Point p : pc.of(DrainageLattice.key(i, j))) {
+                long k = DrainageLattice.key(i, j);
+                for (Point p : pc.of(k)) {
                     if (p.x >= x0 && p.x < x1 && p.z >= z0 && p.z < z1) out.add(p);
                 }
+                RiverPieces.LakeMask mask = pc.maskOf(k);
+                if (mask != null && mask.covers(lx0, lz0, lx1, lz1) && seen.add(mask.owner)) lakes.add(mask);
             }
         }
-        return out.isEmpty() ? NONE : out.toArray(NONE);
+        if (out.isEmpty() && lakes.isEmpty()) return EMPTY;
+        // In one order, whichever thread built the square.
+        lakes.sort(java.util.Comparator.comparingLong(a -> a.owner));
+        return new Square(out.toArray(NONE), lakes.toArray(new RiverPieces.LakeMask[0]));
     }
 
     // === Reports ============================================================
@@ -272,12 +332,13 @@ public final class RiverNetwork {
         RiverPieces pc = pieces;
         if (l == null || pc == null) return "no river network";
         return String.format(Locale.ROOT,
-                "%d channel lengths (%d straightened, %d dry samples, %d held under a bank), %d lake discs, "
-                        + "%d mouths, %d sinks; %d hollows (%d closed), %d lakes, %d ground reads; "
-                        + "%d squares in %.0f ms, slowest %.0f ms",
-                pc.channels.sum(), pc.straightened.sum(), pc.drySamples.sum(), pc.bankClamps.sum(),
-                pc.lakePoints.sum(), pc.mouths.sum(), pc.sinks.sum(), l.pitsFoundCount(), l.closedCount(),
-                l.lakesCount(), l.readsCount(), SQUARES.sum(), SQUARE_NANOS.sum() / 1e6, SLOWEST.get() / 1e6);
+                "%d channel nodes (%d joins, %d with nothing to join, %d not traced, %d dam samples, %d held under a "
+                        + "bank), %d lakes drawn, %d mouths, %d sinks; %d hollows (%d closed), %d lakes, %d ground reads "
+                        + "and %d on the grid; %d squares in %.0f ms, slowest %.0f ms",
+                pc.channels.sum(), pc.joins.sum(), pc.dryJoins.sum(), pc.fallbacks.sum(), pc.dams.sum(),
+                pc.bankClamps.sum(), pc.lakeMasks.sum(), pc.mouths.sum(), pc.sinks.sum(), l.pitsFoundCount(),
+                l.closedCount(), l.lakesCount(), l.readsCount(), pc.gridReads.sum(), SQUARES.sum(),
+                SQUARE_NANOS.sum() / 1e6, SLOWEST.get() / 1e6);
     }
 
     /** How much of the ground round here the rivers and lakes hold, and how much of that is under water. */
@@ -308,7 +369,7 @@ public final class RiverNetwork {
         int n = 0;
         for (int bx = Math.floorDiv(cx - half, BLOCK); bx <= Math.floorDiv(cx + half, BLOCK); bx++) {
             for (int bz = Math.floorDiv(cz - half, BLOCK); bz <= Math.floorDiv(cz + half, BLOCK); bz++) {
-                for (Point p : block(bx, bz)) {
+                for (Point p : block(bx, bz).points()) {
                     // A length is listed in every square it reaches; it is counted in the one it starts in.
                     if (Math.floorDiv((int) Math.floor(p.x), BLOCK) != bx || Math.floorDiv((int) Math.floor(p.z), BLOCK) != bz) continue;
                     if (Math.abs(p.x - cx) > half || Math.abs(p.z - cz) > half) continue;
@@ -318,6 +379,7 @@ public final class RiverNetwork {
                     }
                     h = (h ^ p.kind) * 0x100000001b3L;
                 }
+                for (RiverPieces.LakeMask m : block(bx, bz).lakes()) h = m.hash((h ^ m.owner) * 0x100000001b3L);
             }
         }
         return String.format(Locale.ROOT, "rivers hash within %d of %d,%d: %d lengths, %016x", half, cx, cz, n, h);
@@ -372,56 +434,89 @@ public final class RiverNetwork {
         java.util.Set<Long> seen = new java.util.HashSet<>();
         List<double[]> segs = new ArrayList<>();
         List<Long> owner = new ArrayList<>();
+        int ends = 0, handed = 0, joinsSeen = 0, joinsDry = 0, dams = 0;
+        double worstJoin = 0, worstX = 0, worstZ = 0;
+        String unhanded = "";
+        String firstHead = "";
+        double highestHead = Double.NEGATIVE_INFINITY;
         for (int j = j0; j <= j1; j++) {
             for (int i = i0; i <= i1; i++) {
                 long k = DrainageLattice.key(i, j);
                 Point[] ps = pc.of(k);
-                if (ps.length == 0) continue;
-                if (pc.underLake(k)) {
+                RiverPieces.LakeMask mask = pc.maskOf(k);
+                if (mask != null && seen.add(mask.owner)) {
+                    lakes++;
                     DrainageLattice.Lake lake = l.lakeOf(k);
-                    if (lake != null && seen.add(lake.owner)) {
-                        lakes++;
-                        boolean way = false;
-                        for (long m : lake.members) {
-                            long out = lake.next.get(m);
-                            if (out != Long.MIN_VALUE && java.util.Arrays.binarySearch(lake.members, out) < 0) { way = true; break; }
-                        }
-                        if (!way) lakesNoWay++;
+                    boolean way = false;
+                    for (long m : lake.members) {
+                        long out = lake.next.get(m);
+                        if (out != Long.MIN_VALUE && java.util.Arrays.binarySearch(lake.members, out) < 0) { way = true; break; }
                     }
-                    continue;
+                    if (!way) lakesNoWay++;
                 }
-                channels++;
+                if (ps.length == 0) continue;
                 for (int q = 0; q < ps.length; q++) {
                     Point p = ps[q];
                     if (p.lake()) continue;
-                    if (p.waterEnd > p.water + 1e-3f || (q > 0 && p.water > ps[q - 1].waterEnd + 1e-3f)) rising++;
+                    boolean continues = q > 0 && same(p.x, p.z, ps[q - 1].ex, ps[q - 1].ez);
+                    if (p.waterEnd > p.water + 1e-3f || (continues && p.water > ps[q - 1].waterEnd + 1e-3f)) rising++;
                     segs.add(new double[]{p.x, p.z, p.ex, p.ez});
                     owner.add(k);
+                    if (readGround(p.x, p.z) > p.water + RiverPieces.MAX_SHAVE) dams++;
                     double dx = p.ex - p.x, dz = p.ez - p.z, len = Math.hypot(dx, dz);
                     if (len > 1e-6) {
                         // Where the cut wall reaches the surface: the ground there has to stand over the water.
-                        double nx = -dz / len, nz = dx / len, out = p.halfWidth + RiverPieces.DEPTH * horizontal / RiverPieces.WALL + 1.0;
+                        double nx = -dz / len, nz = dx / len;
+                        double out = p.halfWidth + (p.water - p.bed) / RiverPieces.WALL + 1.0;
                         double rim = Math.min(readGround(p.x + nx * out, p.z + nz * out),
                                 readGround(p.x - nx * out, p.z - nz * out));
                         if (p.water > rim) overBank++;
                     }
+                    // The end of a join has to be in water: the channel it joins, the lake or the sea.
+                    boolean lastOfJoin = p.kind == RiverPieces.JOIN
+                            && (q == ps.length - 1 || !same(ps[q + 1].x, ps[q + 1].z, p.ex, p.ez));
+                    if (lastOfJoin) {
+                        joinsSeen++;
+                        double gap = joinGap(pc, k, ps, q, mask, l);
+                        if (gap > 1.0) {
+                            joinsDry++;
+                            if (gap > worstJoin) { worstJoin = gap; worstX = p.ex; worstZ = p.ez; }
+                        }
+                    }
                 }
-                if (ps[0].fromHead < 1e-3f) heads++;
+                // Every river's end, and every lake's way out, has to be taken on by the node it runs into.
+                Point last = null;
+                for (Point p : ps) if (p.kind == RiverPieces.CHANNEL) last = p;
+                long r = l.receiver(k);
+                if (pc.isRiver(k) && last != null && r != Long.MIN_VALUE) {
+                    ends++;
+                    if (takenOn(pc.of(r), last.ex, last.ez)) handed++;
+                    else if (unhanded.isEmpty()) unhanded = String.format(Locale.ROOT, " (first at %.0f,%.0f)", last.ex, last.ez);
+                }
+                if (!pc.isRiver(k)) continue;
+                channels++;
+                if (ps[0].fromHead < 1e-3f) {
+                    heads++;
+                    if (ps[0].water > highestHead) {
+                        highestHead = ps[0].water;
+                        firstHead = String.format(Locale.ROOT, " (the highest at %.0f,%.0f, water %.0f)", ps[0].x, ps[0].z, ps[0].water);
+                    }
+                }
                 double widest = 0;
                 for (long d : l.donors(k)) {
                     if (l.area(d) < pc.areaMin) continue;
                     double wd;
                     if (pc.underLake(d)) wd = pc.level(d) - 1.0;
                     else {
-                        Point[] dp = pc.of(d);
-                        if (dp.length == 0) continue;
-                        wd = dp[dp.length - 1].waterEnd;
-                        widest = Math.max(widest, dp[dp.length - 1].halfWidth);
+                        Point end = null;
+                        for (Point p : pc.of(d)) if (p.kind == RiverPieces.CHANNEL) end = p;
+                        if (end == null) continue;
+                        wd = end.waterEnd;
+                        widest = Math.max(widest, end.halfWidth);
                     }
                     if (ps[0].water > wd + 1e-3) rising++;
                 }
                 if (ps[0].halfWidth + 1e-3 < widest * RiverPieces.STEEP_NARROW) narrower++;
-                long r = l.receiver(k);
                 if (r == Long.MIN_VALUE) sinks++;
                 else if (l.g(r) <= l.sea) mouths++;
                 else if (pc.underLake(r)) intoLakes++;
@@ -449,11 +544,47 @@ public final class RiverNetwork {
             }
         }
         return String.format(Locale.ROOT,
-                "rivers audit within %d of %d,%d: %d channel nodes, %d heads, %d mouths, %d into lakes, %d ending inland; "
+                "rivers audit within %d of %d,%d: %d channel nodes, %d heads%s, %d mouths, %d into lakes, %d ending inland; "
                         + "%d lakes (%d with no way out); crossings %d, rising %d, over the bank %d, narrower below a join %d; "
-                        + "%d land nodes, %d under water, drained area at least%s; %s",
-                half, cx, cz, channels, heads, mouths, intoLakes, sinks, lakes, lakesNoWay, crossings, rising, overBank,
-                narrower, land, flooded, hist, summary());
+                        + "ends taken on %d of %d%s, joins %d (%d ending short of water, the worst %.1f at %.0f,%.0f), "
+                        + "dam samples %d; %d land nodes, %d under water, drained area at least%s; %s",
+                half, cx, cz, channels, heads, firstHead, mouths, intoLakes, sinks, lakes, lakesNoWay, crossings, rising, overBank,
+                narrower, handed, ends, unhanded, joinsSeen, joinsDry, worstJoin, worstX, worstZ, dams, land, flooded,
+                hist, summary());
+    }
+
+    /** Whether the node a river runs into draws something that starts where the river ends. */
+    private static boolean takenOn(Point[] next, double x, double z) {
+        for (Point p : next) if (same(p.x, p.z, x, z)) return true;
+        return false;
+    }
+
+    /**
+     * How far short of water the join ending at {@code ps[q]} stops: 0 where it ends on the channel it joins, in the
+     * lake or under the sea. A lake's way out starts in the lake and ends where the next river takes it on, so it is
+     * not a join into anything and counts as 0.
+     */
+    private static double joinGap(RiverPieces pc, long owner, Point[] ps, int q, RiverPieces.LakeMask mask,
+                                  DrainageLattice l) {
+        int first = q;
+        while (first > 0 && ps[first - 1].kind == RiverPieces.JOIN && same(ps[first].x, ps[first].z, ps[first - 1].ex, ps[first - 1].ez)) {
+            first--;
+        }
+        Point end = ps[q];
+        if (mask != null) {
+            if (mask.depthAt(ps[first].x, ps[first].z) > 0) return 0.0;
+            if (mask.depthAt(end.ex, end.ez) > -mask.grid) return 0.0;
+        }
+        double best = l.g(owner) <= l.sea ? Math.max(0.0, readGround(end.ex, end.ez) - l.sea) : Double.MAX_VALUE;
+        for (int i = 0; i < ps.length; i++) {
+            if (i >= first && i <= q) continue;
+            Point p = ps[i];
+            if (p.lake()) continue;
+            double ax = p.ex - p.x, az = p.ez - p.z, len2 = ax * ax + az * az;
+            double t = len2 < 1e-12 ? 0 : Math.max(0, Math.min(1, ((end.ex - p.x) * ax + (end.ez - p.z) * az) / len2));
+            best = Math.min(best, Math.hypot(p.x + ax * t - end.ex, p.z + az * t - end.ez));
+        }
+        return best;
     }
 
     private static double readGround(double x, double z) {

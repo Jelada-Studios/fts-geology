@@ -89,6 +89,10 @@ public final class DrainageLattice {
         this.areaCap = areaCap;
     }
 
+    long seed() {
+        return seed;
+    }
+
     // === Nodes ==============================================================
 
     public static long key(int i, int j) {
