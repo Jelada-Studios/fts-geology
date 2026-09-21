@@ -41,6 +41,19 @@ public final class ClientSetup {
         });
     }
 
+    /**
+     * The river's water takes the biome's water colour, as vanilla's does. The fluid already did in the world, through
+     * water's own fluid type; but a renderer that colours a block from its particle texture and the block colours --
+     * Distant Horizons for its far terrain -- found nothing registered for this block and drew every river the grey of
+     * the untinted water texture.
+     */
+    @SubscribeEvent
+    public static void blockColors(net.minecraftforge.client.event.RegisterColorHandlersEvent.Block event) {
+        event.register((state, level, pos, tint) -> level != null && pos != null
+                        ? net.minecraft.client.renderer.BiomeColors.getAverageWaterColor(level, pos) : 0x3F76E4,
+                com.jeladastudios.ftsgeology.registry.ModBlocks.RIVER_WATER.get());
+    }
+
     @SubscribeEvent
     public static void registerParticles(RegisterParticleProvidersEvent event) {
         event.registerSpriteSet(ModParticles.GEYSER_MIST.get(), GeothermalParticles.MistProvider::new);
