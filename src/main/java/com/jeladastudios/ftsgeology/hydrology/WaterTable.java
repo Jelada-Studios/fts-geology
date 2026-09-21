@@ -28,12 +28,6 @@ public final class WaterTable {
     private WaterTable() {}
 
     /**
-     * How far out the neighbourhood is sampled, in blocks. Measured: at 32 the ring never leaves a
-     * valley and no springs appear; at 96 it spans a Terralith valley while ignoring single hills.
-     */
-    private static final int RING_SPREAD = 96;
-
-    /**
      * A groundwater reading for one column.
      *
      * @param head         Y the water surface WANTS to be at, before the land gets in the way.
@@ -84,17 +78,14 @@ public final class WaterTable {
         try {
             ServerChunkCache chunkSource = level.getChunkSource();
 
-            int local = surfaceAt(chunkSource, level, blockX, blockZ);
+            int local = heightAt(chunkSource, level, blockX, blockZ);
 
             // Eight neighbours on a ring, plus this column. The MEAN of them is what recharges the
-            // aquifer - the land rain falls on. The MINIMUM is the drain it runs to.
+            // aquifer - the land rain falls on. The MINIMUM is the drain it runs to. The offsets are whole
+            // lattice steps, so each of them is a point some other sample reads as its own middle.
             int sum = local, base = local;
-            int d = RING_SPREAD, diag = (int) Math.round(RING_SPREAD * 0.7071);
-            int[][] ring = {
-                    {d, 0}, {-d, 0}, {0, d}, {0, -d},
-                    {diag, diag}, {diag, -diag}, {-diag, diag}, {-diag, -diag}};
-            for (int[] o : ring) {
-                int h = regionalAt(chunkSource, level, blockX + o[0], blockZ + o[1]);
+            for (int[] o : RING) {
+                int h = heightAt(chunkSource, level, blockX + o[0] * GRID, blockZ + o[1] * GRID);
                 sum += h;
                 base = Math.min(base, h);
             }
@@ -124,18 +115,17 @@ public final class WaterTable {
     }
 
     /**
-     * Cached {@link #sample}, on a {@link #SAMPLE_GRID} grid. A sample costs a stack of generator height
-     * lookups and each of those runs a whole noise column, so anything that walks a chunk calls this one.
+     * Cached {@link #sample}, on the {@link #GRID} lattice.
      *
-     * <p>Measured on the two worlds of the twenty-second round: this call was three quarters of everything
-     * the mod spent on the server thread, and near enough all of it was misses. The grid was four blocks and
-     * the ring reaches ninety-six, so no two neighbouring cells shared a single reading -- about a hundred
-     * and forty noise columns for one chunk. The ring is a regional field by its own definition, so it is
-     * read on a coarse lattice and kept; only the column at the middle, which is what decides a spring line,
-     * is still read where it stands.</p>
+     * <p>A sample costs a stack of generator height lookups and each of those runs a whole noise column, so
+     * anything that walks a chunk calls this one. It was three quarters of everything the mod spent on the
+     * server thread in the twenty-second round and still two per cent of it in the twenty-fourth, and the
+     * spark said why: the ring cost five times the column in the middle. The two were kept on different
+     * grids, so a ring point was never any other sample's middle and nothing was read once. Now every height
+     * lands on one lattice and is kept there.</p>
      */
     public static Sample sampleCached(ServerLevel level, int blockX, int blockZ) {
-        int gx = blockX & ~(SAMPLE_GRID - 1), gz = blockZ & ~(SAMPLE_GRID - 1);
+        int gx = blockX & ~(GRID - 1), gz = blockZ & ~(GRID - 1);
         long key = ColumnCache.key(gx, gz);
         Sample hit = CACHE.get(key);
         if (hit != null) return hit;
@@ -157,17 +147,27 @@ public final class WaterTable {
     /** Dropped alongside the other tectonic caches when a server stops. */
     public static void clearCache() {
         CACHE.clear();
-        REGIONAL.clear();
+        HEIGHTS.clear();
     }
 
     // === Internals ==========================================================
 
-    /** Blocks to a cached reading: one for a whole sample, a coarser one for the ring it averages. */
-    private static final int SAMPLE_GRID = 16, REGIONAL_GRID = 32;
+    /** Blocks between the points any height is read on, samples included. */
+    private static final int GRID = 32;
+
+    /**
+     * The ring, in lattice steps: four on the axes at three steps out (96 blocks), four on the diagonals at two.
+     *
+     * <p>Measured when the ring was first drawn: at 32 blocks it never leaves a valley and no springs appear;
+     * at 96 it spans a Terralith valley while ignoring single hills.</p>
+     */
+    private static final int[][] RING = {
+            {3, 0}, {-3, 0}, {0, 3}, {0, -3},
+            {2, 2}, {2, -2}, {-2, 2}, {-2, -2}};
 
     /** Fixed tables, not maps that empty themselves when they fill: a distant-horizon mod fills them all day. */
     private static final ColumnCache<Sample> CACHE = new ColumnCache<>(14);
-    private static final ColumnCache<int[]> REGIONAL = new ColumnCache<>(16);
+    private static final ColumnCache<int[]> HEIGHTS = new ColumnCache<>(16);
 
     /** Counted so this class's cost can be read off a run: it was three quarters of the mod's tick. */
     private static final java.util.concurrent.atomic.LongAdder COLUMNS =
@@ -186,19 +186,19 @@ public final class WaterTable {
     }
 
     /**
-     * The same height on a coarse lattice and kept. The ring is what recharges the aquifer and what it drains
-     * to -- land measured a hundred blocks out, deliberately blunt -- so reading it every four blocks bought
-     * nothing but noise columns. On this lattice a chunk's own cells share their readings with each other and
-     * with the chunks round them.
+     * A height on the lattice, read once and kept. Both the middle of a sample and the ring it averages come
+     * through here, which is the point of it: the water table is a blunt regional field by its own definition,
+     * so reading it on one coarse lattice costs a chunk a quarter of a noise column instead of six, and a point
+     * read for one sample's ring is the next sample's middle already answered.
      */
-    private static int regionalAt(ServerChunkCache chunkSource, ServerLevel level, int x, int z) {
-        int gx = Math.floorDiv(x, REGIONAL_GRID) * REGIONAL_GRID;
-        int gz = Math.floorDiv(z, REGIONAL_GRID) * REGIONAL_GRID;
+    private static int heightAt(ServerChunkCache chunkSource, ServerLevel level, int x, int z) {
+        int gx = Math.floorDiv(x, GRID) * GRID;
+        int gz = Math.floorDiv(z, GRID) * GRID;
         long key = ColumnCache.key(gx, gz);
-        int[] hit = REGIONAL.get(key);
+        int[] hit = HEIGHTS.get(key);
         if (hit != null) return hit[0];
         int h = surfaceAt(chunkSource, level, gx, gz);
-        REGIONAL.put(key, new int[]{h});
+        HEIGHTS.put(key, new int[]{h});
         return h;
     }
 
