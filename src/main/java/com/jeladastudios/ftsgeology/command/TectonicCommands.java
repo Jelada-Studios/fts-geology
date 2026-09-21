@@ -128,6 +128,11 @@ public final class TectonicCommands {
                                                         .executes(ctx -> TerrainCommands.terrainTraceGrid(ctx,
                                                                 IntegerArgumentType.getInteger(ctx, "half"),
                                                                 IntegerArgumentType.getInteger(ctx, "step"))))))
+                                // Whether the river water round here would take a naturally spawned fish.
+                                .then(Commands.literal("fish")
+                                        .then(Commands.argument("half", IntegerArgumentType.integer(8, 256))
+                                                .executes(ctx -> TerrainCommands.terrainFish(ctx,
+                                                        IntegerArgumentType.getInteger(ctx, "half")))))
                                 .then(Commands.literal("grid")
                                         .then(Commands.argument("half", IntegerArgumentType.integer(8, 2000))
                                                 .then(Commands.argument("step", IntegerArgumentType.integer(1, 64))

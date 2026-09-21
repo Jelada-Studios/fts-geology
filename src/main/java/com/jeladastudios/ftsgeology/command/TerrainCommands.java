@@ -118,6 +118,35 @@ public final class TerrainCommands {
         return 1;
     }
 
+    /**
+     * Whether a column's ground is a cave mouth rather than a face, for telling one from the other in a grid.
+     *
+     * <p>The generator's height counts an open cave as ground, so a cheese cave that reaches a hillside reads as a
+     * step as deep as the cave. A seventy-four block step measured in the tall world's badlands was one of these:
+     * one column wide, with the two columns either side of it within a block of each other, and the ground above
+     * it whole. Without this the grid says "tallest step 74" and a round goes looking for a cliff that is not
+     * there.</p>
+     */
+    private static String cavesAt(ServerLevel level, int x, int z) {
+        record Pos(int blockX, int blockY, int blockZ) implements net.minecraft.world.level.levelgen.DensityFunction.FunctionContext {}
+        var router = level.getChunkSource().randomState().router();
+        double dep = router.depth().compute(new Pos(x, 64, z));
+        double span = level.getMaxBuildHeight() - level.getMinBuildHeight();
+        double grad = 1.5 - (64.0 - level.getMinBuildHeight()) * (8.0 / span);
+        int flat = (int) Math.round(128.0 + 128.0 * (dep - grad));
+        int noCave = Integer.MIN_VALUE, withCave = Integer.MIN_VALUE;
+        for (int y = Math.min(level.getMaxBuildHeight() - 8, flat + 24);
+             y >= Math.max(level.getMinBuildHeight() + 8, flat - 160); y -= 2) {
+            if (noCave == Integer.MIN_VALUE
+                    && router.initialDensityWithoutJaggedness().compute(new Pos(x, y, z)) > 0) noCave = y;
+            if (withCave == Integer.MIN_VALUE
+                    && router.finalDensity().compute(new Pos(x, y, z)) > 0) withCave = y;
+            if (noCave != Integer.MIN_VALUE && withCave != Integer.MIN_VALUE) break;
+        }
+        if (noCave == Integer.MIN_VALUE || withCave == Integer.MIN_VALUE) return "no reading";
+        return String.format(Locale.ROOT, "solid from %d, open to %d", noCave, withCave);
+    }
+
     /** What the river network says about a column, for telling a channel's own wall from the hillside's. */
     private static String channelAt(int x, int z) {
         com.jeladastudios.ftsgeology.hydrology.RiverNetwork.At a =
@@ -188,7 +217,8 @@ public final class TerrainCommands {
         String line = String.format(Locale.ROOT, "terrain grid at %d,%d, half %d every %d: %d samples, max %d, min %d, mean %.1f, within 3 of the top %d, level pairs %.1f%%, slope 1+ %.1f%%, slope 2+ %.1f%%, tallest step %d at %d,%d (%s), 8+ steps %d, high ground%s",
                 at.getX(), at.getZ(), half, step, n * n, max, min, (double) sum / (n * n), nearTop, 100.0 * flat / Math.max(1, pairs),
                 100.0 * steep / Math.max(1, pairs), 100.0 * walls / Math.max(1, pairs), tallest, tallX, tallZ,
-                channelAt(tallX, tallZ), faces, spread.length() == 0 ? " none" : spread);
+                channelAt(tallX, tallZ) + "; " + cavesAt(level, tallX, tallZ),
+                faces, spread.length() == 0 ? " none" : spread);
         source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
         return 1;
@@ -476,6 +506,46 @@ public final class TerrainCommands {
                 radius, at.getX(), at.getZ(), total, 100.0 * sea / total, 100.0 * mountain / total);
         source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
+        return 1;
+    }
+
+    /**
+     * How many blocks of the mod's river water round here would take a naturally spawned salmon, by vanilla's rule
+     * and by the one the mod widens it with. Needs the chunks loaded, so it is a measurement tool, not a player's.
+     */
+    public static int terrainFish(CommandContext<CommandSourceStack> ctx, int half) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        net.minecraft.world.level.block.Block river = ModBlocks.RIVER_WATER.get();
+        int wet = 0, plain = 0, ours = 0;
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        for (int x = at.getX() - half; x <= at.getX() + half; x++) {
+            for (int z = at.getZ() - half; z <= at.getZ() + half; z++) {
+                if (!level.hasChunkAt(x, z)) continue;
+                int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x, z);
+                for (int y = Math.max(level.getMinBuildHeight() + 1, top - 24); y <= top; y++) {
+                    p.set(x, y, z);
+                    if (!level.getBlockState(p).is(river)) continue;
+                    wet++;
+                    if (net.minecraft.world.entity.animal.WaterAnimal.checkSurfaceWaterAnimalSpawnRules(
+                            net.minecraft.world.entity.EntityType.SALMON, level,
+                            net.minecraft.world.entity.MobSpawnType.NATURAL, p, level.random)) {
+                        plain++;
+                    }
+                    if (net.minecraft.world.entity.SpawnPlacements.checkSpawnRules(
+                            net.minecraft.world.entity.EntityType.SALMON, level,
+                            net.minecraft.world.entity.MobSpawnType.NATURAL, p, level.random)) {
+                        ours++;
+                    }
+                }
+            }
+        }
+        final String out = String.format(Locale.ROOT,
+                "fish at %d,%d, half %d: %d river water blocks, %d take a salmon by vanilla's rule, %d by ours",
+                at.getX(), at.getZ(), half, wet, plain, ours);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(out);
+        source.sendSuccess(() -> Component.literal(out), false);
         return 1;
     }
 
