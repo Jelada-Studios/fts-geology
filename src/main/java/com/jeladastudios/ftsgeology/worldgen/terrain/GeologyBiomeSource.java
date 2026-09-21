@@ -65,6 +65,8 @@ public class GeologyBiomeSource extends BiomeSource {
     private static final double ON_CHANNEL = 0.5;
     /** How much of a named mountain's height a column has to carry before it is called by that mountain's name. */
     private static final double ON_LANDMARK = 0.18;
+    /** The sea's surface: a crop's ground over it is dry land whatever the climate says. */
+    private static final double SEA_LEVEL = 63.0;
     /** How far out, in quarts, a stranded river biome looks for the land it should have been. */
     private static final int[][] ASHORE = {{12, 0}, {-12, 0}, {0, 12}, {0, -12}, {24, 0}, {0, 24}};
 
@@ -80,11 +82,17 @@ public class GeologyBiomeSource extends BiomeSource {
         // A named mountain takes its own name wherever its ground is most of what a column stands on. The share is
         // the crop's own height here against the tallest it reaches, so the name belongs to the mountain and not to
         // the whole square the crop covers -- the valleys round it stay the country they were.
-        if (!sea && !underground(base) && landmarks.length > 0) {
+        // A crop can reach out over the sea, and where it lifts the ground out of the water the climate still calls it
+        // ocean: a mountainside three hundred blocks up came out as deep lukewarm ocean. There the mountain's name
+        // goes on whatever of its ground stands dry.
+        if (!underground(base) && landmarks.length > 0) {
             LandmarkSites.Site site = LandmarkSites.near(TerrainContext.seed(), TerrainContext.params(), bx, bz);
-            if (site != null && landmarks[site.which()] != null
-                    && TerrainFields.landmarkShare(TerrainContext.seed(), TerrainContext.params(), bx, bz) > ON_LANDMARK) {
-                return landmarks[site.which()];
+            if (site != null && landmarks[site.which()] != null) {
+                double share = TerrainFields.landmarkShare(TerrainContext.seed(), TerrainContext.params(), bx, bz);
+                if (sea ? share > 0.0 && RawGround.ready() && RawGround.heightAt(bx, bz) > SEA_LEVEL
+                        : share > ON_LANDMARK) {
+                    return landmarks[site.which()];
+                }
             }
         }
         if (!sea && !underground(base)) {

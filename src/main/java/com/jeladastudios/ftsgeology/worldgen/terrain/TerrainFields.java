@@ -71,6 +71,11 @@ public final class TerrainFields {
      * floor is let go over FRONT_OVER inside that, where the uplift is already half its height.
      */
     private static final double FRONT_EROSION = -0.3, FRONT_TO = 0.5, FRONT_OVER = 0.2;
+    /**
+     * How rugged a transform fault's belt is on the line, and over how many fault widths the ocean's side of an
+     * ocean-continent transform lets that go: the continent's flank is steep where it meets the sea.
+     */
+    private static final double TRANSFORM_RUGGED = 1.2, TRANSFORM_SEA_SLOPE = 0.5;
     /** Where a trench lies off a subduction coast. */
     private static final double TRENCH_AT = 0.3, TRENCH_HALF = 0.35;
     /**
@@ -358,6 +363,14 @@ public final class TerrainFields {
         double quiet = mine + (theirs - mine)
                 * 0.5 * smooth(Mth.clamp(1.0 - across(s, p) / CRUST_BLEND, 0, 1));
         FaultType k = s.boundaryType();
+        // A transform between an ocean and a continent: the continent's side is rugged down to the line, and an ocean
+        // floor that stayed quiet up to it stood the two a whole erosion unit apart there -- a sheer wall hundreds of
+        // blocks high where one ran through K2. The sea floor takes the same ruggedness on the line and lets it go
+        // over a short slope, the continent's flank going down into the water.
+        if (oceanic && k == FaultType.TRANSFORM && !s.neighbourKind().isOceanic()) {
+            double slope = smooth(Mth.clamp(1.0 - across(s, p) / TRANSFORM_SEA_SLOPE, 0, 1));
+            return quiet - belt(s, p) * TRANSFORM_RUGGED * slope;
+        }
         // A sea floor is flat except where it is being made or destroyed: the hills of a spreading ridge and the
         // islands of an arc are the exceptions.
         if (oceanic && !s.overridingSide() && k != FaultType.DIVERGENT) return quiet;
@@ -367,7 +380,7 @@ public final class TerrainFields {
         double b = belt(s, p);
         double rugged = b * calm(s, p) * switch (k) {
             case CONVERGENT_SUBDUCTION, CONVERGENT_COLLISION -> 2.0;
-            case TRANSFORM -> 1.2;
+            case TRANSFORM -> TRANSFORM_RUGGED;
             case DIVERGENT -> 0.9;
             case INTERIOR -> 0.0;
         };
@@ -557,12 +570,15 @@ public final class TerrainFields {
      * the arc's mountains start; a rift keeps its floor flat and leaves the ruggedness to its scarps and shoulders.
      */
     private static double calm(PlateSample s, GeologyParams p) {
-        if (s.plateKind().isOceanic()) return 1.0;
         double a = across(s, p);
         FaultType k = s.boundaryType();
+        // An ocean plate riding over another is an island arc's, and its ruggedness starts back from the trench as a
+        // continent's does: taken in full on the line, the sea floor stood a two-unit erosion step against the
+        // quiet plate going under.
         if (k == FaultType.CONVERGENT_SUBDUCTION && s.overridingSide()) {
             return smooth(Mth.clamp((a - COAST_LOWLAND) / COAST_FOOTHILLS, 0, 1));
         }
+        if (s.plateKind().isOceanic()) return 1.0;
         // Vanilla turns erosion into height steeply, so the rift's flat floor hands over to its rugged shoulders slowly:
         // over a third of a fault width the change stood as a fifty-block step.
         if (k == FaultType.DIVERGENT) {

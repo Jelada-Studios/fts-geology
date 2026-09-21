@@ -92,14 +92,21 @@ public final class LandmarkSites {
         return false;
     }
 
-    /** The named mountain whose crop covers this column, or null. */
+    /**
+     * The named mountain whose crop covers this column, or null. The crop is turned to its bearing, so it is tested in
+     * its own frame: a square round the site, as this once was, cut off the crop's corners in straight walls a hundred
+     * and more blocks high wherever the mountain still stood there.
+     */
     public static Site near(long seed, GeologyParams p, int x, int z) {
         Site[] all = all(seed, p);
         double mpb = TerrainFields.METRES_PER_BLOCK / p.horizontal();
         for (Site s : all) {
-            double reach = DemLibrary.landmarkHalfAlong(s.which()) / mpb;
-            double dx = Math.abs(x - s.x()), dz = Math.abs(z - s.z());
-            if (dx <= reach && dz <= reach) return s;
+            double halfAlong = DemLibrary.landmarkHalfAlong(s.which()) / mpb;
+            double halfAcross = DemLibrary.landmarkHalfAcross(s.which()) / mpb;
+            double dx = x - s.x(), dz = z - s.z();
+            if (dx * dx + dz * dz > halfAlong * halfAlong + halfAcross * halfAcross) continue;
+            double c = Math.cos(s.bearing()), sn = Math.sin(s.bearing());
+            if (Math.abs(dx * c + dz * sn) <= halfAlong && Math.abs(-dx * sn + dz * c) <= halfAcross) return s;
         }
         return null;
     }

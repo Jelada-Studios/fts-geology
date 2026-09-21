@@ -133,7 +133,7 @@ public final class TectonicMap {
         //    so the distance to an edge is the distance to that bisector: exact, unlike the common
         //    second-nearest-minus-nearest approximation, which bulges where three plates meet.
         java.util.List<double[]> edges = new java.util.ArrayList<>();
-        collectEdges(seed, bgx, bgz, bx, bz, bx, bz, px, pz, scale, jitter, false, bgx, bgz, edges);
+        collectEdges(seed, bgx, bgz, bx, bz, px, pz, scale, jitter, false, bgx, bgz, edges);
         double[] own = edges.get(0);
         for (double[] e : edges) if (e[0] < own[0]) own = e;
         double faultDistance = Math.max(0.0, own[0]);
@@ -151,7 +151,7 @@ public final class TectonicMap {
         int ngx = (int) own[3], ngz = (int) own[4];
         if (faultDistance < NEIGHBOUR_REACH * params.horizontal()) {
             collectEdges(seed, ngx, ngz, siteX(seed, ngx, ngz, scale, jitter), siteZ(seed, ngx, ngz, scale, jitter),
-                    bx, bz, px, pz, scale, jitter, true, bgx, bgz, edges);
+                    px, pz, scale, jitter, true, bgx, bgz, edges);
         }
         edges.remove(own);
         edges.sort(java.util.Comparator.comparingDouble(e -> e[0]));
@@ -165,24 +165,30 @@ public final class TectonicMap {
     }
 
     /**
-     * The bisectors between one plate's centre and every centre round it, as candidate boundaries for a column:
-     * {distance, normal x, normal z, the cell across, the cell that owns the edge}. For the column's own plate the
-     * signed offset is the distance, the column lying inside the cell. For the plate across the nearest boundary the
-     * column lies outside the cell, and the bisector runs on past the junction into the column's own plate as a
-     * line that is no boundary there: the distance is to the edge itself, which starts at the junction, the three
-     * centres' circumcentre. Where the foot of the perpendicular falls on the far side of it, nearer the column's
-     * own centre than the neighbour's, the distance is to the junction. The cell to skip is the column's own, whose
-     * edge with the neighbour is the shared line already in the list.
+     * The edges between one plate's cell and every cell round it, as candidate boundaries for a column:
+     * {distance, normal x, normal z, the cell across, the cell that owns the edge}. The distance is to the edge
+     * itself -- the stretch of the bisector between its two junctions -- so the column's own plate and the plate
+     * across the line measure every boundary alike. The cell to skip, for the plate across, is the column's own,
+     * whose edge with the neighbour is the shared line already in the list.
      */
-    private static void collectEdges(long seed, int cgx, int cgz, double cx, double cz, double ax, double az,
+    private static void collectEdges(long seed, int cgx, int cgz, double cx, double cz,
                                      double px, double pz, double scale, double jitter, boolean absolute,
                                      int skipGx, int skipGz, java.util.List<double[]> out) {
+        double[] siteXs = new double[25], siteZs = new double[25];
+        for (int ox = -2; ox <= 2; ox++) {
+            for (int oz = -2; oz <= 2; oz++) {
+                int i = (ox + 2) * 5 + oz + 2;
+                siteXs[i] = siteX(seed, cgx + ox, cgz + oz, scale, jitter);
+                siteZs[i] = siteZ(seed, cgx + ox, cgz + oz, scale, jitter);
+            }
+        }
         for (int ox = -2; ox <= 2; ox++) {
             for (int oz = -2; oz <= 2; oz++) {
                 int gx = cgx + ox, gz = cgz + oz;
                 if ((gx == cgx && gz == cgz) || (absolute && gx == skipGx && gz == skipGz)) continue;
-                double sx = siteX(seed, gx, gz, scale, jitter);
-                double sz = siteZ(seed, gx, gz, scale, jitter);
+                int self = (ox + 2) * 5 + oz + 2;
+                double sx = siteXs[self];
+                double sz = siteZs[self];
                 double dx = sx - cx, dz = sz - cz;
                 double len = Math.sqrt(dx * dx + dz * dz);
                 if (len < 1.0e-6) continue;
@@ -195,14 +201,30 @@ public final class TectonicMap {
                 // sides of a line measure from the same end and read the same ground.
                 double along = (px - midX) * -uz + (pz - midZ) * ux;
                 double alongOne = (cgx < gx || (cgx == gx && cgz < gz)) ? along : -along;
-                if (absolute) {
-                    d = Math.abs(d);
-                    // The foot of the perpendicular on the bisector, and whether it lies past the junction.
-                    double fx = midX - uz * along, fz = midZ + ux * along;
-                    if (sq(fx - ax) + sq(fz - az) < sq(fx - cx) + sq(fz - cz)) {
-                        double[] v = circumcentre(ax, az, cx, cz, sx, sz);
-                        if (v != null) d = Math.sqrt(sq(px - v[0]) + sq(pz - v[1]));
+                // The edge is not the whole bisector but the stretch of it between the junctions, where the cell's
+                // other neighbours cut it off; a neighbour whose bisector they cut away entirely is no neighbour at
+                // all. Measured to that stretch, from whichever side: the plate the column stands in used to measure
+                // its own edges to the whole line, the plate across to the junction, and where a third boundary came
+                // near the two sides gave it different shares -- a hundred-block step down the line between them.
+                double lo = Double.NEGATIVE_INFINITY, hi = Double.POSITIVE_INFINITY;
+                for (int t = 0; t < 25 && lo <= hi; t++) {
+                    if (t == 12 || t == self) continue;
+                    double wx = siteXs[t] - cx, wz = siteZs[t] - cz;
+                    double k = -uz * wx + ux * wz;
+                    double r = -((midX - (cx + siteXs[t]) * 0.5) * wx + (midZ - (cz + siteZs[t]) * 0.5) * wz);
+                    if (Math.abs(k) < 1.0e-9) {
+                        if (r < 0) lo = Double.POSITIVE_INFINITY;
+                    } else if (k > 0) {
+                        hi = Math.min(hi, r / k);
+                    } else {
+                        lo = Math.max(lo, r / k);
                     }
+                }
+                if (lo > hi) continue;
+                d = Math.abs(d);
+                if (along < lo || along > hi) {
+                    double t = along < lo ? lo : hi;
+                    d = Math.sqrt(sq(px - (midX - uz * t)) + sq(pz - (midZ + ux * t)));
                 }
                 out.add(new double[]{d, ux, uz, gx, gz, cgx, cgz, alongOne});
             }
@@ -211,15 +233,6 @@ public final class TectonicMap {
 
     private static double sq(double d) {
         return d * d;
-    }
-
-    /** The point equally far from three centres, where their three boundaries meet; null when they are in a line. */
-    private static double[] circumcentre(double ax, double az, double bx, double bz, double cx, double cz) {
-        double d = 2.0 * (ax * (bz - cz) + bx * (cz - az) + cx * (az - bz));
-        if (Math.abs(d) < 1.0e-6) return null;
-        double a2 = ax * ax + az * az, b2 = bx * bx + bz * bz, c2 = cx * cx + cz * cz;
-        return new double[]{(a2 * (bz - cz) + b2 * (cz - az) + c2 * (az - bz)) / d,
-                (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d};
     }
 
     /** The sample a candidate edge makes, as the plate that owns the edge sees it. */
