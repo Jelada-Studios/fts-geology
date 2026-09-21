@@ -205,12 +205,18 @@ public final class RiverNetwork {
     private static At look(int x, int z) {
         if (ground == null) return NOTHING;
         double reach = REACH * horizontal;
-        double bestD2 = reach * reach;
+        double reach2 = reach * reach;
+        double bestD2 = reach2;
         // A length is kept by where it starts, so a column within reach of any part of it is within reach plus its
         // length of the start. Most of the lengths in an index square are nowhere near, and this throws them out
         // for five operations instead of projecting onto every one of them.
         double far = reach + STEP * horizontal + 1.0, far2 = far * far;
-        double half = 0, water = 0, bed = 0, head = 0;
+        // The surface, the bed and the width are a weighted mean of every length within reach rather than a copy of
+        // the nearest one. Weight falls as the fourth power of the distance, so along a lone river the nearest length
+        // is all that counts and the numbers are its own; where two traces meet, the two are comparably near and
+        // blend across the middle of the junction instead of swapping there. That swap was a step in the bed as tall
+        // as the difference between the two surfaces, and it ran the length of the confluence.
+        double weight = 0, half = 0, water = 0, bed = 0, head = 0;
         boolean found = false;
         int bx0 = Math.floorDiv(x - (int) reach, BLOCK), bx1 = Math.floorDiv(x + (int) reach, BLOCK);
         int bz0 = Math.floorDiv(z - (int) reach, BLOCK), bz1 = Math.floorDiv(z + (int) reach, BLOCK);
@@ -226,17 +232,22 @@ public final class RiverNetwork {
                             : Math.max(0.0, Math.min(1.0, ((x - p.x) * ax + (z - p.z) * az) / len2));
                     double dx = p.x + ax * t - x, dz = p.z + az * t - z;
                     double d2 = dx * dx + dz * dz;
-                    if (d2 >= bestD2) continue;
-                    bestD2 = d2;
+                    if (d2 >= reach2) continue;
+                    // The distance itself stays the true nearest: it is what says whether the column is in the
+                    // channel at all, and a mean of it would widen every river by the width of its neighbours.
+                    if (d2 < bestD2) bestD2 = d2;
                     found = true;
-                    half = p.halfWidth;
-                    water = p.water + (p.waterEnd - p.water) * t;
-                    bed = p.bed + (p.bedEnd - p.bed) * t;
-                    head = p.fromHead + STEP * horizontal * t;
+                    double w = 1.0 / ((d2 + 1.0) * (d2 + 1.0));
+                    weight += w;
+                    half += w * p.halfWidth;
+                    water += w * (p.water + (p.waterEnd - p.water) * t);
+                    bed += w * (p.bed + (p.bedEnd - p.bed) * t);
+                    head += w * (p.fromHead + STEP * horizontal * t);
                 }
             }
         }
-        return found ? new At(Math.sqrt(bestD2), half, water, bed, head) : NOTHING;
+        if (!found) return NOTHING;
+        return new At(Math.sqrt(bestD2), half / weight, water / weight, bed / weight, head / weight);
     }
 
     /**
