@@ -44,6 +44,9 @@ public class GeysersMod {
         // Populate the creative menu once tabs are built (mod bus event).
         modBus.addListener(this::onBuildCreativeTabs);
 
+        // Let the fish be born in the mod's river water as well as in vanilla's (mod bus event).
+        modBus.addListener(com.jeladastudios.ftsgeology.hydrology.RiverSpawns::register);
+
         // The mod's first packet. Registered in common setup because the channel has to exist on
         // both sides before anybody joins, and the handler itself is guarded for physical side.
         modBus.addListener((net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent e) ->
