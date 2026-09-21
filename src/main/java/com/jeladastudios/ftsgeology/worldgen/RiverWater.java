@@ -7,6 +7,7 @@ import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.hydrology.RiverNetwork;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.util.SeedHash;
+import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyChunkGenerator;
 import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -55,7 +56,20 @@ public final class RiverWater {
     private static final int SPRING_DEEP = 40, SPRING_VARY = 24, SPRING_LEAST = 5;
 
     private static final LongAdder CANDIDATES = new LongAdder(), KEPT = new LongAdder(), BLOCKS = new LongAdder(),
-            DROPPED = new LongAdder(), LEVELLED = new LongAdder(), SPRINGS = new LongAdder(), WET = new LongAdder();
+            DROPPED = new LongAdder(), LEVELLED = new LongAdder(), SPRINGS = new LongAdder(), WET = new LongAdder(),
+            BANKED = new LongAdder(), CLIFFS = new LongAdder();
+
+    /**
+     * How much a bank may be built up to hold the water beside it, in blocks.
+     *
+     * <p>The channel is cut into the raw ground, and the rim the water is held under is read off it too, but the chunk
+     * is built with the three-dimensional noise on top. Where that leaves the ground beside a river a block or two
+     * lower than the raw ground said, the water stood a block over its bank: a sheet of water upright in the open,
+     * seven columns in a hundred along the new rivers. The column beside it is built up to the water in its own
+     * ground. More than two blocks is a cliff, not a bank, and is counted and left.</p>
+     */
+    private static final int BANK_FILL = 2;
+    private static final int[][] SIDES = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
     private static final AtomicLong CHUNKS = new AtomicLong();
 
     public static int generate(WorldGenLevel level, ChunkPos cp) {
@@ -89,6 +103,8 @@ public final class RiverWater {
                     continue;
                 }
                 if (g >= w) {
+                    // A lake fills its hollow and no more: ground standing over its water is its shore.
+                    if (a.lake()) continue;
                     int bedY = level(level, at, x, z, g, w, a);
                     if (bedY == Integer.MIN_VALUE) {
                         DROPPED.increment();
@@ -128,12 +144,61 @@ public final class RiverWater {
                 if (a.isHead()) placed += spring(level, at, x, z, g, water);
             }
         }
+        placed += banks(level, cp, sea, at);
         BLOCKS.add(placed);
         if (CHUNKS.incrementAndGet() % 100 == 0) {
             GeysersMod.LOGGER.info("River water over {} chunks: {} columns in a channel, {} kept, {} of them wet, "
-                            + "{} levelled, {} let go, {} springs, {} blocks, {} traces cut; {}",
+                            + "{} levelled, {} let go, {} springs, {} blocks, {} banks built up, {} left as cliffs; {}; {}",
                     CHUNKS.get(), CANDIDATES.sum(), KEPT.sum(), WET.sum(), LEVELLED.sum(), DROPPED.sum(),
-                    SPRINGS.sum(), BLOCKS.sum(), RiverNetwork.tracesCut(), RiverNetwork.endings());
+                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), RiverNetwork.summary(),
+                    GeologyChunkGenerator.summary());
+        }
+        return placed;
+    }
+
+    /**
+     * The top of the water a column is to hold, or {@link Integer#MIN_VALUE} where it holds none. Worked out from the
+     * river network alone, so a column can tell what its neighbour in the next chunk will hold without reading it.
+     */
+    private static int waterTop(int x, int z, int sea) {
+        RiverNetwork.At a = RiverNetwork.at(x, z);
+        if (a.distance() == Double.MAX_VALUE) return Integer.MIN_VALUE;
+        int w = (int) Math.floor(a.water());
+        // At the mouth the sea is the other bank.
+        if (w <= sea) return Integer.MIN_VALUE;
+        return a.floor() > w - 0.5 ? Integer.MIN_VALUE : w;
+    }
+
+    /** Builds up the columns beside the water that came out lower than it. Only this chunk's own columns. */
+    private static int banks(WorldGenLevel level, ChunkPos cp, int sea, BlockPos.MutableBlockPos at) {
+        int placed = 0;
+        for (int dx = 0; dx < 16; dx++) {
+            for (int dz = 0; dz < 16; dz++) {
+                int x = cp.getMinBlockX() + dx, z = cp.getMinBlockZ() + dz;
+                if (waterTop(x, z, sea) != Integer.MIN_VALUE) continue;
+                int want = Integer.MIN_VALUE;
+                for (int[] d : SIDES) want = Math.max(want, waterTop(x + d[0], z + d[1], sea));
+                if (want == Integer.MIN_VALUE) continue;
+                int g = TerrainProbe.groundY(level, x, z);
+                if (g == Integer.MIN_VALUE || g >= want) continue;
+                if (want - g > BANK_FILL) {
+                    CLIFFS.increment();
+                    continue;
+                }
+                BlockState top = level.getBlockState(at.set(x, g, z));
+                if (EruptionHandler.isPlayerPlaced(top) || !top.isSolidRender(level, at)) continue;
+                // Grass stays on top; what is under it is the soil it grows in.
+                boolean turf = top.is(BlockTags.DIRT) && !top.is(Blocks.DIRT);
+                BlockState body = turf ? Blocks.DIRT.defaultBlockState() : top;
+                if (turf) level.setBlock(at, body, FLAGS);
+                for (int y = g + 1; y <= want; y++) {
+                    BlockState was = level.getBlockState(at.set(x, y, z));
+                    if (!was.isAir() && !TerrainProbe.isVegetation(was)) break;
+                    level.setBlock(at, y == want ? top : body, FLAGS);
+                    placed++;
+                }
+                BANKED.increment();
+            }
         }
         return placed;
     }

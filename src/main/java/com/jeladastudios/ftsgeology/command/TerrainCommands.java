@@ -560,16 +560,15 @@ public final class TerrainCommands {
         var a = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.at(at.getX(), at.getZ());
         String line;
         if (a.distance() == Double.MAX_VALUE) {
-            line = String.format(Locale.ROOT, "no channel within reach of %d,%d (%d traces cut)",
-                    at.getX(), at.getZ(), com.jeladastudios.ftsgeology.hydrology.RiverNetwork.tracesCut());
+            line = String.format(Locale.ROOT, "no channel within reach of %d,%d; %s",
+                    at.getX(), at.getZ(), com.jeladastudios.ftsgeology.hydrology.RiverNetwork.summary());
         } else {
             line = String.format(Locale.ROOT,
-                    "channel %.1f blocks away, half width %.1f, floor %.1f, water %.1f; ground here %d (%d traces cut)",
-                    a.distance(), a.halfWidth(), a.bed(), a.water(),
+                    "%s %.1f blocks away, half width %.1f, floor %.1f, water %.1f, %.0f blocks from its head; ground here %d",
+                    a.lake() ? "lake" : "channel", a.distance(), a.halfWidth(), a.bed(), a.water(), a.fromHead(),
                     level.getChunkSource().getGenerator().getBaseHeight(at.getX(), at.getZ(),
                             net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG,
-                            level, level.getChunkSource().randomState()),
-                    com.jeladastudios.ftsgeology.hydrology.RiverNetwork.tracesCut());
+                            level, level.getChunkSource().randomState()));
         }
         final String out = line;
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(out);
@@ -588,6 +587,99 @@ public final class TerrainCommands {
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(out);
         ctx.getSource().sendSuccess(() -> Component.literal(out), false);
         return 1;
+    }
+
+    /** The rivers round here checked against what they promise: no crossings, no dead ends, no water going uphill. */
+    public static int terrainRiversAudit(CommandContext<CommandSourceStack> ctx, int half) {
+        BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+        if (!com.jeladastudios.ftsgeology.hydrology.RiverNetwork.ready()) {
+            ctx.getSource().sendSuccess(() -> Component.literal("No river network: this world type traces none."), false);
+            return 0;
+        }
+        final String out = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.audit(at.getX(), at.getZ(), half);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(out);
+        ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+        return 1;
+    }
+
+    /**
+     * A picture of the rivers round here, drawn from the network and the raw ground alone. Nothing is generated, so a
+     * whole region can be looked at in the time its rivers take to work out. Written beside the server as
+     * {@code fts_rivers_<x>_<z>.png}: the ground shaded by height, the sea dark, lakes pale blue, channels blue.
+     */
+    public static int terrainRiversMap(CommandContext<CommandSourceStack> ctx, int half, int step) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        if (!com.jeladastudios.ftsgeology.hydrology.RiverNetwork.ready()
+                || !com.jeladastudios.ftsgeology.worldgen.terrain.RawGround.ready()) {
+            source.sendSuccess(() -> Component.literal("No river network: this world type traces none."), false);
+            return 0;
+        }
+        final int cx = at.getX(), cz = at.getZ();
+        java.io.File out = level.getServer().getServerDirectory().toPath()
+                .resolve("fts_rivers_" + cx + "_" + cz + ".png").toFile();
+        CompletableFuture.supplyAsync(() -> riversPicture(cx, cz, half, step, out), Util.backgroundExecutor())
+                .thenAcceptAsync(msg -> {
+                    com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(msg);
+                    source.sendSuccess(() -> Component.literal(msg), false);
+                }, level.getServer())
+                .exceptionally(t -> {
+                    source.sendFailure(Component.literal("River map failed: " + t));
+                    return null;
+                });
+        return 1;
+    }
+
+    private static String riversPicture(int cx, int cz, int half, int step, java.io.File out) {
+        int n = 2 * (half / step) + 1, mid = n / 2;
+        double[][] h = new double[n][n];
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                h[i][j] = com.jeladastudios.ftsgeology.worldgen.terrain.RawGround.heightAt(cx + (i - mid) * step, cz + (j - mid) * step);
+            }
+        }
+        java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(n, n, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        int channel = 0, lake = 0;
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                int x = cx + (i - mid) * step, z = cz + (j - mid) * step;
+                double y = h[i][j];
+                int r, g, b;
+                if (y <= 63) {
+                    r = 20; g = 40; b = 110;
+                } else {
+                    // Light from the north-west, so the valleys read.
+                    double ex = (h[Math.min(n - 1, i + 1)][j] - h[Math.max(0, i - 1)][j]) / (2.0 * step);
+                    double ez = (h[i][Math.min(n - 1, j + 1)] - h[i][Math.max(0, j - 1)]) / (2.0 * step);
+                    double shade = Math.max(0.35, Math.min(1.25, 0.85 - 0.6 * (ex + ez)));
+                    double t = Math.max(0, Math.min(1, (y - 63) / 260.0));
+                    double lr = t < 0.5 ? 70 + 160 * t : 150 + 170 * (t - 0.5);
+                    double lg = t < 0.5 ? 130 + 20 * t : 140 + 180 * (t - 0.5);
+                    double lb = t < 0.5 ? 60 + 60 * t : 90 + 280 * (t - 0.5);
+                    r = (int) Math.min(255, lr * shade);
+                    g = (int) Math.min(255, lg * shade);
+                    b = (int) Math.min(255, lb * shade);
+                }
+                com.jeladastudios.ftsgeology.hydrology.RiverNetwork.At a =
+                        com.jeladastudios.ftsgeology.hydrology.RiverNetwork.at(x, z);
+                if (a.distance() != Double.MAX_VALUE && a.lake()) {
+                    // A lake holds water only where its hollow is: it cuts no more than a couple of blocks.
+                    if (Math.max(a.floor(), y - 2.0) < Math.floor(a.water()) - 0.5) { r = 110; g = 170; b = 235; lake++; }
+                } else if (a.distance() != Double.MAX_VALUE && a.distance() <= Math.max(a.halfWidth(), step * 0.5)) {
+                    r = 25; g = 70; b = 215;
+                    channel++;
+                }
+                img.setRGB(i, j, (r << 16) | (g << 8) | b);
+            }
+        }
+        try {
+            javax.imageio.ImageIO.write(img, "png", out);
+        } catch (java.io.IOException e) {
+            return "River map failed: " + e;
+        }
+        return String.format(Locale.ROOT, "river map round %d,%d, %d blocks a pixel, %d pixels a side: %d channel, %d lake; %s",
+                cx, cz, step, n, channel, lake, out.getAbsolutePath());
     }
 
     /** A fingerprint of the rivers round here, to check that the same world gives the same rivers every time. */

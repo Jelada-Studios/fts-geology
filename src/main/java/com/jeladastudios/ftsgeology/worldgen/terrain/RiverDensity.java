@@ -50,6 +50,13 @@ public final class RiverDensity implements DensityFunction {
      */
     private static final double MAX_SHAVE = 12.0;
 
+    /**
+     * How far under its raw ground a lake may cut, in blocks. A lake fills the hollow it stands in; given a channel's
+     * twelve blocks, every disc of it dug a round basin into the hillside beside the hollow and the lake came out as
+     * a string of blobs.
+     */
+    private static final double LAKE_SHAVE = 2.0;
+
     public static final MapCodec<RiverDensity> DATA_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             DensityFunction.HOLDER_HELPER_CODEC.fieldOf("argument").forGetter(f -> f.raw),
             Codec.STRING.fieldOf("mode").forGetter(f -> f.mode.name().toLowerCase(Locale.ROOT))
@@ -79,7 +86,8 @@ public final class RiverDensity implements DensityFunction {
                 // The raw ground is a flat cache the chunk filled when it was built, and the router hands the same
                 // function to both this and the offset's min, so reading it here is an array lookup.
                 double ground = 128.0 + 128.0 * raw.compute(ctx);
-                yield (Math.max(y, ground - MAX_SHAVE) - 128.0) / 128.0;
+                double shave = RiverNetwork.lakeAt(x, z) ? LAKE_SHAVE : MAX_SHAVE;
+                yield (Math.max(y, ground - shave) - 128.0) / 128.0;
             }
             case NEAR -> RiverNetwork.near(x, z);
         };

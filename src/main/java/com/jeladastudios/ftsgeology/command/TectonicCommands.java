@@ -151,6 +151,18 @@ public final class TectonicCommands {
                                                 .then(Commands.argument("half", IntegerArgumentType.integer(64, 8000))
                                                         .executes(ctx -> TerrainCommands.terrainRiversHash(ctx,
                                                                 IntegerArgumentType.getInteger(ctx, "half")))))
+                                        // A picture of the network over a region, nothing generated.
+                                        .then(Commands.literal("map")
+                                                .then(Commands.argument("half", IntegerArgumentType.integer(256, 16000))
+                                                        .then(Commands.argument("step", IntegerArgumentType.integer(1, 64))
+                                                                .executes(ctx -> TerrainCommands.terrainRiversMap(ctx,
+                                                                        IntegerArgumentType.getInteger(ctx, "half"),
+                                                                        IntegerArgumentType.getInteger(ctx, "step"))))))
+                                        // Crossings, dead ends, water going uphill or standing over its bank.
+                                        .then(Commands.literal("audit")
+                                                .then(Commands.argument("half", IntegerArgumentType.integer(64, 8000))
+                                                        .executes(ctx -> TerrainCommands.terrainRiversAudit(ctx,
+                                                                IntegerArgumentType.getInteger(ctx, "half")))))
                                         .then(Commands.argument("half", IntegerArgumentType.integer(64, 4000))
                                                 .then(Commands.argument("step", IntegerArgumentType.integer(4, 64))
                                                         .then(Commands.argument("minPath", IntegerArgumentType.integer(0, 10000))

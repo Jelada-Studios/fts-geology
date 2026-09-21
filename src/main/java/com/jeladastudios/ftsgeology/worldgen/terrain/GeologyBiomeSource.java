@@ -89,7 +89,7 @@ public class GeologyBiomeSource extends BiomeSource {
         }
         if (!sea && !underground(base)) {
             boolean onChannel = river != null
-                    && com.jeladastudios.ftsgeology.hydrology.RiverNetwork.near(bx, bz) >= ON_CHANNEL;
+                    && com.jeladastudios.ftsgeology.hydrology.RiverNetwork.onRiver(bx, bz, ON_CHANNEL);
             if (onChannel && !TfcCompat.beach(base)) return river;
             if (TfcCompat.river(base)) return ashore(qx, qy, qz, sampler, base);
         }
