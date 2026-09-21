@@ -3,7 +3,7 @@
     "minecraft:overworld": {
       "type": "fts_geology:overworld_tall",
       "generator": {
-        "type": "minecraft:noise",
+        "type": "fts_geology:noise",
         "biome_source": {
           "type": "fts_geology:geology",
           "parent": {
