@@ -129,7 +129,7 @@ public final class RiverNetwork {
 
     /** What a column knows about the nearest channel or lake. */
     public record At(double distance, double halfWidth, double water, double bed, double fromHead, boolean lake,
-                     double cut) {
+                     double cut, double fx, double fz) {
         /** True at the few columns a river rises from: where the ground first gives its water up. */
         public boolean isHead() {
             return !lake && distance <= 0.75 && fromHead <= RiverPieces.STEP * horizontal * 0.5;
@@ -145,7 +145,7 @@ public final class RiverNetwork {
         }
     }
 
-    public static final At NOTHING = new At(Double.MAX_VALUE, 0, 0, 0, 0, false, 0);
+    public static final At NOTHING = new At(Double.MAX_VALUE, 0, 0, 0, 0, false, 0, 0, 0);
     /** The last column asked about: the offset asks twice for every column, and the water again after. */
     private static final ThreadLocal<long[]> LAST_KEY = ThreadLocal.withInitial(() -> new long[]{Long.MIN_VALUE});
     private static final ThreadLocal<At> LAST = new ThreadLocal<>();
@@ -173,7 +173,7 @@ public final class RiverNetwork {
                 lakeDepth = d;
             }
         }
-        if (lake != null) return new At(0.0, lake.grid, lake.water, Math.min(lake.bed, lake.water - lakeDepth), 1.0e4, true, 0);
+        if (lake != null) return new At(0.0, lake.grid, lake.water, Math.min(lake.bed, lake.water - lakeDepth), 1.0e4, true, 0, 0, 0);
         double reach = reach();
         double reach2 = reach * reach;
         double bestD2 = reach2;
@@ -182,7 +182,7 @@ public final class RiverNetwork {
         // The surface, the bed and the width are a weighted mean of every length within reach rather than a copy of
         // the nearest one. Weight falls as the fourth power of the distance, so along a lone river the nearest length
         // is all that counts; where two meet, the two blend across the junction instead of swapping there.
-        double weight = 0, half = 0, water = 0, bed = 0, head = 0, cut = 0;
+        double weight = 0, half = 0, water = 0, bed = 0, head = 0, cut = 0, fx = 0, fz = 0;
         boolean found = false;
         int bx0 = Math.floorDiv(x - (int) reach, BLOCK), bx1 = Math.floorDiv(x + (int) reach, BLOCK);
         int bz0 = Math.floorDiv(z - (int) reach, BLOCK), bz1 = Math.floorDiv(z + (int) reach, BLOCK);
@@ -210,12 +210,18 @@ public final class RiverNetwork {
                     bed += w * (p.bed + (p.bedEnd - p.bed) * t);
                     head += w * (p.fromHead + Math.sqrt(len2) * t);
                     cut += w * (p.cut + (p.cutEnd - p.cut) * t);
+                    // Which way the water runs: the lengths' own directions, a lake's discs having none.
+                    double l = Math.sqrt(len2);
+                    if (l > 1e-6 && !p.lake()) {
+                        fx += w * ax / l;
+                        fz += w * az / l;
+                    }
                 }
             }
         }
         if (!found) return NOTHING;
         return new At(Math.sqrt(bestD2), half / weight, water / weight, bed / weight, head / weight, bestLake,
-                cut / weight);
+                cut / weight, fx / weight, fz / weight);
     }
 
     /** How far over the water the cut wall is carried before the hillside is left alone: enough to hold the water. */
@@ -357,10 +363,10 @@ public final class RiverNetwork {
         RiverPieces pc = pieces;
         if (l == null || pc == null) return "no river network";
         return String.format(Locale.ROOT,
-                "%d channel nodes (%d joins, %d with nothing to join, %d not traced, %d dam samples, %d gorge lengths, %d spring eyes, %d held under a "
+                "%d channel nodes (%d joins, %d with nothing to join, %d not traced, %d dam samples, %d gorge lengths, %d spring eyes, %d inlets cut through a bar (%d open, %d big, %d shut), %d held under a "
                         + "bank), %d lakes drawn, %d mouths, %d sinks; %d hollows (%d closed), %d lakes, %d ground reads "
                         + "and %d on the grid; %d squares in %.0f ms, slowest %.0f ms",
-                pc.channels.sum(), pc.joins.sum(), pc.dryJoins.sum(), pc.fallbacks.sum(), pc.dams.sum(), pc.gorges.sum(), pc.eyes.sum(),
+                pc.channels.sum(), pc.joins.sum(), pc.dryJoins.sum(), pc.fallbacks.sum(), pc.dams.sum(), pc.gorges.sum(), pc.eyes.sum(), pc.inlets.sum(), pc.inletOpen.sum(), pc.inletBig.sum(), pc.inletShut.sum(),
                 pc.bankClamps.sum(), pc.lakeMasks.sum(), pc.mouths.sum(), pc.sinks.sum(), l.pitsFoundCount(),
                 l.closedCount(), l.lakesCount(), l.readsCount(), pc.gridReads.sum(), SQUARES.sum(),
                 SQUARE_NANOS.sum() / 1e6, SLOWEST.get() / 1e6);
@@ -460,7 +466,7 @@ public final class RiverNetwork {
         List<double[]> segs = new ArrayList<>();
         List<Long> owner = new ArrayList<>();
         int ends = 0, handed = 0, joinsSeen = 0, joinsDry = 0, dams = 0, gorged = 0;
-        int turns = 0, turns45 = 0, turns60 = 0;
+        int turns = 0, turns45 = 0, turns60 = 0, tight = 0;
         double worstJoin = 0, worstX = 0, worstZ = 0;
         String unhanded = "";
         String firstHead = "";
@@ -487,10 +493,10 @@ public final class RiverNetwork {
                     boolean continues = q > 0 && same(p.x, p.z, ps[q - 1].ex, ps[q - 1].ez);
                     if (continues && p.kind == RiverPieces.CHANNEL && ps[q - 1].kind == RiverPieces.CHANNEL) {
                         double t = turn(ps[q - 1], p);
-                        if (t >= 0) { turns++; if (t > 45) turns45++; if (t > 60) turns60++; }
+                        if (t >= 0) { turns++; if (t > 45) turns45++; if (t > 60) turns60++; if (tight(ps[q - 1], p, t)) tight++; }
                     }
                     if (p.waterEnd > p.water + 1e-3f || (continues && p.water > ps[q - 1].waterEnd + 1e-3f)) rising++;
-                    segs.add(new double[]{p.x, p.z, p.ex, p.ez});
+                    segs.add(new double[]{p.x, p.z, p.ex, p.ez, Math.max(p.water, p.waterEnd)});
                     owner.add(k);
                     // A dam is ground the cut does not reach: over the ordinary shave, and over the gorge where there is one.
                     double allowed = Math.max(RiverPieces.MAX_SHAVE, p.cut - (p.water - p.bed));
@@ -526,7 +532,7 @@ public final class RiverNetwork {
                     for (Point n : pc.of(r)) {
                         if (n.kind != RiverPieces.CHANNEL || !same(n.x, n.z, last.ex, last.ez)) continue;
                         double t = turn(last, n);
-                        if (t >= 0) { turns++; if (t > 45) turns45++; if (t > 60) turns60++; }
+                        if (t >= 0) { turns++; if (t > 45) turns45++; if (t > 60) turns60++; if (tight(last, n, t)) tight++; }
                         break;
                     }
                     if (takenOn(pc.of(r), last.ex, last.ez)) handed++;
@@ -561,7 +567,8 @@ public final class RiverNetwork {
                 else if (pc.underLake(r)) intoLakes++;
             }
         }
-        int crossings = 0;
+        int crossings = 0, crossingsAtSea = 0;
+        String firstCrossing = "";
         java.util.Map<Long, List<Integer>> grid = new java.util.HashMap<>();
         for (int s = 0; s < segs.size(); s++) {
             double[] a = segs.get(s);
@@ -578,21 +585,37 @@ public final class RiverNetwork {
                     int sa = cell.get(a), sb = cell.get(b);
                     if (owner.get(sa).equals(owner.get(sb))) continue;
                     if (!tested.add(((long) Math.min(sa, sb) << 32) | Math.max(sa, sb))) continue;
-                    if (crosses(segs.get(sa), segs.get(sb))) crossings++;
+                    double[] x = segs.get(sa), y = segs.get(sb);
+                    if (!crosses(x, y)) continue;
+                    // Two ways out through the same lagoon meet in the sea's own water: that is not a river crossing one.
+                    if (x[4] <= l.sea + 1e-3 && y[4] <= l.sea + 1e-3) { crossingsAtSea++; continue; }
+                    crossings++;
+                    if (firstCrossing.isEmpty()) {
+                        firstCrossing = String.format(Locale.ROOT, " (first at %.0f,%.0f, water %.1f and %.1f)",
+                                x[0], x[1], x[4], y[4]);
+                    }
                 }
             }
         }
         return String.format(Locale.ROOT,
                 "rivers audit within %d of %d,%d: %d channel nodes, %d heads%s, %d mouths, %d into lakes, %d ending inland; "
-                        + "%d lakes (%d with no way out); crossings %d, rising %d, over the bank %d, narrower below a join %d; "
+                        + "%d lakes (%d with no way out); crossings %d%s (%d more in the sea's water), rising %d, over the bank %d, narrower below a join %d; "
                         + "ends taken on %d of %d%s, joins %d (%d ending short of water, the worst %.1f at %.0f,%.0f), "
-                        + "dam samples %d (%d lengths in a gorge); turns %d, over 45 degrees %d, over 60 %d; %d land nodes, %d under water, drained area at least%s; %s",
-                half, cx, cz, channels, heads, firstHead, mouths, intoLakes, sinks, lakes, lakesNoWay, crossings, rising, overBank,
-                narrower, handed, ends, unhanded, joinsSeen, joinsDry, worstJoin, worstX, worstZ, dams, gorged, turns, turns45, turns60, land, flooded,
+                        + "dam samples %d (%d lengths in a gorge); turns %d, over 45 degrees %d, over 60 %d, bends tighter than two widths %d; %d land nodes, %d under water, drained area at least%s; %s",
+                half, cx, cz, channels, heads, firstHead, mouths, intoLakes, sinks, lakes, lakesNoWay, crossings, firstCrossing, crossingsAtSea, rising, overBank,
+                narrower, handed, ends, unhanded, joinsSeen, joinsDry, worstJoin, worstX, worstZ, dams, gorged, turns, turns45, turns60, tight, land, flooded,
                 hist, summary());
     }
 
     /** Whether the node a river runs into draws something that starts where the river ends. */
+    /** Whether a turn between two lengths bends on a circle less than two channel widths across. */
+    private static boolean tight(Point a, Point b, double degrees) {
+        if (degrees < 5) return false;
+        double len = 0.5 * (Math.hypot(a.ex - a.x, a.ez - a.z) + Math.hypot(b.ex - b.x, b.ez - b.z));
+        double radius = len / Math.toRadians(degrees);
+        return radius < 4.0 * Math.max(a.halfWidth, b.halfWidth);
+    }
+
     /** The angle in degrees one length turns from the one before, or -1 where either has no length. */
     private static double turn(Point a, Point b) {
         double ax = a.ex - a.x, az = a.ez - a.z, bx = b.ex - b.x, bz = b.ez - b.z;

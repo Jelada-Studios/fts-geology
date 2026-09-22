@@ -4,6 +4,7 @@ import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
+import com.jeladastudios.ftsgeology.fluid.RiverWaterFluid;
 import com.jeladastudios.ftsgeology.hydrology.RiverNetwork;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.util.SeedHash;
@@ -17,6 +18,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.concurrent.atomic.AtomicLong;
@@ -55,10 +57,14 @@ public final class RiverWater {
      * asking for more only means it gets as much of what it asked for as the rock under it will give.</p>
      */
     private static final int SPRING_DEEP = 40, SPRING_VARY = 24, SPRING_LEAST = 5;
+    /** How deep a hollow under a channel's floor is stopped up. */
+    private static final int PLUG_DEEP = 12;
+    /** The highest step down whose face is hung with falling water, in blocks. */
+    private static final int CURTAIN_MAX = 16;
 
     private static final LongAdder CANDIDATES = new LongAdder(), KEPT = new LongAdder(), BLOCKS = new LongAdder(),
             DROPPED = new LongAdder(), LEVELLED = new LongAdder(), SPRINGS = new LongAdder(), WET = new LongAdder(),
-            BANKED = new LongAdder(), CLIFFS = new LongAdder(), ICED = new LongAdder(), GLACIERS = new LongAdder();
+            BANKED = new LongAdder(), CLIFFS = new LongAdder(), ICED = new LongAdder(), GLACIERS = new LongAdder(), PLUGGED = new LongAdder(), CURTAINS = new LongAdder();
 
     /**
      * The tongue of ice a mountain river comes out from under, where it rises high enough to snow: how far it reaches
@@ -123,24 +129,39 @@ public final class RiverWater {
                     g = bedY;
                     LEVELLED.increment();
                 }
-                // Nothing is poured over a hole: the block under the water has to be solid.
-                if (!level.getBlockState(at.set(x, g, z)).isSolidRender(level, at)) {
+                // Nothing is poured over a hole: the block under the water has to be solid, or a cave under the bed is
+                // stopped up first.
+                if (!level.getBlockState(at.set(x, g, z)).isSolidRender(level, at) && !plug(level, at, x, g, z)) {
                     DROPPED.increment();
                     continue;
                 }
+                // Which way the water runs here, for the surface to be drawn running and a swimmer to be carried. A lake
+                // and a mouth stand still.
+                BlockState run = mouth || a.lake() ? water
+                        : water.setValue(RiverWaterFluid.FLOW, RiverWaterFluid.wayOf(a.fx(), a.fz()));
                 int here = 0;
                 for (int y = g + 1; y <= w; y++) {
                     BlockState was = level.getBlockState(at.set(x, y, z));
                     if (!was.isAir() && was.getFluidState().isEmpty() && !TerrainProbe.isVegetation(was)) break;
+                    // The sea's top block in a river's mouth is the river's: vanilla water there freezes over in the cold,
+                    // and a river's mouth does not.
+                    if (mouth && y == w && was.is(Blocks.WATER)) {
+                        level.setBlock(at, run, FLAGS);
+                        here++;
+                        continue;
+                    }
                     // The sea has already filled what it could, and it is the same water: only the gap is ours.
                     if (mouth && !was.isAir()) {
                         here++;
                         continue;
                     }
-                    level.setBlock(at, water, FLAGS);
+                    level.setBlock(at, run, FLAGS);
                     placed++;
                     here++;
                 }
+                // Nothing grows standing on the water: a plant the ground under it was taken from, or one a neighbour
+                // chunk put there, goes.
+                if (here > 0) clearPlants(level, at, x, g + here + 1, z);
                 KEPT.increment();
                 // Counted apart: a column can be kept, have its bed swapped for gravel, and still take no water
                 // because the first block over its floor turned out to be solid. That is a dry gravel stripe
@@ -159,15 +180,16 @@ public final class RiverWater {
             }
         }
         placed += banks(level, cp, sea, at);
+        placed += curtains(level, cp, sea, at);
         placed += glaciers(level, cp, at);
         BLOCKS.add(placed);
         if (CHUNKS.incrementAndGet() % 100 == 0) {
             GeysersMod.LOGGER.info("River water over {} chunks: {} columns in a channel, {} kept, {} of them wet, "
                             + "{} levelled, {} let go, {} springs, {} blocks, {} banks built up, {} left as cliffs, "
-                            + "{} lake columns iced, {} glacier columns; {}; {}",
+                            + "{} lake columns iced, {} glacier columns, {} hollows stopped up, {} steps hung with falling water; {}; {}; {}",
                     CHUNKS.get(), CANDIDATES.sum(), KEPT.sum(), WET.sum(), LEVELLED.sum(), DROPPED.sum(),
-                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(),
-                    RiverNetwork.summary(), GeologyChunkGenerator.summary());
+                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(), PLUGGED.sum(), CURTAINS.sum(),
+                    RiverNetwork.summary(), GeologyChunkGenerator.summary(), SnowCover.summary());
         }
         return placed;
     }
@@ -237,6 +259,37 @@ public final class RiverWater {
         return a.floor() > w - 0.5 ? Integer.MIN_VALUE : w;
     }
 
+    /**
+     * Falling water down the face of every step in a river: where a column's neighbour holds its water higher, the
+     * air over this column's water, up to the neighbour's, takes the falling form of the river's water. A still
+     * river comes down a valley a block at a time, and each step used to show its bare bed on the riser; a lake's
+     * edge over the river leaving it stood as a sheet of water with nothing falling from it. The neighbour's water is
+     * read off the network, so the next chunk need not be built.
+     */
+    private static int curtains(WorldGenLevel level, ChunkPos cp, int sea, BlockPos.MutableBlockPos at) {
+        BlockState falling = ModBlocks.RIVER_WATER.get().defaultBlockState().setValue(LiquidBlock.LEVEL, 8);
+        int placed = 0;
+        for (int dx = 0; dx < 16; dx++) {
+            for (int dz = 0; dz < 16; dz++) {
+                int x = cp.getMinBlockX() + dx, z = cp.getMinBlockZ() + dz;
+                int w = waterTop(x, z, sea);
+                if (w == Integer.MIN_VALUE || !level.getBlockState(at.set(x, w, z)).is(ModBlocks.RIVER_WATER.get())) continue;
+                int top = w;
+                for (int[] d : SIDES) top = Math.max(top, waterTop(x + d[0], z + d[1], sea));
+                top = Math.min(top, w + CURTAIN_MAX);
+                int laid = 0;
+                for (int y = w + 1; y <= top; y++) {
+                    if (!level.getBlockState(at.set(x, y, z)).isAir()) break;
+                    level.setBlock(at, falling, FLAGS);
+                    laid++;
+                }
+                if (laid > 0) CURTAINS.increment();
+                placed += laid;
+            }
+        }
+        return placed;
+    }
+
     /** Builds up the columns beside the water that came out lower than it. Only this chunk's own columns. */
     private static int banks(WorldGenLevel level, ChunkPos cp, int sea, BlockPos.MutableBlockPos at) {
         int placed = 0;
@@ -290,11 +343,16 @@ public final class RiverWater {
         if (g - w > Math.round(LEVEL_SHAVE * RiverNetwork.horizontal())) return Integer.MIN_VALUE;
         int bedY = Math.min(w - 1, (int) Math.floor(a.floor()));
         if (bedY < level.getMinBuildHeight() + 1) return Integer.MIN_VALUE;
-        // The floor of the channel has to be there to stand on, and everything over it has to be ours to take.
-        if (!level.getBlockState(at.set(x, bedY, z)).isSolidRender(level, at)) return Integer.MIN_VALUE;
+        // The floor of the channel has to be there to stand on -- a cave the carvers ran under the bed is stopped up,
+        // where it was left as a crust across the river -- and everything over it has to be ours to take.
+        if (!level.getBlockState(at.set(x, bedY, z)).isSolidRender(level, at) && !plug(level, at, x, bedY, z)) {
+            return Integer.MIN_VALUE;
+        }
         for (int y = bedY + 1; y <= g; y++) {
             if (EruptionHandler.isPlayerPlaced(level.getBlockState(at.set(x, y, z)))) return Integer.MIN_VALUE;
         }
+        // A plant on the ground being taken away would be left standing in the air over the water.
+        clearPlants(level, at, x, g + 1, z);
         for (int y = bedY + 1; y <= g; y++) {
             level.setBlock(at.set(x, y, z), Blocks.AIR.defaultBlockState(), FLAGS);
         }
@@ -326,6 +384,35 @@ public final class RiverWater {
             // Sand and gravel fall: never over a hole.
             if (!level.getBlockState(at.set(x, y - 1, z)).isSolidRender(level, at)) break;
             level.setBlock(at.set(x, y, z), lay, FLAGS);
+        }
+    }
+
+    /**
+     * Stops up a hollow under a channel's floor with the rock under it, so the floor at {@code y} is solid. A cave the
+     * carvers ran along under a river left the ground over it as a crust; the water was dropped there, and the crust
+     * stood across the river as a bar of grass. Only down to a few blocks, and never through what a player built.
+     */
+    private static boolean plug(WorldGenLevel level, BlockPos.MutableBlockPos at, int x, int y, int z) {
+        int bottom = y;
+        int least = Math.max(level.getMinBuildHeight() + 1, y - PLUG_DEEP);
+        while (bottom > least && !level.getBlockState(at.set(x, bottom, z)).isSolidRender(level, at)) bottom--;
+        BlockState under = level.getBlockState(at.set(x, bottom, z));
+        if (!under.isSolidRender(level, at) || EruptionHandler.isPlayerPlaced(under)) return false;
+        for (int k = bottom + 1; k <= y; k++) {
+            if (EruptionHandler.isPlayerPlaced(level.getBlockState(at.set(x, k, z)))) return false;
+        }
+        BlockState fill = under.is(BlockTags.BASE_STONE_OVERWORLD) ? under : Blocks.STONE.defaultBlockState();
+        for (int k = bottom + 1; k <= y; k++) level.setBlock(at.set(x, k, z), fill, FLAGS);
+        PLUGGED.increment();
+        return true;
+    }
+
+    /** Clears plants standing from {@code y} up, a few blocks at most. */
+    private static void clearPlants(WorldGenLevel level, BlockPos.MutableBlockPos at, int x, int y, int z) {
+        for (int k = y; k < y + 3; k++) {
+            BlockState s = level.getBlockState(at.set(x, k, z));
+            if (s.isAir() || !TerrainProbe.isVegetation(s) || EruptionHandler.isPlayerPlaced(s)) return;
+            level.setBlock(at, Blocks.AIR.defaultBlockState(), FLAGS);
         }
     }
 

@@ -62,7 +62,7 @@ public final class ModBlocks {
      * surface may come down a valley a block at a time; see {@link com.jeladastudios.ftsgeology.registry.ModFluids}.
      */
     public static final RegistryObject<Block> RIVER_WATER = BLOCKS.register("river_water",
-            () -> new net.minecraft.world.level.block.LiquidBlock(
+            () -> new com.jeladastudios.ftsgeology.block.RiverWaterBlock(
                     () -> (net.minecraft.world.level.material.FlowingFluid) ModFluids.RIVER_WATER.get(),
                     BlockBehaviour.Properties.copy(Blocks.WATER).noLootTable()));
 
