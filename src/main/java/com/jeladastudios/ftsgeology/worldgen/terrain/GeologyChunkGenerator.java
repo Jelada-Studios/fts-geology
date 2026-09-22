@@ -50,6 +50,8 @@ public final class GeologyChunkGenerator extends NoiseBasedChunkGenerator {
     private static final int MARGIN = 2;
     /** Blocks between the columns a piece is checked at. */
     private static final int STEP = 4;
+    /** Ground under this lies under the sea's water: the ocean fills to the block under sea level. */
+    private static final double SEA_DRY = 62.0;
 
     private static final LongAdder VILLAGES = new LongAdder(), PIECES = new LongAdder(), DROPPED = new LongAdder(),
             GONE = new LongAdder();
@@ -96,7 +98,7 @@ public final class GeologyChunkGenerator extends NoiseBasedChunkGenerator {
         }
     }
 
-    /** Whether water reaches a piece: a channel, its banks or a lake within a couple of blocks of it. */
+    /** Whether water reaches a piece: a channel, its banks or a lake within a couple of blocks of it, or the sea under it. */
     private static boolean wet(BoundingBox box) {
         int x0 = box.minX() - MARGIN, x1 = box.maxX() + MARGIN, z0 = box.minZ() - MARGIN, z1 = box.maxZ() + MARGIN;
         for (int x = x0; ; x = Math.min(x + STEP, x1)) {
@@ -104,6 +106,9 @@ public final class GeologyChunkGenerator extends NoiseBasedChunkGenerator {
                 RiverNetwork.At a = RiverNetwork.at(x, z);
                 // The water stands out to where the cut wall climbs through it, a block and a half past the bed.
                 if (a.distance() != Double.MAX_VALUE && a.distance() <= a.halfWidth() + 1.5) return true;
+                // Nor on the sea: a piece laid over ground the sea covers is built on a foundation the generator
+                // raises out of the water, and at a river's mouth that foundation shut the river off from the sea.
+                if (RawGround.heightAt(x, z) < SEA_DRY) return true;
                 if (z == z1) break;
             }
             if (x == x1) break;
