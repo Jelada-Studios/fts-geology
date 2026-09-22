@@ -3,10 +3,12 @@ package com.jeladastudios.ftsgeology.worldgen;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.blockentity.SpringSourceBlockEntity;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
+import com.jeladastudios.ftsgeology.hydrology.RiverNetwork;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -49,6 +51,13 @@ public final class HotSpringSites {
         return placeHotSpringAt(level, x, z, HotSpringShape.MAX_STAGE);
     }
 
+    /** Over a channel or a lake of the river network, or a few blocks from one. */
+    private static boolean besideRiver(int x, int z) {
+        if (!RiverNetwork.ready()) return false;
+        RiverNetwork.At a = RiverNetwork.at(x, z);
+        return a.distance() != Double.MAX_VALUE && a.distance() <= a.halfWidth() + 4.0;
+    }
+
     /** Says at debug level why a site was turned down, so a country with no springs can be read from the log. */
     private static boolean refused(int x, int z, String why) {
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.debug("Hot spring site at {},{} refused: {}", x, z, why);
@@ -70,6 +79,9 @@ public final class HotSpringSites {
                 int g = TerrainProbe.groundY(level, x + dx, z + dz);
                 if (g == Integer.MIN_VALUE) return refused(x, z, "a cliff edge or open air");
                 if (TerrainProbe.hasFluidAbove(level, x + dx, z + dz)) return refused(x, z, "a lake or the sea");
+                // A frozen lake reads as ground: its ice is solid, and springs came up through it on the mountains.
+                if (level.getBlockState(new BlockPos(x + dx, g, z + dz)).is(BlockTags.ICE)) return refused(x, z, "ice");
+                if ((dx & 3) == 0 && (dz & 3) == 0 && besideRiver(x + dx, z + dz)) return refused(x, z, "a river or a lake");
                 lo = Math.min(lo, g);
                 hi = Math.max(hi, g);
             }
