@@ -158,6 +158,11 @@ public final class TectonicCommands {
                                                                 .executes(ctx -> TerrainCommands.terrainRiversMap(ctx,
                                                                         IntegerArgumentType.getInteger(ctx, "half"),
                                                                         IntegerArgumentType.getInteger(ctx, "step"))))))
+                                        // The channels against the water the world holds: dry beds, and what the floor is.
+                                        .then(Commands.literal("wet")
+                                                .then(Commands.argument("half", IntegerArgumentType.integer(16, 1000))
+                                                        .executes(ctx -> TerrainCommands.terrainRiversWet(ctx,
+                                                                IntegerArgumentType.getInteger(ctx, "half")))))
                                         // Crossings, dead ends, water going uphill or standing over its bank.
                                         .then(Commands.literal("audit")
                                                 .then(Commands.argument("half", IntegerArgumentType.integer(64, 8000))

@@ -40,12 +40,18 @@ final class RiverPieces {
     static final double STEP = 8.0;
     /** The deepest a channel is cut under its water, in blocks at the normal world's layout. */
     static final double DEPTH = 3.0;
-    /** A new stream's half width in blocks, in any layout: a rill a block or two across. */
-    static final double HALF_MIN = 0.5;
+    /** A new stream's half width in blocks, in any layout: a rill two blocks across, with no gaps down its middle. */
+    static final double HALF_MIN = 0.75;
     /** A grown river's half width, at the normal world's layout. */
     static final double HALF_GROWN = 7.0;
-    /** How deep a stream runs for its width: a rill a block deep, a river its full depth. */
-    static final double DEPTH_LEAST = 1.0, DEPTH_BASE = 0.6, DEPTH_PER_HALF = 0.6;
+    /**
+     * How fast a stream widens with the ground it drains: the power of the drained share its width follows. At 1.5 a
+     * river that drained half the most any does was still a third of the width of the widest, and a stream stayed a
+     * rill for most of its way down; at 0.6 it is two thirds.
+     */
+    static final double WIDEN = 0.6;
+    /** How deep a stream runs for its width: a rill a block and a half, a river its full depth. */
+    static final double DEPTH_LEAST = 1.5, DEPTH_BASE = 0.6, DEPTH_PER_HALF = 0.6;
     /** How steeply a channel's wall climbs out of its bed, and how far over the water it is carried. */
     static final double WALL = 2.0, BANK_RISE = 2.0;
     /** How far under its water a lake's floor lies, where the hollow is not already deeper. */
@@ -58,6 +64,10 @@ final class RiverPieces {
     static final double LAKE_MIN_DEPTH = 4.0;
     /** How far under its raw ground a channel may be cut; the density clamps the cut at this. */
     static final double MAX_SHAVE = 12.0;
+    /** The deepest gorge a channel cuts through a hill in its way, in blocks at the normal world's layout. */
+    static final double CUT_MAX = 32.0;
+    /** The share of springs that rise in an eye, and how wide an eye is, in blocks at the normal world's layout. */
+    static final double EYE_SHARE = 0.4, EYE_HALF = 1.8;
     /** A fall of this many blocks between two points, and the points below it that get a plunge pool. */
     static final double FALL_MIN = 10.0, POOL_WIDE = 1.8, POOL_DEEP = 1.6;
     static final int POOL_RUN = 3;
@@ -82,6 +92,10 @@ final class RiverPieces {
      * straight row of cells.
      */
     private static final double HANDOFF_WANDER = 2.0;
+    /** Grid steps a way runs straight along the line between two cells as it leaves and enters one. */
+    private static final double LEAD = 1.1;
+    /** Corner-cutting passes over a way. */
+    private static final int SMOOTH_PASSES = 3;
     /** Grid points to a height tile. */
     private static final int TILE = 8;
     /** A node's neighbour slots in turn round it: east, north-east, north, and on. */
@@ -108,7 +122,7 @@ final class RiverPieces {
     private final SetCache<LakeMask> masks = new SetCache<>(10);
 
     final LongAdder channels = new LongAdder(), joins = new LongAdder(), fallbacks = new LongAdder(),
-            dams = new LongAdder(), bankClamps = new LongAdder(), lakeMasks = new LongAdder(), sinks = new LongAdder(),
+            dams = new LongAdder(), gorges = new LongAdder(), eyes = new LongAdder(), bankClamps = new LongAdder(), lakeMasks = new LongAdder(), sinks = new LongAdder(),
             mouths = new LongAdder(), dryJoins = new LongAdder(), gridReads = new LongAdder();
 
     RiverPieces(DrainageLattice lat, DrainageLattice.Ground ground, double horizontal, int areaMin) {
@@ -297,7 +311,7 @@ final class RiverPieces {
                 }
                 java.util.Collections.reverse(path);
                 double w = mask.water;
-                List<RiverNetwork.Point> pts = lay(tidy(c, path), w, w, w, FROM_LAKE, halfFor(lat.area(m)), JOIN);
+                List<RiverNetwork.Point> pts = lay(tidy(c, new Led(path, false, false)), w, w, w, FROM_LAKE, halfFor(lat.area(m)), JOIN);
                 out.addAll(pts);
                 segments(pts, segs);
                 joins.increment();
@@ -501,7 +515,7 @@ final class RiverPieces {
         boolean[] wet = new boolean[c.in.length];
         boolean any = false;
         for (int i = 0; i < wet.length; i++) {
-            wet[i] = c.in[i] && c.hgt[i] <= lat.sea - 2.0;
+            wet[i] = c.in[i] && c.hgt[i] <= lat.sea;
             any |= wet[i];
         }
         // A sea node on a shore that stands a little over the water everywhere in its cell: its lowest ground, then.
@@ -588,9 +602,11 @@ final class RiverPieces {
             fallbacks.increment();
             path = new ArrayList<>(List.of(s, new double[]{lat.x(u), lat.z(u)}, e));
         } else {
-            path = tidy(c, path);
+            path = tidy(c, lead(c, path, main == Long.MIN_VALUE ? null : across(main, u),
+                    r == Long.MIN_VALUE ? null : across(u, r)));
         }
         List<RiverNetwork.Point> pts = lay(path, tS, tE, wIn, lenIn, halfFor(lat.area(u)), CHANNEL);
+        if (main == Long.MIN_VALUE) eye(pts);
         if (r == Long.MIN_VALUE) {
             // A river the ground closes round: it ends in a pond of its own.
             sinks.increment();
@@ -598,7 +614,8 @@ final class RiverPieces {
             float w = last.waterEnd();
             float bed = (float) (w - LAKE_BED * h);
             float ux = (float) lat.x(u), uz = (float) lat.z(u);
-            pts.add(new RiverNetwork.Point(ux, uz, ux, uz, w, w, bed, bed, (float) (SINK_HALF * lat.cell), FROM_LAKE, LAKE));
+            pts.add(new RiverNetwork.Point(ux, uz, ux, uz, w, w, bed, bed, (float) (SINK_HALF * lat.cell), FROM_LAKE,
+                    0f, 0f, LAKE));
         }
         // The other rivers that come in, biggest first, each carried to the nearest water already drawn in this cell.
         List<double[]> segs = new ArrayList<>();
@@ -649,7 +666,7 @@ final class RiverPieces {
             double[] w = hopTo.nearestWater(last[0], last[1], lat.cell);
             if (w != null) path.add(w);
         }
-        path = tidy(c, path);
+        path = tidy(c, lead(c, path, across(d, owner), null));
         List<RiverNetwork.Point> pts = lay(path, from.water(), Math.min(from.water(), endWater), from.water(),
                 from.length(), from.half(), JOIN);
         out.addAll(pts);
@@ -707,7 +724,7 @@ final class RiverPieces {
     private double halfFor(int area) {
         double t = (Math.sqrt(area / (double) areaMin) - 1.0) / (Math.sqrt(lat.areaCap / (double) areaMin) - 1.0);
         t = Math.max(0.0, Math.min(1.0, t));
-        return HALF_MIN + (HALF_GROWN * h - HALF_MIN) * Math.pow(t, 1.5);
+        return HALF_MIN + (HALF_GROWN * h - HALF_MIN) * Math.pow(t, WIDEN);
     }
 
     /** How deep a channel this wide runs: a rill a block, a grown river the full depth. */
@@ -728,7 +745,7 @@ final class RiverPieces {
         }
         double len = cum[m - 1];
         int n = Math.max(1, (int) Math.ceil(len / (STEP * h)));
-        double[] qx = new double[n + 1], qz = new double[n + 1], qw = new double[n + 1];
+        double[] qx = new double[n + 1], qz = new double[n + 1], qw = new double[n + 1], qg = new double[n + 1];
         int seg = 0;
         double w = wIn;
         for (int q = 0; q <= n; q++) {
@@ -752,10 +769,10 @@ final class RiverPieces {
             double lw = Math.min(w, Math.min(target, rim - 1.0));
             if (rim - 1.0 < Math.min(w, target)) bankClamps.increment();
             w = lw;
-            if (read(x, z) > w + MAX_SHAVE) dams.increment();
             qx[q] = x;
             qz[q] = z;
             qw[q] = w;
+            qg[q] = read(x, z);
         }
         List<RiverNetwork.Point> pts = new ArrayList<>(n);
         double[] wide = new double[n + 1], deeper = new double[n + 1];
@@ -776,12 +793,58 @@ final class RiverPieces {
             double narrow = STEEP_NARROW + (1.0 - STEEP_NARROW) * gentle;
             double hw = Math.max(HALF_MIN, half * narrow) * Math.max(wide[q], wide[q + 1]);
             double depth = depthFor(hw);
+            double bedS = qw[q] - depth * deeper[q], bedE = qw[q + 1] - depth * deeper[q + 1];
+            double cutS = gorge(qg[q], qw[q], bedS, hw), cutE = gorge(qg[q + 1], qw[q + 1], bedE, hw);
+            if (cutS > 0) gorges.increment();
             pts.add(new RiverNetwork.Point((float) qx[q], (float) qz[q], (float) qx[q + 1], (float) qz[q + 1],
-                    (float) qw[q], (float) qw[q + 1],
-                    (float) (qw[q] - depth * deeper[q]), (float) (qw[q + 1] - depth * deeper[q + 1]),
-                    (float) hw, (float) (lenIn + step * q), kind));
+                    (float) qw[q], (float) qw[q + 1], (float) bedS, (float) bedE,
+                    (float) hw, (float) (lenIn + step * q), (float) cutS, (float) cutE, kind));
         }
         return pts;
+    }
+
+    /**
+     * A spring's eye: at some of the places a river rises, a small round pool a little way up the valley from where the
+     * stream sets off, cut back into the slope. The water is seen to well up out of the hillside and run off, rather
+     * than to begin as a thread in the grass. It is a length of no length, so a column is measured against it as a
+     * disc, and it stands at the stream's own water or not at all: where the ground round it would not hold the pool,
+     * there is no eye.
+     */
+    private void eye(List<RiverNetwork.Point> pts) {
+        if (pts.isEmpty()) return;
+        RiverNetwork.Point p = pts.get(0);
+        double dx = p.ex() - p.x(), dz = p.ez() - p.z(), l = Math.hypot(dx, dz);
+        if (l < 1e-6) return;
+        long hash = SeedHash.hash(seed, (int) Math.floor(p.x()), (int) Math.floor(p.z()), 0xE7E1L);
+        if (SeedHash.rand01(hash) >= EYE_SHARE) return;
+        double half = EYE_HALF * h;
+        double cx = p.x() - dx / l * half * 0.8, cz = p.z() - dz / l * half * 0.8;
+        double out = half + BANK_RISE * h + 1.0;
+        double rim = Math.min(Math.min(read(cx + out, cz), read(cx - out, cz)), Math.min(read(cx, cz + out), read(cx, cz - out)));
+        double w = p.water();
+        if (rim - 1.0 < w) return;
+        float bed = (float) (w - depthFor(half));
+        pts.add(0, new RiverNetwork.Point((float) cx, (float) cz, (float) cx, (float) cz, (float) w, (float) w,
+                bed, bed, (float) half, 0f, 0f, 0f, CHANNEL));
+        eyes.increment();
+    }
+
+    /**
+     * How far under its raw ground the channel may go at a sample, where the way the water has to take runs through
+     * a hill: down to its bed, so the hill is cut through as a gorge rather than left standing across the river with
+     * the river going on behind it. 0 where the ordinary shave already reaches the bed.
+     *
+     * <p>Two things hold it back. A gorge deeper than {@link #CUT_MAX} is not cut: that is a mountain, not a hill.
+     * And its walls, stepping up at the channel wall's slope, have to finish inside the reach a column looks for a
+     * channel over, or the gorge would end in a face at the edge of that reach.</p>
+     */
+    private double gorge(double groundHere, double water, double bed, double hw) {
+        if (groundHere <= water + MAX_SHAVE) return 0;
+        double need = groundHere - bed + 1.0;
+        double reach = Math.max(HALF_GROWN * POOL_WIDE * h, SINK_HALF * lat.cell) + RiverNetwork.CAVE_REACH * h + 4.0 * h;
+        double allowed = Math.min(CUT_MAX * h, WALL * (reach - 3.0 - hw));
+        if (need > allowed) dams.increment();
+        return Math.max(0.0, Math.min(need, allowed));
     }
 
     private double read(double x, double z) {
@@ -1068,32 +1131,96 @@ final class RiverPieces {
 
     /**
      * A way made fit to draw: the grid's zigzags straightened where they stray less than half a step from a straight
-     * line, then the corners cut once. A corner is only cut where both new points stay in the cell.
+     * line, then the corners cut, three times over. A corner is only cut where both new points stay in the cell. The
+     * leads along the cell edge are kept through the straightening, so the water still sets off the way the next cell
+     * takes it on.
      */
-    private List<double[]> tidy(Cell c, List<double[]> path) {
+    private List<double[]> tidy(Cell c, Led way) {
+        List<double[]> path = way.path();
         if (path.size() <= 2) return path;
         boolean[] keep = new boolean[path.size()];
         keep[0] = true;
         keep[path.size() - 1] = true;
+        if (way.in()) keep[1] = true;
+        if (way.out()) keep[path.size() - 2] = true;
         simplify(path, 0, path.size() - 1, 0.5 * grid, keep);
         List<double[]> p = new ArrayList<>();
         for (int i = 0; i < path.size(); i++) if (keep[i]) p.add(path.get(i));
-        if (p.size() <= 2) return p;
-        List<double[]> out = new ArrayList<>();
-        out.add(p.get(0));
-        for (int i = 1; i < p.size() - 1; i++) {
-            double[] a = p.get(i - 1), b = p.get(i), d = p.get(i + 1);
-            double[] q = {b[0] + (a[0] - b[0]) * 0.25, b[1] + (a[1] - b[1]) * 0.25};
-            double[] r = {b[0] + (d[0] - b[0]) * 0.25, b[1] + (d[1] - b[1]) * 0.25};
-            if (c.contains(q[0], q[1]) && c.contains(r[0], r[1])) {
-                out.add(q);
-                out.add(r);
-            } else {
-                out.add(b);
+        for (int pass = 0; pass < SMOOTH_PASSES && p.size() > 2; pass++) {
+            List<double[]> out = new ArrayList<>();
+            out.add(p.get(0));
+            for (int i = 1; i < p.size() - 1; i++) {
+                double[] a = p.get(i - 1), b = p.get(i), d = p.get(i + 1);
+                double[] q = {b[0] + (a[0] - b[0]) * 0.25, b[1] + (a[1] - b[1]) * 0.25};
+                double[] r = {b[0] + (d[0] - b[0]) * 0.25, b[1] + (d[1] - b[1]) * 0.25};
+                if (c.contains(q[0], q[1]) && c.contains(r[0], r[1])) {
+                    out.add(q);
+                    out.add(r);
+                } else {
+                    out.add(b);
+                }
+            }
+            out.add(p.get(p.size() - 1));
+            p = out;
+        }
+        return p;
+    }
+
+    /** A way through a cell, and whether it was given a lead along the cell edge at its start and at its end. */
+    private record Led(List<double[]> path, boolean in, boolean out) {}
+
+    /**
+     * Which way water crosses from one node's cell into the next, worked out alike from both: half way between the
+     * way in from the first node to the crossing and the way on from the crossing to the second. Along the straight
+     * line between the two nodes the crossing, which sits at the lowest point of the edge rather than its middle, was
+     * met at a slant, and the turn it forced went inside the cell instead.
+     */
+    private double[] across(long from, long to) {
+        double[] hh = handoff(from, to);
+        double ax = hh[0] - lat.x(from), az = hh[1] - lat.z(from), al = Math.hypot(ax, az);
+        double cx = lat.x(to) - hh[0], cz = lat.z(to) - hh[1], cl = Math.hypot(cx, cz);
+        if (al < 1e-9 || cl < 1e-9) return null;
+        double tx = ax / al + cx / cl, tz = az / al + cz / cl, tl = Math.hypot(tx, tz);
+        return tl < 1e-9 ? null : new double[]{tx / tl, tz / tl};
+    }
+
+    /**
+     * A way through a cell made to leave and enter along the line between the two cells, so that where one cell's
+     * way ends and the next one's begins the river runs straight on. Each cell used to reach the crossing from
+     * wherever its own grid led, and the two came in at an angle: the sharp turns were all at the cell edges.
+     * {@code in} and {@code out} are the directions at the start and the end, null where there is nothing to match.
+     */
+    private Led lead(Cell c, List<double[]> path, double[] in, double[] out) {
+        double len = LEAD * grid;
+        List<double[]> p = new ArrayList<>(path);
+        boolean led = false, ledOut = false;
+        if (in != null && p.size() >= 2) {
+            double[] s = p.get(0);
+            double[] q = {s[0] + in[0] * len, s[1] + in[1] * len};
+            if (c.contains(q[0], q[1])) {
+                // Grid points short of the lead would make the way double back on itself.
+                while (p.size() > 2 && Math.hypot(p.get(1)[0] - s[0], p.get(1)[1] - s[1]) < len * 1.25) p.remove(1);
+                p.add(1, q);
+                led = true;
             }
         }
-        out.add(p.get(p.size() - 1));
-        return out;
+        if (out != null && p.size() >= 2) {
+            double[] e = p.get(p.size() - 1);
+            double[] q = {e[0] - out[0] * len, e[1] - out[1] * len};
+            if (c.contains(q[0], q[1])) {
+                // Never the lead just put in at the start.
+                int keepFrom = led ? 2 : 1;
+                while (p.size() - 2 >= keepFrom
+                        && Math.hypot(p.get(p.size() - 2)[0] - e[0], p.get(p.size() - 2)[1] - e[1]) < len * 1.25) {
+                    p.remove(p.size() - 2);
+                }
+                p.add(p.size() - 1, q);
+                ledOut = true;
+            }
+        }
+        // Too short a way for both leads: the one at the end would sit on the one at the start.
+        if (led && ledOut && p.size() < 4) ledOut = false;
+        return new Led(p, led, ledOut);
     }
 
     private static void simplify(List<double[]> p, int a, int b, double tol, boolean[] keep) {

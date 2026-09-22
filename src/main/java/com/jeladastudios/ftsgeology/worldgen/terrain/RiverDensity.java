@@ -86,7 +86,9 @@ public final class RiverDensity implements DensityFunction {
                 // The raw ground is a flat cache the chunk filled when it was built, and the router hands the same
                 // function to both this and the offset's min, so reading it here is an array lookup.
                 double ground = 128.0 + 128.0 * raw.compute(ctx);
-                double shave = RiverNetwork.lakeAt(x, z) ? LAKE_SHAVE : MAX_SHAVE;
+                // Where the trace runs through a hill it is allowed a gorge: the full cut down the middle, stepping
+                // back to the ordinary shave up its walls, so the hill is cut through instead of left standing.
+                double shave = RiverNetwork.shaveAt(x, z, MAX_SHAVE, LAKE_SHAVE);
                 yield (Math.max(y, ground - shave) - 128.0) / 128.0;
             }
             case NEAR -> RiverNetwork.near(x, z);

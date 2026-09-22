@@ -7,6 +7,7 @@ import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.hydrology.RiverNetwork;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.util.SeedHash;
+import com.jeladastudios.ftsgeology.util.ValueNoise;
 import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyChunkGenerator;
 import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld;
 import net.minecraft.core.BlockPos;
@@ -97,11 +98,14 @@ public final class RiverWater {
                 // shore -- with nothing in it: the ocean's own top block is one under sea level, the last river
                 // column stood one over it, and the block between was air. Below the line the fill drops to the
                 // ocean's own level and patches only what the generator left dry, so the two waters meet.
+                // Out to where the channel's own floor climbs to the surface, and no further: past that the bank
+                // stands over the water and the water would be lying on the hillside. Measured against the river's own
+                // water, before the mouth drops it to the sea's: a stream's floor is a block and a half under its water,
+                // so against the sea's level every narrow stream came out dry for its last few blocks, and where the
+                // ground stood a block over the line it kept its grass in the middle of the river.
+                if (a.floor() > w - 0.5) continue;
                 boolean mouth = w <= sea;
                 if (mouth) w = sea - 1;
-                // Out to where the channel's own floor climbs to the surface, and no further: past that the bank
-                // stands over the water and the water would be lying on the hillside.
-                if (a.floor() > w - 0.5) continue;
                 CANDIDATES.increment();
                 int g = TerrainProbe.groundY(level, x, z);
                 if (g == Integer.MIN_VALUE) {
@@ -150,11 +154,7 @@ public final class RiverWater {
                     level.setBlock(at, Blocks.ICE.defaultBlockState(), FLAGS);
                     ICED.increment();
                 }
-                // A river bed is gravel in the mountains and sand lower down, not the meadow the surface rules laid.
-                BlockState bed = level.getBlockState(at.set(x, g, z));
-                if (bed.is(BlockTags.DIRT)) {
-                    level.setBlock(at, (w - sea > 12 ? Blocks.GRAVEL : Blocks.SAND).defaultBlockState(), FLAGS);
-                }
+                if (here > 0) sediment(level, at, x, z, g, w - sea, a.lake(), a.halfWidth());
                 if (a.isHead()) placed += spring(level, at, x, z, g, water);
             }
         }
@@ -284,7 +284,10 @@ public final class RiverWater {
         // whose floor the noise left high was dropped, and the river got a ragged stair down both its sides.
         // That ring is a quarter of the channel, and it is exactly where the factor boost that pins the noise
         // has decayed to nothing.
-        if (g - w > LEVEL_SHAVE) return Integer.MIN_VALUE;
+        // The tall world's noise is laid out two and a half times as high, and so is how far it lifts a floor: a
+        // quarter of the bed columns on K2's rivers stood five to seven blocks over their water and were dropped,
+        // which read as a river broken off and starting again further down.
+        if (g - w > Math.round(LEVEL_SHAVE * RiverNetwork.horizontal())) return Integer.MIN_VALUE;
         int bedY = Math.min(w - 1, (int) Math.floor(a.floor()));
         if (bedY < level.getMinBuildHeight() + 1) return Integer.MIN_VALUE;
         // The floor of the channel has to be there to stand on, and everything over it has to be ours to take.
@@ -299,6 +302,34 @@ public final class RiverWater {
     }
 
     /**
+     * Lays what a river leaves on its floor over the ground it was cut from: gravel with cobbles in the mountains,
+     * sand with clay lower down, clay and sand under a lake, in patches a few blocks across. Only the natural ground a
+     * channel was cut through is taken, the soil or the stone; a floor already of sediment, or anything a player put
+     * there, is left. A wide river's floor is two blocks deep.
+     *
+     * <p>Only the soil used to be swapped. Wherever the cut went down to stone, or to one of the belt's own rocks, the
+     * bed kept it: grey patches in the gravel, which read as holes in the river's floor.</p>
+     */
+    private static void sediment(WorldGenLevel level, BlockPos.MutableBlockPos at, int x, int z, int g, int overSea,
+                                 boolean lake, double half) {
+        double n = ValueNoise.noise(x, z, 5.0);
+        BlockState lay;
+        if (lake) lay = n > 0.1 ? Blocks.CLAY.defaultBlockState() : overSea > 12 ? Blocks.GRAVEL.defaultBlockState() : Blocks.SAND.defaultBlockState();
+        else if (overSea > 12) lay = n > 0.45 ? Blocks.COBBLESTONE.defaultBlockState() : Blocks.GRAVEL.defaultBlockState();
+        else lay = n > 0.4 ? Blocks.CLAY.defaultBlockState() : n < -0.55 ? Blocks.GRAVEL.defaultBlockState() : Blocks.SAND.defaultBlockState();
+        int deep = half >= 4.0 ? 2 : 1;
+        for (int y = g; y > g - deep; y--) {
+            BlockState was = level.getBlockState(at.set(x, y, z));
+            if (!was.is(BlockTags.DIRT) && !was.is(BlockTags.BASE_STONE_OVERWORLD) && !was.is(BlockTags.TERRACOTTA)
+                    && !was.is(Blocks.SANDSTONE) && !was.is(Blocks.RED_SANDSTONE)) break;
+            if (EruptionHandler.isPlayerPlaced(was)) break;
+            // Sand and gravel fall: never over a hole.
+            if (!level.getBlockState(at.set(x, y - 1, z)).isSolidRender(level, at)) break;
+            level.setBlock(at.set(x, y, z), lay, FLAGS);
+        }
+    }
+
+    /**
      * The mouth a river rises from: one block wide, running well under the bed, so that the water is seen to come
      * out of the ground rather than to begin in a puddle. It stops above the first thing that is not solid, so a
      * spring never opens into a cave.
@@ -308,9 +339,11 @@ public final class RiverWater {
         long hash = SeedHash.hash(level.getSeed(), x, z, 0x5B10L);
         int want = SPRING_DEEP + (int) (SeedHash.rand01(hash) * SPRING_VARY);
         int floor = level.getMinBuildHeight() + 2;
+        // Down only while the next block is rock with rock under it and rock on all four sides. The bore used to
+        // take the last solid block over a cave and stand its water on the cave's roof with nothing under it, and a
+        // bore running down beside a cave had a wall of water standing open to it.
         int deepest = g;
-        while (deepest > g - want && deepest > floor
-                && level.getBlockState(at.set(x, deepest - 1, z)).isSolidRender(level, at)) {
+        while (deepest > g - want && deepest - 1 > floor && sealed(level, at, x, deepest - 1, z)) {
             deepest--;
         }
         if (g - deepest < SPRING_LEAST) return 0;
@@ -322,5 +355,15 @@ public final class RiverWater {
         }
         if (placed > 0) SPRINGS.increment();
         return placed;
+    }
+
+    /** Whether a block of the bore can hold water: solid itself, and solid under it and on every side. */
+    private static boolean sealed(WorldGenLevel level, BlockPos.MutableBlockPos at, int x, int y, int z) {
+        if (!level.getBlockState(at.set(x, y, z)).isSolidRender(level, at)) return false;
+        if (!level.getBlockState(at.set(x, y - 1, z)).isSolidRender(level, at)) return false;
+        for (int[] d : SIDES) {
+            if (!level.getBlockState(at.set(x + d[0], y, z + d[1])).isSolidRender(level, at)) return false;
+        }
+        return true;
     }
 }

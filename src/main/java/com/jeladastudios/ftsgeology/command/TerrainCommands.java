@@ -549,6 +549,65 @@ public final class TerrainCommands {
         return 1;
     }
 
+    /**
+     * The channels round here against what the world holds: every loaded column inside a channel's flat bed should
+     * have water at the traced level (the sea's at a mouth). Counts the dry ones, how many of those are at a mouth,
+     * and what the floor under the water is made of.
+     */
+    public static int terrainRiversWet(CommandContext<CommandSourceStack> ctx, int half) {
+        ServerLevel level = ctx.getSource().getLevel();
+        BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+        if (!com.jeladastudios.ftsgeology.hydrology.RiverNetwork.ready()) {
+            ctx.getSource().sendSuccess(() -> Component.literal("No river network: this world type traces none."), false);
+            return 0;
+        }
+        int sea = level.getSeaLevel();
+        int bed = 0, dry = 0, dryMouth = 0, dryNarrow = 0, sediment = 0, rock = 0, soil = 0, other = 0;
+        java.util.List<String> eg = new java.util.ArrayList<>();
+        java.util.TreeMap<String, Integer> under = new java.util.TreeMap<>();
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        for (int x = at.getX() - half; x <= at.getX() + half; x++) {
+            for (int z = at.getZ() - half; z <= at.getZ() + half; z++) {
+                if (!level.hasChunkAt(x, z)) continue;
+                var a = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.at(x, z);
+                if (a.distance() == Double.MAX_VALUE || a.lake() || a.distance() > a.halfWidth()) continue;
+                int w = (int) Math.floor(a.water());
+                if (a.floor() > w - 0.5) continue;
+                boolean mouth = w <= sea;
+                if (mouth) w = sea - 1;
+                bed++;
+                var s = level.getBlockState(p.set(x, w, z));
+                boolean wet = !s.getFluidState().isEmpty() || s.is(net.minecraft.tags.BlockTags.ICE);
+                if (!wet) {
+                    dry++;
+                    if (mouth || a.water() < sea + 2) dryMouth++;
+                    if (a.halfWidth() < 1.5) dryNarrow++;
+                    if (eg.size() < 6) eg.add(x + "," + w + "," + z + " " + s.getBlock().getDescriptionId().replace("block.minecraft.", ""));
+                    continue;
+                }
+                int y = w;
+                while (y > level.getMinBuildHeight() && !level.getBlockState(p.set(x, y, z)).getFluidState().isEmpty()) y--;
+                var f = level.getBlockState(p.set(x, y, z));
+                if (f.is(net.minecraft.world.level.block.Blocks.SAND) || f.is(net.minecraft.world.level.block.Blocks.GRAVEL)
+                        || f.is(net.minecraft.world.level.block.Blocks.CLAY) || f.is(net.minecraft.world.level.block.Blocks.COBBLESTONE)) sediment++;
+                else if (f.is(net.minecraft.tags.BlockTags.DIRT)) soil++;
+                else if (f.is(net.minecraft.tags.BlockTags.BASE_STONE_OVERWORLD)) rock++;
+                else other++;
+                if (!f.is(net.minecraft.world.level.block.Blocks.SAND) && !f.is(net.minecraft.world.level.block.Blocks.GRAVEL)
+                        && !f.is(net.minecraft.world.level.block.Blocks.CLAY) && !f.is(net.minecraft.world.level.block.Blocks.COBBLESTONE)) {
+                    under.merge(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(f.getBlock()).getPath(), 1, Integer::sum);
+                }
+            }
+        }
+        final String out = String.format(Locale.ROOT,
+                "rivers wet within %d of %d,%d: %d bed columns, %d dry (%d at a mouth, %d on a rill) e.g. %s; floors: "
+                        + "%d sediment, %d soil, %d rock, %d other %s",
+                half, at.getX(), at.getZ(), bed, dry, dryMouth, dryNarrow, eg, sediment, soil, rock, other, under);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(out);
+        ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+        return 1;
+    }
+
     /** The traced river nearest this column: its channel, the pool over it and the rock bar below it. */
     public static int terrainTrace(CommandContext<CommandSourceStack> ctx) {
         ServerLevel level = ctx.getSource().getLevel();
