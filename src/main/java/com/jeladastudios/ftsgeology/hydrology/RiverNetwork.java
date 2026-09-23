@@ -55,11 +55,10 @@ public final class RiverNetwork {
     /** Blocks an index square covers. */
     private static final int BLOCK = 512;
     /**
-     * How high the ground under a river and beside it may be built up to carry the water down a slope in steps, in
-     * blocks at the normal world's layout.
+     * How close to a lake's water, in blocks at the normal world's layout, a river running well below the lake leaves
+     * the ground uncut, and how much lower than the lake its water has to be for that.
      */
-    public static final double FILL_MAX = 8.0;
-
+    private static final double LAKE_KEEP = 2.0, LAKE_UNDER = 2.0;
     /**
      * One length of river, or one disc of a lake: where it runs from and to, the water and the floor at each end,
      * how wide the flat floor is, and how far down its river it lies. {@code cut} is how far under its raw ground
@@ -256,7 +255,43 @@ public final class RiverNetwork {
         double top = a.water + BANK_RISE * horizontal;
         // Through a hill the wall climbs on up the gorge, as far as the cut the trace allowed there.
         if (a.cut > 0) top = Math.max(top, a.bed + a.cut);
-        return f > top ? Double.MAX_VALUE : f;
+        if (f > top) return Double.MAX_VALUE;
+        // Beside a lake standing well over the river, the river's wall is not cut: the ground between is the lake's rim.
+        if (!a.lake && a.distance > a.halfWidth && besideHigherLake(x, z, a.water)) return Double.MAX_VALUE;
+        return f;
+    }
+
+    /**
+     * Whether a lake whose water stands well over {@code water} comes within a couple of blocks of this column. A river
+     * running below a lake on a shelf cut its wall into the lake's rim, and the lake was left standing at the lip of the
+     * gorge with nothing to hold it: a cliff of water. Left uncut, the ground between is the hillside it was.
+     */
+    private static boolean besideHigherLake(int x, int z, double water) {
+        double keep = LAKE_KEEP * horizontal, under = LAKE_UNDER * horizontal;
+        for (RiverPieces.LakeMask m : block(Math.floorDiv(x, BLOCK), Math.floorDiv(z, BLOCK)).lakes()) {
+            if (m.water - water <= under) continue;
+            if (m.depthAt(x, z) > 0) continue;
+            if (m.distanceToWater(x, z, keep + m.grid) <= keep + m.grid * 0.5) return true;
+        }
+        return false;
+    }
+
+    /** The query here and every lake round it, for {@code /geology terrain column}. */
+    public static String describe(int x, int z) {
+        if (lattice == null) return "no network";
+        At a = at(x, z);
+        StringBuilder s = new StringBuilder(String.format(java.util.Locale.ROOT,
+                "%s %.1f of %.1f, water %.1f, bed %.1f, cut %.1f, floor %s; raw %.1f",
+                a.lake ? "lake" : "channel", a.distance, a.halfWidth, a.water, a.bed, a.cut,
+                floorAt(x, z) == Double.MAX_VALUE ? "none" : String.format(java.util.Locale.ROOT, "%.1f", floorAt(x, z)),
+                ground == null ? Double.NaN : ground.heightAt(x, z)));
+        for (RiverPieces.LakeMask m : block(Math.floorDiv(x, BLOCK), Math.floorDiv(z, BLOCK)).lakes()) {
+            double d = m.distanceToWater(x, z, 40);
+            if (d == Double.MAX_VALUE) continue;
+            s.append(String.format(java.util.Locale.ROOT, "; lake water %.1f depth %.1f, %.1f off",
+                    m.water, m.depthAt(x, z), d));
+        }
+        return s.toString();
     }
 
     /**
@@ -384,10 +419,10 @@ public final class RiverNetwork {
         RiverPieces pc = pieces;
         if (l == null || pc == null) return "no river network";
         return String.format(Locale.ROOT,
-                "%d channel nodes (%d joins, %d with nothing to join, %d not traced, %d dam samples, %d gorge lengths, %d spring eyes, %d inlets cut through a bar (%d open, %d big, %d shut), %d points stepped down a slope, %d plunge pools, %d held under a "
+                "%d channel nodes (%d joins, %d with nothing to join, %d not traced, %d dam samples, %d gorge lengths, %d spring eyes, %d inlets cut through a bar (%d open, %d big, %d shut), %d plunge pools, %d held under a "
                         + "bank), %d lakes drawn, %d mouths, %d sinks; %d hollows (%d closed), %d lakes, %d ground reads "
                         + "and %d on the grid; %d squares in %.0f ms, slowest %.0f ms",
-                pc.channels.sum(), pc.joins.sum(), pc.dryJoins.sum(), pc.fallbacks.sum(), pc.dams.sum(), pc.gorges.sum(), pc.eyes.sum(), pc.inlets.sum(), pc.inletOpen.sum(), pc.inletBig.sum(), pc.inletShut.sum(), pc.stepHeld.sum(), pc.pools.sum(),
+                pc.channels.sum(), pc.joins.sum(), pc.dryJoins.sum(), pc.fallbacks.sum(), pc.dams.sum(), pc.gorges.sum(), pc.eyes.sum(), pc.inlets.sum(), pc.inletOpen.sum(), pc.inletBig.sum(), pc.inletShut.sum(), pc.pools.sum(),
                 pc.bankClamps.sum(), pc.lakeMasks.sum(), pc.mouths.sum(), pc.sinks.sum(), l.pitsFoundCount(),
                 l.closedCount(), l.lakesCount(), l.readsCount(), pc.gridReads.sum(), SQUARES.sum(),
                 SQUARE_NANOS.sum() / 1e6, SLOWEST.get() / 1e6);

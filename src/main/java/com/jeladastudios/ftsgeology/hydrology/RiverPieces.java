@@ -79,13 +79,6 @@ final class RiverPieces {
     static final int INLET_BUDGET = 3000;
     /** A fall of this many blocks between two points, and the points below it that get a plunge pool. */
     static final double POOL_FALL = 4.0, POOL_WIDE = 1.8, POOL_DIG = 0.3, POOL_DIG_MAX = 3.0;
-    /**
-     * The most the water comes down in one point's length, in blocks at the normal world's layout, where the ground
-     * under it can be built up to carry it (up to {@link RiverNetwork#FILL_MAX}). Where the ground fell away the water
-     * used to fall with it in one sheer drop the whole height of the slope; now it comes down in a run of short steps
-     * over rock laid under it, and only where the ground falls further than can be built up does it go over a fall.
-     */
-    static final double STEP_DROP = 3.0;
     static final int POOL_RUN = 3;
     /** How much of its width a torrent keeps, and the gradients that ramp between a torrent and a lowland river. */
     static final double STEEP_NARROW = 0.35, STEEP_FROM = 0.15, STEEP_OVER = 0.5;
@@ -147,7 +140,7 @@ final class RiverPieces {
     private final SetCache<LakeMask> masks = new SetCache<>(10);
 
     final LongAdder channels = new LongAdder(), joins = new LongAdder(), fallbacks = new LongAdder(),
-            dams = new LongAdder(), gorges = new LongAdder(), eyes = new LongAdder(), heldOver = new LongAdder(), stepHeld = new LongAdder(), pools = new LongAdder(), inlets = new LongAdder(), inletOpen = new LongAdder(), inletBig = new LongAdder(), inletShut = new LongAdder(), bankClamps = new LongAdder(), lakeMasks = new LongAdder(), sinks = new LongAdder(),
+            dams = new LongAdder(), gorges = new LongAdder(), eyes = new LongAdder(), heldOver = new LongAdder(), pools = new LongAdder(), inlets = new LongAdder(), inletOpen = new LongAdder(), inletBig = new LongAdder(), inletShut = new LongAdder(), bankClamps = new LongAdder(), lakeMasks = new LongAdder(), sinks = new LongAdder(),
             mouths = new LongAdder(), dryJoins = new LongAdder(), gridReads = new LongAdder();
 
     RiverPieces(DrainageLattice lat, DrainageLattice.Ground ground, double horizontal, int areaMin) {
@@ -951,14 +944,6 @@ final class RiverPieces {
                     Math.min(read(x + dx * in, z + dz * in), read(x - dx * in, z - dz * in)));
             // Held up to the floor only as far as a bank can be built up to hold it; past that the water steps down.
             double lw = Math.min(w, Math.max(Math.min(floorW, rim - 1.0 + BANK_HOLD), Math.min(target, rim - 1.0)));
-            // Down a slope in short steps over ground built up under the water, as far as it can be built up.
-            if (q > 0) {
-                double stepped = Math.min(w - STEP_DROP * h, rim - 1.0 + RiverNetwork.FILL_MAX * h);
-                if (stepped > lw) {
-                    lw = Math.min(w, stepped);
-                    stepHeld.increment();
-                }
-            }
             if (rim - 1.0 < Math.min(w, target)) bankClamps.increment();
             if (lw > rim - 1.0 + 1e-6) heldOver.increment();
             w = lw;

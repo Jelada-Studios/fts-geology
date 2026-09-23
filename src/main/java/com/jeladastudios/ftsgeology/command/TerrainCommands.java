@@ -112,6 +112,8 @@ public final class TerrainCommands {
                 "terrain column at %d,%d: offset ground %d, first solid without caves %d, with them %d, samples caves ate %d, gaps %d",
                 at.getX(), at.getZ(), flat, noCave, withCave, eaten, gaps);
         source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
+        String river = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.describe(at.getX(), at.getZ());
+        source.sendSuccess(() -> Component.literal("river: " + river), false);
         source.sendSuccess(() -> Component.literal(row.toString()).withStyle(ChatFormatting.GRAY), false);
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("terrain density: {}", row);
