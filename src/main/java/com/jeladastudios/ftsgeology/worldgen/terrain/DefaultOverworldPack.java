@@ -16,19 +16,20 @@ import java.util.List;
 
 /**
  * Makes "FT's Geology" the default overworld: a built-in data pack that replaces {@code minecraft:normal} with the
- * mod's world preset, so a new world and a dedicated server's {@code level-type=minecraft:normal} get the plate
- * terrain without anyone choosing it. The pack is only registered when no other terrain mod is present: a
- * conditional file in the mod's own data shadowed vanilla's whether its condition held or not, and with the
- * condition false the preset was simply gone. Terralith and Tectonic bring their own overworld; TerraBlender,
- * Biomes O' Plenty and BYG put their biomes into vanilla's biome source, which the mod's wraps, so the mod's
- * preset stays a choice under World Type beside theirs.
+ * mod's tall world preset, so a new world and a dedicated server's {@code level-type=minecraft:normal} get the plate
+ * terrain at full height without anyone choosing it. The pack is only registered when no other terrain mod is
+ * present: a conditional file in the mod's own data shadowed vanilla's whether its condition held or not, and with
+ * the condition false the preset was simply gone. Terralith's biomes are no bar: they come in through vanilla's biome
+ * list, which the mod's biome source wraps, so the default is the mod's terrain with Terralith's biomes on it.
+ * Tectonic brings a terrain of its own; TerraBlender, Biomes O' Plenty and BYG keep the mod's preset a choice under
+ * World Type beside theirs.
  */
 @Mod.EventBusSubscriber(modid = GeysersMod.MODID, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class DefaultOverworldPack {
 
     private DefaultOverworldPack() {}
 
-    private static final List<String> TERRAIN_MODS = List.of("terralith", "tectonic", "terrablender", "biomesoplenty", "byg");
+    private static final List<String> TERRAIN_MODS = List.of("tectonic", "terrablender", "biomesoplenty", "byg");
     private static final String PACK_ID = GeysersMod.MODID + "/default_overworld";
 
     @SubscribeEvent

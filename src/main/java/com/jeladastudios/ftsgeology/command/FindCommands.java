@@ -94,6 +94,8 @@ public final class FindCommands {
         // A named mountain stands in one place in a world, worked out from the seed: there is nothing to spiral for.
         for (String name : com.jeladastudios.ftsgeology.worldgen.terrain.DemLibrary.LANDMARKS) {
             if (!what.equals(name)) continue;
+            // Only the mod's own world types raise them; anywhere else there is nothing at the seed's place.
+            if (!com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level)) return null;
             var site = com.jeladastudios.ftsgeology.worldgen.terrain.LandmarkSites.of(
                     com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(),
                     com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params(), name);
