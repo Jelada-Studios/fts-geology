@@ -57,6 +57,9 @@ public final class RiverDensity implements DensityFunction {
      */
     private static final double LAKE_SHAVE = 2.0;
 
+    /** Raw ground under this lies under the sea's water; a channel cuts no more than a block into it. */
+    private static final double SEA_FLOOR = 62.0, SEA_SCOUR = 1.0;
+
     public static final MapCodec<RiverDensity> DATA_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             DensityFunction.HOLDER_HELPER_CODEC.fieldOf("argument").forGetter(f -> f.raw),
             Codec.STRING.fieldOf("mode").forGetter(f -> f.mode.name().toLowerCase(Locale.ROOT))
@@ -89,6 +92,9 @@ public final class RiverDensity implements DensityFunction {
                 // Where the trace runs through a hill it is allowed a gorge: the full cut down the middle, stepping
                 // back to the ordinary shave up its walls, so the hill is cut through instead of left standing.
                 double shave = RiverNetwork.shaveAt(x, z, MAX_SHAVE, LAKE_SHAVE);
+                // Under the sea the water is there already: the channel only scours the floor, where a full cut left
+                // a trench under the waves whose walls stood up out of the bed in steps.
+                if (ground < SEA_FLOOR) shave = Math.min(shave, SEA_SCOUR);
                 yield (Math.max(y, ground - shave) - 128.0) / 128.0;
             }
             case NEAR -> RiverNetwork.near(x, z);

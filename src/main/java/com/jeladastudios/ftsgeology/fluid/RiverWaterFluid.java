@@ -87,12 +87,15 @@ public abstract class RiverWaterFluid extends ForgeFlowingFluid {
 
     /**
      * The way the river runs, if it runs: the surface is drawn with the flowing texture moving that way and a swimmer
-     * or a boat is carried gently along. Still water has none.
+     * or a boat is carried gently along. Still water has none. Water falling down a step runs downwards as well, as
+     * vanilla's does.
      */
     @Override
     @Nonnull
     public Vec3 getFlow(@Nonnull BlockGetter level, @Nonnull BlockPos pos, @Nonnull FluidState state) {
-        return way(state.getValue(FLOW)).scale(CURRENT);
+        Vec3 run = way(state.getValue(FLOW));
+        if (state.hasProperty(FALLING) && state.getValue(FALLING)) return run.add(0.0, -6.0, 0.0).normalize();
+        return run.scale(CURRENT);
     }
 
     /**

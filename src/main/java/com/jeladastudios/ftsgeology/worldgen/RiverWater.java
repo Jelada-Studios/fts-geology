@@ -61,10 +61,21 @@ public final class RiverWater {
     private static final int PLUG_DEEP = 12;
     /** The highest step down whose face is hung with falling water, in blocks. */
     private static final int CURTAIN_MAX = 16;
+    /** The blocks at the top of the sea in a river's mouth that are the river's water. */
+    private static final int MOUTH_TOP = 3;
+    /**
+     * How far a lake's shore may be taken down to its water, in blocks at the normal world's layout. The lake's
+     * extent is worked out on the raw ground; the chunk is built with the noise on top, which left the edge of a
+     * lake a block or two over its water in a dry strip -- the last two blocks between a stream and the lake it runs
+     * into.
+     */
+    private static final int LAKE_LEVEL = 2;
+    /** How far a river beside a lake may run below the lake's water before the lake's edge there is held in rock. */
+    private static final int LAKE_WALL = 2;
 
     private static final LongAdder CANDIDATES = new LongAdder(), KEPT = new LongAdder(), BLOCKS = new LongAdder(),
             DROPPED = new LongAdder(), LEVELLED = new LongAdder(), SPRINGS = new LongAdder(), WET = new LongAdder(),
-            BANKED = new LongAdder(), CLIFFS = new LongAdder(), ICED = new LongAdder(), GLACIERS = new LongAdder(), PLUGGED = new LongAdder(), CURTAINS = new LongAdder();
+            BANKED = new LongAdder(), CLIFFS = new LongAdder(), ICED = new LongAdder(), GLACIERS = new LongAdder(), PLUGGED = new LongAdder(), CURTAINS = new LongAdder(), SHORED = new LongAdder(), RAISED = new LongAdder(), WALLED = new LongAdder();
 
     /**
      * The tongue of ice a mountain river comes out from under, where it rises high enough to snow: how far it reaches
@@ -72,16 +83,13 @@ public final class RiverWater {
      */
     private static final double TONGUE_LONG = 10.0, TONGUE_WIDE = 5.0, TONGUE_THICK = 3.0;
 
-    /**
-     * How much a bank may be built up to hold the water beside it, in blocks.
-     *
-     * <p>The channel is cut into the raw ground, and the rim the water is held under is read off it too, but the chunk
-     * is built with the three-dimensional noise on top. Where that leaves the ground beside a river a block or two
-     * lower than the raw ground said, the water stood a block over its bank: a sheet of water upright in the open,
-     * seven columns in a hundred along the new rivers. The column beside it is built up to the water in its own
-     * ground. More than two blocks is a cliff, not a bank, and is counted and left.</p>
+    /*
+     * A bank is built up to hold the water beside it as far as RiverNetwork.FILL_MAX. The channel is cut into the raw
+     * ground, and the rim the water is held under is read off it too, but the chunk is built with the
+     * three-dimensional noise on top: where that left the ground beside a river lower than the raw ground said, the
+     * water stood over its bank, a sheet of water upright in the open. Down a slope the water is now carried in steps
+     * over built-up ground, and the banks go up with it. More than that is a cliff, and is counted and left.
      */
-    private static final int BANK_FILL = 2;
     private static final int[][] SIDES = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
     private static final AtomicLong CHUNKS = new AtomicLong();
 
@@ -112,6 +120,19 @@ public final class RiverWater {
                 if (a.floor() > w - 0.5) continue;
                 boolean mouth = w <= sea;
                 if (mouth) w = sea - 1;
+                // A lake's edge over a river well below it is shore: the banks built round the water hold it in rock.
+                if (a.lake() && !mouth && lakeWall(x, z, w, sea)) {
+                    placed += shoreUp(level, at, x, z, w);
+                    WALLED.increment();
+                    continue;
+                }
+                // And an edge over ground that falls away further than a bank can be built: the edge itself is built
+                // up to the water, so the lake is held a column in.
+                if (a.lake() && !mouth && overDrop(level, x, z, w)) {
+                    placed += shoreUp(level, at, x, z, w);
+                    WALLED.increment();
+                    continue;
+                }
                 CANDIDATES.increment();
                 int g = TerrainProbe.groundY(level, x, z);
                 if (g == Integer.MIN_VALUE) {
@@ -119,8 +140,10 @@ public final class RiverWater {
                     continue;
                 }
                 if (g >= w) {
-                    // A lake fills its hollow and no more: ground standing over its water is its shore.
-                    if (a.lake()) continue;
+                    // A lake fills its hollow and no more: ground standing well over its water is its shore. A block or
+                    // two over is the noise on the raw ground the hollow was worked out on, and is taken down.
+                    if (a.lake() && g - w > Math.round(LAKE_LEVEL * RiverNetwork.horizontal())) continue;
+                    if (a.lake()) SHORED.increment();
                     int bedY = level(level, at, x, z, g, w, a);
                     if (bedY == Integer.MIN_VALUE) {
                         DROPPED.increment();
@@ -129,23 +152,26 @@ public final class RiverWater {
                     g = bedY;
                     LEVELLED.increment();
                 }
+                // Where the river is carried down a slope in steps, the ground under it is built up to its bed.
+                if (!a.lake() && !mouth && g < w) g = raise(level, at, x, z, g, Math.min(w - 1, (int) Math.floor(a.floor())));
                 // Nothing is poured over a hole: the block under the water has to be solid, or a cave under the bed is
                 // stopped up first.
                 if (!level.getBlockState(at.set(x, g, z)).isSolidRender(level, at) && !plug(level, at, x, g, z)) {
                     DROPPED.increment();
                     continue;
                 }
-                // Which way the water runs here, for the surface to be drawn running and a swimmer to be carried. A lake
-                // and a mouth stand still.
-                BlockState run = mouth || a.lake() ? water
+                // Which way the water runs here, for the surface to be drawn running and a swimmer to be carried, out
+                // through the mouth into the sea. A lake stands still.
+                BlockState run = a.lake() ? water
                         : water.setValue(RiverWaterFluid.FLOW, RiverWaterFluid.wayOf(a.fx(), a.fz()));
                 int here = 0;
                 for (int y = g + 1; y <= w; y++) {
                     BlockState was = level.getBlockState(at.set(x, y, z));
                     if (!was.isAir() && was.getFluidState().isEmpty() && !TerrainProbe.isVegetation(was)) break;
-                    // The sea's top block in a river's mouth is the river's: vanilla water there freezes over in the cold,
-                    // and a river's mouth does not.
-                    if (mouth && y == w && was.is(Blocks.WATER)) {
+                    // The top of the sea in a river's mouth is the river's: vanilla water there freezes over in the cold,
+                    // and a river's mouth does not. Seagrass and kelp reaching up into it go too: each holds vanilla water
+                    // of its own, drawn as a block of a different water standing in the river.
+                    if (mouth && y >= w - MOUTH_TOP + 1 && (was.is(Blocks.WATER) || seaPlant(was))) {
                         level.setBlock(at, run, FLAGS);
                         here++;
                         continue;
@@ -162,6 +188,10 @@ public final class RiverWater {
                 // Nothing grows standing on the water: a plant the ground under it was taken from, or one a neighbour
                 // chunk put there, goes.
                 if (here > 0) clearPlants(level, at, x, g + here + 1, z);
+                // Kelp cut short under the river's water ends in a head, not a stem with nothing on it.
+                if (mouth && level.getBlockState(at.set(x, w - MOUTH_TOP, z)).is(Blocks.KELP_PLANT)) {
+                    level.setBlock(at, Blocks.KELP.defaultBlockState(), FLAGS);
+                }
                 KEPT.increment();
                 // Counted apart: a column can be kept, have its bed swapped for gravel, and still take no water
                 // because the first block over its floor turned out to be solid. That is a dry gravel stripe
@@ -186,9 +216,9 @@ public final class RiverWater {
         if (CHUNKS.incrementAndGet() % 100 == 0) {
             GeysersMod.LOGGER.info("River water over {} chunks: {} columns in a channel, {} kept, {} of them wet, "
                             + "{} levelled, {} let go, {} springs, {} blocks, {} banks built up, {} left as cliffs, "
-                            + "{} lake columns iced, {} glacier columns, {} hollows stopped up, {} steps hung with falling water; {}; {}; {}",
+                            + "{} lake columns iced, {} glacier columns, {} hollows stopped up, {} steps hung with falling water, {} lake shore columns taken down, {} beds built up, {} lake edges held in rock over a river; {}; {}; {}",
                     CHUNKS.get(), CANDIDATES.sum(), KEPT.sum(), WET.sum(), LEVELLED.sum(), DROPPED.sum(),
-                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(), PLUGGED.sum(), CURTAINS.sum(),
+                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(), PLUGGED.sum(), CURTAINS.sum(), SHORED.sum(), RAISED.sum(), WALLED.sum(),
                     RiverNetwork.summary(), GeologyChunkGenerator.summary(), SnowCover.summary());
         }
         return placed;
@@ -256,7 +286,27 @@ public final class RiverWater {
         int w = (int) Math.floor(a.water());
         // At the mouth the sea is the other bank.
         if (w <= sea) return Integer.MIN_VALUE;
-        return a.floor() > w - 0.5 ? Integer.MIN_VALUE : w;
+        if (a.floor() > w - 0.5) return Integer.MIN_VALUE;
+        return a.lake() && lakeWall(x, z, w, sea) ? Integer.MIN_VALUE : w;
+    }
+
+    /**
+     * Whether a lake's edge here stands over a river running well below it. The lake's hollow is worked out on the
+     * raw ground and the river's gorge is cut into it, so a lake on a shelf came out with its shore right on the
+     * gorge's lip: a wall of water the height of the lake standing in the open over the river, with the river's
+     * falling water hung under it to the bottom -- a cliff of water all along the shore. That edge is the lake's
+     * shore instead, built up in rock; the lake comes down to the river only where its own way out takes it.
+     */
+    private static boolean lakeWall(int x, int z, int w, int sea) {
+        long drop = Math.round(LAKE_WALL * RiverNetwork.horizontal());
+        for (int[] d : SIDES) {
+            RiverNetwork.At n = RiverNetwork.at(x + d[0], z + d[1]);
+            if (n.distance() == Double.MAX_VALUE || n.lake()) continue;
+            int nw = Math.max(sea - 1, (int) Math.floor(n.water()));
+            if (n.floor() > nw - 0.5) continue;
+            if (w - nw > drop) return true;
+        }
+        return false;
     }
 
     /**
@@ -275,12 +325,26 @@ public final class RiverWater {
                 int w = waterTop(x, z, sea);
                 if (w == Integer.MIN_VALUE || !level.getBlockState(at.set(x, w, z)).is(ModBlocks.RIVER_WATER.get())) continue;
                 int top = w;
-                for (int[] d : SIDES) top = Math.max(top, waterTop(x + d[0], z + d[1], sea));
+                int[] from = null;
+                for (int[] d : SIDES) {
+                    int n = waterTop(x + d[0], z + d[1], sea);
+                    if (n > top) {
+                        top = n;
+                        from = d;
+                    }
+                }
                 top = Math.min(top, w + CURTAIN_MAX);
+                if (top <= w) continue;
+                // Falling the way the river runs, so its face is drawn coming over the step and down; where the water
+                // here stands still, the way it comes over the step, from the higher water beside.
+                RiverNetwork.At a = RiverNetwork.at(x, z);
+                int way = RiverWaterFluid.wayOf(a.fx(), a.fz());
+                if (way == 0 && from != null) way = RiverWaterFluid.wayOf(-from[0], -from[1]);
+                BlockState fall = falling.setValue(RiverWaterFluid.FLOW, way);
                 int laid = 0;
                 for (int y = w + 1; y <= top; y++) {
                     if (!level.getBlockState(at.set(x, y, z)).isAir()) break;
-                    level.setBlock(at, falling, FLAGS);
+                    level.setBlock(at, fall, FLAGS);
                     laid++;
                 }
                 if (laid > 0) CURTAINS.increment();
@@ -302,7 +366,7 @@ public final class RiverWater {
                 if (want == Integer.MIN_VALUE) continue;
                 int g = TerrainProbe.groundY(level, x, z);
                 if (g == Integer.MIN_VALUE || g >= want) continue;
-                if (want - g > BANK_FILL) {
+                if (want - g > Math.round(RiverNetwork.FILL_MAX * RiverNetwork.horizontal())) {
                     CLIFFS.increment();
                     continue;
                 }
@@ -405,6 +469,61 @@ public final class RiverWater {
         for (int k = bottom + 1; k <= y; k++) level.setBlock(at.set(x, k, z), fill, FLAGS);
         PLUGGED.increment();
         return true;
+    }
+
+    /**
+     * Builds the ground under a channel up to its bed, where it lies two blocks or more under it and no more than
+     * {@link RiverNetwork#FILL_MAX} blocks: the rock a river is carried down a slope on, in steps, instead of falling
+     * the whole height of the slope at once. The ground's own rock, soil under soil. Returns the new ground.
+     */
+    private static int raise(WorldGenLevel level, BlockPos.MutableBlockPos at, int x, int z, int g, int bedY) {
+        if (bedY - g < 2 || bedY - g > Math.round(RiverNetwork.FILL_MAX * RiverNetwork.horizontal())) return g;
+        BlockState under = level.getBlockState(at.set(x, g, z));
+        if (!under.isSolidRender(level, at) || EruptionHandler.isPlayerPlaced(under)) return g;
+        BlockState fill = under.is(BlockTags.BASE_STONE_OVERWORLD) ? under
+                : under.is(BlockTags.DIRT) ? Blocks.DIRT.defaultBlockState() : Blocks.STONE.defaultBlockState();
+        int y = g + 1;
+        for (; y <= bedY; y++) {
+            BlockState was = level.getBlockState(at.set(x, y, z));
+            if (!was.isAir() && was.getFluidState().isEmpty() && !TerrainProbe.isVegetation(was)) break;
+            level.setBlock(at, fill, FLAGS);
+        }
+        RAISED.increment();
+        return y - 1;
+    }
+
+    /** Whether a lake column has a neighbour, neither lake nor river, whose ground lies further under its water than a bank can be built. */
+    private static boolean overDrop(WorldGenLevel level, int x, int z, int w) {
+        long most = Math.round(RiverNetwork.FILL_MAX * RiverNetwork.horizontal());
+        for (int[] d : SIDES) {
+            RiverNetwork.At n = RiverNetwork.at(x + d[0], z + d[1]);
+            if (n.lake() || (n.distance() != Double.MAX_VALUE && n.floor() <= Math.floor(n.water()) - 0.5)) continue;
+            int g = TerrainProbe.groundY(level, x + d[0], z + d[1]);
+            if (g != Integer.MIN_VALUE && w - g > most) return true;
+        }
+        return false;
+    }
+
+    /** Builds a lake's edge column up to the water in its own ground: the lake's shore. */
+    private static int shoreUp(WorldGenLevel level, BlockPos.MutableBlockPos at, int x, int z, int w) {
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE || g >= w) return 0;
+        BlockState top = level.getBlockState(at.set(x, g, z));
+        if (EruptionHandler.isPlayerPlaced(top) || !top.isSolidRender(level, at)) return 0;
+        BlockState body = top.is(BlockTags.BASE_STONE_OVERWORLD) ? top : Blocks.STONE.defaultBlockState();
+        int laid = 0;
+        for (int y = g + 1; y <= w; y++) {
+            BlockState was = level.getBlockState(at.set(x, y, z));
+            if (!was.isAir() && was.getFluidState().isEmpty() && !TerrainProbe.isVegetation(was)) break;
+            level.setBlock(at, y == w && top.is(BlockTags.DIRT) ? top : body, FLAGS);
+            laid++;
+        }
+        return laid;
+    }
+
+    /** A plant of the sea, standing in vanilla water of its own. */
+    private static boolean seaPlant(BlockState s) {
+        return s.is(Blocks.SEAGRASS) || s.is(Blocks.TALL_SEAGRASS) || s.is(Blocks.KELP) || s.is(Blocks.KELP_PLANT);
     }
 
     /** Clears plants standing from {@code y} up, a few blocks at most. */

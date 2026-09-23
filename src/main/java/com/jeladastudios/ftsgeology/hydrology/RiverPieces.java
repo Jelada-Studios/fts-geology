@@ -78,7 +78,14 @@ final class RiverPieces {
     /** The most water a lagoon may hold, in steps of the search, before it is taken for the sea. */
     static final int INLET_BUDGET = 3000;
     /** A fall of this many blocks between two points, and the points below it that get a plunge pool. */
-    static final double FALL_MIN = 10.0, POOL_WIDE = 1.8, POOL_DEEP = 1.6;
+    static final double POOL_FALL = 4.0, POOL_WIDE = 1.8, POOL_DIG = 0.3, POOL_DIG_MAX = 3.0;
+    /**
+     * The most the water comes down in one point's length, in blocks at the normal world's layout, where the ground
+     * under it can be built up to carry it (up to {@link RiverNetwork#FILL_MAX}). Where the ground fell away the water
+     * used to fall with it in one sheer drop the whole height of the slope; now it comes down in a run of short steps
+     * over rock laid under it, and only where the ground falls further than can be built up does it go over a fall.
+     */
+    static final double STEP_DROP = 3.0;
     static final int POOL_RUN = 3;
     /** How much of its width a torrent keeps, and the gradients that ramp between a torrent and a lowland river. */
     static final double STEEP_NARROW = 0.35, STEEP_FROM = 0.15, STEEP_OVER = 0.5;
@@ -140,7 +147,7 @@ final class RiverPieces {
     private final SetCache<LakeMask> masks = new SetCache<>(10);
 
     final LongAdder channels = new LongAdder(), joins = new LongAdder(), fallbacks = new LongAdder(),
-            dams = new LongAdder(), gorges = new LongAdder(), eyes = new LongAdder(), heldOver = new LongAdder(), inlets = new LongAdder(), inletOpen = new LongAdder(), inletBig = new LongAdder(), inletShut = new LongAdder(), bankClamps = new LongAdder(), lakeMasks = new LongAdder(), sinks = new LongAdder(),
+            dams = new LongAdder(), gorges = new LongAdder(), eyes = new LongAdder(), heldOver = new LongAdder(), stepHeld = new LongAdder(), pools = new LongAdder(), inlets = new LongAdder(), inletOpen = new LongAdder(), inletBig = new LongAdder(), inletShut = new LongAdder(), bankClamps = new LongAdder(), lakeMasks = new LongAdder(), sinks = new LongAdder(),
             mouths = new LongAdder(), dryJoins = new LongAdder(), gridReads = new LongAdder();
 
     RiverPieces(DrainageLattice lat, DrainageLattice.Ground ground, double horizontal, int areaMin) {
@@ -327,6 +334,8 @@ final class RiverPieces {
                     double[] water = mask.nearestWater(last[0], last[1], lat.cell);
                     if (water != null) path.add(water);
                 }
+                // The way out starts a block deep in the lake, not on its shore.
+                intoLake(path, mask);
                 java.util.Collections.reverse(path);
                 double w = mask.water;
                 List<RiverNetwork.Point> pts = lay(tidy(c, new Led(path, false, false), halfFor(lat.area(m))), w, w, w, FROM_LAKE, halfFor(lat.area(m)), JOIN, w, 0);
@@ -335,7 +344,7 @@ final class RiverPieces {
                 joins.increment();
             }
         }
-        for (long d : riverDonors(m, lake)) join(c, d, m, segs, out, local, wet, mask.water, hop ? mask : null);
+        for (long d : riverDonors(m, lake)) join(c, d, m, segs, out, local, wet, mask.water, mask, hop);
         return out.toArray(NONE);
     }
 
@@ -544,7 +553,7 @@ final class RiverPieces {
         List<double[]> segs = new ArrayList<>();
         for (long d : ds) {
             int before = out.size();
-            join(c, d, s, segs, out, local, wet, lat.sea, null);
+            join(c, d, s, segs, out, local, wet, lat.sea, null, false);
             mouths.increment();
             if (out.size() > before) {
                 List<RiverNetwork.Point> cut = inlet(out.get(out.size() - 1));
@@ -755,7 +764,7 @@ final class RiverPieces {
         segments(pts, segs);
         for (long d : ds) {
             if (d == main) continue;
-            join(c, d, u, segs, pts, local, null, 0, null);
+            join(c, d, u, segs, pts, local, null, 0, null, false);
         }
         return pts.toArray(NONE);
     }
@@ -767,7 +776,7 @@ final class RiverPieces {
      */
     private void join(Cell c, long d, long owner, List<double[]> segs, List<RiverNetwork.Point> out,
                       Long2ObjectOpenHashMap<RiverNetwork.Point[]> local, boolean[] wet, double wetWater,
-                      LakeMask hopTo) {
+                      LakeMask lake, boolean hop) {
         End from = end(d, local);
         if (from == null) return;
         double[] s = handoff(d, owner);
@@ -794,17 +803,54 @@ final class RiverPieces {
         if (!ontoWater && snap != null) {
             path.add(new double[]{snap[0], snap[1]});
             endWater = snap[2];
-        } else if (ontoWater && hopTo != null) {
+        } else if (ontoWater && hop && lake != null) {
             // Over the lake's dry edge into its water.
-            double[] w = hopTo.nearestWater(last[0], last[1], lat.cell);
+            double[] w = lake.nearestWater(last[0], last[1], lat.cell);
             if (w != null) path.add(w);
         }
+        if (ontoWater && lake != null) intoLake(path, lake);
         path = tidy(c, lead(c, path, across(d, owner), null), from.half());
         List<RiverNetwork.Point> pts = lay(path, from.water(), Math.min(from.water(), endWater), from.water(),
                 from.length(), from.half(), JOIN, endWater, 0);
         out.addAll(pts);
         segments(pts, segs);
         joins.increment();
+    }
+
+    /**
+     * Carries a way that ends at a lake on until it is a block deep in the lake's water. It used to stop at the first
+     * grid point the lake reached, which lies at the lake's very edge: a stream ended there with the last block or
+     * two of shore still standing between it and the lake.
+     */
+    private void intoLake(List<double[]> path, LakeMask lake) {
+        double[] end = path.get(path.size() - 1);
+        if (lake.depthAt(end[0], end[1]) >= 1.0) return;
+        double[] water = lake.nearestWater(end[0], end[1], 3.0 * lat.cell);
+        if (water == null) return;
+        double dx = water[0] - end[0], dz = water[1] - end[1], l = Math.hypot(dx, dz);
+        if (l < 1e-6) {
+            // On the edge's grid point already: on towards the lake's deeper water, where the next grid point is wetter.
+            double best = lake.depthAt(end[0], end[1]);
+            for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                double v = lake.depthAt(end[0] + d[0] * grid, end[1] + d[1] * grid);
+                if (v > best) { best = v; dx = d[0]; dz = d[1]; }
+            }
+            l = Math.hypot(dx, dz);
+            if (l < 1e-6) return;
+        }
+        dx /= l;
+        dz /= l;
+        // A block deep, or where a shallow lake is deepest along the way: never out the other side onto its shore.
+        double bestDepth = lake.depthAt(end[0], end[1]), bestT = 0.0;
+        for (double t = 1.0; t <= l + 2.0 * grid; t += 1.0) {
+            double v = lake.depthAt(end[0] + dx * t, end[1] + dz * t);
+            if (v > bestDepth) {
+                bestDepth = v;
+                bestT = t;
+            }
+            if (v >= 1.0) break;
+        }
+        if (bestT > 0 && bestDepth > 0) path.add(new double[]{end[0] + dx * bestT, end[1] + dz * bestT});
     }
 
     private boolean isWetPoint(Cell c, boolean[] wet, double[] p) {
@@ -905,6 +951,14 @@ final class RiverPieces {
                     Math.min(read(x + dx * in, z + dz * in), read(x - dx * in, z - dz * in)));
             // Held up to the floor only as far as a bank can be built up to hold it; past that the water steps down.
             double lw = Math.min(w, Math.max(Math.min(floorW, rim - 1.0 + BANK_HOLD), Math.min(target, rim - 1.0)));
+            // Down a slope in short steps over ground built up under the water, as far as it can be built up.
+            if (q > 0) {
+                double stepped = Math.min(w - STEP_DROP * h, rim - 1.0 + RiverNetwork.FILL_MAX * h);
+                if (stepped > lw) {
+                    lw = Math.min(w, stepped);
+                    stepHeld.increment();
+                }
+            }
             if (rim - 1.0 < Math.min(w, target)) bankClamps.increment();
             if (lw > rim - 1.0 + 1e-6) heldOver.increment();
             w = lw;
@@ -916,12 +970,18 @@ final class RiverPieces {
         List<RiverNetwork.Point> pts = new ArrayList<>(n);
         double[] wide = new double[n + 1], deeper = new double[n + 1];
         Arrays.fill(wide, 1.0);
-        Arrays.fill(deeper, 1.0);
-        for (int q = 0; q < n; q++) {
-            if (qw[q] - qw[q + 1] < FALL_MIN) continue;
-            for (int k = q + 1; k <= Math.min(n, q + POOL_RUN); k++) {
+        // A plunge pool at the foot of every fall: where the water has come down far in the last two points' length
+        // and runs on about level, the bed is scoured deeper for a few points. Counted over two points, because a fall
+        // no longer has to land inside one length; the water's own level is the pool's, only the floor goes down.
+        for (int q = 1; q <= n; q++) {
+            double fall = qw[Math.max(0, q - 2)] - qw[q];
+            if (fall < POOL_FALL * h) continue;
+            if (q < n && qw[q] - qw[q + 1] > fall * 0.5) continue;
+            double dig = Math.min(POOL_DIG * fall, POOL_DIG_MAX * h);
+            pools.increment();
+            for (int k = q; k <= Math.min(n, q + POOL_RUN - 1); k++) {
                 wide[k] = POOL_WIDE;
-                deeper[k] = POOL_DEEP;
+                deeper[k] = Math.max(deeper[k], dig);
             }
         }
         double step = len / n;
@@ -932,7 +992,7 @@ final class RiverPieces {
             double narrow = STEEP_NARROW + (1.0 - STEEP_NARROW) * gentle;
             double hw = Math.max(HALF_MIN, half * narrow) * Math.max(wide[q], wide[q + 1]);
             double depth = depthFor(hw);
-            double bedS = qw[q] - depth * deeper[q], bedE = qw[q + 1] - depth * deeper[q + 1];
+            double bedS = qw[q] - depth - deeper[q], bedE = qw[q + 1] - depth - deeper[q + 1];
             double cutS = gorge(qg[q], qw[q], bedS, hw), cutE = gorge(qg[q + 1], qw[q + 1], bedE, hw);
             if (cutS > 0) gorges.increment();
             pts.add(new RiverNetwork.Point((float) qx[q], (float) qz[q], (float) qx[q + 1], (float) qz[q + 1],

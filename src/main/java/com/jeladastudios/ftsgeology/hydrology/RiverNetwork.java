@@ -54,6 +54,11 @@ public final class RiverNetwork {
     public static final double CAVE_REACH = 8.0;
     /** Blocks an index square covers. */
     private static final int BLOCK = 512;
+    /**
+     * How high the ground under a river and beside it may be built up to carry the water down a slope in steps, in
+     * blocks at the normal world's layout.
+     */
+    public static final double FILL_MAX = 8.0;
 
     /**
      * One length of river, or one disc of a lake: where it runs from and to, the water and the floor at each end,
@@ -173,7 +178,23 @@ public final class RiverNetwork {
                 lakeDepth = d;
             }
         }
-        if (lake != null) return new At(0.0, lake.grid, lake.water, Math.min(lake.bed, lake.water - lakeDepth), 1.0e4, true, 0, 0, 0);
+        if (lake != null) {
+            // A river that runs on into the lake carries its channel, and the pool at the foot of its fall, into the
+            // lake's floor: the lake's bed here is the lower of its own and that of any length whose bed it is on.
+            double lakeBed = Math.min(lake.bed, lake.water - lakeDepth);
+            int span = (int) Math.ceil(RiverPieces.HALF_GROWN * RiverPieces.POOL_WIDE * horizontal + RiverPieces.STEP * horizontal);
+            for (int bx = Math.floorDiv(x - span, BLOCK); bx <= Math.floorDiv(x + span, BLOCK); bx++)
+            for (int bz = Math.floorDiv(z - span, BLOCK); bz <= Math.floorDiv(z + span, BLOCK); bz++)
+            for (Point p : block(bx, bz).points()) {
+                if (p.lake()) continue;
+                double ax = p.ex - p.x, az = p.ez - p.z, len2 = ax * ax + az * az;
+                double t = len2 < 1e-9 ? 0.0 : Math.max(0.0, Math.min(1.0, ((x - p.x) * ax + (z - p.z) * az) / len2));
+                double dx = p.x + ax * t - x, dz = p.z + az * t - z;
+                if (dx * dx + dz * dz > p.halfWidth * p.halfWidth) continue;
+                lakeBed = Math.min(lakeBed, p.bed + (p.bedEnd - p.bed) * t);
+            }
+            return new At(0.0, lake.grid, lake.water, lakeBed, 1.0e4, true, 0, 0, 0);
+        }
         double reach = reach();
         double reach2 = reach * reach;
         double bestD2 = reach2;
@@ -363,10 +384,10 @@ public final class RiverNetwork {
         RiverPieces pc = pieces;
         if (l == null || pc == null) return "no river network";
         return String.format(Locale.ROOT,
-                "%d channel nodes (%d joins, %d with nothing to join, %d not traced, %d dam samples, %d gorge lengths, %d spring eyes, %d inlets cut through a bar (%d open, %d big, %d shut), %d held under a "
+                "%d channel nodes (%d joins, %d with nothing to join, %d not traced, %d dam samples, %d gorge lengths, %d spring eyes, %d inlets cut through a bar (%d open, %d big, %d shut), %d points stepped down a slope, %d plunge pools, %d held under a "
                         + "bank), %d lakes drawn, %d mouths, %d sinks; %d hollows (%d closed), %d lakes, %d ground reads "
                         + "and %d on the grid; %d squares in %.0f ms, slowest %.0f ms",
-                pc.channels.sum(), pc.joins.sum(), pc.dryJoins.sum(), pc.fallbacks.sum(), pc.dams.sum(), pc.gorges.sum(), pc.eyes.sum(), pc.inlets.sum(), pc.inletOpen.sum(), pc.inletBig.sum(), pc.inletShut.sum(),
+                pc.channels.sum(), pc.joins.sum(), pc.dryJoins.sum(), pc.fallbacks.sum(), pc.dams.sum(), pc.gorges.sum(), pc.eyes.sum(), pc.inlets.sum(), pc.inletOpen.sum(), pc.inletBig.sum(), pc.inletShut.sum(), pc.stepHeld.sum(), pc.pools.sum(),
                 pc.bankClamps.sum(), pc.lakeMasks.sum(), pc.mouths.sum(), pc.sinks.sum(), l.pitsFoundCount(),
                 l.closedCount(), l.lakesCount(), l.readsCount(), pc.gridReads.sum(), SQUARES.sum(),
                 SQUARE_NANOS.sum() / 1e6, SLOWEST.get() / 1e6);
@@ -644,7 +665,7 @@ public final class RiverNetwork {
         Point end = ps[q];
         if (mask != null) {
             if (mask.depthAt(ps[first].x, ps[first].z) > 0) return 0.0;
-            if (mask.depthAt(end.ex, end.ez) > -mask.grid) return 0.0;
+            if (mask.depthAt(end.ex, end.ez) > 0) return 0.0;
         }
         double best = l.g(owner) <= l.sea ? Math.max(0.0, readGround(end.ex, end.ez) - l.sea) : Double.MAX_VALUE;
         for (int i = 0; i < ps.length; i++) {
