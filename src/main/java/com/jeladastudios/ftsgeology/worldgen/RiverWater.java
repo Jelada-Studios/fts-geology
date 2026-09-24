@@ -73,6 +73,11 @@ public final class RiverWater {
     /** How far a river beside a lake may run below the lake's water before no falling water is hung from the lake down to it. */
     private static final int LAKE_WALL = 2;
 
+    /** Lake floor columns taken down to a block over their lowest neighbour. */
+    private static final LongAdder EASED = new LongAdder();
+    /** How many times a chunk's lake floor is eased: a step is taken down a block a pass, at most this many. */
+    private static final int EASE_PASSES = 4;
+
     private static final LongAdder CANDIDATES = new LongAdder(), KEPT = new LongAdder(), BLOCKS = new LongAdder(),
             DROPPED = new LongAdder(), LEVELLED = new LongAdder(), SPRINGS = new LongAdder(), WET = new LongAdder(),
             BANKED = new LongAdder(), CLIFFS = new LongAdder(), ICED = new LongAdder(), GLACIERS = new LongAdder(), PLUGGED = new LongAdder(), CURTAINS = new LongAdder(), SHORED = new LongAdder(), GAPS = new LongAdder(), REEDS = new LongAdder();
@@ -205,6 +210,7 @@ public final class RiverWater {
                 if (a.isHead()) placed += spring(level, at, x, z, g, water);
             }
         }
+        placed += easeLakeFloor(level, cp, at, water);
         placed += banks(level, cp, sea, at);
         placed += curtains(level, cp, sea, at);
         placed += glaciers(level, cp, at);
@@ -212,9 +218,9 @@ public final class RiverWater {
         if (CHUNKS.incrementAndGet() % 100 == 0) {
             com.jeladastudios.ftsgeology.util.Diagnostics.info("River water over {} chunks: {} columns in a channel, {} kept, {} of them wet, "
                             + "{} levelled, {} let go, {} springs, {} blocks, {} banks built up, {} left as cliffs, "
-                            + "{} lake columns iced, {} glacier columns, {} hollows stopped up, {} steps hung with falling water, {} lake shore columns taken down, {} lake necks filled, {} plants cleared off the water; {}; {}; {}",
+                            + "{} lake columns iced, {} glacier columns, {} hollows stopped up, {} steps hung with falling water, {} lake shore columns taken down, {} lake necks filled, {} plants cleared off the water, {} lake floor columns eased; {}; {}; {}",
                     CHUNKS.get(), CANDIDATES.sum(), KEPT.sum(), WET.sum(), LEVELLED.sum(), DROPPED.sum(),
-                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(), PLUGGED.sum(), CURTAINS.sum(), SHORED.sum(), GAPS.sum(), REEDS.sum(),
+                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(), PLUGGED.sum(), CURTAINS.sum(), SHORED.sum(), GAPS.sum(), REEDS.sum(), EASED.sum(),
                     RiverNetwork.summary(), GeologyChunkGenerator.summary(), SnowCover.summary() + "; " + SnowLineSpawns.summary());
         }
         return placed;
@@ -380,6 +386,67 @@ public final class RiverWater {
                 }
                 BANKED.increment();
             }
+        }
+        return placed;
+    }
+
+    /**
+     * Takes a lake's floor down where it stands in a step over its neighbours, to a block over the lowest of them, a
+     * block a pass. A lake's floor is the ground the hollow was worked out on where that lay under the water, and the
+     * ground the noise lifted over the water taken down to a block under it: two floors, a shelf a block deep and the
+     * hollow four or five under it, with a sheer drop between. Through clear shallow water the shelf's edges read as
+     * columns standing in the lake. Eased, the drop is a slope. Only taken down, never built up, and only under the
+     * lake's own water.
+     */
+    private static int easeLakeFloor(WorldGenLevel level, ChunkPos cp, BlockPos.MutableBlockPos at, BlockState water) {
+        // The chunk and a ring of columns round it, read but not changed, so a step at the edge is eased too.
+        int[][] floor = new int[18][18], top = new int[18][18];
+        boolean any = false;
+        for (int i = 0; i < 18; i++) {
+            for (int j = 0; j < 18; j++) {
+                floor[i][j] = Integer.MIN_VALUE;
+                int x = cp.getMinBlockX() + i - 1, z = cp.getMinBlockZ() + j - 1;
+                RiverNetwork.At a = RiverNetwork.at(x, z);
+                if (!a.lake() || a.distance() == Double.MAX_VALUE) continue;
+                int w = (int) Math.floor(a.water());
+                int y = w;
+                while (y > level.getMinBuildHeight() + 1) {
+                    BlockState s = level.getBlockState(at.set(x, y, z));
+                    if (!(s.is(ModBlocks.RIVER_WATER.get()) || s.is(Blocks.ICE))) break;
+                    y--;
+                }
+                if (y == w) continue;                       // no water here after all
+                floor[i][j] = y;
+                top[i][j] = w;
+                any = true;
+            }
+        }
+        if (!any) return 0;
+        int placed = 0;
+        for (int pass = 0; pass < EASE_PASSES; pass++) {
+            boolean changed = false;
+            for (int i = 1; i < 17; i++) {
+                for (int j = 1; j < 17; j++) {
+                    int g = floor[i][j];
+                    if (g == Integer.MIN_VALUE) continue;
+                    int low = Integer.MAX_VALUE;
+                    for (int[] d : SIDES) {
+                        int n = floor[i + d[0]][j + d[1]];
+                        if (n != Integer.MIN_VALUE && top[i + d[0]][j + d[1]] == top[i][j]) low = Math.min(low, n);
+                    }
+                    if (low == Integer.MAX_VALUE || g <= low + 1) continue;
+                    int x = cp.getMinBlockX() + i - 1, z = cp.getMinBlockZ() + j - 1;
+                    if (EruptionHandler.isPlayerPlaced(level.getBlockState(at.set(x, g, z)))) continue;
+                    BlockState under = level.getBlockState(at.set(x, g - 1, z));
+                    if (!under.isSolidRender(level, at)) continue;  // never open the floor onto a cave
+                    level.setBlock(at.set(x, g, z), water, FLAGS);
+                    floor[i][j] = g - 1;
+                    placed++;
+                    changed = true;
+                    EASED.increment();
+                }
+            }
+            if (!changed) break;
         }
         return placed;
     }
