@@ -19,4 +19,9 @@ public final class ModSurfaceRules {
     /** The rock under the ground, from the plates. See {@link LithologyRule}. */
     public static final RegistryObject<Codec<? extends SurfaceRules.RuleSource>> LITHOLOGY =
             MATERIAL_RULES.register("lithology", () -> LithologyRule.CODEC.codec());
+
+    /** The overworld's surface where a mod changed it. See {@link com.jeladastudios.ftsgeology.worldgen.terrain.OverworldSurfaceRule}. */
+    public static final RegistryObject<Codec<? extends SurfaceRules.RuleSource>> OVERWORLD_SURFACE =
+            MATERIAL_RULES.register("overworld_surface",
+                    () -> com.jeladastudios.ftsgeology.worldgen.terrain.OverworldSurfaceRule.CODEC.codec());
 }

@@ -388,6 +388,8 @@ public final class TerrainCommands {
                 com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(),
                 com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params(), at.getX(), at.getZ());
         source.sendSuccess(() -> Component.literal(edges).withStyle(ChatFormatting.GRAY), false);
+        String made = com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.describe(level);
+        source.sendSuccess(() -> Component.literal(made).withStyle(ChatFormatting.GRAY), false);
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("edges: {}", edges);
         return 1;

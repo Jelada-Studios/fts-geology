@@ -874,6 +874,9 @@
             "type" : "minecraft:condition"
          },
          {
+            "type" : "fts_geology:overworld_surface"
+         },
+         {
             "if_true" : {
                "false_at_and_above" : {
                   "above_bottom" : 5

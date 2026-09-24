@@ -51,6 +51,15 @@ public class GeologyBiomeSource extends BiomeSource {
         this.landmarks = marks;
     }
 
+    /** The same roles over another parent's biomes: a terrain mod's overworld list, when it brings one. */
+    public GeologyBiomeSource withParent(BiomeSource other) {
+        return new GeologyBiomeSource(other, byRole);
+    }
+
+    public BiomeSource parent() {
+        return parent;
+    }
+
     @Override
     protected Codec<? extends BiomeSource> codec() {
         return CODEC;

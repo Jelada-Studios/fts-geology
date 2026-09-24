@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.jeladastudios.ftsgeology.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "fts_geology.refmap.json",
+  "mixins": [
+    "WorldDimensionsMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

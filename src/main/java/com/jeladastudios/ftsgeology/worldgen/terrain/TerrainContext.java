@@ -38,6 +38,7 @@ public final class TerrainContext {
         GeologyParams.take(isTall(event.getServer()) ? TALL_HORIZONTAL : 1.0);
         TerrainCache.clear();
         GeologyWorld.clear();
+        OverworldSurfaceRule.open(event.getServer());
         LandmarkSites.clear();
         // The ground and the rivers of the last world go with it: a second world opened in the same game, with the
         // rivers switched off, cut the first one's channels into its terrain.
@@ -61,6 +62,7 @@ public final class TerrainContext {
         GeologyParams.forget();
         TerrainCache.clear();
         GeologyWorld.clear();
+        OverworldSurfaceRule.clear();
         LandmarkSites.clear();
         RawGround.clear();
         RiverNetwork.clear();

@@ -31,9 +31,48 @@ public final class GeologyWorld {
 
     public static boolean isOwn(ServerLevel level) {
         return OWN.computeIfAbsent(level.dimension().location().toString(), k -> {
-            if (!(level.getChunkSource().getGenerator() instanceof NoiseBasedChunkGenerator noise)) return false;
-            return noise.generatorSettings().is(SETTINGS) || noise.generatorSettings().is(SETTINGS_TALL);
+            boolean own = level.getChunkSource().getGenerator() instanceof NoiseBasedChunkGenerator noise
+                    && (noise.generatorSettings().is(SETTINGS) || noise.generatorSettings().is(SETTINGS_TALL));
+            GeysersMod.LOGGER.info("{}: own {}; {}", k, own, describe(level));
+            return own;
         });
+    }
+
+    /**
+     * What the level's generator is made of, for telling when another mod has swapped a piece of it: the generator
+     * and biome source classes, the noise settings' key (or "direct" when the holder carries no key), and whether the
+     * settings are the very object the registry holds under the mod's keys.
+     */
+    public static String describe(ServerLevel level) {
+        var generator = level.getChunkSource().getGenerator();
+        StringBuilder s = new StringBuilder("generator ").append(generator.getClass().getName())
+                .append(", biomes ").append(generator.getBiomeSource().getClass().getName());
+        if (generator instanceof NoiseBasedChunkGenerator noise) {
+            var holder = noise.generatorSettings();
+            s.append(", settings ").append(holder.unwrapKey().map(k -> k.location().toString()).orElse("direct"));
+            var registry = level.registryAccess().registryOrThrow(Registries.NOISE_SETTINGS);
+            for (ResourceKey<NoiseGeneratorSettings> key : new ResourceKey[] {SETTINGS, SETTINGS_TALL}) {
+                NoiseGeneratorSettings ours = registry.get(key);
+                if (ours != null && ours == holder.value()) s.append(", same object as ").append(key.location());
+            }
+            s.append(", router ").append(level.getChunkSource().randomState().router().finalDensity().getClass().getSimpleName());
+        }
+        // What the default preset and ours would build, as the registry holds them now.
+        level.registryAccess().registry(Registries.WORLD_PRESET).ifPresent(presets -> {
+            for (String id : new String[] {"minecraft:normal", GeysersMod.MODID + ":geology_tall"}) {
+                var preset = presets.get(new ResourceLocation(id));
+                if (preset == null) {
+                    s.append("; preset ").append(id).append(" missing");
+                    continue;
+                }
+                preset.overworld().ifPresent(stem -> {
+                    s.append("; preset ").append(id).append(" -> ").append(stem.generator().getClass().getSimpleName());
+                    if (stem.generator() instanceof NoiseBasedChunkGenerator n)
+                        s.append(" ").append(n.generatorSettings().unwrapKey().map(k -> k.location().toString()).orElse("direct"));
+                });
+            }
+        });
+        return s.toString();
     }
 
     public static void clear() {
