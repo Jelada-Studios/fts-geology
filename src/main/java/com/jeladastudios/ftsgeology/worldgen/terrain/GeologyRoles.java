@@ -97,7 +97,7 @@ public final class GeologyRoles {
         if (HotspotMap.plumeStrength(seed, x, z, p) >= BASIN_PLUME && erosion > FLAT) return Role.GEOTHERMAL_BASIN;
         // The rift's own ruler, so the biome narrows with the landform it names. See TerrainFields.riftAcross.
         if (k == FaultType.DIVERGENT
-                && (p.horizontal() > 1.5 ? a : a / 0.75) < GRABEN_TO + j) {
+                && TerrainFields.riftAcross(s, p) < GRABEN_TO + j) {
             return Role.RIFT_VALLEY;
         }
         if (s.overridingSide() && a >= ARC_FROM + j && a <= ARC_TO + j) return Role.VOLCANIC_HIGHLAND;

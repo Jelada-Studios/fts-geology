@@ -88,20 +88,19 @@ public final class TerrainFields {
     /** Where a rift's floor starts to take the ruggedness of its shoulders, and over how far. */
     private static final double RIFT_CALM_FROM = 0.1, RIFT_CALM_OVER = 0.6;
 
-    /** How much narrower a rift is in the normal world. The tall one keeps its full width. */
+    /** How much narrower a rift is than its first drawing, in both worlds: at full width it read as a lowland. */
     private static final double RIFT_NARROW = 0.75;
 
     /**
-     * A column's distance from a rift's axis, in fault widths, measured on a shorter ruler in the normal world.
+     * A column's distance from a rift's axis, in fault widths, measured on a shorter ruler.
      *
      * <p>Nine numbers set a rift's shape -- the graben floor, the two fault steps, the shoulder and its width, the
      * two ends of the quiet ramp, the fade of the graben field and the biome's own half width -- and narrowing it
      * by hand means changing all nine together. Dividing the distance instead does the same arithmetic in one
      * place and cannot drift out of step.</p>
      */
-    private static double riftAcross(PlateSample s, GeologyParams p) {
-        double a = across(s, p);
-        return p.horizontal() > 1.5 ? a : a / RIFT_NARROW;
+    static double riftAcross(PlateSample s, GeologyParams p) {
+        return across(s, p) / RIFT_NARROW;
     }
     /** How far out the continental shelf runs before the floor falls away to the abyss. */
     private static final double SHELF_TO = 0.15, SLOPE_OVER = 1.5;
@@ -203,6 +202,30 @@ public final class TerrainFields {
         // the column's rock and role on the wrong plate.
         if (e.gap() >= HANDOVER * p.horizontal() || e.second().plateId() != e.first().plateId()) return e.first();
         return relief(e.second(), p, seed, x, z) > relief(e.first(), p, seed, x, z) ? e.second() : e.first();
+    }
+
+    /** How far off a column the cached 4-block cell can put the nearest line, in blocks: the cell's diagonal and a bit. */
+    private static final double CELL_SLACK = 6.0;
+
+    /**
+     * How far this column is from the axis of a rift between two continents, in blocks, on the same warped ground the
+     * graben itself is laid out on; -1 where the nearest boundary is no such rift or its axis is further than
+     * {@code reach}. The cached edges are read on a four-block grid, which cannot draw a strip a few blocks wide, so
+     * the exact ones are read -- but only where the cached cell already puts the axis near.
+     */
+    public static double riftAxisDistance(long seed, GeologyParams p, int x, int z, double reach) {
+        if (!continentalRift(edgesAt(seed, p, x, z).first(), reach + CELL_SLACK)) return -1;
+        double h = p.horizontal();
+        double wx = x + WARP_AMPLITUDE * h * twoOctaves(seed, x, z, WARP_SCALE * h, 0x77A1L);
+        double wz = z + WARP_AMPLITUDE * h * twoOctaves(seed, x, z, WARP_SCALE * h, 0x3B2CL);
+        PlateSample s = TectonicMap.sampleSeededEdges(seed, (int) Math.floor(wx), (int) Math.floor(wz), p).first();
+        return continentalRift(s, reach) ? s.faultDistance() : -1;
+    }
+
+    /** A rift between two continents within {@code reach} blocks of its line: a continent-ocean one is a coast. */
+    private static boolean continentalRift(PlateSample s, double reach) {
+        return s.boundaryType() == FaultType.DIVERGENT && s.faultDistance() <= reach
+                && !s.plateKind().isOceanic() && !s.neighbourKind().isOceanic();
     }
 
     /** The plate at the warped coordinate against its two nearest boundaries. */

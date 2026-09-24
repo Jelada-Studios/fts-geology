@@ -20,6 +20,10 @@ public final class ModSurfaceRules {
     public static final RegistryObject<Codec<? extends SurfaceRules.RuleSource>> LITHOLOGY =
             MATERIAL_RULES.register("lithology", () -> LithologyRule.CODEC.codec());
 
+    /** The young basalt down a continental rift's axis. See {@link com.jeladastudios.ftsgeology.worldgen.lithology.RiftAxisRule}. */
+    public static final RegistryObject<Codec<? extends SurfaceRules.RuleSource>> RIFT_AXIS =
+            MATERIAL_RULES.register("rift_axis", () -> com.jeladastudios.ftsgeology.worldgen.lithology.RiftAxisRule.CODEC.codec());
+
     /** The overworld's surface where a mod changed it. See {@link com.jeladastudios.ftsgeology.worldgen.terrain.OverworldSurfaceRule}. */
     public static final RegistryObject<Codec<? extends SurfaceRules.RuleSource>> OVERWORLD_SURFACE =
             MATERIAL_RULES.register("overworld_surface",
