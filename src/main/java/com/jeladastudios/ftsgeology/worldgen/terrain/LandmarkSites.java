@@ -24,8 +24,16 @@ public final class LandmarkSites {
     /** One named mountain in one world: where its crop's middle sits, and which way its long axis runs. */
     public record Site(int which, int x, int z, double bearing) {}
 
-    /** How far out the sites are looked for, in blocks of the normal world, and how finely. */
-    private static final double FROM = 20_000.0, TO = 110_000.0, STEP = 2_500.0;
+    /**
+     * Where the sites are looked for first, in blocks from the world's middle whatever its layout: near enough to be a
+     * few minutes' flight from spawn and on the horizon with Distant Horizons. They used to be looked for from twenty
+     * thousand blocks out -- fifty thousand in the tall world -- and nobody saw them.
+     */
+    private static final double NEAR_FROM = 3_000.0, NEAR_TO = 10_000.0, NEAR_STEP = 500.0;
+    /** Where they are looked for after that, in blocks of the normal world, and how finely: a world with no belt near. */
+    private static final double FROM = 10_000.0, TO = 110_000.0, STEP = 2_500.0;
+    /** How far past its own crop a mountain keeps from the world's middle, so spawn is never on its flank. */
+    private static final double SPAWN_CLEAR = 500.0;
 
     /** How much ground a candidate has to have: dry, and inside a range. */
     private static final double WANT_LAND = 0.25, WANT_BELT = 0.45;
@@ -52,19 +60,13 @@ public final class LandmarkSites {
             double reach = DemLibrary.landmarkHalfAlong(which) / (TerrainFields.METRES_PER_BLOCK / p.horizontal());
             long h = SeedHash.hash(seed, which, 0x1A2D, 0x4E71L);
             double turn = SeedHash.rand01(h) * Math.PI * 2.0;
-            Site found = null;
-            // A spiral rather than a scan: the candidates come out spread over the whole ring instead of marching
-            // outwards along one line, so a world whose first belt is far away does not put all three in it.
-            for (double r = FROM * p.horizontal(); r <= TO * p.horizontal() && found == null; r += STEP * p.horizontal()) {
-                int ring = Math.max(8, (int) (r / (STEP * p.horizontal())) * 2);
-                for (int i = 0; i < ring; i++) {
-                    double a = turn + Math.PI * 2.0 * ((i * 0.6180339887) % 1.0);
-                    int cx = (int) Math.round(Math.cos(a) * r), cz = (int) Math.round(Math.sin(a) * r);
-                    if (!suits(seed, p, cx, cz)) continue;
-                    if (tooNear(out, made, cx, cz, reach * APART)) continue;
-                    found = new Site(which, cx, cz, SeedHash.rand01(SeedHash.mix(h ^ 0x77L)) * Math.PI * 2.0);
-                    break;
-                }
+            double bearing = SeedHash.rand01(SeedHash.mix(h ^ 0x77L)) * Math.PI * 2.0;
+            double clear = Math.hypot(DemLibrary.landmarkHalfAlong(which), DemLibrary.landmarkHalfAcross(which))
+                    / (TerrainFields.METRES_PER_BLOCK / p.horizontal()) + SPAWN_CLEAR;
+            Site found = ring(seed, p, which, turn, bearing, Math.max(NEAR_FROM, clear), NEAR_TO, NEAR_STEP, out, made, reach);
+            if (found == null) {
+                found = ring(seed, p, which, turn, bearing, FROM * p.horizontal(), TO * p.horizontal(),
+                        STEP * p.horizontal(), out, made, reach);
             }
             if (found == null) continue;
             out[made++] = found;
@@ -76,6 +78,26 @@ public final class LandmarkSites {
             GeysersMod.LOGGER.warn("Only {} of the named mountains found ground to stand on", made);
         }
         return kept;
+    }
+
+    /**
+     * The first candidate on a spiral out from {@code from} to {@code to} that suits. A spiral rather than a scan: the
+     * candidates come out spread over the whole ring instead of marching outwards along one line, so a world whose
+     * first belt is far away does not put all three in it.
+     */
+    private static Site ring(long seed, GeologyParams p, int which, double turn, double bearing, double from, double to,
+                             double step, Site[] out, int made, double reach) {
+        for (double r = from; r <= to; r += step) {
+            int ring = Math.max(8, (int) (r / step) * 2);
+            for (int i = 0; i < ring; i++) {
+                double a = turn + Math.PI * 2.0 * ((i * 0.6180339887) % 1.0);
+                int cx = (int) Math.round(Math.cos(a) * r), cz = (int) Math.round(Math.sin(a) * r);
+                if (!suits(seed, p, cx, cz)) continue;
+                if (tooNear(out, made, cx, cz, reach * APART)) continue;
+                return new Site(which, cx, cz, bearing);
+            }
+        }
+        return null;
     }
 
     /** Dry continental ground inside a range, read off the plate model alone so nothing has to be generated. */
