@@ -158,14 +158,14 @@ public final class Earthquake {
         List<QuakePlanner.TracePoint> trace =
                 QuakePlanner.traceFault(level, epicentreOnFault, type, magnitude, sx, sz, forced);
         long t1 = System.nanoTime();
-        GeysersMod.LOGGER.info("quake trace: {} points, {} blocks long, corridor +/-{} in {} ms",
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("quake trace: {} points, {} blocks long, corridor +/-{} in {} ms",
                 trace.size(), QuakePlanner.ruptureLengthBlocks(magnitude),
                 QuakePlanner.deformationHalfWidth(type, magnitude), (t1 - t0) / 1_000_000);
         if (trace.isEmpty()) return;
 
         QuakePlanner.Snapshot snap = QuakePlanner.snapshot(level, trace, type, magnitude);
         long t2 = System.nanoTime();
-        GeysersMod.LOGGER.info("quake snapshot: {} columns in {} ms",
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("quake snapshot: {} columns in {} ms",
                 snap.size(), (t2 - t1) / 1_000_000);
 
         double depthM = quakeDepthMetres(type, level.random);
@@ -175,7 +175,7 @@ public final class Earthquake {
 
         PendingEdits.register(level, epicentreOnFault, type, magnitude, depthM, seed, mayBreak, trace);
         long t3 = System.nanoTime();
-        GeysersMod.LOGGER.info("quake register done in {} ms", (t3 - t2) / 1_000_000);
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("quake register done in {} ms", (t3 - t2) / 1_000_000);
 
         // Filed for the instruments; a station in an unloaded chunk reads back what it missed.
         com.jeladastudios.ftsgeology.instrument.SeismicNetwork
@@ -192,7 +192,7 @@ public final class Earthquake {
                     long p0 = System.nanoTime();
                     QuakePlanner.Plan plan = QuakePlanner.plan(snap, trace, epicentreOnFault, type,
                             magnitude, depthM, new Random(seed), mayBreak);
-                    GeysersMod.LOGGER.info("quake plan: {} edits in {} ms",
+                    com.jeladastudios.ftsgeology.util.Diagnostics.info("quake plan: {} edits in {} ms",
                             plan.edits().size(), (System.nanoTime() - p0) / 1_000_000);
                     return plan;
                 }, Util.backgroundExecutor())
@@ -201,7 +201,7 @@ public final class Earthquake {
                     // Everything geothermal in the corridor stands down until the ground has
                     // stopped moving AND the debris has landed. See QuakeQuiet.
                     QuakeQuiet.open(level, plan.epicentre(), plan.ruptureLength(), plan.magnitude());
-                    GeysersMod.LOGGER.info("quake apply starting: {} edits queued", plan.edits().size());
+                    com.jeladastudios.ftsgeology.util.Diagnostics.info("quake apply starting: {} edits queued", plan.edits().size());
                 }, level.getServer())
                 .exceptionally(t -> {
                     GeysersMod.LOGGER.warn("Earthquake planning failed: {}", t.toString());
@@ -288,14 +288,14 @@ public final class Earthquake {
             run.applied += placed;
             run.ticks++;
             if (run.ticks % 100 == 0) {
-                GeysersMod.LOGGER.info("quake apply: {} placed, {} left, {} ticks",
+                com.jeladastudios.ftsgeology.util.Diagnostics.info("quake apply: {} placed, {} left, {} ticks",
                         run.applied, run.pending.size(), run.ticks);
             }
             shake(level, run);
             run.shakeTicks--;
             boolean done = run.pending.isEmpty() && run.shakeTicks <= 0;
             if (done) {
-                GeysersMod.LOGGER.info("quake finished: {} blocks over {} ticks", run.applied, run.ticks);
+                com.jeladastudios.ftsgeology.util.Diagnostics.info("quake finished: {} blocks over {} ticks", run.applied, run.ticks);
                 // The shaking stops, but the ground it left is raw. Let it relax.
                 Weathering.enqueue(level, run.plan.edits());
                 // And the caves under it: an arch that stood for ten thousand years can fail in a minute.

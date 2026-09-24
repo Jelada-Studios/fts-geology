@@ -523,7 +523,7 @@ public final class VolcanoSummit {
             core.setFumaroles(c.fumaroles);
         }
         // Logged, since an outlet site that will not do is skipped silently.
-        GeysersMod.LOGGER.info("volcano {} vents: {} cut of {} sites, {} molten cells",
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("volcano {} vents: {} cut of {} sites, {} molten cells",
                 c.type, c.vents.size(), c.ventSites.size(), c.molten.size());
     }
 

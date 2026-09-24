@@ -288,7 +288,7 @@ public final class RetrogenHandler {
             if (doneSinceReport > 0 || generated > 0 || !QUEUE.isEmpty()) {
                 // The longest step is the number that matters with a mod hooking every block change:
                 // it has to stay inside retrogen's slice now that a chunk can stop part way through.
-                GeysersMod.LOGGER.info("retrogen: {} chunks in the last 10s, {} blocks placed, {} still queued, "
+                com.jeladastudios.ftsgeology.util.Diagnostics.info("retrogen: {} chunks in the last 10s, {} blocks placed, {} still queued, "
                                 + "longest step {} ms; {} chunks got their deep geology at generation ({} blocks, {} of them ore), "
                                 + "{} their ground paint; {} groundwater noise columns so far",
                         doneSinceReport, blocksSinceReport, QUEUE.size(), ms(longestStepNanos), generated,
@@ -298,7 +298,7 @@ public final class RetrogenHandler {
             }
             if (surfaceNanos > 0) {
                 long[] p = SurfaceFeatures.PART_NANOS;
-                GeysersMod.LOGGER.info("retrogen surface pass, ms: suitability {}, signs {}, basin {}, soil {}, "
+                com.jeladastudios.ftsgeology.util.Diagnostics.info("retrogen surface pass, ms: suitability {}, signs {}, basin {}, soil {}, "
                                 + "springs {}, volcanoes {}, geysers {}; springs expected {}",
                         ms(p[0]), ms(p[1]), ms(p[2]), ms(p[3]), ms(p[4]), ms(p[5]),
                         ms(surfaceNanos - p[0] - p[1] - p[2] - p[3] - p[4] - p[5]),

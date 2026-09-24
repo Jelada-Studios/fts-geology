@@ -117,7 +117,7 @@ public final class VolcanoJob {
             }
             if (job.steps.isEmpty()) {
                 // Logged with its cost, so a slow build can be traced to the step that made it slow.
-                GeysersMod.LOGGER.info("Volcano finished: {} ({} steps, {} ms, slowest step #{} {} ms)",
+                com.jeladastudios.ftsgeology.util.Diagnostics.info("Volcano finished: {} ({} steps, {} ms, slowest step #{} {} ms)",
                         job.label, job.done, String.format(java.util.Locale.ROOT, "%.1f", job.nanos / 1e6),
                         job.slowestIndex, String.format(java.util.Locale.ROOT, "%.1f", job.slowest / 1e6));
                 QUEUE.remove(0);

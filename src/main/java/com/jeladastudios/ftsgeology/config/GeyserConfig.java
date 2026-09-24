@@ -165,6 +165,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue SUGGEST_OPTIONAL_MODS;   // default ON
     public static final ForgeConfigSpec.BooleanValue TFC_COMPAT;             // write TFC blocks on a TFC world
     public static final ForgeConfigSpec.IntValue STALL_REPORT_SECONDS;       // default 30, 0 = off
+    public static final ForgeConfigSpec.BooleanValue VERBOSE_LOG;            // default OFF
 
     // --- Hydrology (groundwater) ---------------------------------------------
     public static final ForgeConfigSpec.BooleanValue RIVERS;                 // default ON, experimental
@@ -190,8 +191,8 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue SEISMOGRAPH_RANGE;   // blocks a station can hear
     public static final ForgeConfigSpec.IntValue TURBINE_MAX_FE;      // FE/t of a turbine over the hottest ground
     public static final ForgeConfigSpec.IntValue TURBINE_MIN_FE;      // FE/t over the faintest heat it runs on
-    static {
     public static final ForgeConfigSpec.IntValue TURBINE_WELL_DEPTH;  // lengths of casing a well may run to
+    static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
 
         b.push("thermodynamics");
@@ -852,6 +853,11 @@ public final class GeyserConfig {
                         "thread's stack to logs/fts_geology_stall.txt, once per stall. The stacks show what the",
                         "game was waiting on when it froze. Nothing else is read or written. 0 turns it off.")
                 .defineInRange("stallReportSeconds", 30, 0, 3600);
+        VERBOSE_LOG = b
+                .comment("Write the mod's running counts and events to the log: rivers, villages and hot springs as",
+                        "the world is made, retrogen, volcanoes finishing and waking, quakes, springs growing. For",
+                        "testing and for bug reports; off, the log keeps only warnings and one-off notes.")
+                .define("verboseLog", false);
         b.pop();
 
         b.push("instruments");
@@ -873,17 +879,17 @@ public final class GeyserConfig {
         TURBINE_MIN_FE = b
                 .comment("Forge Energy per tick over the faintest heat a turbine will run on at all.")
                 .defineInRange("turbineMinFePerTick", 20, 0, 100000);
+        TURBINE_WELL_DEPTH = b
+                .comment("How deep a turbine's well may run, in lengths of well casing. A hot spring's reservoir",
+                        "sits thirty to sixty blocks under its pool; a natural geyser's chamber is down near the",
+                        "bottom of the world, out of reach unless this is raised.")
+                .defineInRange("turbineWellMaxDepth", 96, 1, 512);
         b.pop();
 
         b.push("hydrology");
         RIVERS = b
                 .comment("Trace rivers down the raw ground and fill them, in the mod's own world types only.",
                         "This is the newest and least settled thing in the mod. A river is cut by the",
-        TURBINE_WELL_DEPTH = b
-                .comment("How deep a turbine's well may run, in lengths of well casing. A hot spring's reservoir",
-                        "sits thirty to sixty blocks under its pool; a natural geyser's chamber is down near the",
-                        "bottom of the world, out of reach unless this is raised.")
-                .defineInRange("turbineWellMaxDepth", 96, 1, 512);
                         "terrain itself, so turning this off changes the shape of the land as well as",
                         "taking the water away - in a world you have already played, the chunks you",
                         "have been to keep their channels and the ones past them do not, which leaves",

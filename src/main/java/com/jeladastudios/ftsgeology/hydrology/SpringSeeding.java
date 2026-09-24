@@ -51,7 +51,7 @@ public final class SpringSeeding {
         // while a great one usually does something.
         double chance = GeyserConfig.QUAKE_SPRING_CHANCE.get() * Math.max(0.0, magnitude - 3.0);
         if (rng.nextDouble() > chance) {
-            GeysersMod.LOGGER.info("quake spring: no roll (M{}, {}% chance)",
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("quake spring: no roll (M{}, {}% chance)",
                     String.format(java.util.Locale.ROOT, "%.1f", magnitude),
                     Math.round(chance * 100));
             return;
@@ -81,13 +81,13 @@ public final class SpringSeeding {
 
             BlockPos source = HotSpringSites.seedSourceAt(level, x, z, ground);
             if (source == null) { refused++; continue; }
-            GeysersMod.LOGGER.info(
+            com.jeladastudios.ftsgeology.util.Diagnostics.info(
                     "Earthquake opened a new spring source at {} (heat {}, {} blocks from the epicentre)",
                     source, String.format(java.util.Locale.ROOT, "%.2f", s.hotSpring()),
                     (int) Math.sqrt(epicentre.distSqr(source)));
             return;                                  // one per quake, deliberately
         }
-        GeysersMod.LOGGER.info(
+        com.jeladastudios.ftsgeology.util.Diagnostics.info(
                 "quake spring: rolled but found nowhere in {} tries "
                         + "({} unloaded, {} not hot enough, {} no spring line, {} bad ground, "
                         + "{} too close to one, {} refused)",

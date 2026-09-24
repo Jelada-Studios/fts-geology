@@ -67,7 +67,7 @@ public final class PendingEdits {
                             epicentre, e.getValue()));
             registered++;
         }
-        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(
+        com.jeladastudios.ftsgeology.util.Diagnostics.info(
                 "quake register: {} chunks parked ({} corridor chunks total)", registered, byChunk.size());
     }
 

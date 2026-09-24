@@ -210,12 +210,12 @@ public final class RiverWater {
         placed += glaciers(level, cp, at);
         BLOCKS.add(placed);
         if (CHUNKS.incrementAndGet() % 100 == 0) {
-            GeysersMod.LOGGER.info("River water over {} chunks: {} columns in a channel, {} kept, {} of them wet, "
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("River water over {} chunks: {} columns in a channel, {} kept, {} of them wet, "
                             + "{} levelled, {} let go, {} springs, {} blocks, {} banks built up, {} left as cliffs, "
                             + "{} lake columns iced, {} glacier columns, {} hollows stopped up, {} steps hung with falling water, {} lake shore columns taken down, {} lake necks filled, {} plants cleared off the water; {}; {}; {}",
                     CHUNKS.get(), CANDIDATES.sum(), KEPT.sum(), WET.sum(), LEVELLED.sum(), DROPPED.sum(),
                     SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(), PLUGGED.sum(), CURTAINS.sum(), SHORED.sum(), GAPS.sum(), REEDS.sum(),
-                    RiverNetwork.summary(), GeologyChunkGenerator.summary(), SnowCover.summary());
+                    RiverNetwork.summary(), GeologyChunkGenerator.summary(), SnowCover.summary() + "; " + SnowLineSpawns.summary());
         }
         return placed;
     }

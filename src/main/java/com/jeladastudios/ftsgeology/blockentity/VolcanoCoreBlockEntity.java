@@ -80,7 +80,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
             if (s.is(Blocks.BEDROCK) || s.hasBlockEntity() || EruptionHandler.isPlayerPlaced(s)) continue;
             level.setBlock(p, Blocks.LAVA.defaultBlockState(), 3);
         }
-        GeysersMod.LOGGER.info("Dormant volcano at {} wakes: its crater opens ({} cells)", pos, sealCells.length);
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("Dormant volcano at {} wakes: its crater opens ({} cells)", pos, sealCells.length);
     }
 
     /** After an eruption a sealed volcano crusts over again: its crater cools and its vent is plugged. */
@@ -98,7 +98,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         if (ps.isAir() || ps.getFluidState().is(FluidTags.LAVA)) {
             level.setBlock(plug, com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, plug, Blocks.BLACKSTONE.defaultBlockState()), 3);
         }
-        GeysersMod.LOGGER.info("Dormant volcano at {} crusts over again", pos);
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("Dormant volcano at {} crusts over again", pos);
     }
 
     public VolcanoCoreBlockEntity(BlockPos pos, BlockState state) {
@@ -141,7 +141,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         int delay = min + level.random.nextInt(max - min);
         if (delay >= timer) return;
         timer = delay;
-        GeysersMod.LOGGER.info("Volcano at {} woken by an M{} quake {} blocks away, erupting in {} s", pos,
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("Volcano at {} woken by an M{} quake {} blocks away, erupting in {} s", pos,
                 String.format(java.util.Locale.ROOT, "%.1f", q.magnitude()), (int) Math.round(q.distance()), delay / 20);
     }
 
@@ -185,7 +185,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         setChanged();
         if (com.jeladastudios.ftsgeology.volcano.VolcanoBuilder.rebuildEdifice(
                 level, originalBase, magnitude, type, originalSummitY, size)) {
-            GeysersMod.LOGGER.info("Volcano at {} rebuilding after a quake ({} -> {})",
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("Volcano at {} rebuilding after a quake ({} -> {})",
                     pos, here, originalSummitY);
         }
     }
@@ -244,11 +244,11 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         }
 
         if (restored > 0) {
-            GeysersMod.LOGGER.info("Volcano at {} recharged after a quake: {} cells", pos, restored);
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("Volcano at {} recharged after a quake: {} cells", pos, restored);
             stampRecharge(quake);
         } else if (++refillTries >= REFILL_TRIES) {
             // Nothing would take lava in three tries: said once, and no more sweeps for this quake.
-            GeysersMod.LOGGER.info("Volcano at {} could not refill its lake after a quake ({} molten cells recorded)",
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("Volcano at {} could not refill its lake after a quake ({} molten cells recorded)",
                     pos, moltenCells.length);
             stampRecharge(quake);
         }

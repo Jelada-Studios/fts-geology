@@ -148,7 +148,7 @@ public final class CaveCollapse {
             shaking.add((float) (strength * Mth.clamp(1.0 - d / reach, 0.15, 1.0)));
         }
         QUEUE.add(new Job(level.dimension(), columns.toLongArray(), shaking.toFloatArray()));
-        GeysersMod.LOGGER.info("cave collapse queued: {} probes along the rupture", columns.size());
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("cave collapse queued: {} probes along the rupture", columns.size());
     }
 
     /** Looks at a slice of the probes. Bounded by a count and a wall-clock deadline. */
@@ -165,7 +165,7 @@ public final class CaveCollapse {
             if (job.cursor >= job.columns.length) {
                 QUEUE.poll();
                 if (job.collapses > 0 || job.columns.length >= 32) {
-                    GeysersMod.LOGGER.info("cave collapse finished: {} probes, {} caves under them, {} roofs "
+                    com.jeladastudios.ftsgeology.util.Diagnostics.info("cave collapse finished: {} probes, {} caves under them, {} roofs "
                                     + "came down, {} reached the surface, {} blocks moved, {} columns refused",
                             job.probed, job.caves, job.collapses, job.sinkholes, job.moved, job.refused);
                 }

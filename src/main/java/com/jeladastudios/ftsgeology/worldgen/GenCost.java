@@ -54,7 +54,7 @@ public final class GenCost {
     public static void chunkDone() {
         CHUNKS.increment();
         if (CHUNKS.sum() % EVERY != 0) return;
-        GeysersMod.LOGGER.info("{}", summary());
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", summary());
     }
 
     /** The running totals as one line. */

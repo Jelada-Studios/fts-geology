@@ -145,7 +145,7 @@ public final class HotSpringSites {
         }
         if (placed == 0) return refused(x, z, why);
         // Logged so the stage distribution can be counted.
-        GeysersMod.LOGGER.info(
+        com.jeladastudios.ftsgeology.util.Diagnostics.info(
                 "Hot spring at {},{}: {} pool(s), stage {}, relief {}, basin {}",
                 x, z, placed, chainStage, relief, String.format("%.2f", basinHere));
         return true;

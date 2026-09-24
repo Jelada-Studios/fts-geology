@@ -168,7 +168,7 @@ public final class GeologyChunkGenerator extends NoiseBasedChunkGenerator {
     private static void tell(StructureStart start, int taken, int of, boolean gone) {
         if (TOLD.incrementAndGet() > 100) return;
         BoundingBox b = start.getBoundingBox();
-        GeysersMod.LOGGER.info("Village at {} {}: {}; so far {}", (b.minX() + b.maxX()) / 2, (b.minZ() + b.maxZ()) / 2,
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("Village at {} {}: {}; so far {}", (b.minX() + b.maxX()) / 2, (b.minZ() + b.maxZ()) / 2,
                 gone ? "its middle is in the water, not built" : taken + " of its " + of + " pieces in the water taken away",
                 summary());
     }

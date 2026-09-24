@@ -16,6 +16,7 @@ out from them at true scale: twenty-five metres to the block in the normal world
     him_*       the Himalaya: Manaslu, Langtang, Cho Oyu
     kara_*      the Karakoram: Baltoro, Nanga Parbat
     app_*       the Appalachians: Valley and Ridge, Blue Ridge, New River
+    land_*      the named mountains, each laid down once in the tall world: Everest, K2, the Matterhorn
 
 Format: int magic "FTDD", short version, short width, short height, short metres per pixel, short shift,
 then a deflated stream of big-endian shorts, each row given as its first value and then deltas.

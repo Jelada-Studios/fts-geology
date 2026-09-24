@@ -220,7 +220,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
                 } else if (be.stalled >= STALL_LIMIT) {
                     // Its pool will not go back here and nothing is changing: it rests until a quake moves the ground.
                     be.dormant = true;
-                    GeysersMod.LOGGER.info("Spring at {},{} cannot hold a pool here; dormant until the ground moves",
+                    com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring at {},{} cannot hold a pool here; dormant until the ground moves",
                             be.siteX(), be.siteZ());
                 }
                 return;
@@ -245,7 +245,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
         if (be.applyStage(server, be.stage + 1, true)) {
             be.stage++;
             be.stageSince = server.getGameTime();
-            GeysersMod.LOGGER.info("Spring at {} reached stage {}/{} ({} blocks across)",
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring at {} reached stage {}/{} ({} blocks across)",
                     // Its own ceiling, not the global one.
                     be.vent(), be.stage, be.maxStage, HotSpringShape.radiusFor(be.stage) * 2 + 1);
             be.setChanged();
@@ -334,7 +334,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
             // It has not: rebuild exactly where the spring was.
             if (!applyStage(level, stage)) return recoverPool(level, quake, ring);
             resitedFor = quake;
-            GeysersMod.LOGGER.info("Spring at {},{} rebuilt after a quake, same level",
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring at {},{} rebuilt after a quake, same level",
                     siteX(), siteZ());
             setChanged();
             return true;
@@ -350,7 +350,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
             return recoverPool(level, quake, ring);
         }
         resitedFor = quake;
-        GeysersMod.LOGGER.info("Spring at {},{} re-sited after a quake: ground moved {} blocks",
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring at {},{} re-sited after a quake: ground moved {} blocks",
                 siteX(), siteZ(), moved);
         setChanged();
         return true;
@@ -368,21 +368,21 @@ public class SpringSourceBlockEntity extends BlockEntity {
         // On a volcano's own rock the basin is not cut back in: on a young cone that took half the cone away.
         boolean onRock = com.jeladastudios.ftsgeology.volcano.VolcanoSummit.standsOnVolcanicRock(level, siteX(), siteZ());
         if (!onRock && HotSpringShape.restoreBasin(level, poolCells, datumY - 1) && applyStage(level, stage)) {
-            GeysersMod.LOGGER.info("Spring at {},{} restored its basin after a quake", siteX(), siteZ());
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring at {},{} restored its basin after a quake", siteX(), siteZ());
             setChanged();
             return true;
         }
         int old = datumY;
         datumY = ring + 1;
         if (datumY != old && applyStage(level, stage)) {
-            GeysersMod.LOGGER.info("Spring at {},{} followed the ground after a quake: {} blocks",
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring at {},{} followed the ground after a quake: {} blocks",
                     siteX(), siteZ(), datumY - old);
             setChanged();
             return true;
         }
         datumY = old;
         dormant = true;
-        GeysersMod.LOGGER.info("Spring at {},{} could not hold a pool after a quake; dormant until the ground moves again",
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring at {},{} could not hold a pool after a quake; dormant until the ground moves again",
                 siteX(), siteZ());
         setChanged();
         return true;
@@ -472,7 +472,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
             if (!dormant) {
                 dormant = true;
                 setChanged();
-                GeysersMod.LOGGER.info(
+                com.jeladastudios.ftsgeology.util.Diagnostics.info(
                         "Spring at {},{} could not hold its pool after {} rebuilds; dormant",
                         outletX, outletZ, rebuilds);
             }
@@ -562,7 +562,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
         // them, and a basin there would drain into the sea. It sleeps rather than failing forever.
         if (ground - 1 <= level.getSeaLevel() + 1) {
             dormant = true;
-            GeysersMod.LOGGER.info("Spring line at {} surfaced at Y {}, at the waterline; dormant",
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring line at {} surfaced at Y {}, at the waterline; dormant",
                     pos, ground);
             setChanged();
             return;
@@ -592,7 +592,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
             stalled++;
             if (stalled >= STALL_LIMIT) {
                 dormant = true;
-                GeysersMod.LOGGER.info("Spring line at {} cannot open a pool at Y {}; dormant until the ground moves",
+                com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring line at {} cannot open a pool at Y {}; dormant until the ground moves",
                         pos, ground);
             }
             setChanged();
@@ -603,7 +603,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
         surfaced = true;
         rebuilds = 0;
         stageSince = level.getGameTime();
-        GeysersMod.LOGGER.info("Spring line at {} broke surface at Y {}, carrying {}",
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring line at {} broke surface at Y {}, carrying {}",
                 pos, ground, deposit().getBlock().getName().getString());
         setChanged();
     }

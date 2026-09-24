@@ -174,7 +174,7 @@ public final class Weathering {
         }
 
         QUEUE.add(new Job(level.dimension(), seen.keySet().toLongArray(), seen));
-        GeysersMod.LOGGER.info("weathering queued: {} columns ({} from {} edits, {} on the edge)",
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("weathering queued: {} columns ({} from {} edits, {} on the edge)",
                 seen.size(), base.size(), edits.size(), edge.size());
     }
 
@@ -215,7 +215,7 @@ public final class Weathering {
             if (job.cursor >= job.columns.length) {
                 job.cursor = 0;
                 if (++job.pass >= PASSES) {
-                    GeysersMod.LOGGER.info("weathering finished: {} blocks moved over {} columns, {} trees felled, {} ms, longest tick {} ms",
+                    com.jeladastudios.ftsgeology.util.Diagnostics.info("weathering finished: {} blocks moved over {} columns, {} trees felled, {} ms, longest tick {} ms",
                             job.moved, job.columns.length, job.felledBase.size(), job.nanos / 1_000_000,
                             job.worstNanos / 1_000_000);
                     QUEUE.poll();

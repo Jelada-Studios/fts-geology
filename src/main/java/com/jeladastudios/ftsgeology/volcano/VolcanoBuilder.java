@@ -371,7 +371,7 @@ public final class VolcanoBuilder {
         job.add(lvl -> FINISHING.remove(key));
         if (VolcanoJob.enqueue(job)) {
             FINISHING.put(key, level.getGameTime());
-            GeysersMod.LOGGER.info("Large {} at {}, {}: finishing its summit (base Y {}, summit Y {}, {})",
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("Large {} at {}, {}: finishing its summit (base Y {}, summit Y {}, {})",
                     c.type, c.x, c.z, c.baseY, c.summitY, c.activity);
         }
     }
