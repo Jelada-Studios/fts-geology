@@ -536,6 +536,7 @@ public final class EruptionHandler {
         if (!s.getFluidState().isEmpty()) return true; // any water/lava, source or flowing
         // Ground cover is landscape, not a build.
         if (com.jeladastudios.ftsgeology.worldgen.TerrainProbe.isVegetation(s)) return true;
+        if (TfcCompat.isGround(s)) return true;
         // Trees are landscape too, or quakes leave forests hanging; a log cabin counts as terrain as a result.
         if (s.is(BlockTags.LOGS) || s.is(BlockTags.LEAVES) || s.is(BlockTags.WART_BLOCKS)
                 || s.is(Blocks.MANGROVE_ROOTS) || s.is(Blocks.MUSHROOM_STEM)

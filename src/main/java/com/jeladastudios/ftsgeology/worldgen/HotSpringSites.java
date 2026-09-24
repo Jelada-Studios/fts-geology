@@ -413,7 +413,7 @@ public final class HotSpringSites {
                 if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) continue;
                 if (!s.getFluidState().isEmpty()) continue;
                 TerrainProbe.clearVegetation(level, x, g, z, 2);
-                level.setBlock(p, b.defaultBlockState(), FLAGS);
+                level.setBlock(p, com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, p, b.defaultBlockState()), FLAGS);
                 if (bank) stainStepFace(level, x, g, z, b);
             }
         }
@@ -452,7 +452,7 @@ public final class HotSpringSites {
             BlockState s = level.getBlockState(under);
             if (s.isAir() || !s.getFluidState().isEmpty() || s.is(Blocks.BEDROCK)
                     || EruptionHandler.isPlayerPlaced(s)) return;
-            level.setBlock(under, b.defaultBlockState(), FLAGS);
+            level.setBlock(under, com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, under, b.defaultBlockState()), FLAGS);
             return;
         }
     }

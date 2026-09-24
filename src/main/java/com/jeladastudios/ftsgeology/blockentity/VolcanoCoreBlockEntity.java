@@ -96,7 +96,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         BlockPos plug = pos.above(2);
         BlockState ps = level.getBlockState(plug);
         if (ps.isAir() || ps.getFluidState().is(FluidTags.LAVA)) {
-            level.setBlock(plug, Blocks.BLACKSTONE.defaultBlockState(), 3);
+            level.setBlock(plug, com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, plug, Blocks.BLACKSTONE.defaultBlockState()), 3);
         }
         GeysersMod.LOGGER.info("Dormant volcano at {} crusts over again", pos);
     }

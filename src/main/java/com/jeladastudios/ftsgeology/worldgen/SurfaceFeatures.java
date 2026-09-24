@@ -287,7 +287,7 @@ public final class SurfaceFeatures {
             BlockState s = level.getBlockState(p);
             if (EruptionHandler.isPlayerPlaced(s)) return false; // respect player builds
             // Require solid-ish natural matrix around the chamber shell for realism.
-            if (dy == chamberH + 1 && !(s.is(Blocks.DEEPSLATE) || s.is(Blocks.STONE))) {
+            if (dy == chamberH + 1 && !(s.is(Blocks.DEEPSLATE) || s.is(Blocks.STONE) || com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.isRock(s))) {
                 return false; // need a real rock cap on top
             }
         }
@@ -346,7 +346,10 @@ public final class SurfaceFeatures {
             for (int dz = -rad; dz <= rad; dz++) {
                 BlockPos p = center.offset(dx, 0, dz);
                 if (EruptionHandler.isPlayerPlaced(level.getBlockState(p))) continue;
-                level.setBlock(p, block.defaultBlockState(), FLAGS);
+                // The heat bed stays vanilla magma, which is what the cores read as heat; it is sealed out of sight.
+                BlockState put = block == Blocks.MAGMA_BLOCK ? block.defaultBlockState()
+                        : com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, p, block.defaultBlockState());
+                level.setBlock(p, put, FLAGS);
             }
         }
     }
@@ -360,7 +363,7 @@ public final class SurfaceFeatures {
                 BlockState s = level.getBlockState(p);
                 if (EruptionHandler.isPlayerPlaced(s)) continue;
                 if (s.isAir() || !s.getFluidState().isEmpty()) {
-                    level.setBlock(p, Blocks.DEEPSLATE.defaultBlockState(), FLAGS);
+                    level.setBlock(p, com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, p, Blocks.DEEPSLATE.defaultBlockState()), FLAGS);
                 }
             }
         }

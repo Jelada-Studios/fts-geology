@@ -271,7 +271,7 @@ public final class Earthquake {
                 QuakePlanner.Edit e = run.pending.poll();
                 examined++;
                 if (level.hasChunkAt(e.pos())) {
-                    level.setBlock(e.pos(), e.state(), FLAGS);
+                    level.setBlock(e.pos(), com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, e.pos(), e.state()), FLAGS);
                     placed++;
                 } else {
                     // The chunk went away since the snapshot: parked, not dropped, so the rupture is

@@ -44,7 +44,7 @@ public final class MagmaSealing {
             if (EruptionHandler.isPlayerPlaced(s)) continue;
             // Only fill what is actually open; solid rock already does the job.
             if (s.isAir() || !s.getFluidState().isEmpty() || TerrainProbe.isVegetation(s)) {
-                level.setBlock(p, skinFor(magma), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+                level.setBlock(p, com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, p, skinFor(magma)), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
             }
         }
     }

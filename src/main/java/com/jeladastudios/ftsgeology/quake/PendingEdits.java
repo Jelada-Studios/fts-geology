@@ -165,7 +165,7 @@ public final class PendingEdits {
                         r.magnitude(), r.depthMetres(), new Random(r.seed()), r.mayBreakBuilds(), cp);
                 for (QuakePlanner.Edit e : plan.edits()) {
                     if ((e.pos().getX() >> 4) != cp.x || (e.pos().getZ() >> 4) != cp.z) continue;
-                    level.setBlock(e.pos(), e.state(), Earthquake.FLAGS);
+                    level.setBlock(e.pos(), com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, e.pos(), e.state()), Earthquake.FLAGS);
                     applied.add(e);
                 }
             } catch (Exception ex) {

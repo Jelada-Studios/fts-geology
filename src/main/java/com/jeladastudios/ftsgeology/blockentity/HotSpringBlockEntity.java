@@ -107,9 +107,9 @@ public class HotSpringBlockEntity extends BlockEntity {
     private static void thawAround(ServerLevel level, BlockPos center, int r) {
         for (BlockPos p : BlockPos.betweenClosed(center.offset(-r, -1, -r), center.offset(r, 2, r))) {
             BlockState s = level.getBlockState(p);
-            if (s.is(Blocks.SNOW) || s.is(Blocks.SNOW_BLOCK) || s.is(Blocks.POWDER_SNOW)) {
+            if (s.is(Blocks.SNOW) || s.is(Blocks.SNOW_BLOCK) || s.is(Blocks.POWDER_SNOW) || com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.meltsToAir(s)) {
                 level.setBlock(p.immutable(), Blocks.AIR.defaultBlockState(), 3);
-            } else if (s.is(Blocks.ICE) || s.is(Blocks.FROSTED_ICE)) {
+            } else if (s.is(Blocks.ICE) || s.is(Blocks.FROSTED_ICE) || com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.meltsToWater(s)) {
                 level.setBlock(p.immutable(), Blocks.WATER.defaultBlockState(), 3);
             }
         }

@@ -116,6 +116,18 @@ public final class TfcCompat {
         m.put(ModBlocks.SHALE.get(), "rock/raw/shale");
         m.put(ModBlocks.CHERT.get(), "rock/raw/chert");
         m.put(ModBlocks.RHYOLITE.get(), "rock/raw/rhyolite");
+        // The ores the deposits lay: TFC's of the same metal, in the column's own rock.
+        m.put(Blocks.GOLD_ORE, "ore/normal_native_gold/%r");
+        m.put(Blocks.DEEPSLATE_GOLD_ORE, "ore/normal_native_gold/%r");
+        m.put(Blocks.COPPER_ORE, "ore/normal_native_copper/%r");
+        m.put(Blocks.DEEPSLATE_COPPER_ORE, "ore/normal_native_copper/%r");
+        m.put(Blocks.IRON_ORE, "ore/normal_hematite/%r");
+        m.put(Blocks.COAL_ORE, "ore/bituminous_coal/%r");
+        m.put(Blocks.DEEPSLATE_COAL_ORE, "ore/bituminous_coal/%r");
+        m.put(Blocks.EMERALD_ORE, "ore/emerald/%r");
+        m.put(Blocks.DEEPSLATE_EMERALD_ORE, "ore/emerald/%r");
+        m.put(Blocks.LAPIS_ORE, "ore/lapis_lazuli/%r");
+        m.put(Blocks.DEEPSLATE_LAPIS_ORE, "ore/lapis_lazuli/%r");
         // Soil and sand: TFC's, of the kind already round the column.
         m.put(Blocks.DIRT, "dirt/%s");
         m.put(Blocks.COARSE_DIRT, "dirt/%s");
@@ -158,6 +170,46 @@ public final class TfcCompat {
             return b == null ? Blocks.AIR : b;
         });
         return t == Blocks.AIR ? state : t.defaultBlockState();
+    }
+
+    /** Whether a block is one of TFC's raw or hardened rocks: the country rock of a TFC world. */
+    public static boolean isRock(BlockState state) {
+        if (!active()) return false;
+        ResourceLocation id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        return id != null && id.getNamespace().equals("tfc")
+                && (id.getPath().startsWith("rock/raw/") || id.getPath().startsWith("rock/hardened/"));
+    }
+
+    /**
+     * Whether a block is TFC's natural ground: its raw, hardened and magma rock, gravel, soil, grass, sand, clay and
+     * snow and ice. Whether TFC tags them with vanilla's stone and soil tags is not relied on; cobble and bricks, which
+     * build houses, are left out.
+     */
+    public static boolean isGround(BlockState state) {
+        if (!active()) return false;
+        ResourceLocation id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        if (id == null || !id.getNamespace().equals("tfc")) return false;
+        String p = id.getPath();
+        return p.startsWith("rock/raw/") || p.startsWith("rock/hardened/") || p.startsWith("rock/magma/")
+                || p.startsWith("rock/gravel/") || p.startsWith("dirt/") || p.startsWith("grass/")
+                || p.startsWith("sand/") || p.startsWith("clay/") || p.startsWith("clay_grass/")
+                || p.startsWith("mud/") || p.startsWith("rooted_dirt/") || p.equals("snow_pile")
+                || p.equals("ice_pile") || p.equals("sea_ice") || p.equals("peat") || p.equals("peat_grass");
+    }
+
+    /** TFC's snow and ice that a hot spring melts: its snow pile, ice pile and sea ice. */
+    public static boolean meltsToAir(BlockState state) {
+        if (!active()) return false;
+        ResourceLocation id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        return id != null && id.getNamespace().equals("tfc") && id.getPath().equals("snow_pile");
+    }
+
+    /** TFC's ice, which a hot spring melts to water. */
+    public static boolean meltsToWater(BlockState state) {
+        if (!active()) return false;
+        ResourceLocation id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        return id != null && id.getNamespace().equals("tfc")
+                && (id.getPath().equals("ice_pile") || id.getPath().equals("sea_ice"));
     }
 
     // === Reading the column =================================================
