@@ -1,9 +1,0 @@
-{
-  "type": "fts_geology:optional_spawns",
-  "biomes": ["fts_geology:alluvial_plain"],
-  "spawns": [
-    { "entity": "alexsmobs:bison", "weight": 6, "min": 2, "max": 4 },
-    { "entity": "alexsmobs:crow", "weight": 6, "min": 2, "max": 3 },
-    { "entity": "alexsmobs:raccoon", "weight": 4, "min": 1, "max": 2 }
-  ]
-}
