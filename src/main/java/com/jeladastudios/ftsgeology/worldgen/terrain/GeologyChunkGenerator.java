@@ -65,6 +65,46 @@ public final class GeologyChunkGenerator extends NoiseBasedChunkGenerator {
         return CODEC;
     }
 
+    /** How deep under a river's bed, and how far out past its edge, the carvers are kept off. */
+    private static final int GUARD_UNDER = 12, GUARD_SIDE = 3;
+
+    /**
+     * Keeps the carvers out from under the rivers. A canyon carver cut across a river's channel left the water laid
+     * over it with nothing under it: the river stopped at the canyon's lip on one side and started again on the other,
+     * with water hanging down the wall between. Each column in or just beside a channel or a lake is marked as already
+     * carved from a little under its bed to over its water, so a carver passing through leaves it standing; a canyon
+     * meets the river as a bridge of rock under it, and a cave passes deeper.
+     */
+    @Override
+    public void applyCarvers(net.minecraft.server.level.WorldGenRegion region, long seed,
+                             net.minecraft.world.level.levelgen.RandomState random,
+                             net.minecraft.world.level.biome.BiomeManager biomes, StructureManager structures,
+                             ChunkAccess chunk, net.minecraft.world.level.levelgen.GenerationStep.Carving step) {
+        if (chunk instanceof net.minecraft.world.level.chunk.ProtoChunk proto && RiverNetwork.ready()
+                && com.jeladastudios.ftsgeology.config.GeyserConfig.RIVERS.get()
+                && !com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.active()) {
+            net.minecraft.world.level.chunk.CarvingMask mask = proto.getOrCreateCarvingMask(step);
+            int minX = chunk.getPos().getMinBlockX(), minZ = chunk.getPos().getMinBlockZ();
+            int bottom = chunk.getMinBuildHeight(), top = chunk.getMaxBuildHeight() - 1;
+            double side = GUARD_SIDE * RiverNetwork.horizontal();
+            int under = (int) Math.round(GUARD_UNDER * RiverNetwork.horizontal());
+            for (int dx = 0; dx < 16; dx++) {
+                for (int dz = 0; dz < 16; dz++) {
+                    RiverNetwork.At a = RiverNetwork.at(minX + dx, minZ + dz);
+                    if (a.distance() == Double.MAX_VALUE) continue;
+                    if (!a.lake() && a.distance() > a.halfWidth() + side) continue;
+                    int from = Math.max(bottom, (int) Math.floor(a.bed()) - under);
+                    int to = Math.min(top, (int) Math.ceil(a.water()) + 2 * under);
+                    for (int y = from; y <= to; y++) mask.set(dx, y, dz);
+                    GUARDED.increment();
+                }
+            }
+        }
+        super.applyCarvers(region, seed, random, biomes, structures, chunk, step);
+    }
+
+    private static final LongAdder GUARDED = new LongAdder();
+
     @Override
     public void createStructures(RegistryAccess registries, ChunkGeneratorStructureState state,
                                  StructureManager structures, ChunkAccess chunk, StructureTemplateManager templates) {
@@ -119,7 +159,7 @@ public final class GeologyChunkGenerator extends NoiseBasedChunkGenerator {
     /** How the villages have fared so far, for the river log line. */
     public static String summary() {
         return String.format(Locale.ROOT, "%d villages laid out, %d of their %d pieces in the water taken away, "
-                + "%d not built", VILLAGES.sum(), DROPPED.sum(), PIECES.sum(), GONE.sum());
+                + "%d not built; %d columns kept from the carvers", VILLAGES.sum(), DROPPED.sum(), PIECES.sum(), GONE.sum(), GUARDED.sum());
     }
 
     /** The first hundred villages the water changed, each with where it is, so one can be gone and looked at. */

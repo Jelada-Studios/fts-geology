@@ -81,7 +81,15 @@ final class RiverPieces {
     static final double POOL_FALL = 4.0, POOL_WIDE = 1.8, POOL_DIG = 0.3, POOL_DIG_MAX = 3.0;
     static final int POOL_RUN = 3;
     /** How much of its width a torrent keeps, and the gradients that ramp between a torrent and a lowland river. */
-    static final double STEEP_NARROW = 0.35, STEEP_FROM = 0.15, STEEP_OVER = 0.5;
+    static final double STEEP_NARROW = 0.7, STEEP_FROM = 0.15, STEEP_OVER = 0.5;
+    /**
+     * The most a channel's width changes from one point to the next, as a ratio. A torrent is narrower than the river
+     * it becomes, but a steep length drawn a third as wide as the gentle ones either side of it read as a river pinched
+     * shut and let out again.
+     */
+    static final double WIDTH_STEP = 1.2;
+    /** How much deeper under the sea, per unit of layout past the normal world's, a mouth is carried out to. */
+    static final double MOUTH_DEEPER = 2.0;
     /** A river that the ground closes round ends in a pond this wide, as a share of the lattice cell. */
     static final double SINK_HALF = 0.33;
     /** Where a river's length is counted from, for a river that leaves a lake: far enough that no spring opens there. */
@@ -141,7 +149,7 @@ final class RiverPieces {
 
     final LongAdder channels = new LongAdder(), joins = new LongAdder(), fallbacks = new LongAdder(),
             dams = new LongAdder(), gorges = new LongAdder(), eyes = new LongAdder(), heldOver = new LongAdder(), pools = new LongAdder(), inlets = new LongAdder(), inletOpen = new LongAdder(), inletBig = new LongAdder(), inletShut = new LongAdder(), bankClamps = new LongAdder(), lakeMasks = new LongAdder(), sinks = new LongAdder(),
-            mouths = new LongAdder(), dryJoins = new LongAdder(), gridReads = new LongAdder();
+            mouths = new LongAdder(), dryJoins = new LongAdder(), gridReads = new LongAdder(), backwater = new LongAdder();
 
     RiverPieces(DrainageLattice lat, DrainageLattice.Ground ground, double horizontal, int areaMin) {
         this.lat = lat;
@@ -534,9 +542,19 @@ final class RiverPieces {
         Cell c = cell(s);
         boolean[] wet = new boolean[c.in.length];
         boolean any = false;
+        // Out to where the raw ground lies deeper under the sea in the tall world: its noise lifts a shore two and a
+        // half times as far over the raw ground, and a river that stopped where the raw ground first went under the sea
+        // still had a bank of sand, and a drowned ruin on it, between its end and the waves.
+        double deep = lat.sea - MOUTH_DEEPER * Math.max(0.0, h - 1.0);
         for (int i = 0; i < wet.length; i++) {
-            wet[i] = c.in[i] && c.hgt[i] <= lat.sea;
+            wet[i] = c.in[i] && c.hgt[i] <= deep;
             any |= wet[i];
+        }
+        if (!any) {
+            for (int i = 0; i < wet.length; i++) {
+                wet[i] = c.in[i] && c.hgt[i] <= lat.sea;
+                any |= wet[i];
+            }
         }
         // A sea node on a shore that stands a little over the water everywhere in its cell: its lowest ground, then.
         if (!any) {
@@ -920,6 +938,7 @@ final class RiverPieces {
         double len = cum[m - 1];
         int n = Math.max(1, (int) Math.ceil(len / (STEP * h)));
         double[] qx = new double[n + 1], qz = new double[n + 1], qw = new double[n + 1], qg = new double[n + 1];
+        double[] qr = new double[n + 1];
         int seg = 0;
         double w = wIn;
         for (int q = 0; q <= n; q++) {
@@ -951,6 +970,23 @@ final class RiverPieces {
             qz[q] = z;
             qw[q] = w;
             qg[q] = read(x, z);
+            qr[q] = rim;
+        }
+        // Backwater. A river whose water comes to its end lower than the water it runs into -- a lake filled to its
+        // spill level, a river standing higher at the join -- does not step up into it: the lake reaches back up the
+        // channel, level, as far as the channel's banks hold that level and the river's own water is under it. Left
+        // as it was, the river ended a few blocks under the lake with falling water hung from the lake's edge down to
+        // it, drawn running the way the river runs: water climbing a waterfall.
+        // Only where the floor is the water run into: a length out of a lake passes its own start as the floor, and
+        // raising that would lift a lake's outflow back up to the lake. The banks may be built up as far as the water
+        // may be held over them anywhere else.
+        if ((kind == CHANNEL || least != wIn) && least > qw[n] + 0.5) {
+            for (int q = n; q >= 0; q--) {
+                if (qw[q] >= least) break;
+                if (qr[q] - 1.0 + BANK_HOLD < least) break;
+                qw[q] = least;
+                backwater.increment();
+            }
         }
         List<RiverNetwork.Point> pts = new ArrayList<>(n);
         double[] wide = new double[n + 1], deeper = new double[n + 1];
@@ -970,12 +1006,19 @@ final class RiverPieces {
             }
         }
         double step = len / n;
+        double[] hws = new double[n];
         for (int q = 0; q < n; q++) {
             double fall = (qw[q] - qw[q + 1]) / Math.max(step, 1e-6);
             double t = Math.max(0.0, Math.min(1.0, 1.0 - (fall - STEEP_FROM) / STEEP_OVER));
             double gentle = t * t * (3.0 - 2.0 * t);
             double narrow = STEEP_NARROW + (1.0 - STEEP_NARROW) * gentle;
-            double hw = Math.max(HALF_MIN, half * narrow) * Math.max(wide[q], wide[q + 1]);
+            hws[q] = Math.max(HALF_MIN, half * narrow) * Math.max(wide[q], wide[q + 1]);
+        }
+        // No point narrower than its neighbours allow: a width comes down and goes back up gradually.
+        for (int q = 1; q < n; q++) hws[q] = Math.max(hws[q], hws[q - 1] / WIDTH_STEP);
+        for (int q = n - 2; q >= 0; q--) hws[q] = Math.max(hws[q], hws[q + 1] / WIDTH_STEP);
+        for (int q = 0; q < n; q++) {
+            double hw = hws[q];
             double depth = depthFor(hw);
             double bedS = qw[q] - depth - deeper[q], bedE = qw[q + 1] - depth - deeper[q + 1];
             double cutS = gorge(qg[q], qw[q], bedS, hw), cutE = gorge(qg[q + 1], qw[q + 1], bedE, hw);

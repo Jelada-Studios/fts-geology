@@ -75,7 +75,7 @@ public final class RiverWater {
 
     private static final LongAdder CANDIDATES = new LongAdder(), KEPT = new LongAdder(), BLOCKS = new LongAdder(),
             DROPPED = new LongAdder(), LEVELLED = new LongAdder(), SPRINGS = new LongAdder(), WET = new LongAdder(),
-            BANKED = new LongAdder(), CLIFFS = new LongAdder(), ICED = new LongAdder(), GLACIERS = new LongAdder(), PLUGGED = new LongAdder(), CURTAINS = new LongAdder(), SHORED = new LongAdder();
+            BANKED = new LongAdder(), CLIFFS = new LongAdder(), ICED = new LongAdder(), GLACIERS = new LongAdder(), PLUGGED = new LongAdder(), CURTAINS = new LongAdder(), SHORED = new LongAdder(), GAPS = new LongAdder(), REEDS = new LongAdder();
 
     /**
      * The tongue of ice a mountain river comes out from under, where it rises high enough to snow: how far it reaches
@@ -108,6 +108,14 @@ public final class RiverWater {
             for (int dz = 0; dz < 16; dz++) {
                 int x = cp.getMinBlockX() + dx, z = cp.getMinBlockZ() + dz;
                 RiverNetwork.At a = RiverNetwork.at(x, z);
+                if (!a.lake()) {
+                    double gap = RiverNetwork.lakeGap(x, z);
+                    if (!Double.isNaN(gap) && (a.distance() == Double.MAX_VALUE
+                            || a.floor() > Math.floor(a.water()) - 0.5 || gap > a.water())) {
+                        placed += fillGap(level, at, x, z, (int) Math.floor(gap), water);
+                        continue;
+                    }
+                }
                 if (a.distance() == Double.MAX_VALUE) continue;
                 int w = (int) Math.floor(a.water());
                 // At the mouth the ocean is the river's surface. The fill used to stop the moment the traced water
@@ -204,9 +212,9 @@ public final class RiverWater {
         if (CHUNKS.incrementAndGet() % 100 == 0) {
             GeysersMod.LOGGER.info("River water over {} chunks: {} columns in a channel, {} kept, {} of them wet, "
                             + "{} levelled, {} let go, {} springs, {} blocks, {} banks built up, {} left as cliffs, "
-                            + "{} lake columns iced, {} glacier columns, {} hollows stopped up, {} steps hung with falling water, {} lake shore columns taken down; {}; {}; {}",
+                            + "{} lake columns iced, {} glacier columns, {} hollows stopped up, {} steps hung with falling water, {} lake shore columns taken down, {} lake necks filled, {} plants cleared off the water; {}; {}; {}",
                     CHUNKS.get(), CANDIDATES.sum(), KEPT.sum(), WET.sum(), LEVELLED.sum(), DROPPED.sum(),
-                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(), PLUGGED.sum(), CURTAINS.sum(), SHORED.sum(),
+                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(), PLUGGED.sum(), CURTAINS.sum(), SHORED.sum(), GAPS.sum(), REEDS.sum(),
                     RiverNetwork.summary(), GeologyChunkGenerator.summary(), SnowCover.summary());
         }
         return placed;
@@ -324,11 +332,10 @@ public final class RiverWater {
                 }
                 top = Math.min(top, w + CURTAIN_MAX);
                 if (top <= w) continue;
-                // Falling the way the river runs, so its face is drawn coming over the step and down; where the water
-                // here stands still, the way it comes over the step, from the higher water beside.
+                // Falling the way the water comes over the step: from the higher water beside, down into this column. Drawn
+                // the way the river runs instead, a curtain where a river met a lake higher than itself ran up the fall.
                 RiverNetwork.At a = RiverNetwork.at(x, z);
-                int way = RiverWaterFluid.wayOf(a.fx(), a.fz());
-                if (way == 0 && from != null) way = RiverWaterFluid.wayOf(-from[0], -from[1]);
+                int way = from != null ? RiverWaterFluid.wayOf(-from[0], -from[1]) : RiverWaterFluid.wayOf(a.fx(), a.fz());
                 BlockState fall = falling.setValue(RiverWaterFluid.FLOW, way);
                 int laid = 0;
                 for (int y = w + 1; y <= top; y++) {
@@ -445,6 +452,75 @@ public final class RiverWater {
      * carvers ran along under a river left the ground over it as a crust; the water was dropped there, and the crust
      * stood across the river as a bar of grass. Only down to a few blocks, and never through what a player built.
      */
+    /**
+     * Takes the plants out of the river after the world has grown them. The water goes in before the vegetation step,
+     * and a patch of grass or flowers laid down after it could still leave a tuft standing at the water's level, in a
+     * cube of water of its own, in the middle of the river. Run at the last step of generation: a plant at or under the
+     * water's level in a channel is water, one standing on the water is air.
+     */
+    public static void clearReeds(WorldGenLevel level, ChunkPos cp) {
+        ServerLevel server = level.getLevel();
+        if (TfcCompat.active() || !GeologyWorld.isOwn(server) || !RiverNetwork.ready()) return;
+        if (!GeyserConfig.RIVERS.get()) return;
+        int sea = level.getSeaLevel();
+        BlockState water = ModBlocks.RIVER_WATER.get().defaultBlockState();
+        BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();
+        for (int dx = 0; dx < 16; dx++) {
+            for (int dz = 0; dz < 16; dz++) {
+                int x = cp.getMinBlockX() + dx, z = cp.getMinBlockZ() + dz;
+                // The water's top as the fill laid it, the mouth's included: a river at the sea stands at the sea's level.
+                RiverNetwork.At a = RiverNetwork.at(x, z);
+                if (a.distance() == Double.MAX_VALUE) continue;
+                int w = (int) Math.floor(a.water());
+                if (a.floor() > w - 0.5) continue;
+                if (w <= sea) w = sea - 1;
+                for (int y = w - 3; y <= w + 1; y++) {
+                    BlockState s = level.getBlockState(at.set(x, y, z));
+                    if (!TerrainProbe.isVegetation(s) || !s.getFluidState().isEmpty()) continue;
+                    BlockState under = level.getBlockState(at.set(x, y - 1, z));
+                    boolean wetUnder = under.is(ModBlocks.RIVER_WATER.get());
+                    at.set(x, y, z);
+                    if (y <= w && (wetUnder || under.isSolidRender(level, at.below()))) {
+                        level.setBlock(at, water, FLAGS);
+                        REEDS.increment();
+                    } else if (y > w && wetUnder) {
+                        level.setBlock(at, Blocks.AIR.defaultBlockState(), FLAGS);
+                        REEDS.increment();
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Water in a neck of a lake the grid missed ({@link RiverNetwork#lakeGap}): only where the ground lies under the
+     * lake's water, on solid ground, and with each side either as high as the water or water itself, so nothing is
+     * poured that could not be held.
+     */
+    private static int fillGap(WorldGenLevel level, BlockPos.MutableBlockPos at, int x, int z, int w, BlockState water) {
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE || g >= w) return 0;
+        if (!level.getBlockState(at.set(x, g, z)).isSolidRender(level, at)) return 0;
+        for (int[] d : SIDES) {
+            int nx = x + d[0], nz = z + d[1];
+            if (TerrainProbe.groundY(level, nx, nz) >= w) continue;
+            if (RiverNetwork.at(nx, nz).lake() || !Double.isNaN(RiverNetwork.lakeGap(nx, nz))) continue;
+            return 0;
+        }
+        int laid = 0;
+        for (int y = g + 1; y <= w; y++) {
+            BlockState was = level.getBlockState(at.set(x, y, z));
+            if (!was.isAir() && was.getFluidState().isEmpty() && !TerrainProbe.isVegetation(was)) break;
+            level.setBlock(at, water, FLAGS);
+            laid++;
+        }
+        if (laid > 0) {
+            clearPlants(level, at, x, g + laid + 1, z);
+            GAPS.increment();
+        }
+        return laid;
+    }
+
     private static boolean plug(WorldGenLevel level, BlockPos.MutableBlockPos at, int x, int y, int z) {
         int bottom = y;
         int least = Math.max(level.getMinBuildHeight() + 1, y - PLUG_DEEP);

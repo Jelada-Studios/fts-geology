@@ -47,7 +47,8 @@ public final class RiverNetwork {
      * How far under sea level the ground has to lie for the network to call it the sea. The ocean fills to the block
      * under sea level, so ground whose top block is that block or the one over it is dry: a beach. Counted as sea, a
      * flat shore two blocks from the water took every river in and ended it in the sand, tens of blocks short of the
-     * waves -- the rivers that "come right up to the sea and never meet it".
+     * waves -- the rivers that "come right up to the sea and never meet it". The tall world carries its mouths further
+     * out, see {@link RiverPieces#MOUTH_DEEPER}.
      */
     private static final int SHORE = 2;
     /** How far from the middle of a channel the ground still knows about it, for the caves to keep away. */
@@ -81,6 +82,8 @@ public final class RiverNetwork {
     record Square(Point[] points, RiverPieces.LakeMask[] lakes) {}
 
     private static final Square EMPTY = new Square(new Point[0], new RiverPieces.LakeMask[0]);
+    /** Set while a search sweeps far and wide: only squares already worked out are read, none is built for it. */
+    private static final ThreadLocal<Boolean> BUILT_ONLY = ThreadLocal.withInitial(() -> Boolean.FALSE);
     private static final ColumnCache<Square> INDEX = new ColumnCache<>(12);
     /** A square being worked out, so a second thread that asks for it waits for the first instead of repeating it. */
     private static final ConcurrentHashMap<Long, CompletableFuture<Square>> BUILDING = new ConcurrentHashMap<>();
@@ -153,6 +156,22 @@ public final class RiverNetwork {
     /** The last column asked about: the offset asks twice for every column, and the water again after. */
     private static final ThreadLocal<long[]> LAST_KEY = ThreadLocal.withInitial(() -> new long[]{Long.MIN_VALUE});
     private static final ThreadLocal<At> LAST = new ThreadLocal<>();
+
+    /**
+     * Asks the network something without building any of it: a square not yet worked out reads as empty. For a
+     * search that sweeps thousands of squares -- /locate -- where working each out would take the server minutes.
+     */
+    public static <T> T builtOnly(java.util.function.Supplier<T> ask) {
+        boolean was = BUILT_ONLY.get();
+        BUILT_ONLY.set(Boolean.TRUE);
+        LAST_KEY.get()[0] = Long.MIN_VALUE;
+        try {
+            return ask.get();
+        } finally {
+            BUILT_ONLY.set(was);
+            LAST_KEY.get()[0] = Long.MIN_VALUE;
+        }
+    }
 
     public static At at(int x, int z) {
         long key = (((long) x) << 32) ^ (z & 0xFFFFFFFFL);
@@ -306,6 +325,33 @@ public final class RiverNetwork {
     }
 
     /** Whether the nearest water here is a lake's rather than a channel's. */
+    /**
+     * The water of a lake this column stands in a gap of, or NaN. A lake's extent is worked out on a grid, from the raw
+     * ground at each grid point; a neck of lower ground between two arms of one lake, narrower than the grid, came out
+     * dry between them even where it lay under the lake's water -- and the bank builder then walled it up to the water
+     * as a dam across the lake. A column with the same lake's water on two opposite sides, within two grid steps, is
+     * the lake's too wherever its ground is under the water.
+     */
+    public static double lakeGap(int x, int z) {
+        if (lattice == null) return Double.NaN;
+        for (RiverPieces.LakeMask m : block(Math.floorDiv(x, BLOCK), Math.floorDiv(z, BLOCK)).lakes()) {
+            if (m.depthAt(x, z) > 0) continue;
+            int reach = 2 * m.grid;
+            if (m.distanceToWater(x, z, reach) > reach) continue;
+            for (int[] d : GAP_AXES) {
+                if (wetAlong(m, x, z, d[0], d[1], reach) && wetAlong(m, x, z, -d[0], -d[1], reach)) return m.water;
+            }
+        }
+        return Double.NaN;
+    }
+
+    private static final int[][] GAP_AXES = {{1, 0}, {0, 1}, {1, 1}, {1, -1}};
+
+    private static boolean wetAlong(RiverPieces.LakeMask m, int x, int z, int dx, int dz, int reach) {
+        for (int k = 1; k <= reach; k++) if (m.depthAt(x + dx * k, z + dz * k) > 0) return true;
+        return false;
+    }
+
     public static boolean lakeAt(int x, int z) {
         return at(x, z).lake();
     }
@@ -356,6 +402,7 @@ public final class RiverNetwork {
         long key = ColumnCache.key(bx, bz);
         Square hit = INDEX.get(key);
         if (hit != null) return hit;
+        if (BUILT_ONLY.get()) return EMPTY;
         CompletableFuture<Square> mine = new CompletableFuture<>();
         CompletableFuture<Square> other = BUILDING.putIfAbsent(key, mine);
         if (other != null) return other.join();
@@ -419,10 +466,10 @@ public final class RiverNetwork {
         RiverPieces pc = pieces;
         if (l == null || pc == null) return "no river network";
         return String.format(Locale.ROOT,
-                "%d channel nodes (%d joins, %d with nothing to join, %d not traced, %d dam samples, %d gorge lengths, %d spring eyes, %d inlets cut through a bar (%d open, %d big, %d shut), %d plunge pools, %d held under a "
+                "%d channel nodes (%d joins, %d with nothing to join, %d not traced, %d dam samples, %d gorge lengths, %d spring eyes, %d inlets cut through a bar (%d open, %d big, %d shut), %d plunge pools, %d backwater points, %d held under a "
                         + "bank), %d lakes drawn, %d mouths, %d sinks; %d hollows (%d closed), %d lakes, %d ground reads "
                         + "and %d on the grid; %d squares in %.0f ms, slowest %.0f ms",
-                pc.channels.sum(), pc.joins.sum(), pc.dryJoins.sum(), pc.fallbacks.sum(), pc.dams.sum(), pc.gorges.sum(), pc.eyes.sum(), pc.inlets.sum(), pc.inletOpen.sum(), pc.inletBig.sum(), pc.inletShut.sum(), pc.pools.sum(),
+                pc.channels.sum(), pc.joins.sum(), pc.dryJoins.sum(), pc.fallbacks.sum(), pc.dams.sum(), pc.gorges.sum(), pc.eyes.sum(), pc.inlets.sum(), pc.inletOpen.sum(), pc.inletBig.sum(), pc.inletShut.sum(), pc.pools.sum(), pc.backwater.sum(),
                 pc.bankClamps.sum(), pc.lakeMasks.sum(), pc.mouths.sum(), pc.sinks.sum(), l.pitsFoundCount(),
                 l.closedCount(), l.lakesCount(), l.readsCount(), pc.gridReads.sum(), SQUARES.sum(),
                 SQUARE_NANOS.sum() / 1e6, SLOWEST.get() / 1e6);

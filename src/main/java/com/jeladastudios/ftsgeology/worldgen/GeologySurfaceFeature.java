@@ -37,6 +37,7 @@ public class GeologySurfaceFeature extends Feature<NoneFeatureConfiguration> {
             SoilProfile.generate(level, cp);
             RiftSteps.generate(level, cp);
             SnowCover.generate(level, cp);
+            RiverWater.clearReeds(level, cp);
             long t3 = System.nanoTime();
             GenCost.add(GenCost.SIGNS, t1 - t0);
             GenCost.add(GenCost.BASIN, t2 - t1);
