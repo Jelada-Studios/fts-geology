@@ -2,7 +2,7 @@
   "type": "minecraft:add",
   "argument1": {
     "type": "minecraft:mul",
-    "argument1": 4.0,
+    "argument1": 4,
     "argument2": {
       "type": "minecraft:quarter_negative",
       "argument": {
@@ -12,14 +12,26 @@
           "argument1": "fts_geology:geology/depth",
           "argument2": {
             "type": "minecraft:mul",
-            "argument1": "fts_geology:geology/jaggedness",
+            "argument1": {
+              "type": "minecraft:mul",
+              "argument1": "fts_geology:geology/jaggedness",
+              "argument2": {
+                "type": "minecraft:add",
+                "argument1": 1,
+                "argument2": {
+                  "type": "minecraft:mul",
+                  "argument1": -1,
+                  "argument2": "fts_geology:geology/river_near"
+                }
+              }
+            },
             "argument2": {
               "type": "minecraft:half_negative",
               "argument": {
                 "type": "minecraft:noise",
                 "noise": "minecraft:jagged",
-                "xz_scale": 1500.0,
-                "y_scale": 0.0
+                "xz_scale": 1500,
+                "y_scale": 0
               }
             }
           }
