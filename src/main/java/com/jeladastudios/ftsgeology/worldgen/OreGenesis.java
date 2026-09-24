@@ -46,6 +46,9 @@ import java.util.Map;
  *   <li><b>Hydrothermal veins</b> wherever a fault or a geothermal field moves hot water: thin sheets of quartz
  *       with ore in shoots, zoned by depth, cinnabar only in the shallow, cooler part.</li>
  *   <li><b>Coal and ironstone</b> in the quiet basins between the belts, as seams in shale.</li>
+ *   <li><b>Kimberlite</b> in the old heart of a continent - a pipe of peridotite with diamonds in its root.</li>
+ *   <li><b>Magnetite</b> in the sea floor's gabbro, as flat seams, and scattered through serpentinite.</li>
+ *   <li><b>Native copper</b> at the top of old basalt flows in a rift or over a hot spot.</li>
  * </ul>
  *
  * <h2>Bodies, not dice</h2>
@@ -69,6 +72,9 @@ public final class OreGenesis {
         skarns(d);
         massiveSulfides(d);
         faultGouge(d);
+        kimberlites(d);
+        magnetite(d);
+        nativeCopper(d);
         return d.placed;
     }
 
@@ -634,6 +640,147 @@ public final class OreGenesis {
                 }
             }
         }
+    }
+
+    // === Ore in the mafic and ultramafic rocks ====================================
+    //
+    // The dark rocks of the sea floor and the mantle -- gabbro, peridotite, serpentinite, basalt -- are the hosts of
+    // their own ores, and a player who knows it reads them as a sign. These three are placed only on the mod's own
+    // world types, where the rock model says where those rocks are.
+
+    /** The nearest height, from {@code from} downwards through {@code span} blocks, at which the column is one of these rocks. */
+    private static int findHost(Deposit d, Lithology.Column col, int x, int z, int ground, int from, int span,
+                                java.util.Set<Lithology.Rock> hosts) {
+        for (int y = from; y > from - span; y--) {
+            if (y <= d.level.getMinBuildHeight() + 6) return Integer.MIN_VALUE;
+            if (hosts.contains(Lithology.rockAt(d.rockSeed, col, x, y, z, ground))) return y;
+        }
+        return Integer.MIN_VALUE;
+    }
+
+    private static final int PIPE_CELL = 192, PIPE_REACH = 10;
+
+    /**
+     * Kimberlite: a carrot-shaped pipe of mantle rock punched up through the old heart of a continent, carrying
+     * diamonds from deep down. Only in the plate interiors, far from any boundary, as the real ones are in the oldest
+     * cratons. The pipe is peridotite, altered to serpentinite in its upper part; the diamonds are in its lower part,
+     * scattered thin. It stops short of the surface: nothing of it shows but the rock a miner digs into.
+     */
+    private static void kimberlites(Deposit d) {
+        if (!d.own) return;
+        d.cells(PIPE_CELL, PIPE_REACH, 0x61B3L, (cellX, cellZ, h) -> {
+            if (die(h, 0) >= 0.3) return;
+            int ax = cellX + 12 + (int) (die(h, 1) * (PIPE_CELL - 24)), az = cellZ + 12 + (int) (die(h, 2) * (PIPE_CELL - 24));
+            Lithology.Column col = d.column(ax, az);
+            if (col == null || col.setting() != Lithology.Setting.PLATFORM || col.weight() < 1.0) return;
+            if (TectonicMap.sampleCached(d.world, ax, az).faultType() != FaultType.INTERIOR) return;
+            int ground = d.base(ax, az);
+            int bottom = d.level.getMinBuildHeight() + 6, top = ground - 8;
+            if (top - bottom < 40) return;
+            double r0 = 3.5 + die(h, 3) * 2.5;
+            int ext = (int) Math.ceil(r0) + 2;
+            for (int x = d.minX(ax - ext); x <= d.maxX(ax + ext); x++) {
+                for (int z = d.minZ(az - ext); z <= d.maxZ(az + ext); z++) {
+                    double dist = Math.hypot(x - ax, z - az);
+                    if (dist > r0 + 1.5) continue;
+                    for (int y = bottom; y <= top; y++) {
+                        double f = (y - bottom) / (double) (top - bottom);
+                        // Narrow at the root, widening upward, its wall wandering a block.
+                        double r = r0 * (0.3 + 0.7 * Math.pow(f, 0.8)) + noise3D(x + 611, y, z - 611, 6.0, 6.0);
+                        if (dist > r) continue;
+                        Block b = f > 0.65 ? ModBlocks.SERPENTINITE.get() : ModBlocks.PERIDOTITE.get();
+                        if (f < 0.6 && grain(x, y, z, 0x61) < 0.006) b = y < 0 ? Blocks.DEEPSLATE_DIAMOND_ORE : Blocks.DIAMOND_ORE;
+                        d.set(x, y, z, b, 6);
+                    }
+                }
+            }
+        });
+    }
+
+    private static final int MAG_CELL = 40, MAG_REACH = 14;
+    private static final java.util.Set<Lithology.Rock> MAFIC = java.util.EnumSet.of(Lithology.Rock.GABBRO,
+            Lithology.Rock.SERPENTINITE, Lithology.Rock.PERIDOTITE);
+
+    /**
+     * Magnetite. In gabbro it settles out of the cooling magma in layers -- seams of iron ore a block or two thick lying
+     * flat through the rock, as in the Bushveld. In peridotite and serpentinite it comes of the serpentinisation
+     * itself, scattered through a pod. Either way the ore keeps to its host: a seam stops where the gabbro does.
+     */
+    private static void magnetite(Deposit d) {
+        if (!d.own) return;
+        d.cells(MAG_CELL, MAG_REACH, 0x3A6EL, (cellX, cellZ, h) -> {
+            if (die(h, 0) >= 0.55) return;
+            int ax = cellX + (int) (die(h, 1) * MAG_CELL), az = cellZ + (int) (die(h, 2) * MAG_CELL);
+            Lithology.Column col = d.column(ax, az);
+            if (col == null) return;
+            Lithology.Setting st = col.setting();
+            if (st != Lithology.Setting.OCEAN_FLOOR && st != Lithology.Setting.HOTSPOT && st != Lithology.Setting.RIFT
+                    && st != Lithology.Setting.ARC && st != Lithology.Setting.PRISM) return;
+            int ground = d.base(ax, az);
+            int ay = findHost(d, col, ax, az, ground, ground - 12 - (int) (die(h, 3) * 20), 100, MAFIC);
+            if (ay == Integer.MIN_VALUE) return;
+            Lithology.Rock host = Lithology.rockAt(d.rockSeed, col, ax, ay, az, ground);
+            boolean seam = host == Lithology.Rock.GABBRO;
+            double a = seam ? 8.0 + die(h, 4) * 6.0 : 3.0 + die(h, 4) * 1.5;
+            double b = seam ? 5.0 + die(h, 5) * 4.0 : a;
+            int thick = seam ? 1 + (int) (die(h, 6) * 2) : (int) Math.ceil(a);
+            double turn = die(h, 7) * Math.PI;
+            double cx = Math.cos(turn), sz = Math.sin(turn);
+            int ext = (int) Math.ceil(a) + 1;
+            for (int x = d.minX(ax - ext); x <= d.maxX(ax + ext); x++) {
+                for (int z = d.minZ(az - ext); z <= d.maxZ(az + ext); z++) {
+                    double along = (x - ax) * cx + (z - az) * sz, across = -(x - ax) * sz + (z - az) * cx;
+                    double flat = (along / a) * (along / a) + (across / b) * (across / b);
+                    if (flat > 1.0) continue;
+                    for (int dy = -thick; dy <= thick; dy++) {
+                        int y = ay + dy;
+                        if (seam ? dy < 0 || dy >= thick : flat + (dy / a) * (dy / a) > 1.0) continue;
+                        double g = grain(x, y, z, 0x3A);
+                        if (g >= (seam ? 0.75 : 0.25)) continue;
+                        if (!MAFIC.contains(Lithology.rockAt(d.rockSeed, col, x, y, z, d.ground(x, z)))) continue;
+                        d.set(x, y, z, y < 0 ? Blocks.DEEPSLATE_IRON_ORE : Blocks.IRON_ORE, 5);
+                    }
+                }
+            }
+        });
+    }
+
+    private static final int CU_CELL = 36, CU_REACH = 12;
+    private static final java.util.Set<Lithology.Rock> BASALTS = java.util.EnumSet.of(Lithology.Rock.BASALT,
+            Lithology.Rock.SMOOTH_BASALT);
+
+    /**
+     * Native copper, the metal itself, filling the gas holes and cracks at the top of old basalt flows where the
+     * fluids moving through a rift or over a hot spot dropped it -- the Keweenaw's copper. A flow top is flat, so the
+     * copper lies in a sheet, sparse through it, and only in the basalt.
+     */
+    private static void nativeCopper(Deposit d) {
+        if (!d.own) return;
+        d.cells(CU_CELL, CU_REACH, 0xC0C0L, (cellX, cellZ, h) -> {
+            if (die(h, 0) >= 0.5) return;
+            int ax = cellX + (int) (die(h, 1) * CU_CELL), az = cellZ + (int) (die(h, 2) * CU_CELL);
+            Lithology.Column col = d.column(ax, az);
+            if (col == null) return;
+            if (col.setting() != Lithology.Setting.RIFT && col.setting() != Lithology.Setting.HOTSPOT) return;
+            int ground = d.base(ax, az);
+            int ay = findHost(d, col, ax, az, ground, ground - 6 - (int) (die(h, 3) * 25), 60, BASALTS);
+            if (ay == Integer.MIN_VALUE) return;
+            double a = 10.0 + die(h, 4) * 6.0, b = 6.0 + die(h, 5) * 4.0;
+            double turn = die(h, 6) * Math.PI;
+            double cx = Math.cos(turn), sz = Math.sin(turn);
+            int ext = (int) Math.ceil(a) + 1;
+            for (int x = d.minX(ax - ext); x <= d.maxX(ax + ext); x++) {
+                for (int z = d.minZ(az - ext); z <= d.maxZ(az + ext); z++) {
+                    double along = (x - ax) * cx + (z - az) * sz, across = -(x - ax) * sz + (z - az) * cx;
+                    if ((along / a) * (along / a) + (across / b) * (across / b) > 1.0) continue;
+                    for (int y = ay; y <= ay + 1; y++) {
+                        if (grain(x, y, z, 0xC0) >= 0.14) continue;
+                        if (!BASALTS.contains(Lithology.rockAt(d.rockSeed, col, x, y, z, d.ground(x, z)))) continue;
+                        d.set(x, y, z, y < 0 ? Blocks.DEEPSLATE_COPPER_ORE : Blocks.COPPER_ORE, 4);
+                    }
+                }
+            }
+        });
     }
 
     /** Natural rock a deposit may replace. Ore already there, the generator's or another deposit's, stays. */
