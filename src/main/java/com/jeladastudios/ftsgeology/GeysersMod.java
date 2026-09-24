@@ -87,6 +87,7 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.instrument.SeismicNetwork.clear();
         com.jeladastudios.ftsgeology.command.SiteTeleport.clear();
         com.jeladastudios.ftsgeology.blockentity.GeothermalTurbineBlockEntity.clearAll();
+        com.jeladastudios.ftsgeology.blockentity.GeyserCoreBlockEntity.clearAll();
         com.jeladastudios.ftsgeology.worldgen.LavaTubes.clear();
         com.jeladastudios.ftsgeology.worldgen.OreGenesis.clear();
         com.jeladastudios.ftsgeology.worldgen.GeothermalBasin.clear();

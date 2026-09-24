@@ -83,6 +83,8 @@ public final class VentPathfinder {
 
             BlockState s = level.getBlockState(above);
             if (s.is(Blocks.BEDROCK)) break;     // never break bedrock — and no side path found
+            // Nor a turbine capping the vent: it is meant to be there, and the core does not erupt under one.
+            if (s.is(com.jeladastudios.ftsgeology.registry.ModBlocks.GEOTHERMAL_TURBINE.get())) break;
 
             boolean easy = EruptionHandler.isNaturalTerrain(s);   // soft/natural terrain clears readily
             boolean force = GeyserConfig.VENT_BREAKS_OBSTRUCTIONS.get()

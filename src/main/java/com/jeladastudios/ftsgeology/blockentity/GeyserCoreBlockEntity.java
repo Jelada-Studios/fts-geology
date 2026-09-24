@@ -21,10 +21,15 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FluidState;
 
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import net.minecraft.resources.ResourceKey;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -95,6 +100,15 @@ public class GeyserCoreBlockEntity extends BlockEntity {
      * its way to daylight across eruptions instead of re-climbing from the core.
      */
     private int ventTopY = UNKNOWN_MOUTH_Y;
+
+    /**
+     * How far a turbine may stand from the core's axis, and how far under and over the vent's mouth, and still sit on
+     * the vent: the vent can jog a block sideways on its way up, and the mouth is walled by its own sinter.
+     */
+    public static final int CAP_REACH = 2, CAP_BELOW = 6, CAP_ABOVE = 2;
+
+    /** Where the loaded cores are, per dimension, so a turbine set on a vent can find the core under it. */
+    private static final Map<ResourceKey<Level>, LongOpenHashSet> LOADED = new HashMap<>();
 
     /** Last mouth resolved by the pathfinder (transient cache for the per-tick jet). */
     private transient BlockPos currentMouth;
@@ -398,7 +412,10 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         double crackP = GeyserConfig.CRUST_EROSION_PRESSURE.get();
         // Re-trace the live vent mouth once per second. While erupting the trace is allowed to
         // breach/reroute, so a plugged vent blasts back open and a capped one force-breaches.
-        BlockPos mouth = resolveMouth(level, pos, phase == Phase.ERUPTING);
+        // A turbine set on the vent takes the steam: the geyser no longer erupts, and nothing bores through it.
+        boolean capped = ventMouthY != UNKNOWN_MOUTH_Y
+                && GeothermalTurbineBlockEntity.capsVent(level, pos, ventMouthY);
+        BlockPos mouth = resolveMouth(level, pos, phase == Phase.ERUPTING && !capped);
 
         // Secondary fumaroles puff whenever the system is hot; they bite (lightly) mid-eruption.
         if ((phase == Phase.PRESSURIZING || phase == Phase.ERUPTING) && fumaroleTips.length > 0) {
@@ -435,7 +452,9 @@ public class GeyserCoreBlockEntity extends BlockEntity {
                 if (pressure >= crackP) {
                     EruptionHandler.erodeCrust(level, mouth, pressure);
                 }
-                if (pressure >= erupt) {
+                if (capped) {
+                    latentSteam = 0.0;          // drawn off through the turbine, never built into an eruption
+                } else if (pressure >= erupt) {
                     beginEruption(level, pos, mouth);
                 }
                 // If we lost heat before erupting, fall back.
@@ -444,6 +463,10 @@ public class GeyserCoreBlockEntity extends BlockEntity {
                 }
             }
             case ERUPTING -> {
+                if (capped) {
+                    endEruption(level, pos, mouth);
+                    break;
+                }
                 // Venting bleeds latent steam and pressure each second.
                 double vented = Math.max(latentSteam * 0.25, 500.0);
                 latentSteam = Math.max(0.0, latentSteam - vented);
@@ -609,6 +632,70 @@ public class GeyserCoreBlockEntity extends BlockEntity {
     }
 
     public int getVentMouthY() { return ventMouthY; }
+
+    /**
+     * The core whose vent opens just under or at this spot, or null: its axis within {@link #CAP_REACH} blocks, its
+     * mouth no more than {@link #CAP_BELOW} blocks over the spot nor {@link #CAP_ABOVE} under it.
+     */
+    public static GeyserCoreBlockEntity under(ServerLevel level, BlockPos top) {
+        long[] cores;
+        synchronized (LOADED) {
+            LongOpenHashSet all = LOADED.get(level.dimension());
+            if (all == null || all.isEmpty()) return null;
+            cores = all.toLongArray();
+        }
+        GeyserCoreBlockEntity best = null;
+        int bestD = Integer.MAX_VALUE;
+        for (long l : cores) {
+            BlockPos p = BlockPos.of(l);
+            int dx = Math.abs(p.getX() - top.getX()), dz = Math.abs(p.getZ() - top.getZ());
+            if (dx > CAP_REACH || dz > CAP_REACH || p.getY() >= top.getY()) continue;
+            if (!(level.getBlockEntity(p) instanceof GeyserCoreBlockEntity core)) continue;
+            int mouth = core.ventMouthY;
+            if (mouth == UNKNOWN_MOUTH_Y || top.getY() < mouth - CAP_BELOW || top.getY() > mouth + CAP_ABOVE) continue;
+            if (dx + dz < bestD) {
+                bestD = dx + dz;
+                best = core;
+            }
+        }
+        return best;
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        if (!(level instanceof ServerLevel)) return;
+        synchronized (LOADED) {
+            LOADED.computeIfAbsent(level.dimension(), k -> new LongOpenHashSet()).add(worldPosition.asLong());
+        }
+    }
+
+    @Override
+    public void setRemoved() {
+        super.setRemoved();
+        forget();
+    }
+
+    @Override
+    public void onChunkUnloaded() {
+        super.onChunkUnloaded();
+        forget();
+    }
+
+    private void forget() {
+        if (!(level instanceof ServerLevel)) return;
+        synchronized (LOADED) {
+            LongOpenHashSet all = LOADED.get(level.dimension());
+            if (all != null) all.remove(worldPosition.asLong());
+        }
+    }
+
+    /** Forgets every core: the server is going down, and the next may be another world. */
+    public static void clearAll() {
+        synchronized (LOADED) {
+            LOADED.clear();
+        }
+    }
 
     /** Stamped once at generation when the surface shaft is carved. */
     public void setVentMouthY(int y) {

@@ -41,7 +41,8 @@ import java.util.Map;
  * chamber, a steam vent, a mud pot -- and the heat round its foot (the reservoir's magma bed above all) sets how hard
  * the turbine runs. A short well beside a pool reaches the pool's own bed and runs part way; a deep one bored down to
  * the chamber a spring or a geyser rises from runs flat out. Lava poured down a hole is not a reservoir: there is no
- * water there to make steam of. Turbines close together draw on one reservoir and share it, and the same well away
+ * water there to make steam of. A geyser's own vent is a well already: a turbine set on it caps the geyser, which
+ * stops erupting and sends its steam through the turbine instead, flat out, with no casing needed. Turbines close together draw on one reservoir and share it, and the same well away
  * from the plate boundaries and plumes that make geothermal ground runs weaker.
  */
 public class GeothermalTurbineBlockEntity extends BlockEntity {
@@ -82,6 +83,8 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
     private int well;
     private double heat;
     private boolean reservoir;
+    /** Whether it stands capping a geyser's vent rather than on a well of its own. */
+    private boolean onGeyser;
     private double region = 1.0;
     private int perTick;
     private int sharing = 1;
@@ -150,6 +153,14 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
         well = depth;
         double h = 0;
         boolean found = false;
+        GeyserCoreBlockEntity geyser = depth == 0 ? GeyserCoreBlockEntity.under(level, worldPosition) : null;
+        onGeyser = geyser != null;
+        if (onGeyser) {
+            // The geyser's vent is the well, bored to its chamber on its magma bed: all the heat a turbine can use.
+            well = worldPosition.getY() - geyser.getBlockPos().getY();
+            h = HEAT_FULL;
+            found = true;
+        }
         if (depth > 0) {
             // Round the open foot of the string: the block under its last length, and two either way.
             int fx = worldPosition.getX(), fy = worldPosition.getY() - depth - 1, fz = worldPosition.getZ();
@@ -201,6 +212,22 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
         return 0.0;
     }
 
+    /** Whether a turbine drawing on the ground stands over this geyser core's vent, near where the vent opens. */
+    public static boolean capsVent(ServerLevel level, BlockPos core, int mouthY) {
+        synchronized (PLACED) {
+            LongOpenHashSet all = PLACED.get(level.dimension());
+            if (all == null) return false;
+            for (long l : all) {
+                BlockPos p = BlockPos.of(l);
+                if (Math.abs(p.getX() - core.getX()) <= GeyserCoreBlockEntity.CAP_REACH
+                        && Math.abs(p.getZ() - core.getZ()) <= GeyserCoreBlockEntity.CAP_REACH
+                        && p.getY() >= mouthY - GeyserCoreBlockEntity.CAP_BELOW
+                        && p.getY() <= mouthY + GeyserCoreBlockEntity.CAP_ABOVE) return true;
+            }
+        }
+        return false;
+    }
+
     /** Puts this turbine among those drawing on the ground, or takes it out. */
     private void drawing(ServerLevel level, boolean draws) {
         synchronized (PLACED) {
@@ -246,7 +273,9 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
     /** What a right-click reads off it. */
     public List<Component> report() {
         List<Component> out = new ArrayList<>();
-        if (well == 0) {
+        if (onGeyser) {
+            out.add(Component.translatable("message.fts_geology.turbine.geyser"));
+        } else if (well == 0) {
             out.add(Component.translatable("message.fts_geology.turbine.no_well"));
         } else if (!reservoir) {
             out.add(Component.translatable("message.fts_geology.turbine.no_reservoir", well));

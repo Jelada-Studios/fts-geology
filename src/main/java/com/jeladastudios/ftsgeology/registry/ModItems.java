@@ -1,6 +1,7 @@
 package com.jeladastudios.ftsgeology.registry;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
+import com.jeladastudios.ftsgeology.item.DescribedBlockItem;
 import com.jeladastudios.ftsgeology.item.FaultCompassItem;
 import com.jeladastudios.ftsgeology.item.FieldGuideItem;
 import com.jeladastudios.ftsgeology.item.GeologistsHammerItem;
@@ -249,10 +250,10 @@ public final class ModItems {
     // discoverable, and in a classroom it is the difference between a demonstration and a lesson.
 
     public static final RegistryObject<Item> GEOTHERMAL_TURBINE = ITEMS.register("geothermal_turbine",
-            () -> new BlockItem(ModBlocks.GEOTHERMAL_TURBINE.get(), new Item.Properties()));
+            () -> new DescribedBlockItem(ModBlocks.GEOTHERMAL_TURBINE.get(), new Item.Properties(), 3));
 
     public static final RegistryObject<Item> WELL_CASING = ITEMS.register("well_casing",
-            () -> new BlockItem(ModBlocks.WELL_CASING.get(), new Item.Properties()));
+            () -> new DescribedBlockItem(ModBlocks.WELL_CASING.get(), new Item.Properties(), 2));
 
     public static final RegistryObject<Item> SEISMOGRAPH = ITEMS.register("seismograph",
             () -> new BlockItem(ModBlocks.SEISMOGRAPH.get(), new Item.Properties()));
