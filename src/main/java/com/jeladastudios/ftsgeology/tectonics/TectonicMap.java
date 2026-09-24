@@ -76,13 +76,40 @@ public final class TectonicMap {
      * @param gap how much further away the second boundary is, in blocks
      */
     /**
-     * A column's three nearest boundaries and how much further than the first the other two lie. The terrain blends
-     * all three by distance: a column near where boundaries meet is shaped by every one of them, and the blend has
-     * to stay continuous where the second or third nearest changes identity, and across the first boundary itself,
-     * where the column's own plate and with it the whole set of boundaries change. Where fewer are found the rest
-     * repeat the first with an infinite gap.
+     * A column's nearest boundary and every other within {@link #NEIGHBOUR_REACH} of being as near, nearest first, with
+     * how much further than the first each lies. The terrain blends them all by distance: a column near where
+     * boundaries meet is shaped by every one of them, and the blend has to stay continuous where the order among them
+     * changes, and across the first boundary itself, where the column's own plate and with it the whole set change.
+     *
+     * <p>It used to keep the three nearest. Near a junction four or five boundaries lie within a few blocks of the same
+     * distance, and where the fourth overtook the third it came into the blend at seven tenths of its weight: a
+     * collision belt's crop stood up out of a rift's floor as a straight wall a hundred blocks high. Kept whole, a
+     * boundary comes into the blend only at the reach, where its weight is nothing.</p>
      */
-    public record Edges(PlateSample first, PlateSample second, PlateSample third, double gap, double gap3) {}
+    public record Edges(PlateSample first, PlateSample[] rest, double[] gaps, double[] lends) {
+        /** The second nearest, or the first where there is none. */
+        public PlateSample second() {
+            return rest.length > 0 ? rest[0] : first;
+        }
+
+        /** The third nearest, or the first where there is none. */
+        public PlateSample third() {
+            return rest.length > 1 ? rest[1] : first;
+        }
+
+        /** How much further the second lies than the first, or infinitely far. */
+        public double gap() {
+            return gaps.length > 0 ? gaps[0] : Double.MAX_VALUE;
+        }
+
+        /** How much further the third lies than the first, or infinitely far. */
+        public double gap3() {
+            return gaps.length > 1 ? gaps[1] : Double.MAX_VALUE;
+        }
+    }
+
+    private static final PlateSample[] NO_SAMPLES = new PlateSample[0];
+    private static final double[] NO_GAPS = new double[0];
 
     /**
      * How near its own boundary a column has to be for the plate across it to lend its boundaries, in blocks: the
@@ -139,29 +166,77 @@ public final class TectonicMap {
         double faultDistance = Math.max(0.0, own[0]);
         PlateKind kind = biomes == null ? seededKind(seed, plateId, params) : plateKind(biomes, seed, bgx, bgz, scale, jitter);
         PlateSample first = boundary(seed, plateId, kind, (int) own[3], (int) own[4], faultDistance, own[1], own[2], own[7], biomes, params);
-        if (!withSecond) return new Edges(first, first, first, Double.MAX_VALUE, Double.MAX_VALUE);
+        if (!withSecond) return new Edges(first, NO_SAMPLES, NO_GAPS, NO_GAPS);
 
-        // 3. Near the boundary, the plate across it has boundaries of its own that reach this column: where three
-        //    plates meet, all three boundaries shape the ground. They are taken in from both sides of the line, as
-        //    that plate sees them, so the ground blended from them is the same on both sides and crossing the line
-        //    is no step. Blending this plate's own two nearest alone jumped by ninety blocks at every junction.
-        // Only near the line: a boundary's bisector runs on past the plates it parts, and taken from further away the
-        // line of one of the neighbour's boundaries passed within ten blocks of a column five hundred blocks inside
-        // its own plate, as a mountain range that was not there.
-        int ngx = (int) own[3], ngz = (int) own[4];
-        if (faultDistance < NEIGHBOUR_REACH * params.horizontal()) {
-            collectEdges(seed, ngx, ngz, siteX(seed, ngx, ngz, scale, jitter), siteZ(seed, ngx, ngz, scale, jitter),
-                    px, pz, scale, jitter, true, bgx, bgz, edges);
+        // 3. Every plate near this column lends its boundaries: where three plates meet, all three boundaries shape the
+        //    ground. Each lends by how near its own ground is, measured to its whole outline, so the answer does not
+        //    depend on which plate the column stands in: crossing a line, the two sides see the same boundaries at the
+        //    same weights and the ground runs on. Only the plate across the nearest line used to lend, and where a
+        //    column crossed into a third plate's cell at a junction, a collision belt's boundary lent by the plate it
+        //    had left dropped out of the blend -- a hundred and twenty blocks of mountain gone in four.
+        // Only near: a boundary's bisector runs on past the plates it parts, and taken from further away the line of
+        // one of a neighbour's boundaries passed within ten blocks of a column five hundred blocks inside its own
+        // plate, as a mountain range that was not there.
+        double reach = NEIGHBOUR_REACH * params.horizontal();
+        double ownD2 = (bx - px) * (bx - px) + (bz - pz) * (bz - pz);
+        java.util.Map<Long, double[]> unique = new java.util.HashMap<>();
+        for (double[] e : edges) if (e != own) keepNearer(unique, e, 0.0);
+        for (int ox = -2; ox <= 2; ox++) {
+            for (int oz = -2; oz <= 2; oz++) {
+                if (ox == 0 && oz == 0) continue;
+                int cx = bgx + ox, cz = bgz + oz;
+                double sx = siteX(seed, cx, cz, scale, jitter), sz = siteZ(seed, cx, cz, scale, jitter);
+                double sep = Math.sqrt((sx - bx) * (sx - bx) + (sz - bz) * (sz - bz));
+                if (sep < 1.0e-6) continue;
+                // That plate lies past the bisector between its centre and this one's, so it is at least this far.
+                if (((sx - px) * (sx - px) + (sz - pz) * (sz - pz) - ownD2) / (2.0 * sep) >= reach) continue;
+                java.util.List<double[]> theirs = new java.util.ArrayList<>();
+                collectEdges(seed, cx, cz, sx, sz, px, pz, scale, jitter, false, cx, cz, theirs);
+                double near = Double.MAX_VALUE;
+                for (double[] e : theirs) near = Math.min(near, e[0]);
+                if (near >= reach) continue;
+                for (double[] e : theirs) keepNearer(unique, e, near);
+            }
         }
-        edges.remove(own);
-        edges.sort(java.util.Comparator.comparingDouble(e -> e[0]));
-        PlateSample second = edges.isEmpty() ? first : sampleFor(seed, edges.get(0), biomes, params, scale, jitter);
-        PlateSample third = edges.size() < 2 ? first : sampleFor(seed, edges.get(1), biomes, params, scale, jitter);
-        // A neighbour's boundary can lie nearer than this plate's own: the gap is then negative and the blend takes
-        // it in full.
-        double gap2 = edges.isEmpty() ? Double.MAX_VALUE : edges.get(0)[0] - faultDistance;
-        double gap3 = edges.size() < 2 ? Double.MAX_VALUE : edges.get(1)[0] - faultDistance;
-        return new Edges(first, second, third, gap2, gap3);
+        unique.remove(pairKey(own));
+        java.util.List<double[]> sorted = new java.util.ArrayList<>(unique.values());
+        sorted.sort(java.util.Comparator.comparingDouble(e -> e[0]));
+        // Every boundary that could weigh at all, and the two nearest whatever their distance, for the roles. A
+        // neighbour's boundary can lie nearer than this plate's own: the gap is then negative and the blend takes it in
+        // full.
+        int keep = 0;
+        while (keep < sorted.size() && (keep < 2 || sorted.get(keep)[0] - faultDistance < reach)) keep++;
+        PlateSample[] rest = new PlateSample[keep];
+        double[] gaps = new double[keep], lends = new double[keep];
+        for (int i = 0; i < keep; i++) {
+            rest[i] = sampleFor(seed, sorted.get(i), biomes, params, scale, jitter);
+            gaps[i] = sorted.get(i)[0] - faultDistance;
+            lends[i] = sorted.get(i)[8];
+        }
+        return new Edges(first, rest, gaps, lends);
+    }
+
+    /**
+     * Keeps one copy of a boundary: the same line is found from both the plates it parts, and the copy from the plate
+     * nearer this column lends it more.
+     */
+    private static void keepNearer(java.util.Map<Long, double[]> unique, double[] e, double lend) {
+        long key = pairKey(e);
+        double[] was = unique.get(key);
+        if (was != null && was[8] <= lend) return;
+        double[] c = java.util.Arrays.copyOf(e, 9);
+        c[8] = lend;
+        unique.put(key, c);
+    }
+
+    /** The boundary between the two cells an edge runs between, whichever of them it was found from. */
+    private static long pairKey(double[] e) {
+        long a = cellKey((int) e[5], (int) e[6]), b = cellKey((int) e[3], (int) e[4]);
+        return a < b ? a * 0x9E3779B97F4A7C15L + b : b * 0x9E3779B97F4A7C15L + a;
+    }
+
+    private static long cellKey(int gx, int gz) {
+        return ((long) gx << 32) ^ (gz & 0xffffffffL);
     }
 
     /**

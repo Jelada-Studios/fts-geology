@@ -232,17 +232,14 @@ public final class TerrainFields {
         // as it comes as near as the nearest. Two boundaries at the same distance take the same share, so the
         // second or third changing identity is continuous; both sides of a line see the same set, so crossing it is.
         double handover = HANDOVER * p.horizontal();
-        double w2 = e.gap() < handover ? smooth(1.0 - Math.max(0.0, e.gap()) / handover) : 0.0;
-        double w3 = e.gap3() < handover ? smooth(1.0 - Math.max(0.0, e.gap3()) / handover) : 0.0;
-        // The plate across the line lends its boundaries only near the line, and their share goes out as the column
-        // goes in, so that they neither switch on at a set distance nor reach, as lines, deep into this plate.
-        double lend = smooth(1.0 - Math.min(1.0, e.first().faultDistance() / handover));
-        if (e.second().plateId() != e.first().plateId()) w2 *= lend;
-        if (e.third().plateId() != e.first().plateId()) w3 *= lend;
-        double v = value(field, e.first(), p, seed, x, z);
-        if (w2 > 0) v += w2 * value(field, e.second(), p, seed, x, z);
-        if (w3 > 0) v += w3 * value(field, e.third(), p, seed, x, z);
-        v /= 1.0 + w2 + w3;
+        double v = value(field, e.first(), p, seed, x, z), weights = 1.0;
+        for (int i = 0; i < e.rest().length; i++) {
+            double w = weight(e, i, handover);
+            if (w <= 0) continue;
+            v += w * value(field, e.rest()[i], p, seed, x, z);
+            weights += w;
+        }
+        v /= weights;
         // A belt's floodplain belongs to the belt, whichever boundary is nearer: read off the nearer boundary alone,
         // it stopped on the line where a quiet coast took over as nearest, and the plain's few blocks of lift ended
         // there in a dead-straight shore.
@@ -258,16 +255,26 @@ public final class TerrainFields {
     public static String debugAt(long seed, GeologyParams p, int x, int z) {
         TectonicMap.Edges e = edgesAt(seed, p, x, z);
         double handover = HANDOVER * p.horizontal();
-        double w2 = e.gap() < handover ? smooth(1.0 - Math.max(0.0, e.gap()) / handover) : 0.0;
-        double w3 = e.gap3() < handover ? smooth(1.0 - Math.max(0.0, e.gap3()) / handover) : 0.0;
-        double lend = smooth(1.0 - Math.min(1.0, e.first().faultDistance() / handover));
-        if (e.second().plateId() != e.first().plateId()) w2 *= lend;
-        if (e.third().plateId() != e.first().plateId()) w3 *= lend;
-        return String.format(java.util.Locale.ROOT,
-                "first %s d %.0f plate %d e %.3f | second %s gap %.0f w %.3f plate %d e %.3f | third %s gap %.0f w %.3f plate %d e %.3f",
-                e.first().boundaryType(), e.first().faultDistance(), e.first().plateId(), erosion(e.first(), p, seed, x, z),
-                e.second().boundaryType(), e.gap(), w2, e.second().plateId(), erosion(e.second(), p, seed, x, z),
-                e.third().boundaryType(), e.gap3(), w3, e.third().plateId(), erosion(e.third(), p, seed, x, z));
+        StringBuilder sb = new StringBuilder(String.format(java.util.Locale.ROOT, "first %s d %.0f plate %d e %.3f",
+                e.first().boundaryType(), e.first().faultDistance(), e.first().plateId(), erosion(e.first(), p, seed, x, z)));
+        for (int i = 0; i < e.rest().length; i++) {
+            PlateSample s = e.rest()[i];
+            sb.append(String.format(java.util.Locale.ROOT, " | %s gap %.0f w %.3f plate %d e %.3f", s.boundaryType(),
+                    e.gaps()[i], weight(e, i, handover), s.plateId(), erosion(s, p, seed, x, z)));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * How much of the i-th further boundary a column takes: by how nearly as near it is as the first, and, lent by
+     * another plate, by how near that plate's own ground is -- so a lent boundary neither switches on at a set distance
+     * nor reaches, as a line, deep into the plate the column stands in.
+     */
+    private static double weight(TectonicMap.Edges e, int i, double handover) {
+        double gap = e.gaps()[i];
+        if (gap >= handover) return 0.0;
+        double w = smooth(1.0 - Math.max(0.0, gap) / handover);
+        return w * smooth(1.0 - Math.min(1.0, e.lends()[i] / handover));
     }
 
     /** How deep into a belt's floodplain a column lies, from whichever of its two boundaries says it is deeper. */
