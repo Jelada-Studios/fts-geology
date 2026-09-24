@@ -12,113 +12,760 @@
 # =====================================================================
 
 [thermodynamics]
-    # Degrees C added per tick per adjacent lava/magma block (lowered so it doesn't boil instantly).
-    heatPerLavaNeighbor = 0.30
-    # Passive heat loss per tick when no heat source is adjacent.
-    ambientCoolingPerTick = 0.10
-    # Temperature at which water starts flashing to steam pressure.
-    boilingPointC = 100.0
-    # Hard cap on chamber temperature.
-    maxTemperatureC = 450.0
-    # Abstract volume expansion of 1 water block -> steam (~1600:1).
-    steamExpansionRatio = 1600
+	#Degrees Celsius added per tick for each adjacent lava/magma block.
+	#Lowered so setups don't boil almost instantly â€” gives time to react in a base.
+	#Range: 0.0 ~ 100.0
+	heatPerLavaNeighbor = 0.3
+	#Passive heat loss per tick when no heat source is adjacent.
+	#Range: 0.0 ~ 100.0
+	ambientCoolingPerTick = 0.1
+	#Temperature at which water begins converting to steam pressure.
+	#Range: 0.0 ~ 1000.0
+	boilingPointC = 100.0
+	#Hard cap on chamber temperature.
+	#Range: 100.0 ~ 5000.0
+	maxTemperatureC = 450.0
+	#Abstract volume expansion of 1 water block flashing to steam (~1600).
+	#Range: 1 ~ 10000
+	steamExpansionRatio = 1600
 
 [pressure]
-    # P at which an eruption fires.
-    eruptionThreshold = 4000.0
-    # P below which the jet field is removed and venting stops.
-    safeThreshold = 800.0
-    # P at which the rock cap above the core begins to crack.
-    crustErosionPressure = 2500.0
-    # Explosion power at the vent mouth. NONE interaction = no block damage; safe for builds.
-    explosionPower = 1.5
-    # Sustained updraft velocity in the active vent column (gentle steady flow).
-    jetUpwardVelocity = 0.5
-    # Extra updraft at eruption onset, decaying over time. The whole jet is hard-capped in code
-    # (~1.6/tick) so overlapping vents can't fling you 100+ blocks.
-    jetBurstVelocity = 0.5
-    # Time constant (ticks) for the onset burst to fade (~40 = a couple seconds).
-    jetBurstDecayTicks = 40
-    # One-time upward velocity at breakthrough (~1.2 throws a player ~8-10 blocks up).
-    onsetLaunchVelocity = 1.2
-    # How many surrounding pool-water cells get flung/flashed at breakthrough (scaled by size).
-    onsetWaterScatter = 6
-    # If you plug the vent with tough/placed blocks, let a high-pressure eruption blast through
-    # them (small explosions) rather than staying sealed. Natural terrain is always cleared;
-    # bedrock is never broken.
-    ventBreaksObstructions = true
-    # Pressure at which the vent force-breaches a tough cap it can't reroute around.
-    ventForceBreachPressure = 6000.0
+	#Pressure P at which an eruption is triggered.
+	#Range: 1.0 ~ 1.0E7
+	eruptionThreshold = 4000.0
+	#Pressure P below which the jet field is removed and venting stops.
+	#Range: 0.0 ~ 1.0E7
+	safeThreshold = 800.0
+	#Pressure at which the rock cap above the core starts cracking.
+	#Range: 1.0 ~ 1.0E7
+	crustErosionPressure = 2500.0
+	#world.explode() power at the vent mouth. Kept low to spare builds.
+	#Range: 0.0 ~ 20.0
+	explosionPower = 1.5
+	#Sustained updraft velocity in the active vent column (the gentle steady flow).
+	#Range: 0.0 ~ 10.0
+	jetUpwardVelocity = 0.5
+	#Extra updraft at the very start of an eruption, decaying over time. The whole
+	#jet is hard-capped so entities can't be flung to absurd heights even if several
+	#vents overlap.
+	#Range: 0.0 ~ 10.0
+	jetBurstVelocity = 0.5
+	#Time constant (ticks) for the onset burst to fade. ~40 = burst lasts a couple seconds.
+	#Range: 1 ~ 2000
+	jetBurstDecayTicks = 40
+	#One-time upward velocity given to entities caught in the initial breakthrough.
+	#Scaled by size and hard-capped so it stays sane; ~1.2 throws a player ~8-10
+	#blocks up. The violent first instant, distinct from the sustained flow.
+	#Range: 0.0 ~ 10.0
+	onsetLaunchVelocity = 1.2
+	#How many surrounding pool-water cells get flung/flashed at breakthrough
+	#(scaled up by magnitude). This is the 'water in the pool sprays everywhere' effect.
+	#Range: 0 ~ 128
+	onsetWaterScatter = 6
+	#If you plug the vent with tough/placed blocks, let a high-pressure eruption
+	#blast through them (small explosions) rather than being sealed forever. Natural
+	#terrain in the path is always cleared; this governs deliberate caps. Bedrock is
+	#never broken.
+	ventBreaksObstructions = true
+	#Pressure at which the vent force-breaches a tough cap it can't reroute around.
+	#Higher = you can hold it down longer before it blows through.
+	#Range: 1.0 ~ 1.0E7
+	ventForceBreachPressure = 6000.0
 
 [worldgen]
-    # Master switch for retroactive generation into existing chunks.
-    retrogenEnabled = true
-    # SAFETY CEILING: generation never edits blocks at or above this Y. Protects builds.
-    retrogenMaxY = -30
-    # Deepest Y scanned when carving a chamber.
-    retrogenMinY = -60
-    # Interior vertical size of a carved chamber.
-    chamberTargetHeight = 5
-    # Per-chunk probability that a chunk receives a geyser system.
-    chamberSpawnChance = 0.006
-    # Carve a thin vent from the deep chamber up to the surface so eruptions reach daylight.
-    # Build-safe: aborts (vent stays buried) if the path would hit non-natural terrain.
-    carveSurfaceShaft = true
-    # Safety cap on how many blocks a surface shaft may rise from the cap.
-    shaftMaxLength = 160
+	#How many chunks receive their geology per server tick.
+	#Features write well outside their own chunk, so running them straight from
+	#the chunk-load event forces neighbours to load and cascades. Queueing instead
+	#keeps the work bounded and means nothing runs during world creation at all.
+	#Range: 1 ~ 256
+	retrogenChunksPerTick = 16
+	#Master switch for retroactive generation into existing chunks.
+	retrogenEnabled = true
+	#SAFETY: generation never touches blocks at or above this Y. Protects builds.
+	#Range: -64 ~ 320
+	retrogenMaxY = -30
+	#Deepest Y scanned when carving a chamber.
+	#Range: -64 ~ 0
+	retrogenMinY = -60
+	#Interior vertical size of a carved geyser chamber.
+	#Range: 3 ~ 16
+	chamberTargetHeight = 5
+	#Per-chunk probability of a geyser BEFORE tectonic suitability is applied.
+	#Suitability multiplies this down to near zero outside volcanic settings, so
+	#the raw number is tuned for what you should see along an active arc or rift.
+	#Range: 0.0 ~ 1.0
+	chamberSpawnChance = 0.03
+	#Carve a thin vent from the deep chamber up to the surface so eruptions
+	#reach daylight. Build-safe: the carve aborts (leaving the vent buried) the
+	#moment it would touch anything that isn't natural terrain.
+	carveSurfaceShaft = true
+	#Safety cap on how many blocks a surface shaft may rise from the cap. Must be
+	#tall enough to reach big-mountain surfaces (Terralith peaks) â€” else the vent
+	#gets stuck inside the mountain and never surfaces.
+	#Range: 1 ~ 512
+	shaftMaxLength = 384
+	#Ticks after a Geyser Igniter block is placed before it forms a geyser below
+	#it and vanishes. 300 = 15 seconds.
+	#Range: 20 ~ 24000
+	igniterDelayTicks = 300
 
 [branching]
-    # Grow thin root-like side vents branching upward; tips reaching caves/air become
-    # weaker secondary fumaroles.
-    branchingVentsEnabled = true
-    # Upper bound on simultaneous growth heads (scaled down for small geysers).
-    branchMaxCount = 6
-    # Maximum length of a single branch before it terminates.
-    branchMaxLength = 18
-    # Total cells that may be carved across ALL branches of one system (TPS guard).
-    branchCarveBudget = 160
-    # Per-step probability that a growing branch splits into two.
-    branchSplitChance = 0.12
+	#Grow thin root-like side vents branching upward from the chamber. Their tips
+	#that reach caves/air become weaker secondary fumaroles.
+	branchingVentsEnabled = true
+	#Upper bound on simultaneous growth heads. Higher = bushier root network.
+	#Range: 1 ~ 32
+	branchMaxCount = 10
+	#Maximum length of a single branch before it terminates.
+	#Range: 2 ~ 128
+	branchMaxLength = 24
+	#Total cells that may be carved across ALL branches of one system (TPS guard).
+	#Range: 0 ~ 4096
+	branchCarveBudget = 320
+	#Per-step probability that a growing branch splits into two.
+	#Range: 0.0 ~ 1.0
+	branchSplitChance = 0.12
+
+[hotsprings]
+	#Per-chunk probability of a hot spring BEFORE tectonic suitability.
+	#Hot springs occur at every kind of fault, so this stays comparatively high.
+	#Range: 0.0 ~ 1.0
+	hotSpringSpawnChance = 0.04
+	#Radius over which a hot spring warms soakers and melts snow/ice.
+	#Range: 1 ~ 16
+	hotSpringRadius = 4
+	#Grant brief Regeneration while soaking in a hot spring. The pool also keeps
+	#you from freezing, and its hidden lava heat source reads as warm to Tough As
+	#Nails (so it raises your body temperature there with no hard dependency).
+	hotSpringRegen = true
+
+[volcano]
+	#Minimum quiet time between eruptions (12000 = 10 min).
+	#Range: 200 ~ 720000
+	volcanoDormantMinTicks = 12000
+	#Maximum quiet time between eruptions (36000 = 30 min).
+	#Range: 200 ~ 720000
+	volcanoDormantMaxTicks = 36000
+	#Warning phase length: heavy black smoke + rumble before it erupts (600 = 30s).
+	#Range: 20 ~ 12000
+	volcanoRumbleTicks = 600
+	#How long the summit fountains lava and hurls bombs (1200 = 1 min).
+	#Range: 20 ~ 24000
+	volcanoEruptTicks = 1200
+	#Roughly how many volcanic bombs (basalt/magma) are thrown over an eruption.
+	#Range: 0 ~ 400
+	volcanoBombsPerEruption = 40
+	#Radius of the deep magma chamber carved under a volcano.
+	#Range: 2 ~ 24
+	volcanoReservoirRadius = 10
+	#Radius of the summit crater / lava pool.
+	#Range: 1 ~ 12
+	volcanoCraterRadius = 3
+	#How many cells of lava one eruption may pour out of the summit.
+	#A real flow chills against the ground and stops; left unbounded the crater
+	#simply kept welling until the whole flank was molten and the forest was on
+	#fire. With a budget you get a tongue of lava that advances down the slope
+	#and turns to basalt behind its own front, which is both what happens and
+	#what actually looks like an eruption.
+	#Range: 0 ~ 400
+	volcanoLavaBudget = 24
+	#A large earthquake can set off volcanoes around it once the ground has settled, as the
+	#1960 Chile earthquake did at CordÃ³n Caulle. Only a volcano with magma to draw on erupts.
+	quakeTriggersEruptions = true
+	#Chance a volcano at the epicentre erupts after a magnitude 9 quake. Less for a smaller
+	#quake (none under 6.5) and further away (none past twice the rupture length plus 200 blocks).
+	#Range: 0.0 ~ 1.0
+	quakeEruptionChance = 0.6
+	#Shortest time from the quiet zone's release to the volcano starting to rumble (1200 = 1 min).
+	#Range: 20 ~ 720000
+	quakeEruptionDelayMinTicks = 1200
+	#Longest time from the quiet zone's release to the volcano starting to rumble (6000 = 5 min).
+	#Range: 20 ~ 720000
+	quakeEruptionDelayMaxTicks = 6000
+	#How many times longer a dormant large volcano sleeps between eruptions than a live one. Its
+	#crater is crusted over; it wakes on this long cycle, or after a big earthquake nearby.
+	#Range: 1.0 ~ 100.0
+	dormantVolcanoQuietFactor = 6.0
+	#Let falling ash bury crops. A field downwind of an eruption loses its crop under
+	#the ash, and under three layers or more its tilled soil goes back to dirt. Shovel
+	#the ash off, till and sow again. Off, ash never settles on farmland.
+	ashfallBuriesCrops = true
+	#Let an eruption lay ash on the ground downwind of the volcano.
+	#The eruption column is the thing you see from a distance, and what comes
+	#down out of it is the thing you walk through afterwards: the ground greys
+	#over in a lobe on the downwind side rather than a ring, so you can read
+	#which way the wind was blowing. Each volcano keeps its own prevailing wind
+	#for the life of the world.
+	#The ash settles as a layer on top of whatever is there, like snow, so it
+	#destroys nothing: the grass is underneath it, the volcano's own rock stays
+	#rock, repeat eruptions deepen the layer up to a full block, and it can be
+	#dug off. Turn it off if you would rather the countryside around a volcano
+	#stayed green.
+	volcanicAshfall = true
+	#Let the soil show what rock it weathered out of.
+	#Soil is the rotted top of whatever is underneath it, and its colour is the
+	#clearest single clue about what a place is made of: iron-rich rock like
+	#basalt, gabbro and peridotite oxidises and the ground goes red, which is
+	#why tropical soils are that colour; limestone and marble give a thin pale
+	#alkaline soil; granite and its relatives give an acid, leached one.
+	#Only NAMED rock counts. Ordinary vanilla stone is left alone deliberately -
+	#it is the bulk of the crust rather than a particular rock, and acting on it
+	#would repaint every hillside in the world. So this shows up where the mod
+	#has actually put geology, and nowhere else.
+	soilFromBedrock = true
+	#Let a lava flow set the countryside alight. A flow reaching the tree line
+	#really does start a fire, and the lava budget above already stops the flow
+	#itself from running away, so the burn stays a consequence of where the
+	#eruption went rather than something that spreads forever on its own.
+	#Fire was previously put out as the flow cooled; turn this off to get that
+	#behaviour back. Worth leaving on alongside mods that model fire spread
+	#properly, such as Burnt.
+	eruptionsStartFires = true
 
 [cycle]
-    # Minimum recharge time after an eruption (6000 = 5 min).
-    cooldownTicksMin = 6000
-    # Maximum recharge time after an eruption (12000 = 10 min).
-    cooldownTicksMax = 12000
-    # Fraction of erupted surface water drawn back into the vent (cone gates ~20%).
-    rechargeIntakeFraction = 0.20
-    # Eruption cycles before a Tuff/Calcite cone starts forming.
-    coneBuildEruptions = 4
-    # Eruption (spouting) duration per size unit. Total spout time = magnitude * this.
-    # 2400 -> radius-5 ~10 min, radius-20 ~40 min. Use 3600 for ~60 min at radius 20.
-    eruptionTicksPerMagnitude = 2400
-    # Precipitate Calcite/Tuff sinter terraces where erupted water pools (Water Erosion-safe:
-    # deposits only under settled source water at pool edges, not the fast flowing channel).
-    travertineEnabled = true
-    # Per-second, per-column deposit probability during eruption (low = slow terrace growth).
-    travertineDepositChance = 0.08
-    # While erupting, the basin loses one water cell every N ticks (visibly empties). 60 = 1/sec.
-    chamberDrainIntervalTicks = 60
-    # While recharging/cooling, the basin regains one water cell every N ticks.
-    chamberRefillIntervalTicks = 100
+	#Minimum recharge time after an eruption (20 ticks = 1s; 6000 = 5 min).
+	#Range: 20 ~ 720000
+	cooldownTicksMin = 6000
+	#Maximum recharge time after an eruption (12000 = 10 min).
+	#Range: 20 ~ 720000
+	cooldownTicksMax = 12000
+	#Fraction of erupted surface water that drains back into the vent (cone gates ~20%).
+	#Range: 0.0 ~ 1.0
+	rechargeIntakeFraction = 0.2
+	#Deposit a mineral-cone ring every N eruptions (1 = every eruption, so the
+	#cone grows fast and you see it build up quickly).
+	#Range: 1 ~ 100
+	coneBuildEruptions = 1
+	#Water-spout duration per size unit (capped by waterSpoutMaxTicks).
+	#200 -> radius-5 spouts ~50s, radius-20 hits the ~2 min cap.
+	#Range: 20 ~ 720000
+	eruptionTicksPerMagnitude = 200
+	#Hard cap on how long an eruption spouts water. 2400 = 2 minutes. After the
+	#water stops, the vent still steams (weaker) through recharge/cooldown, then
+	#the cooldown timer brings it back for the next burst.
+	#Range: 100 ~ 72000
+	waterSpoutMaxTicks = 2400
+	#Precipitate Calcite/Tuff sinter terraces where erupted water pools on runoff.
+	#Deposits only under settled (source) water at pool edges â€” never the fast
+	#flowing channel â€” so it complements Water Erosion instead of fighting it.
+	travertineEnabled = true
+	#Per-second, per-column probability of a travertine deposit during eruption.
+	#Raised so terraces are visible quickly.
+	#Range: 0.0 ~ 1.0
+	travertineDepositChance = 0.35
+	#While erupting, the basin loses one water cell every N ticks (it visibly
+	#empties as it spouts). Lower = drains faster. 60 = one cell per second.
+	#Range: 1 ~ 72000
+	chamberDrainIntervalTicks = 60
+	#While recharging/cooling, the basin regains one water cell every N ticks
+	#(groundwater + surface intake refilling it between eruptions).
+	#Range: 1 ~ 72000
+	chamberRefillIntervalTicks = 100
 
 [emergent]
-    # Let PLAYER-BUILT water-over-rock-over-lava setups become live geysers. ON by default.
-    # WARNING: with emergentDestructive=true this can blow up bases you didn't intend as geysers.
-    emergentEnabled = true
-    # If true, emergent eruptions break blocks ("blows up your house"); if false they vent safely.
-    emergentDestructive = true
-    # How often (ticks) each loaded player's surroundings are scanned.
-    emergentScanIntervalTicks = 60
-    # Radius around a player scanned for water+rock+lava columns.
-    emergentScanRadius = 10
-    # Minimum connected water cells above the rock before a setup ignites.
-    emergentMinWater = 4
-    # How many blocks below the rock layer to look for lava.
-    emergentLavaDepth = 3
-    # Never ignite a new emergent core within this many blocks of an existing one (one rig = one
-    # geyser, not a swarm of overlapping cores).
-    emergentMinSpacing = 12
-    # Half-width of the throat an emergent eruption punches UP through its cap: 0 = 1-wide (just
-    # the plug), 1 = 3-wide. Clears a column upward (not a sphere), works underwater.
-    emergentDestroyRadius = 0
+	#Let PLAYER-BUILT water-over-rock-over-lava setups become live geysers.
+	#ON by default. WARNING: with emergentDestructive=true this can blow up bases
+	#you didn't intend as geysers â€” set false (or emergentDestructive=false) to disable.
+	emergentEnabled = true
+	#If true, emergent eruptions use a block-breaking explosion (the 'it blows up
+	#your house' behaviour). If false they vent harmlessly like natural geysers.
+	emergentDestructive = true
+	#How often (ticks) each loaded player's surroundings are scanned for a setup.
+	#Range: 20 ~ 12000
+	emergentScanIntervalTicks = 60
+	#Horizontal/vertical radius around a player scanned for water+rock+lava columns.
+	#Range: 2 ~ 32
+	emergentScanRadius = 10
+	#Minimum connected water cells above the rock before a setup ignites.
+	#Range: 1 ~ 256
+	emergentMinWater = 4
+	#How many blocks below the rock layer to look for lava (the heat source).
+	#Range: 1 ~ 16
+	emergentLavaDepth = 3
+	#Never ignite a new emergent core within this many blocks of an existing one.
+	#Keeps one water-over-lava rig = ONE geyser instead of a swarm of overlapping
+	#cores that fling you into orbit.
+	#Range: 1 ~ 64
+	emergentMinSpacing = 12
+	#Half-width of the vertical throat an emergent eruption punches open through
+	#its cap: 0 = 1-wide (just the plug), 1 = 3-wide, etc. It clears a column
+	#UPWARD (not a sphere), directly (works underwater). Bedrock/fluids untouched.
+	#Range: 0 ~ 3
+	emergentDestroyRadius = 0
+
+[tectonics]
+	#Master switch for the tectonic plate / fault-line model.
+	#The model only READS the world (it never generates or edits blocks), so it is
+	#safe with terrain mods like Terralith and Tectonic; plate crust types are read
+	#from whatever biome source those mods install.
+	tectonicsEnabled = true
+	#Average width of a tectonic plate, in blocks. Bigger means fewer, larger
+	#plates and faults that are farther apart. 3000 gives continent-sized plates
+	#that suit Terralith and Tectonic worlds.
+	#Range: 500.0 ~ 100000.0
+	plateScale = 3000.0
+	#How irregular the plate layout is. 0 makes a boring square grid; 1 makes
+	#very ragged, natural-looking plates. Values above 1 are not supported because
+	#plate centres could then leave their own cell.
+	#Range: 0.0 ~ 1.0
+	plateJitter = 0.8
+	#How many blocks either side of a plate boundary count as fault zone. Inside
+	#this band the fault type applies and tectonic stress rises toward the line;
+	#outside it a column is plain plate interior.
+	#Range: 16.0 ~ 4000.0
+	faultWidth = 220.0
+
+[hotspots]
+	#Mantle hotspots: intraplate volcanism that plate boundaries cannot explain.
+	#Yellowstone, the richest geyser field on Earth, is a hotspot rather than a
+	#boundary, so switching this off makes the model noticeably less realistic.
+	hotspotsEnabled = true
+	#Spacing of the hotspot grid, in blocks. Combined with hotspotDensity this
+	#sets how far apart plumes end up.
+	#Range: 1000.0 ~ 200000.0
+	hotspotScale = 8500.0
+	#Fraction of hotspot grid cells that actually contain a plume. Low on purpose:
+	#hotspots should be rare landmarks, not a second network of boundaries.
+	#Range: 0.0 ~ 1.0
+	hotspotDensity = 0.18
+	#Radius of the actively volcanic dome above a plume, in blocks.
+	#Range: 32.0 ~ 20000.0
+	hotspotRadius = 700.0
+	#Length of the extinct volcano chain the plate drags off the plume, in blocks.
+	#This is the Hawaii-Emperor pattern: live volcano over the plume, dead cones
+	#trailing back the way the plate came. Set 0 to disable trails.
+	#Range: 0.0 ~ 60000.0
+	hotspotTrailLength = 2500.0
+	#Let the model settle on geothermal ground the world generator has already
+	#painted. Terralith ships biomes called yellowstone and caldera; they look
+	#exactly like where geysers belong, but our plume grid is pure seed maths and
+	#knew nothing about them, so the two landed in different places.
+	#With this on, a column whose biome name contains yellowstone, geyser,
+	#caldera, hot_spring, thermal, volcan or basalt is reported as a live mantle
+	#hotspot - which is honest geology, since Yellowstone IS a hotspot and a
+	#caldera is what hotspot volcanism leaves behind.
+	#Read-only and matched by name, so it needs no dependency and works with any
+	#terrain mod. With none installed nothing matches and behaviour is unchanged.
+	biomeAnchoring = true
+	#Spacing of the geyser-basin grid INSIDE a hotspot dome, in blocks.
+	#Real geyser fields are clustered, not evenly scattered: Yellowstone's
+	#thousand-odd vents sit in a handful of basins with quiet country between
+	#them. So the plume dome is subdivided into basins rather than being made
+	#uniformly rich, which is both more accurate and far more striking to find.
+	#Range: 32.0 ~ 4000.0
+	hotspotBasinScale = 320.0
+	#Fraction of those grid cells that actually are a geyser basin.
+	#Range: 0.0 ~ 1.0
+	hotspotBasinDensity = 0.3
+	#How much denser geysers and hot springs get inside a geyser basin.
+	#Multiplies the placement chance, so 4.5 means roughly four and a half
+	#times as many vents as an ordinary volcanic setting would give.
+	#Range: 1.0 ~ 20.0
+	hotspotFeatureBoost = 4.5
+
+[depth]
+	#How many real metres one block of depth represents.
+	#The world is only 384 blocks tall but stands in for tens of kilometres of
+	#crust, so geological output (quake depth, crust thickness) is reported using
+	#this scale. At the default, the buildable world maps to roughly 35 km - real
+	#continental crust. This changes REPORTED numbers only; it never moves blocks.
+	#Range: 1.0 ~ 5000.0
+	metresPerBlock = 90.0
+	#How many real metres one block of HORIZONTAL distance represents.
+	#Deliberately separate from metresPerBlock: the world is squashed vertically
+	#(384 blocks standing in for tens of kilometres of crust) but not horizontally
+	#- a Minecraft biome is already kilometres across. Using the vertical scale for
+	#both made an M5.5 rift rupture only 42 blocks long, which is why fault
+	#ruptures felt far too short. Only surface-rupture length uses this.
+	#Range: 1.0 ~ 5000.0
+	metresPerBlockHorizontal = 25.0
+
+[placement]
+	#Gate geothermal features on the tectonic model instead of scattering them
+	#evenly. With this on, geysers and volcanoes only appear where real geology
+	#would put them (subduction arcs, rifts, hotspots), collision and strike-slip
+	#zones get hot springs but never geysers, and plate interiors stay quiet.
+	#Only affects NEWLY generated chunks.
+	tectonicPlacement = true
+	#Write the geology while a chunk is being generated instead of afterwards.
+	#A chunk made after the mod was installed then gets its boundary rock, ocean ridges,
+	#ore, fumarole fields, basin floors and soil colour as part of world generation:
+	#nothing on the server tick, nothing sent to players, and nothing for mods that hook
+	#block changes to react to. Chunks that already existed still get it from the
+	#background queue as before. Hot springs, geysers and small volcanoes always do.
+	#Turn off only if another world generation mod misbehaves with it.
+	geologyAtGeneration = true
+	#Generate the deep geology that defines each kind of plate boundary:
+	#a descending slab and magma chambers under a subduction arc, thinned and
+	#fractured crust under a rift, a thick magma-free root under a collision belt,
+	#and a shattered vertical zone along a strike-slip fault.
+	#All of it sits below retrogenMaxY and never replaces player blocks, so it is
+	#invisible from the surface and safe on existing worlds.
+	deepStructureEnabled = true
+	#Let boundary rock reach daylight instead of hiding below Y=-30.
+	#Squeezed into a 28-block window it was easy to tunnel straight past and never
+	#know the geology was there. Real boundary rock does not stop at a depth: a
+	#collision root outcrops in mountainsides, a rift's dike swarm cuts the whole
+	#crust, a strike-slip damage zone is a scar you can walk along.
+	#The topsoil is always left alone (see deepStructureSoilDepth), so meadows
+	#still look like meadows and only the rock beneath them changes - which is
+	#also what soil actually does. Player blocks are never touched either way.
+	deepStructureSurfaceOutcrop = true
+	#How many blocks of a column's own surface are left untouched when boundary
+	#rock reaches the top. Four keeps grass, dirt, sand and the terrain mod's own
+	#surface texture intact while cliffs, ravines, caves and mines all show the
+	#structure in section.
+	#Range: 0 ~ 16
+	deepStructureSoilDepth = 4
+	#Build mid-ocean ridges where two oceanic plates pull apart: a basalt swell
+	#along the boundary, an axial (median) rift down its crest, pillow lava on the
+	#flanks and black-smoker chimneys in the valley. This is where most of the
+	#planet's volcanism actually happens, so leaving the sea floor blank was the
+	#biggest gap left in the model. Sea floor only; never touches player blocks.
+	oceanicRidgeEnabled = true
+	#Lay ore down where the geology that makes it is: porphyry copper with a
+	#malachite and azurite cap under subduction arcs, orogenic gold and skarn gems in
+	#collision belts, massive sulfides at rifts, galena along transform faults,
+	#hydrothermal veins through faults and geothermal fields, and coal and ironstone
+	#seams in the quiet basins between. Applies to chunks that have not had their
+	#deep geology yet; it never touches player blocks.
+	oreGenesisEnabled = true
+	#Per-chunk chance of a natural volcano BEFORE tectonic suitability is applied.
+	#Deliberately tiny: volcanoes are huge structures and should be landmarks.
+	#The suitability gate then removes them entirely outside volcanic settings.
+	#Range: 0.0 ~ 1.0
+	volcanoSpawnChance = 0.006
+	#Raise large volcanoes while new terrain generates: stratovolcanoes about 150 blocks
+	#tall on subduction arcs, fissures some 400 blocks long on rifts, and shields and
+	#calderas 400 blocks across over mantle plumes. Only chunks generated from now on get
+	#them; nothing this size is ever built into terrain that already exists.
+	largeVolcanoes = true
+	#Share of the suitable sites that get a large volcano. Set it before exploring, not
+	#after: a volcano straddling explored and new ground is only built on the new side.
+	#Range: 0.0 ~ 1.0
+	largeVolcanoChance = 1.0
+	#Raise large volcanoes from the sea floor too: islands over mantle plumes and on island arcs,
+	#and along a plume's track through the sea older islands, atolls and guyots. Like
+	#largeVolcanoes, only terrain generated from now on gets them.
+	oceanVolcanoes = true
+	#How far a plume's track runs through the sea, in blocks. The plate carries its islands off the
+	#plume, so along the track they are older, lower and more worn, then reefs round lagoons in warm
+	#water and drowned flat tops in cold. 0 leaves only the live island over the plume.
+	#Range: 0.0 ~ 60000.0
+	oceanTrailLength = 6000.0
+
+[quakes]
+	#Earthquakes along plate boundaries. Each fault type produces its own real
+	#deformation: rifts open fissures, convergent faults thrust one side over the
+	#other, strike-slip faults offset the ground sideways.
+	quakesEnabled = true
+	#Allow quakes to damage player-placed blocks. OFF by default, matching the
+	#rest of the mod: only natural terrain is ever deformed, so a base on a fault
+	#line is safe. Turn on for full realism at your own risk.
+	quakesBreakBuilds = false
+	#Let earthquakes move villages and other world-generated structures.
+	#A village is planks and cobblestone, so the rule that protects what a
+	#player built protected villages too - which is why one could stand
+	#untouched in the middle of a rupture that had moved everything around it.
+	#With this on, anything the world generated (villages, temples, outposts,
+	#fortresses) is treated as ground; blocks a player placed are still safe.
+	#The honest catch: the test is the structure, not who laid the block. Move
+	#into a village and make one of its houses yours and the quake will still
+	#take it, because as far as the world is concerned it is still the village.
+	quakesBreakStructures = true
+	#After the ground moves, bring down anything the quake left hanging in the
+	#air. Nothing is destroyed: the stack is set back down on the new ground, so a
+	#tree keeps its trunk and a wall keeps its blocks - they just end up lower.
+	#The one exception is plant matter whose ground fell more than three blocks:
+	#that slope did not subside, it failed, and a fresh landslide scarp is bare.
+	unsupportedBlocksFall = true
+	#Whether player-placed material falls too. ON by default: a floating house is
+	#a worse outcome than a house that settled, and falling is not breaking - every
+	#block survives the drop. Turn OFF to leave builds hanging exactly where they
+	#are. Independent of quakesBreakBuilds, which decides whether the quake may
+	#deform a build in the first place; this only decides what happens to one that
+	#has already been undermined.
+	fallingIncludesPlayerBlocks = true
+	#Let a strong earthquake bring cave roofs down along its rupture. The bottom of a
+	#roof drops onto the cave floor as rubble and the void rises into the space it left;
+	#where the rock above was thin it reaches the surface and a sinkhole opens. Never
+	#moves a roof of player blocks, never buries anything standing in a cave, and leaves
+	#flooded caves and ground under water alone.
+	quakeCaveCollapse = true
+	#Leave ore blocks where they are when a quake moves the ground round them. Off by
+	#default: a fault really does offset an ore body, which is a known headache in mining.
+	#For packs whose ore veins must stay whole.
+	quakePreservesOres = false
+	#How far below the surface, in blocks, a quake looks for caves to bring down.
+	#Range: 8 ~ 128
+	caveCollapseDepth = 48
+	#How many block edits a quake applies per tick on the server thread.
+	#This is not just a performance budget: real ruptures travel along a fault at
+	#kilometres per second and a large quake lasts tens of seconds, so letting the
+	#deformation spread over a few seconds is more accurate than an instant snap.
+	#The tick budget (tickBudgetMs) is the real brake; this only caps a fast machine.
+	#Range: 8 ~ 20000
+	quakeBlocksPerTick = 400
+	#Ticks between a quake being detected and the ground actually starting to
+	#move. A seismograph is told the instant the rupture is triggered and sounds
+	#its siren through this window, so a warning system has time to react before
+	#the shaking arrives - which is exactly how real early warning works, the
+	#alert travelling at the speed of light while the seismic waves do not.
+	#20 = 1 second; 200 is ten seconds. Set 0 for no warning: the ground moves at
+	#once and the siren and the shaking coincide.
+	#Range: 0 ~ 1200
+	quakeWarningTicks = 200
+	#Ticks between ambient earthquake rolls. 0 disables ambient quakes entirely
+	#(the /geology quake command still works).
+	#Range: 0 ~ 1728000
+	quakeAmbientInterval = 6000
+	#How far from a player an ambient quake looks for a fault, in blocks.
+	#This is the knob that actually decides how often you feel one. Each roll
+	#picks a single random point inside this radius, and if that point is plate
+	#interior nothing happens at all - so a player who is not near a boundary can
+	#go a very long time without a quake however low the recurrence is set.
+	#Raise it to find faults further off; lower it to make quakes strictly local.
+	#Range: 16 ~ 2048
+	quakeSearchRadius = 128
+	#Average in-game days between ruptures on a fully stressed fault.
+	#Real faults rupture on a recurrence interval - decades to centuries - rather
+	#than at random every few minutes, and a quake you have to travel to and wait
+	#for is worth far more than one that happens constantly. Stress scales this:
+	#a locked boundary goes off closer to this figure, a sleepy one much less
+	#often. The /geology quake command still fires one instantly whenever you
+	#want to demonstrate or test.
+	#Range: 0.05 ~ 1000.0
+	quakeRecurrenceDays = 8.0
+	#Milliseconds the WHOLE MOD may spend on the server thread per tick.
+	#A hard wall-clock brake shared by everything: the quake itself, deformation
+	#replayed into chunks that just loaded, ground settling afterwards, volcano
+	#construction and chunk geology. When it runs out, all of it stops until the
+	#next tick however much work is queued, so the mod can only ever make the
+	#game a little slower and never lock it up.
+	#
+	#It used to be per-system, and each of the five measured it from its own
+	#start - so a bad tick could hand the mod 32 ms of a 20 ms tick. 5 is a
+	#quarter of a tick and leaves room for a heavily modded server; raise it if
+	#you want geology to appear faster and have the headroom to spare.
+	#Range: 1 ~ 40
+	tickBudgetMs = 5
+	#Move the whole boundary together instead of tearing along it from one end.
+	#An earthquake really does nucleate at a point and rip outward, but the
+	#cumulative motion of two plates - which is what you are watching here over a
+	#minute or two - happens everywhere along the boundary at once.
+	#With this on, the deformation is applied one BLOCK OF MOVEMENT at a time
+	#across the whole rupture, spread over several fronts so a tick still only
+	#touches a handful of chunks. Costs nothing extra: the same edits, reordered.
+	#A quake cut short by the edit cap then leaves every part of the fault moved a
+	#little rather than half of it finished and half untouched.
+	quakeLayeredApplication = true
+	#Hard cap on how many blocks one earthquake may change.
+	#Deformation is planned outward from the epicentre, so hitting this cap simply
+	#shortens the rupture at its far ends rather than leaving holes in it.
+	#Together with quakeBlocksPerTick this sets how long a quake takes to play out:
+	#150000 edits at 300 per tick is about twenty-five seconds of ground tearing.
+	#Range: 1000 ~ 4000000
+	quakeMaxEdits = 400000
+	#Block edits the deep boundary geology may make per chunk.
+	#This runs constantly while exploring a fault zone, so it is deliberately
+	#sparse: the slab and the metamorphic banding stay obvious when you dig, but
+	#the cost of travelling along a boundary stays low.
+	#Range: 0 ~ 20000
+	deepStructureBudget = 2200
+	#How many block edits may wait for their chunk to load before being dropped.
+	#A long rupture reaches well past the loaded area; rather than force-loading
+	#chunks, the leftovers are parked and applied as you travel along the fault, so
+	#the scarp does not simply stop at the edge of your render distance.
+	#Range: 0 ~ 5000000
+	quakePendingLimit = 400000
+	#Longest a rupture may run along a fault, in blocks.
+	#Length is derived from magnitude with the real surface-rupture scaling
+	#log10(L km) = 0.69 M - 3.22, converted through the depth scale, so a M7
+	#tears several hundred blocks. Genuine M9 events rupture around a thousand
+	#kilometres, which no Minecraft world is built for, so this clamps the top end.
+	#Range: 32 ~ 20000
+	quakeMaxRupture = 1000
+	#Deepest a rift fissure may open, in blocks. Kept moderate so a quake is
+	#dramatic without gutting the landscape.
+	#Range: 2 ~ 128
+	quakeMaxFissureDepth = 15
+
+[sulfur]
+	#Native sulfur crusts around volcanic fumaroles and vents.
+	#Real fumaroles deposit sulfur as escaping gases oxidise (Kawah Ijen), which is
+	#the acidic counterpart to the alkaline travertine this mod already lays down
+	#around geyser runoff.
+	sulfurEnabled = true
+	#Per-attempt chance that a fumarole or vent lays down a sulfur block.
+	#Range: 0.0 ~ 1.0
+	sulfurDepositChance = 0.25
+
+[integration]
+	#With TerraFirmaCraft loaded, build volcanoes, veins and the rest out of TFC's rock, soil and sand
+	#instead of vanilla blocks, and read TFC's seas and rivers for the plates. Off, the mod behaves as
+	#it does anywhere else.
+	tfcCompat = true
+	#Mention the optional mods this one works better with, once, the first time
+	#a player joins a world without them. The mod has no hard dependencies and
+	#never will; but water is the one place where vanilla's own physics is the
+	#limit rather than anything here, and a player has no way of knowing that.
+	#Turn off if you are assembling a pack and would rather say it yourself.
+	suggestOptionalMods = true
+
+[diagnostics]
+	#Write the mod's running counts and events to the log: rivers, villages and hot springs as
+	#the world is made, retrogen, volcanoes finishing and waking, quakes, springs growing. For
+	#testing and for bug reports; off, the log keeps only warnings and one-off notes.
+	verboseLog = false
+	#If the server thread goes this many seconds without finishing a tick, write every
+	#thread's stack to logs/fts_geology_stall.txt, once per stall. The stacks show what the
+	#game was waiting on when it froze. Nothing else is read or written. 0 turns it off.
+	#Range: 0 ~ 3600
+	stallReportSeconds = 30
+
+[instruments]
+	#How far away, in blocks, a seismograph will look at an earthquake at all.
+	#This is a housekeeping bound, not the physics: what really decides whether
+	#a station records something is whether the trace clears the drum's noise
+	#floor, and by that rule a large quake is detectable from absurdly far away
+	#- which is true of real stations and not much use in a game. 4000 blocks is
+	#100 km at the default horizontal scale, comfortably wider than anywhere a
+	#player is likely to have built a second station.
+	#Range: 64 ~ 100000
+	seismographRange = 4000
+	#Forge Energy per tick a geothermal turbine makes when its well reaches the hottest
+	#ground: a hot spring's or geyser's deep chamber with its magma bed. A short well to a
+	#pool's own bed makes less. Turbines within eight blocks of each other draw on the same
+	#heat and share it, so a field of them makes little more than one well sited.
+	#Range: 1 ~ 100000
+	turbineMaxFePerTick = 120
+	#Forge Energy per tick over the faintest heat a turbine will run on at all.
+	#Range: 0 ~ 100000
+	turbineMinFePerTick = 20
+	#How deep a turbine's well may run, in lengths of well casing. A hot spring's reservoir
+	#sits thirty to sixty blocks under its pool; a natural geyser's chamber is down near the
+	#bottom of the world, out of reach unless this is raised.
+	#Range: 1 ~ 512
+	turbineWellMaxDepth = 96
+
+[hydrology]
+	#Trace rivers down the raw ground and fill them, in the mod's own world types only.
+	#This is the newest and least settled thing in the mod. A river is cut by the
+	#terrain itself, so turning this off changes the shape of the land as well as
+	#taking the water away - in a world you have already played, the chunks you
+	#have been to keep their channels and the ones past them do not, which leaves
+	#a seam. Set it before a world is made, not after.
+	#Off, the world keeps vanilla's own rivers and nothing else.
+	rivers = true
+	#Model a groundwater table under the world.
+	#Nothing here places or edits a block on its own. It answers one question -
+	#how deep is the water under this column - and the features that need an
+	#answer (springs, wells, recovery after a quake) read it. Turned off, those
+	#fall back to their older placement rules.
+	waterTableEnabled = true
+	#How much of the land's relief the water table climbs, from 0 to 1.
+	#Groundwater is a SUBDUED replica of the topography: it rises from the
+	#valley it drains into towards the high ground that recharges it, but
+	#nothing like as steeply as the land does. At 0 the table is flat at the
+	#valley floor and no water ever reaches the surface elsewhere. At 1 it
+	#copies the land and springs break out all over the slopes. Measured on
+	#upland terrain, the default puts spring lines on about 1% of land columns
+	#- valley floors and breaks of slope, which is where they belong.
+	#Range: 0.0 ~ 1.0
+	waterTableSubdual = 0.5
+	#Blocks of dry ground above the water table in ordinary rainy country.
+	#This is how deep a well has to be dug in a plains or forest biome.
+	#Range: 0 ~ 64
+	waterTableDepthTemperate = 8
+	#Depth to water in hot biomes that get no rain at all.
+	#Nothing recharges a desert aquifer from above, so the table sits far down
+	#and desert wells are deep. Note that this effectively rules out desert
+	#springs, which is correct: a real oasis is not fed by local rainfall but
+	#by a regional aquifer recharged in mountains hundreds of kilometres away.
+	#That is a geological exception, not a climate one, so it does not belong
+	#in this number.
+	#Range: 0 ~ 128
+	waterTableDepthArid = 24
+	#Depth to water in hot, wet biomes - jungle, swamp, mangrove.
+	#More rain goes in than drains away again, so the water is at your ankles.
+	#Range: 0 ~ 64
+	waterTableDepthHumid = 3
+	#Let a buried hot spring work its way back to the surface.
+	#Every spring has a source seated far below the depth an earthquake reaches
+	#(24 blocks). A quake therefore cannot destroy a spring, only block its
+	#outlet, and an outlet still being pushed from below does not stay blocked:
+	#the source bores a conduit back up, lining it with sinter as it climbs, and
+	#cuts a fresh pool wherever it gets out. That is how the 1959 Hebgen Lake
+	#quake left Yellowstone - outlets moved, deposits left behind at the old
+	#ones, and not one system switched off.
+	#Turning this off freezes every source where it is. A column with anything
+	#player-built in it is never bored through, whatever this is set to.
+	springRenewalEnabled = true
+	#In-game days a stage 1 spring takes to reach stage 2.
+	#A hot spring has four ages, 5, 9, 15 and 21 blocks across. Stage 1 appears
+	#the moment the water reaches daylight; these three keys are how long the
+	#steps after it take.
+	#Only affects springs that are GROWING - one recovering after an earthquake,
+	#or one a quake has newly opened. Springs made with the world start at
+	#stage 4, so a new world has old springs in it rather than day-old puddles.
+	#Set these very low to watch the whole sequence while testing, or use
+	#/geology place hotspring <1-4> to stand all four side by side.
+	#Range: 0.01 ~ 400.0
+	springStageOneDays = 1.0
+	#Days from stage 2 to stage 3, where the pool reaches 15 blocks across.
+	#At this step the spring breaks out past the rim it built earlier and
+	#spreads to whatever shape the ground allows.
+	#Range: 0.01 ~ 400.0
+	springStageTwoDays = 5.0
+	#Days from stage 3 to a finished spring with its colour bands.
+	#The microbial mats come last for a reason: they need a big, warm, stable
+	#pool to live in, and a spring that opened a few days ago has not got one.
+	#Range: 0.01 ~ 400.0
+	springStageThreeDays = 12.0
+	#Let an earthquake open a hot spring where there was not one.
+	#Shaking the crust changes how easily water moves through it: some cracks
+	#close, others open, and water that had no way to the surface finds one.
+	#The 1959 Hebgen Lake quake did this at Yellowstone within days.
+	#Three things still have to line up - heat below, groundwater reaching the
+	#surface, and no spring already there - so most ruptures produce nothing,
+	#and at most one new spring is opened per quake.
+	quakesOpenNewSprings = true
+	#Chance of a new spring per point of magnitude above 3.
+	#At the default an M4 quake has roughly a 6% chance and an M8 about 30%,
+	#before the geological conditions above are even checked. Raise it if you
+	#want a world that visibly rearranges itself; set quakesOpenNewSprings to
+	#false to switch the whole thing off.
+	#Range: 0.0 ~ 1.0
+	quakeSpringChance = 0.06
+
+#Terrain: the FT's Geology world type, where the plates shape the ground. Nothing here touches
+#a world made with any other world type.
+[terrain]
+	#The share of plates that are oceanic crust, and so sea. Set when a world is made; the
+	#plates never change afterwards.
+	#Range: 0.0 ~ 1.0
+	oceanShare = 0.4
+	#How far a mountain belt reaches from its plate boundary, in fault widths (faultWidth above).
+	#A collision lifts a fold belt this far either side of the boundary; a subduction zone its arc
+	#on the overriding side and a trench on the other; a rift its graben and shoulders. Everything
+	#else the mod does is measured from the same boundary in the same units, so the mountains, the
+	#volcanoes, the quake corridor and the ore belts line up.
+	#Range: 0.5 ~ 10.0
+	terrainBeltFactor = 2.5
+	#How high a collision lifts the ground at the boundary, in blocks, before the peaks
+	#the ridge noise adds on top. The crests of a belt get all of it, the passes between them
+	#about half; too much and the highest crests reach the top of the terrain and flatten out.
+	#Range: 0.0 ~ 400.0
+	terrainUplift = 140.0
+	#How tall the real mountains are laid out, against the ground they were measured on.
+	#The mod carries crops of the Alps, the Caucasus, the Himalaya, the Karakoram and the
+	#Appalachians, and lays a mountain belt out from them at true scale: twenty-five metres to
+	#the block in the normal world, ten in the tall one. 1 is that true scale; higher makes the
+	#ranges taller and steeper than the real ones, lower flattens them.
+	#Range: 0.1 ~ 4.0
+	demHeightScale = 1.0
+	#Lay the rock the plates imply under the ground: a platform's beds over its basement, a fold
+	#belt's gneiss and marble, an arc's ash over its plutons. Off leaves plain stone, and chunks
+	#generate a little faster.
+	lithology = true
+
