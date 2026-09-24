@@ -47,7 +47,13 @@ public final class VolcanoEdifice {
             // An extinct cone's crater has weathered into a bowl; a live one's is carved when its summit is finished.
             if (c.activity != VolcanoActivity.EXTINCT) return c.summitY;
             double s = dist / Math.max(1.0, innerR);
-            return c.summitY - (int) Math.round(craterBowlDepth(c) * (1.0 - s * s));
+            double depth = craterBowlDepth(c);
+            // The flank's own roughness carried over the rim and down into the bowl, so the rim has no step and the
+            // lake's shore wanders instead of following a contour turned on a lathe, ring under ring. Held back in a
+            // shallow bowl, whose middle would otherwise stand out of the lake.
+            double rough = surfaceNoise(c, gx, gz)
+                    * Math.min(Math.min(3.0, 1.0 + c.coneHeight * 0.02), 0.4 * (depth - 4.0));
+            return c.summitY - (int) Math.round(depth * (1.0 - s * s) - rough);
         }
         double t = (dist - innerR) / Math.max(1.0, baseR - innerR);
         double frac = Math.pow(1.0 - t, c.flankExponent);
@@ -61,10 +67,20 @@ public final class VolcanoEdifice {
         return localGround + (int) Math.round(span * frac + seam + rough + ridges);
     }
 
-    /** How far the crater reaches on this bearing: its rim wanders a tenth either way. */
+    /**
+     * How far the crater reaches on this bearing: its rim wanders a tenth either way, and a dead crater's more, in a
+     * few broad bays where its walls have slumped and worn back unevenly, so the lake that fills it is not a disc.
+     */
     static double craterEdge(Ctx c, double ang) {
-        return c.craterR * (1.0 + 0.10 * Math.sin(2 * ang + c.phaseB));
+        double edge = 1.0 + 0.10 * Math.sin(2 * ang + c.phaseB);
+        if (c.activity == VolcanoActivity.EXTINCT) {
+            edge += CRATER_BAYS * polarNoise(ang, 0.0, 8.0, (int) (c.phaseC * 4096) + 313, 1.0, 12.0);
+        }
+        return c.craterR * edge;
     }
+
+    /** How far a dead crater's bays reach in or out, as a share of its radius. */
+    private static final double CRATER_BAYS = 0.3;
 
     /** How deep an extinct cone's weathered crater bowl is at its middle: deep enough to hold a lake. */
     static double craterBowlDepth(Ctx c) {
@@ -206,10 +222,15 @@ public final class VolcanoEdifice {
         if (ground >= target) {
             // A large cone buries the country under it: at generation, ground standing more than a couple of blocks
             // over the profile inside the foot is cut down to it, or the hills it was built over stood out of its
-            // flank as crags. Elsewhere ground above the profile is left alone, save for rain standing over it in
-            // a dead crater.
-            if (worldgen && !underWater && c.size == VolcanoSize.LARGE && dist > c.craterR * 1.6
-                    && dist <= c.coneBaseR * 1.1 && ground > target + 2) {
+            // flank as crags. A dead crater of any size is cut down to its bowl the same way, to the block: a hill
+            // it was built over stood out of its lake with its trees on. Elsewhere ground above the profile is left
+            // alone. A live summit's own ground is left to the job that finishes it; a dead one has none, so its
+            // rim is cut like its flank.
+            boolean dead = c.activity == VolcanoActivity.EXTINCT;
+            boolean deadCrater = dead && dist <= craterEdge(c, ang);
+            double flankFrom = dead ? craterEdge(c, ang) : c.craterR * 1.6;
+            boolean largeFlank = c.size == VolcanoSize.LARGE && dist > flankFrom && dist <= c.coneBaseR * 1.1;
+            if (worldgen && !underWater && (deadCrater ? ground > target : largeFlank && ground > target + 2)) {
                 for (int y = ground; y > target; y--) {
                     level.setBlock(new BlockPos(gx, y, gz), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
                 }
@@ -219,6 +240,7 @@ public final class VolcanoEdifice {
                 setRock(level, new BlockPos(gx, target, gz), rock);
                 soilUnder(level, gx, target, gz, rock, target - 3);
                 clearCover(level, gx, target, gz);
+                craterLake(level, c, gx, gz, target, dist, ang);
                 return;
             }
             if (worldgen && !underWater) craterLake(level, c, gx, gz, ground, dist, ang);
