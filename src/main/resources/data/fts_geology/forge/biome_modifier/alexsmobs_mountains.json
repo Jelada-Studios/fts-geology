@@ -1,0 +1,10 @@
+{
+  "type": "fts_geology:optional_spawns",
+  "biomes": ["fts_geology:orogenic_highland"],
+  "spawns": [
+    { "entity": "alexsmobs:bald_eagle", "weight": 8, "min": 1, "max": 2 },
+    { "entity": "alexsmobs:snow_leopard", "weight": 4, "min": 1, "max": 1 },
+    { "entity": "alexsmobs:grizzly_bear", "weight": 4, "min": 1, "max": 1 },
+    { "entity": "alexsmobs:gelada_monkey", "weight": 4, "min": 2, "max": 4 }
+  ]
+}

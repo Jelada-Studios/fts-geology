@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:alluvial_plain",
+    "fts_geology:rift_valley"
+  ]
+}
