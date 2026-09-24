@@ -387,5 +387,10 @@
   "biome.fts_geology.k2": "K2",
   "biome.fts_geology.matterhorn": "Matterhorn",
   "biome.fts_geology.alluvial_plain": "Alüvyon Ovası",
-  "biome.fts_geology.oceanic_ridge": "Okyanus Sırtı"
+  "biome.fts_geology.oceanic_ridge": "Okyanus Sırtı",
+  "block.fts_geology.geothermal_turbine": "Jeotermal Türbin",
+  "message.fts_geology.turbine.no_outlet": "Altında jeotermal çıkış yok. Kaplıca, buhar bacası, çamur gözesi ya da gayzerin üstüne koy.",
+  "message.fts_geology.turbine.no_heat": "Altındaki çıkış soğumuş: aşağıda magma, lav ya da gayzer haznesi yok.",
+  "message.fts_geology.turbine.output": "Üretim %s FE/t   (ısı %s, %s türbin paylaşıyor)",
+  "message.fts_geology.turbine.stored": "Depo %s / %s FE"
 }

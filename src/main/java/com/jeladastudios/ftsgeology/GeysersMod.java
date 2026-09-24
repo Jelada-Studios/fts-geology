@@ -41,6 +41,7 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.registry.ModBiomeSources.BIOME_SOURCES.register(modBus);
         com.jeladastudios.ftsgeology.registry.ModChunkGenerators.CHUNK_GENERATORS.register(modBus);
         com.jeladastudios.ftsgeology.registry.ModSurfaceRules.MATERIAL_RULES.register(modBus);
+        com.jeladastudios.ftsgeology.registry.ModBiomeModifiers.SERIALIZERS.register(modBus);
 
         // Populate the creative menu once tabs are built (mod bus event).
         modBus.addListener(this::onBuildCreativeTabs);
@@ -82,6 +83,7 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.quake.PendingEdits.clear();
         com.jeladastudios.ftsgeology.instrument.SeismicNetwork.clear();
         com.jeladastudios.ftsgeology.command.SiteTeleport.clear();
+        com.jeladastudios.ftsgeology.blockentity.GeothermalTurbineBlockEntity.clearAll();
         com.jeladastudios.ftsgeology.worldgen.LavaTubes.clear();
         com.jeladastudios.ftsgeology.worldgen.OreGenesis.clear();
         com.jeladastudios.ftsgeology.worldgen.GeothermalBasin.clear();
@@ -109,6 +111,7 @@ public class GeysersMod {
             // The instruments belong with the tools, not with the terrain: they are the only
             // things in the mod a player is meant to carry.
             event.accept(ModItems.SEISMOGRAPH.get());
+            event.accept(ModItems.GEOTHERMAL_TURBINE.get());
             event.accept(ModItems.GEOLOGISTS_HAMMER.get());
             event.accept(ModItems.FAULT_COMPASS.get());
             event.accept(ModItems.FIELD_GUIDE.get());

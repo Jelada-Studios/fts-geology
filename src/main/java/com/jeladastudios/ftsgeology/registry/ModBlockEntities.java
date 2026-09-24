@@ -59,5 +59,10 @@ public final class ModBlockEntities {
                     .of(SeismographBlockEntity::new, ModBlocks.SEISMOGRAPH.get())
                     .build(null));
 
+    public static final RegistryObject<BlockEntityType<com.jeladastudios.ftsgeology.blockentity.GeothermalTurbineBlockEntity>> GEOTHERMAL_TURBINE =
+            BLOCK_ENTITIES.register("geothermal_turbine", () -> BlockEntityType.Builder
+                    .of(com.jeladastudios.ftsgeology.blockentity.GeothermalTurbineBlockEntity::new, ModBlocks.GEOTHERMAL_TURBINE.get())
+                    .build(null));
+
     private ModBlockEntities() {}
 }

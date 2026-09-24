@@ -188,6 +188,8 @@ public final class GeyserConfig {
 
     // --- Instruments ---------------------------------------------------------
     public static final ForgeConfigSpec.IntValue SEISMOGRAPH_RANGE;   // blocks a station can hear
+    public static final ForgeConfigSpec.IntValue TURBINE_MAX_FE;      // FE/t of a turbine over the hottest ground
+    public static final ForgeConfigSpec.IntValue TURBINE_MIN_FE;      // FE/t over the faintest heat it runs on
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
 
@@ -861,6 +863,15 @@ public final class GeyserConfig {
                         "100 km at the default horizontal scale, comfortably wider than anywhere a",
                         "player is likely to have built a second station.")
                 .defineInRange("seismographRange", 4000, 64, 100000);
+        TURBINE_MAX_FE = b
+                .comment("Forge Energy per tick a geothermal turbine makes over the hottest ground: a hot spring",
+                        "or geyser with its magma bed, lava or a geyser's chamber right under it. Less heat,",
+                        "less power. Turbines within eight blocks of each other draw on the same heat and",
+                        "share it, so a field of them makes little more than one well sited.")
+                .defineInRange("turbineMaxFePerTick", 120, 1, 100000);
+        TURBINE_MIN_FE = b
+                .comment("Forge Energy per tick over the faintest heat a turbine will run on at all.")
+                .defineInRange("turbineMinFePerTick", 20, 0, 100000);
         b.pop();
 
         b.push("hydrology");

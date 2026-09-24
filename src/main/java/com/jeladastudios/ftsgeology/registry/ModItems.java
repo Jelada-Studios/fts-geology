@@ -248,6 +248,9 @@ public final class ModItems {
     // reachable only by someone who already knew the mod was there. An instrument makes the model
     // discoverable, and in a classroom it is the difference between a demonstration and a lesson.
 
+    public static final RegistryObject<Item> GEOTHERMAL_TURBINE = ITEMS.register("geothermal_turbine",
+            () -> new BlockItem(ModBlocks.GEOTHERMAL_TURBINE.get(), new Item.Properties()));
+
     public static final RegistryObject<Item> SEISMOGRAPH = ITEMS.register("seismograph",
             () -> new BlockItem(ModBlocks.SEISMOGRAPH.get(), new Item.Properties()));
 
