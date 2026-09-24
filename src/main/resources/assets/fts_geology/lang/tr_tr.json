@@ -389,8 +389,10 @@
   "biome.fts_geology.alluvial_plain": "Alüvyon Ovası",
   "biome.fts_geology.oceanic_ridge": "Okyanus Sırtı",
   "block.fts_geology.geothermal_turbine": "Jeotermal Türbin",
-  "message.fts_geology.turbine.no_outlet": "Altında jeotermal çıkış yok. Kaplıca, buhar bacası, çamur gözesi ya da gayzerin üstüne koy.",
-  "message.fts_geology.turbine.no_heat": "Altındaki çıkış soğumuş: aşağıda magma, lav ya da gayzer haznesi yok.",
-  "message.fts_geology.turbine.output": "Üretim %s FE/t   (ısı %s, %s türbin paylaşıyor)",
+  "block.fts_geology.well_casing": "Kuyu Borusu",
+  "message.fts_geology.turbine.no_well": "Altında kuyu yok. Altını aşağı doğru kaz ve deliği kuyu borusuyla döşe: bir kaplıcanın yatağına ya da bir kaynağın veya gayzerin yükseldiği hazneye kadar.",
+  "message.fts_geology.turbine.no_reservoir": "Kuyu %s blok derin ama kuru kayada bitiyor: kaplıca yatağına, kaynak ya da gayzer haznesine, buhar bacasına veya çamur gözesine kadar indir.",
+  "message.fts_geology.turbine.no_heat": "Kuyu suya ulaşıyor ama su soğumuş: dibinin çevresinde magma ya da hazne yok.",
+  "message.fts_geology.turbine.output": "Üretim %s FE/t   (kuyu %s blok, ısı %s, %s türbin paylaşıyor)",
   "message.fts_geology.turbine.stored": "Depo %s / %s FE"
 }

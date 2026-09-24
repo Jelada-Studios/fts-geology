@@ -1,6 +1,5 @@
 {
   "variants": {
-    "running=false": { "model": "fts_geology:block/geothermal_turbine" },
-    "running=true":  { "model": "fts_geology:block/geothermal_turbine" }
+    "": { "model": "fts_geology:block/geothermal_turbine" }
   }
 }

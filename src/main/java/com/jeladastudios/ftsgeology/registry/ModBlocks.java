@@ -90,12 +90,21 @@ public final class ModBlocks {
                     .strength(2.5F)
                     .noOcclusion()));
 
-    /** A geothermal turbine: Forge Energy from the heat under a hot spring, vent or geyser. */
+    /** A geothermal turbine: Forge Energy from the heat a well under it reaches. */
     public static final RegistryObject<Block> GEOTHERMAL_TURBINE = BLOCKS.register("geothermal_turbine",
             () -> new com.jeladastudios.ftsgeology.block.GeothermalTurbineBlock(BlockBehaviour.Properties.copy(Blocks.COPPER_BLOCK)
                     .mapColor(MapColor.COLOR_ORANGE)
                     .strength(3.0F, 6.0F)
-                    .requiresCorrectToolForDrops()));
+                    .requiresCorrectToolForDrops()
+                    .noOcclusion()));
+
+    /** Well casing: the steel pipe a turbine's well is lined with, down to the heat. */
+    public static final RegistryObject<Block> WELL_CASING = BLOCKS.register("well_casing",
+            () -> new com.jeladastudios.ftsgeology.block.WellCasingBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BARS)
+                    .mapColor(MapColor.METAL)
+                    .strength(3.0F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .noOcclusion()));
 
     /** Native sulfur: the yellow crust around fumaroles, the acidic counterpart to calcite and travertine. */
     public static final RegistryObject<Block> NATIVE_SULFUR = BLOCKS.register("native_sulfur",

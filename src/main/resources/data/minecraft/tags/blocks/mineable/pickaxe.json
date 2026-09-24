@@ -1,6 +1,7 @@
 {
   "values": [
     "fts_geology:geothermal_turbine",
+    "fts_geology:well_casing",
     "fts_geology:travertine",
     "fts_geology:polished_travertine",
     "fts_geology:travertine_slab",

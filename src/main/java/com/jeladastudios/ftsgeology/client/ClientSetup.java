@@ -54,6 +54,18 @@ public final class ClientSetup {
                 com.jeladastudios.ftsgeology.registry.ModBlocks.RIVER_WATER.get());
     }
 
+    /** The geothermal turbine's rotor turns: a renderer for it, and its model baked though no block names it. */
+    @SubscribeEvent
+    public static void registerRenderers(net.minecraftforge.client.event.EntityRenderersEvent.RegisterRenderers event) {
+        event.registerBlockEntityRenderer(com.jeladastudios.ftsgeology.registry.ModBlockEntities.GEOTHERMAL_TURBINE.get(),
+                TurbineRenderer::new);
+    }
+
+    @SubscribeEvent
+    public static void registerModels(net.minecraftforge.client.event.ModelEvent.RegisterAdditional event) {
+        event.register(TurbineRenderer.ROTOR);
+    }
+
     @SubscribeEvent
     public static void registerParticles(RegisterParticleProvidersEvent event) {
         event.registerSpriteSet(ModParticles.GEYSER_MIST.get(), GeothermalParticles.MistProvider::new);

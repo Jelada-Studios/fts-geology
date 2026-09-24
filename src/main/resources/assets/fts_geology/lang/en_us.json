@@ -399,8 +399,10 @@
   "biome.fts_geology.alluvial_plain": "Alluvial Plain",
   "biome.fts_geology.oceanic_ridge": "Oceanic Ridge",
   "block.fts_geology.geothermal_turbine": "Geothermal Turbine",
-  "message.fts_geology.turbine.no_outlet": "No geothermal outlet under it. Set it over a hot spring, steam vent, mud pot or geyser.",
-  "message.fts_geology.turbine.no_heat": "The outlet under it has gone cold: no magma, lava or geyser chamber below.",
-  "message.fts_geology.turbine.output": "Making %s FE/t   (heat %s, shared by %s turbine(s))",
+  "block.fts_geology.well_casing": "Well Casing",
+  "message.fts_geology.turbine.no_well": "No well under it. Bore down beneath it and line the hole with well casing, down to a hot spring's bed or the chamber a spring or geyser rises from.",
+  "message.fts_geology.turbine.no_reservoir": "The well is %s deep but ends in dry rock: carry it on to a hot spring's bed, a spring's or geyser's chamber, a steam vent or a mud pot.",
+  "message.fts_geology.turbine.no_heat": "The well reaches water, but it has gone cold: no magma or chamber round its foot.",
+  "message.fts_geology.turbine.output": "Making %s FE/t   (well %s deep, heat %s, shared by %s turbine(s))",
   "message.fts_geology.turbine.stored": "Stored %s / %s FE"
 }

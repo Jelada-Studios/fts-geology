@@ -20,27 +20,29 @@ import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A geothermal turbine. Set over a hot spring, a steam vent, a mud pot or a geyser, it makes Forge Energy from the
- * heat under it and hands it to whatever is beside it; see {@link GeothermalTurbineBlockEntity}. Right-click reads
- * what it is making and why. While it runs, steam comes off its top.
+ * A geothermal turbine. Set on a well lined with casing down into a hot water reservoir, it makes Forge Energy from
+ * the heat the well reaches and hands it to whatever is beside it or on top of it; see
+ * {@link GeothermalTurbineBlockEntity}. Right-click reads what it is making and why. While it runs, its rotor turns --
+ * the faster, the more it makes -- and steam comes off its top.
  */
 public class GeothermalTurbineBlock extends BaseEntityBlock {
 
-    public static final BooleanProperty RUNNING = BooleanProperty.create("running");
+    /** How hard it runs, in four steps: 0 stood still, 3 flat out. The rotor's speed and the steam follow it. */
+    public static final IntegerProperty POWER = IntegerProperty.create("power", 0, 3);
 
     public GeothermalTurbineBlock(Properties props) {
         super(props);
-        registerDefaultState(stateDefinition.any().setValue(RUNNING, false));
+        registerDefaultState(stateDefinition.any().setValue(POWER, 0));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> b) {
-        b.add(RUNNING);
+        b.add(POWER);
     }
 
     @Nullable
@@ -58,9 +60,8 @@ public class GeothermalTurbineBlock extends BaseEntityBlock {
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state,
                                                                   BlockEntityType<T> type) {
-        if (level.isClientSide) return null;
-        return createTickerHelper(type, ModBlockEntities.GEOTHERMAL_TURBINE.get(),
-                GeothermalTurbineBlockEntity::serverTick);
+        return createTickerHelper(type, ModBlockEntities.GEOTHERMAL_TURBINE.get(), level.isClientSide
+                ? GeothermalTurbineBlockEntity::clientTick : GeothermalTurbineBlockEntity::serverTick);
     }
 
     @Override
@@ -74,9 +75,11 @@ public class GeothermalTurbineBlock extends BaseEntityBlock {
 
     @Override
     public void animateTick(BlockState state, Level level, BlockPos pos, RandomSource random) {
-        if (!state.getValue(RUNNING)) return;
-        double x = pos.getX() + 0.5, y = pos.getY() + 1.05, z = pos.getZ() + 0.5;
-        for (int i = 0; i < 2; i++) {
+        int power = state.getValue(POWER);
+        if (power == 0) return;
+        // Up through the rotor, out of the open top.
+        double x = pos.getX() + 0.5, y = pos.getY() + 0.9, z = pos.getZ() + 0.5;
+        for (int i = 0; i < power; i++) {
             level.addParticle(ParticleTypes.CLOUD, x + (random.nextDouble() - 0.5) * 0.4, y,
                     z + (random.nextDouble() - 0.5) * 0.4, 0.0, 0.06 + random.nextDouble() * 0.04, 0.0);
         }

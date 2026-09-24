@@ -115,6 +115,7 @@ public class GeysersMod {
             // things in the mod a player is meant to carry.
             event.accept(ModItems.SEISMOGRAPH.get());
             event.accept(ModItems.GEOTHERMAL_TURBINE.get());
+            event.accept(ModItems.WELL_CASING.get());
             event.accept(ModItems.GEOLOGISTS_HAMMER.get());
             event.accept(ModItems.FAULT_COMPASS.get());
             event.accept(ModItems.FIELD_GUIDE.get());

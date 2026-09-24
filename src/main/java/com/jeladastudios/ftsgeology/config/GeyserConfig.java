@@ -191,6 +191,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue TURBINE_MAX_FE;      // FE/t of a turbine over the hottest ground
     public static final ForgeConfigSpec.IntValue TURBINE_MIN_FE;      // FE/t over the faintest heat it runs on
     static {
+    public static final ForgeConfigSpec.IntValue TURBINE_WELL_DEPTH;  // lengths of casing a well may run to
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
 
         b.push("thermodynamics");
@@ -864,10 +865,10 @@ public final class GeyserConfig {
                         "player is likely to have built a second station.")
                 .defineInRange("seismographRange", 4000, 64, 100000);
         TURBINE_MAX_FE = b
-                .comment("Forge Energy per tick a geothermal turbine makes over the hottest ground: a hot spring",
-                        "or geyser with its magma bed, lava or a geyser's chamber right under it. Less heat,",
-                        "less power. Turbines within eight blocks of each other draw on the same heat and",
-                        "share it, so a field of them makes little more than one well sited.")
+                .comment("Forge Energy per tick a geothermal turbine makes when its well reaches the hottest",
+                        "ground: a hot spring's or geyser's deep chamber with its magma bed. A short well to a",
+                        "pool's own bed makes less. Turbines within eight blocks of each other draw on the same",
+                        "heat and share it, so a field of them makes little more than one well sited.")
                 .defineInRange("turbineMaxFePerTick", 120, 1, 100000);
         TURBINE_MIN_FE = b
                 .comment("Forge Energy per tick over the faintest heat a turbine will run on at all.")
@@ -878,6 +879,11 @@ public final class GeyserConfig {
         RIVERS = b
                 .comment("Trace rivers down the raw ground and fill them, in the mod's own world types only.",
                         "This is the newest and least settled thing in the mod. A river is cut by the",
+        TURBINE_WELL_DEPTH = b
+                .comment("How deep a turbine's well may run, in lengths of well casing. A hot spring's reservoir",
+                        "sits thirty to sixty blocks under its pool; a natural geyser's chamber is down near the",
+                        "bottom of the world, out of reach unless this is raised.")
+                .defineInRange("turbineWellMaxDepth", 96, 1, 512);
                         "terrain itself, so turning this off changes the shape of the land as well as",
                         "taking the water away - in a world you have already played, the chunks you",
                         "have been to keep their channels and the ones past them do not, which leaves",

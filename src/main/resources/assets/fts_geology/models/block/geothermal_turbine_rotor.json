@@ -1,0 +1,436 @@
+{
+  "textures": {
+    "particle": "minecraft:block/iron_block",
+    "shaft": "minecraft:block/iron_block",
+    "hub": "minecraft:block/copper_block",
+    "blade": "minecraft:block/iron_block"
+  },
+  "elements": [
+    {
+      "from": [
+        7,
+        8,
+        7
+      ],
+      "to": [
+        9,
+        12,
+        9
+      ],
+      "faces": {
+        "north": {
+          "uv": [
+            7,
+            4,
+            9,
+            8
+          ],
+          "texture": "#shaft"
+        },
+        "south": {
+          "uv": [
+            7,
+            4,
+            9,
+            8
+          ],
+          "texture": "#shaft"
+        },
+        "west": {
+          "uv": [
+            7,
+            4,
+            9,
+            8
+          ],
+          "texture": "#shaft"
+        },
+        "east": {
+          "uv": [
+            7,
+            4,
+            9,
+            8
+          ],
+          "texture": "#shaft"
+        }
+      }
+    },
+    {
+      "from": [
+        6.5,
+        12,
+        6.5
+      ],
+      "to": [
+        9.5,
+        15,
+        9.5
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            6.5,
+            6.5,
+            9.5,
+            9.5
+          ],
+          "texture": "#hub"
+        },
+        "up": {
+          "uv": [
+            6.5,
+            6.5,
+            9.5,
+            9.5
+          ],
+          "texture": "#hub"
+        },
+        "north": {
+          "uv": [
+            6.5,
+            1,
+            9.5,
+            4
+          ],
+          "texture": "#hub"
+        },
+        "south": {
+          "uv": [
+            6.5,
+            1,
+            9.5,
+            4
+          ],
+          "texture": "#hub"
+        },
+        "west": {
+          "uv": [
+            6.5,
+            1,
+            9.5,
+            4
+          ],
+          "texture": "#hub"
+        },
+        "east": {
+          "uv": [
+            6.5,
+            1,
+            9.5,
+            4
+          ],
+          "texture": "#hub"
+        }
+      }
+    },
+    {
+      "from": [
+        9.5,
+        13,
+        6
+      ],
+      "to": [
+        15,
+        14,
+        10
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            9.5,
+            6,
+            15,
+            10
+          ],
+          "texture": "#blade"
+        },
+        "up": {
+          "uv": [
+            9.5,
+            6,
+            15,
+            10
+          ],
+          "texture": "#blade"
+        },
+        "north": {
+          "uv": [
+            1,
+            2,
+            6.5,
+            3
+          ],
+          "texture": "#blade"
+        },
+        "south": {
+          "uv": [
+            9.5,
+            2,
+            15,
+            3
+          ],
+          "texture": "#blade"
+        },
+        "west": {
+          "uv": [
+            6,
+            2,
+            10,
+            3
+          ],
+          "texture": "#blade"
+        },
+        "east": {
+          "uv": [
+            6,
+            2,
+            10,
+            3
+          ],
+          "texture": "#blade"
+        }
+      },
+      "rotation": {
+        "origin": [
+          12.25,
+          13.5,
+          8
+        ],
+        "axis": "x",
+        "angle": 22.5
+      }
+    },
+    {
+      "from": [
+        1,
+        13,
+        6
+      ],
+      "to": [
+        6.5,
+        14,
+        10
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            1,
+            6,
+            6.5,
+            10
+          ],
+          "texture": "#blade"
+        },
+        "up": {
+          "uv": [
+            1,
+            6,
+            6.5,
+            10
+          ],
+          "texture": "#blade"
+        },
+        "north": {
+          "uv": [
+            9.5,
+            2,
+            15,
+            3
+          ],
+          "texture": "#blade"
+        },
+        "south": {
+          "uv": [
+            1,
+            2,
+            6.5,
+            3
+          ],
+          "texture": "#blade"
+        },
+        "west": {
+          "uv": [
+            6,
+            2,
+            10,
+            3
+          ],
+          "texture": "#blade"
+        },
+        "east": {
+          "uv": [
+            6,
+            2,
+            10,
+            3
+          ],
+          "texture": "#blade"
+        }
+      },
+      "rotation": {
+        "origin": [
+          3.75,
+          13.5,
+          8
+        ],
+        "axis": "x",
+        "angle": -22.5
+      }
+    },
+    {
+      "from": [
+        6,
+        13,
+        9.5
+      ],
+      "to": [
+        10,
+        14,
+        15
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            6,
+            1,
+            10,
+            6.5
+          ],
+          "texture": "#blade"
+        },
+        "up": {
+          "uv": [
+            6,
+            9.5,
+            10,
+            15
+          ],
+          "texture": "#blade"
+        },
+        "north": {
+          "uv": [
+            6,
+            2,
+            10,
+            3
+          ],
+          "texture": "#blade"
+        },
+        "south": {
+          "uv": [
+            6,
+            2,
+            10,
+            3
+          ],
+          "texture": "#blade"
+        },
+        "west": {
+          "uv": [
+            9.5,
+            2,
+            15,
+            3
+          ],
+          "texture": "#blade"
+        },
+        "east": {
+          "uv": [
+            1,
+            2,
+            6.5,
+            3
+          ],
+          "texture": "#blade"
+        }
+      },
+      "rotation": {
+        "origin": [
+          8,
+          13.5,
+          12.25
+        ],
+        "axis": "z",
+        "angle": 22.5
+      }
+    },
+    {
+      "from": [
+        6,
+        13,
+        1
+      ],
+      "to": [
+        10,
+        14,
+        6.5
+      ],
+      "faces": {
+        "down": {
+          "uv": [
+            6,
+            9.5,
+            10,
+            15
+          ],
+          "texture": "#blade"
+        },
+        "up": {
+          "uv": [
+            6,
+            1,
+            10,
+            6.5
+          ],
+          "texture": "#blade"
+        },
+        "north": {
+          "uv": [
+            6,
+            2,
+            10,
+            3
+          ],
+          "texture": "#blade"
+        },
+        "south": {
+          "uv": [
+            6,
+            2,
+            10,
+            3
+          ],
+          "texture": "#blade"
+        },
+        "west": {
+          "uv": [
+            1,
+            2,
+            6.5,
+            3
+          ],
+          "texture": "#blade"
+        },
+        "east": {
+          "uv": [
+            9.5,
+            2,
+            15,
+            3
+          ],
+          "texture": "#blade"
+        }
+      },
+      "rotation": {
+        "origin": [
+          8,
+          13.5,
+          3.75
+        ],
+        "axis": "z",
+        "angle": -22.5
+      }
+    }
+  ]
+}
