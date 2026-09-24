@@ -217,6 +217,7 @@ public final class VolcanoEdifice {
                 if (c.type == VolcanoType.STRATOVOLCANO) rock = stratoSurface(rng, c, gx, target, gz, rock);
                 else if (c.type == VolcanoType.SHIELD) rock = shieldSurface(rng, c, gx, target, gz, rock);
                 setRock(level, new BlockPos(gx, target, gz), rock);
+                soilUnder(level, gx, target, gz, rock, target - 3);
                 clearCover(level, gx, target, gz);
                 return;
             }
@@ -230,13 +231,14 @@ public final class VolcanoEdifice {
         for (int y = ground + 1; y <= target; y++) {
             BlockState rock = coneRock(rng, c, gx, y, gz);
             if (y == target) {
-                if (underWater) rock = seaBed(rng, surface - target, 1.0, rock);
+                if (underWater) rock = seaBed(rng, gx, gz, surface - target, 1.0, rock);
                 else if (flow) rock = flowRock(c);
                 else if (c.type == VolcanoType.STRATOVOLCANO) rock = shoreSkin(level, rng, gx, y, gz, stratoSurface(rng, c, gx, y, gz, rock));
                 else if (c.type == VolcanoType.SHIELD) rock = shoreSkin(level, rng, gx, y, gz, shieldSurface(rng, c, gx, y, gz, rock));
             }
             setRock(level, new BlockPos(gx, y, gz), rock);
         }
+        soilUnder(level, gx, target, gz, level.getBlockState(new BlockPos(gx, target, gz)), ground);
         if (worldgen && !underWater) {
             clearCover(level, gx, target, gz);
             craterLake(level, c, gx, gz, target, dist, ang);
@@ -262,10 +264,14 @@ public final class VolcanoEdifice {
      * @param depth water over this top, in blocks
      * @param t     1 at the edifice, falling to 0 at the apron's outer edge
      */
-    static BlockState seaBed(RandomSource rng, int depth, double t, BlockState rock) {
+    static BlockState seaBed(RandomSource rng, int gx, int gz, int depth, double t, BlockState rock) {
         double black = depth <= 2 ? 0.25 + 0.6 * t : depth <= 4 ? 0.4 * t : 0.0;
-        if (rng.nextDouble() < black) return ModBlocks.VOLCANIC_BLACK_SAND.get().defaultBlockState();
-        return rng.nextInt(4) == 0 ? Blocks.GRAVEL.defaultBlockState() : rock;
+        // In drifts a few blocks across, from noise, rather than a roll per column: rolled, the sand came out as black
+        // speckle over the whole shallows, with hard edges where the depth stepped.
+        double drift = 0.5 + 0.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + 211, gz - 211, 5.0);
+        if (drift < black) return ModBlocks.VOLCANIC_BLACK_SAND.get().defaultBlockState();
+        double shingle = 0.5 + 0.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx - 97, gz + 131, 4.0);
+        return shingle > 0.78 ? Blocks.GRAVEL.defaultBlockState() : rock;
     }
 
     /**
@@ -294,6 +300,18 @@ public final class VolcanoEdifice {
             return (rng.nextBoolean() ? Blocks.COARSE_DIRT : ModBlocks.VOLCANIC_BLACK_SAND.get()).defaultBlockState();
         }
         return skin;
+    }
+
+    /**
+     * Soil under a grassed top: the two blocks under it dirt, not the cone's rock. Grass laid straight on andesite read
+     * as a green skin painted on a stone mountain; a flank that has grown over has a soil on it, the volcanic rock
+     * under that. Only down to {@code above}, the ground the column was built up from.
+     */
+    static void soilUnder(LevelAccessor level, int gx, int top, int gz, BlockState skin, int above) {
+        if (!skin.is(BlockTags.DIRT)) return;
+        for (int y = top - 1; y >= Math.max(above + 1, top - 2); y--) {
+            setRock(level, new BlockPos(gx, y, gz), Blocks.DIRT.defaultBlockState());
+        }
     }
 
     /** Clears plants and neighbouring trees' crowns left above a column's new top during generation. */
@@ -400,7 +418,11 @@ public final class VolcanoEdifice {
     static BlockState stratoSkin(RandomSource rng, Ctx c, int gx, int gz, double h, BlockState rock) {
         // An extinct cone has grown over far up its flanks, and its old flows have weathered into its soil.
         boolean extinct = c.activity == VolcanoActivity.EXTINCT;
-        double line = (extinct ? 0.55 : 0.24) + 0.10 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx, gz, 40.0);
+        // A large cone reaches up through the climate: its lower half is the country round it, grown over, and the bare
+        // rock only takes over higher up, through a wide ragged band of scree -- not a grey mountain from its foot.
+        boolean large = c.size == VolcanoSize.LARGE;
+        double line = (extinct ? 0.55 : large ? 0.45 : 0.24) + 0.10 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx, gz, 40.0);
+        double grassFade = large ? 0.22 : 0.14, screeFade = large ? 0.30 : 0.20;
         if (!extinct && h > line && c.size != VolcanoSize.SMALL
                 && oldLava(c, gx, gz) > 0.38 - 0.12 * rng.nextDouble()) {
             int r = rng.nextInt(10);
@@ -408,9 +430,9 @@ public final class VolcanoEdifice {
         }
         // Fine noise rather than a dice roll decides the mix, so grass and scree break up in small patches.
         double jitter = 0.5 + 0.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + 57, gz - 57, 4.0);
-        double grass = Mth.clamp(1.0 - (h - line + 0.06) / 0.14, 0.0, 1.0);
-        if (jitter < grass) return c.highland ? highlandSkin(rng) : Blocks.GRASS_BLOCK.defaultBlockState();
-        double scree = Mth.clamp(1.0 - (h - line) / 0.20, 0.0, 1.0);
+        double grass = Mth.clamp(1.0 - (h - line + 0.06) / grassFade, 0.0, 1.0);
+        if (jitter < grass) return c.highland ? forestFloor(rng) : Blocks.GRASS_BLOCK.defaultBlockState();
+        double scree = Mth.clamp(1.0 - (h - line) / screeFade, 0.0, 1.0);
         Block soil = c.highland ? Blocks.TUFF : Blocks.COARSE_DIRT;
         if (jitter < scree) {
             return (rng.nextInt(3) == 0 ? Blocks.GRAVEL : soil).defaultBlockState();
@@ -463,6 +485,14 @@ public final class VolcanoEdifice {
      * and old basalt of the plateau round it, so the mountain reads as part of its country rather than a green
      * hill set down on it.
      */
+    static BlockState forestFloor(RandomSource rng) {
+        // An arc's stratocone is forested to its tree line, as the Cascades and Kamchatka are: the highland round it is
+        // conifer country, and the tuff and ash gravel that stood in for grass here made the whole mountain one grey
+        // cone from its foot to its crater.
+        int r = rng.nextInt(20);
+        return (r < 12 ? Blocks.GRASS_BLOCK : r < 17 ? Blocks.PODZOL : Blocks.COARSE_DIRT).defaultBlockState();
+    }
+
     static BlockState highlandSkin(RandomSource rng) {
         int r = rng.nextInt(10);
         return (r < 5 ? Blocks.TUFF : r < 8 ? Blocks.GRAVEL : Blocks.BASALT).defaultBlockState();

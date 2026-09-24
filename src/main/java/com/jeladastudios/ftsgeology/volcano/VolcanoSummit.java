@@ -87,8 +87,14 @@ public final class VolcanoSummit {
         return Math.max(2, (int) Math.round(c.craterR * 0.55));
     }
 
+    /**
+     * How many blocks the funnel steps down. A large crater in the tall world is thirty blocks across its radius; seven
+     * steps down that spread its wall over rings four blocks apart, a thin line of black rock round each flat terrace,
+     * which under snow read as rings hung over the mountain. It is as deep as the crater is wide, up to seven blocks at
+     * the normal world's layout and further in a wider one.
+     */
     static int funnelDepth(Ctx c) {
-        return Mth.clamp(c.craterR + 1, 3, 7);
+        return Mth.clamp(c.craterR + 1, 3, (int) Math.round(7 * Math.max(1.0, c.scale)));
     }
 
     /** One row of one layer of the funnel, {@code d} blocks below the summit. */
@@ -105,7 +111,10 @@ public final class VolcanoSummit {
             double rr = r * (1.0 + 0.18 * Math.sin(3 * ang + c.phaseA));
             if (dist > rr) continue;
             BlockPos p = new BlockPos(c.x + dx, y, c.z + dz);
-            if (dist > rr - 1.3) {
+            // The wall reaches in to where the next step down begins, so the funnel's side is one stepped slope of
+            // rock rather than a ring at every step with bare terrace between.
+            double wall = Math.max(1.3, c.craterR / (double) (depth + 1) + 0.5);
+            if (dist > rr - wall) {
                 // The wall of the funnel, still hot in places.
                 setRock(level, p, (level.random.nextInt(6) == 0
                         ? Blocks.MAGMA_BLOCK : Blocks.BLACKSTONE).defaultBlockState());

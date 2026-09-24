@@ -102,7 +102,7 @@ public final class ApronEdifice {
             BlockState bed0 = level.getBlockState(new BlockPos(gx, ground, gz));
             for (int h = 0; h <= skin; h++) {
                 BlockState rock = apronBody(rng, c, gx, ground + h, gz, t, h == 0 ? bed0 : null, nativeBand);
-                setRock(level, new BlockPos(gx, ground + h, gz), h == skin ? seaBed(rng, water - skin, t, rock) : rock);
+                setRock(level, new BlockPos(gx, ground + h, gz), h == skin ? seaBed(rng, gx, gz, water - skin, t, rock) : rock);
             }
             return;
         }
