@@ -35,10 +35,16 @@ public final class SnowCover {
 
     private static final LongAdder COLUMNS = new LongAdder(), SNOWED = new LongAdder(), STEEP = new LongAdder();
 
+    /** The snow line of the world being played, in blocks: higher in the tall world, whose mountains are. */
+    public static int line() {
+        double h = TerrainContext.params().horizontal();
+        return (int) Math.round(SNOW_LINE * (1.0 + (h - 1.0) / 1.5));
+    }
+
     public static void generate(WorldGenLevel level, ChunkPos cp) {
         if (!GeologyWorld.isOwn(level.getLevel())) return;
         double h = TerrainContext.params().horizontal();
-        int line = (int) Math.round(SNOW_LINE * (1.0 + (h - 1.0) / 1.5));
+        int line = line();
         int deeper = (int) Math.round(DEEPER * h);
         int[][] top = new int[16][16];
         for (int dx = 0; dx < 16; dx++) {

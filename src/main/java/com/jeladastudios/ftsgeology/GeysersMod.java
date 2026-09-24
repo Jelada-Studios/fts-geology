@@ -59,6 +59,9 @@ public class GeysersMod {
         // instance's defaultconfigs/ folder is copied into each new world.
         ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, GeyserConfig.SPEC, "fts_geology.toml");
 
+        // Above the snow line only the animals of the high snow are born (game bus event).
+        MinecraftForge.EVENT_BUS.addListener(com.jeladastudios.ftsgeology.worldgen.SnowLineSpawns::check);
+
         // RetrogenHandler registers itself through @EventBusSubscriber.
         MinecraftForge.EVENT_BUS.register(this);
 

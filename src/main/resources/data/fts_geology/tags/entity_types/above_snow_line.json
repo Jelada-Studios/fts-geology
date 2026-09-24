@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "minecraft:goat",
+    "minecraft:rabbit",
+    { "id": "alexsmobs:snow_leopard", "required": false },
+    { "id": "alexsmobs:bald_eagle", "required": false },
+    { "id": "alexsmobs:froststalker", "required": false }
+  ]
+}
