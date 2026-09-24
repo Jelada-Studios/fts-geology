@@ -7,6 +7,9 @@
   "mixins": [
     "WorldDimensionsMixin"
   ],
+  "client": [
+    "OculusBlockIdsMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

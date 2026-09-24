@@ -70,6 +70,36 @@ public class GeologyBiomeSource extends BiomeSource {
         return Stream.concat(parent.possibleBiomes().stream(), byRole.values().stream()).distinct();
     }
 
+    /**
+     * /locate, without freezing the server. The search asks for a biome every 32 blocks out to 6400 and at every 64
+     * of height -- millions of columns -- and a column's biome here asks the river network whether a channel runs
+     * through it, which, where no chunk has been made yet, works out a whole square of rivers. So the search reads only
+     * the rivers already worked out; and when it wants one of the mod's own biomes, which are all of the surface, it
+     * looks at one height above the ground instead of every height down to the bottom of the world.
+     */
+    @Override
+    public com.mojang.datafixers.util.Pair<net.minecraft.core.BlockPos, Holder<Biome>> findClosestBiome3d(
+            net.minecraft.core.BlockPos origin, int radius, int horizontalStep, int verticalStep,
+            java.util.function.Predicate<Holder<Biome>> wanted, Climate.Sampler sampler,
+            net.minecraft.world.level.LevelReader level) {
+        boolean surface = parent.possibleBiomes().stream().noneMatch(wanted);
+        net.minecraft.core.BlockPos from = surface
+                ? new net.minecraft.core.BlockPos(origin.getX(), level.getMaxBuildHeight() - 16, origin.getZ()) : origin;
+        int step = surface ? level.getHeight() : verticalStep;
+        var found = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.builtOnly(
+                () -> super.findClosestBiome3d(from, radius, horizontalStep, step, wanted, sampler, level));
+        // Found up in the sky, so it is reported on the ground: the coordinates a player clicks to go there.
+        if (found != null && surface && level instanceof net.minecraft.server.level.ServerLevel server) {
+            net.minecraft.core.BlockPos at = found.getFirst();
+            int y = server.getChunkSource().getGenerator().getBaseHeight(at.getX(), at.getZ(),
+                    net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, server,
+                    server.getChunkSource().randomState());
+            return com.mojang.datafixers.util.Pair.of(new net.minecraft.core.BlockPos(at.getX(), y, at.getZ()),
+                    found.getSecond());
+        }
+        return found;
+    }
+
     /** How much of a channel has to reach a column before the river biome follows it there. */
     private static final double ON_CHANNEL = 0.5;
     /** How much of a named mountain's height a column has to carry before it is called by that mountain's name. */
