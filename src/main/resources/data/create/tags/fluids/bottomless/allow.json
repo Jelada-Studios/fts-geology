@@ -1,0 +1,13 @@
+{
+  "replace": false,
+  "values": [
+    {
+      "id": "fts_geology:river_water",
+      "required": false
+    },
+    {
+      "id": "fts_geology:flowing_river_water",
+      "required": false
+    }
+  ]
+}
