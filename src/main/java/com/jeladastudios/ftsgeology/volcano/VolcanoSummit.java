@@ -115,7 +115,10 @@ public final class VolcanoSummit {
             // rock rather than a ring at every step with bare terrace between.
             double wall = Math.max(1.3, c.craterR / (double) (depth + 1) + 0.5);
             if (dist > rr - wall) {
-                // The wall of the funnel, still hot in places.
+                // The wall of the funnel, still hot in places -- laid on the mountain only. The top step reaches past
+                // the summit's flat, and where the flank outside it had already fallen away below the step, the ring
+                // was set in the air.
+                if (level.getBlockState(p).isAir() && level.getBlockState(p.below()).isAir()) continue;
                 setRock(level, p, (level.random.nextInt(6) == 0
                         ? Blocks.MAGMA_BLOCK : Blocks.BLACKSTONE).defaultBlockState());
             } else {
@@ -142,6 +145,18 @@ public final class VolcanoSummit {
                     setRock(level, p, (level.random.nextInt(3) == 0
                             ? Blocks.MAGMA_BLOCK : Blocks.BLACKSTONE).defaultBlockState());
                 }
+            }
+        }
+        // The funnel's lowest steps are no narrower than the lake, so their walls reach in over its edge; the air over
+        // the lava was cleared under them and they were left as a ring hung a block over the lake. Over the lake's rim
+        // the shaft is open to the sky.
+        int depth = funnelDepth(c);
+        double band = Math.max(1.3, c.craterR / (double) (depth + 1) + 0.5) + 0.2 * (poolR + 1) + 1.0;
+        for (int dx = -poolR; dx <= poolR; dx++) {
+            for (int dz = -poolR; dz <= poolR; dz++) {
+                double dist = Math.sqrt(dx * dx + dz * dz);
+                if (dist > poolR || dist < poolR - band) continue;
+                for (int y = floorY + 2; y <= c.summitY; y++) clearNatural(level, new BlockPos(c.x + dx, y, c.z + dz));
             }
         }
         c.vent = new BlockPos(c.x, floorY, c.z);
