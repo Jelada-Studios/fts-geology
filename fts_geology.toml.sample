@@ -768,4 +768,9 @@
 	#belt's gneiss and marble, an arc's ash over its plutons. Off leaves plain stone, and chunks
 	#generate a little faster.
 	lithology = true
+	#How many times as fast crops on tilled soil ripen, and melon and pumpkin stems fruit, on the
+	#alluvial plain, where the rivers spread their silt in flood. 1 grows them as anywhere else.
+	#Bone meal is not changed.
+	#Range: 1.0 ~ 4.0
+	alluvialCropGrowth = 1.5
 

@@ -186,6 +186,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue TERRAIN_UPLIFT;        // blocks a collision lifts the ground
     public static final ForgeConfigSpec.DoubleValue DEM_HEIGHT_SCALE;      // how much the real mountain crops are exaggerated
     public static final ForgeConfigSpec.BooleanValue LITHOLOGY;           // rock sequences under the ground (own terrain)
+    public static final ForgeConfigSpec.DoubleValue ALLUVIAL_CROP_GROWTH; // how much faster crops ripen on a floodplain
 
     // --- Instruments ---------------------------------------------------------
     public static final ForgeConfigSpec.IntValue SEISMOGRAPH_RANGE;   // blocks a station can hear
@@ -1011,6 +1012,11 @@ public final class GeyserConfig {
                         "belt's gneiss and marble, an arc's ash over its plutons. Off leaves plain stone, and chunks",
                         "generate a little faster.")
                 .define("lithology", true);
+        ALLUVIAL_CROP_GROWTH = b
+                .comment("How many times as fast crops on tilled soil ripen, and melon and pumpkin stems fruit, on the",
+                        "alluvial plain, where the rivers spread their silt in flood. 1 grows them as anywhere else.",
+                        "Bone meal is not changed.")
+                .defineInRange("alluvialCropGrowth", 1.5D, 1.0D, 4.0D);
         b.pop();
 
         SPEC = b.build();

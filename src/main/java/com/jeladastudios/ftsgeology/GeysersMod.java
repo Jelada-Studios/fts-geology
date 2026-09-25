@@ -62,6 +62,9 @@ public class GeysersMod {
         // Above the snow line only the animals of the high snow are born (game bus event).
         MinecraftForge.EVENT_BUS.addListener(com.jeladastudios.ftsgeology.worldgen.SnowLineSpawns::check);
 
+        // Crops ripen faster on the floodplain's silt (game bus event).
+        MinecraftForge.EVENT_BUS.addListener(com.jeladastudios.ftsgeology.hydrology.AlluvialSoil::grow);
+
         // RetrogenHandler registers itself through @EventBusSubscriber.
         MinecraftForge.EVENT_BUS.register(this);
 
