@@ -33,10 +33,19 @@ public final class ThermalBiomes {
      * <p>Ordered most specific first: the first fragment found in the biome id wins, so
      * {@code terralith:yellowstone} is read as a geyser field rather than merely volcanic.</p>
      */
-    private record Match(String fragment, double strength, boolean allowsVolcano, String label) {}
+    private record Match(String fragment, double strength, boolean allowsVolcano, String label, double springs) {
+        Match(String fragment, double strength, boolean allowsVolcano, String label) {
+            this(fragment, strength, allowsVolcano, label, 1.0);
+        }
+    }
+
+    /** The share of hot springs a Yellowstone keeps. */
+    private static final double YELLOWSTONE_SPRINGS = 0.7;
 
     private static final Match[] MATCHES = {
-            new Match("yellowstone", 1.00, true,  "a Yellowstone-type thermal basin"),
+            // Terralith's Yellowstone paints its own sinter and pools; the mod's springs on top of them crowded it,
+            // so it takes fewer of them than a plume's own basin does.
+            new Match("yellowstone", 1.00, true,  "a Yellowstone-type thermal basin", YELLOWSTONE_SPRINGS),
             new Match("geyser",      1.00, true,  "a geyser field"),
             // A caldera has already collapsed, so no new cone belongs in it, but it stays thermally
             // alive: springs and geysers still do.
@@ -78,6 +87,14 @@ public final class ThermalBiomes {
      */
     public static boolean isCaldera(ServerLevel level, int blockX, int blockZ) {
         return lookup(level, blockX, blockZ).fragment().equals("caldera");
+    }
+
+    /**
+     * How many of the hot springs the ground would get here the biome keeps: fewer in a biome that already lays out a
+     * geyser basin of its own.
+     */
+    public static double springScale(ServerLevel level, int blockX, int blockZ) {
+        return lookup(level, blockX, blockZ).springs();
     }
 
     /** True unless the world generator has already put a collapsed edifice here. */

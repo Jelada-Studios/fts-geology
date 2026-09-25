@@ -6,6 +6,7 @@ import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.tectonics.GeothermalSuitability;
+import com.jeladastudios.ftsgeology.tectonics.ThermalBiomes;
 import com.jeladastudios.ftsgeology.volcano.VolcanoBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -136,7 +137,8 @@ public final class SurfaceFeatures {
         } else if (margin < APRON_SPRINGS) {
             springFit = Math.max(springFit, 0.6 * (1.0 - margin / APRON_SPRINGS));
         }
-        double springChance = GeyserConfig.HOT_SPRING_SPAWN_CHANCE.get() * springFit * springBoost;
+        double springChance = GeyserConfig.HOT_SPRING_SPAWN_CHANCE.get() * springFit * springBoost
+                * ThermalBiomes.springScale(level, centreX, centreZ);
         // At a big mountain's foot the springs come in groups: inside a cluster most chunks get one.
         if (com.jeladastudios.ftsgeology.volcano.VolcanoField.footCluster(level, centreX, centreZ)
                 <= com.jeladastudios.ftsgeology.volcano.VolcanoField.FOOT_CLUSTER_R) {

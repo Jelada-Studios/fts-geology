@@ -88,8 +88,11 @@ public final class TerrainFields {
     /** Where a rift's floor starts to take the ruggedness of its shoulders, and over how far. */
     private static final double RIFT_CALM_FROM = 0.1, RIFT_CALM_OVER = 0.6;
 
-    /** How much narrower a rift is than its first drawing, in both worlds: at full width it read as a lowland. */
-    private static final double RIFT_NARROW = 0.75;
+    /**
+     * How much narrower a rift is than its first drawing, in both worlds: at full width it read as a lowland, and at
+     * three quarters still as a broad basin more than a trough. The rock laid in the rift's floor narrows with it.
+     */
+    public static final double RIFT_NARROW = 0.525;
 
     /**
      * A column's distance from a rift's axis, in fault widths, measured on a shorter ruler.

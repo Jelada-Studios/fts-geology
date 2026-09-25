@@ -222,9 +222,13 @@ public final class Lithology {
         return basement(seed, c, x, y, z, depth - fill);
     }
 
-    /** How deep a rift's fill goes: forty blocks on the axis, thinning to nothing at the shoulders. */
+    /**
+     * How deep a rift's fill goes: forty blocks on the axis, thinning to nothing at the shoulders -- measured on the
+     * rift's own narrower ruler, so the fill lies in the valley and not out on its flanks.
+     */
     private static int riftFill(Column c) {
-        return (int) Math.round(40.0 * (1.0 - smooth((c.across() - 0.1) / 0.45)));
+        double a = c.across() / com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.RIFT_NARROW;
+        return (int) Math.round(40.0 * (1.0 - smooth((a - 0.1) / 0.45)));
     }
 
     // === For the deposits =====================================================
