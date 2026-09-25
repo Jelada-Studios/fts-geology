@@ -341,6 +341,8 @@ public final class HotSpringSites {
     static void paintThermalRings(ServerLevel level, List<BlockPos> pool,
                                           int cx, int cz, int waterY, int stage) {
         if (pool.isEmpty()) return;
+        // A caldera's floor takes no soil of the mod's: see ThermalBiomes.isCaldera.
+        boolean bare = com.jeladastudios.ftsgeology.tectonics.ThermalBiomes.isCaldera(level, cx, cz);
 
         // Outward from the water: sinter shelf, a narrow green fringe, yellow, orange, and brown at the dry
         // edge. Older springs have more bands; a young one has only its own deposit.
@@ -388,7 +390,7 @@ public final class HotSpringSites {
                     if (out < 0.0 || out > 1.0) continue;
                     // Thins outward, so the crust breaks up instead of drawing another ring.
                     if (level.random.nextDouble() > 1.0 - out) continue;
-                    b = haloBlock(level.random);
+                    b = haloBlock(level.random, bare);
                     inHalo = true;
                 }
 
@@ -404,7 +406,7 @@ public final class HotSpringSites {
                     int rise = g - waterY;
                     if (rise > BANK_REACH
                             || level.random.nextDouble() < (rise - flat) / (double) (BANK_REACH - flat + 1)) continue;
-                    b = altered(b, level.random);
+                    b = altered(b, level.random, bare);
                 }
                 // Never paint the floor under standing water, such as a neighbouring pool's bed.
                 if (!level.getBlockState(new BlockPos(x, g + 1, z)).getFluidState().isEmpty()) continue;
@@ -427,15 +429,15 @@ public final class HotSpringSites {
     private static final int BANK_REACH = 4;
 
     /** A band's colour as hydrothermally altered ground instead of a mat: bleached white, a little sulfur yellow. */
-    static Block altered(Block band, net.minecraft.util.RandomSource rng) {
+    static Block altered(Block band, net.minecraft.util.RandomSource rng, boolean bare) {
         if (band == ModBlocks.SINTER.get()) return rng.nextBoolean() ? Blocks.CALCITE : Blocks.WHITE_TERRACOTTA;
         if (band == ModBlocks.MICROBIAL_MAT_GREEN.get() || band == ModBlocks.MICROBIAL_MAT_YELLOW.get()) {
             int r = rng.nextInt(3);
-            return r == 0 ? Blocks.COARSE_DIRT : r == 1 ? Blocks.YELLOW_TERRACOTTA : ModBlocks.SINTER_CRUST.get();
+            return r == 0 ? (bare ? Blocks.GRAVEL : Blocks.COARSE_DIRT) : r == 1 ? Blocks.YELLOW_TERRACOTTA : ModBlocks.SINTER_CRUST.get();
         }
         if (band == ModBlocks.MICROBIAL_MAT_ORANGE.get() || band == ModBlocks.MICROBIAL_MAT_BROWN.get()) {
             int r = rng.nextInt(4);
-            return r == 0 ? Blocks.COARSE_DIRT : r < 3 ? Blocks.GRAVEL : ModBlocks.SINTER_CRUST.get();
+            return r == 0 && !bare ? Blocks.COARSE_DIRT : r < 3 ? Blocks.GRAVEL : ModBlocks.SINTER_CRUST.get();
         }
         return band;
     }
@@ -457,10 +459,10 @@ public final class HotSpringSites {
         }
     }
 
-    /** Halo crust: pale, dry, broken ground made of existing blocks. */
-    static Block haloBlock(net.minecraft.util.RandomSource rng) {
+    /** Halo crust: pale, dry, broken ground made of existing blocks; in a caldera ({@code bare}) no soil among it. */
+    static Block haloBlock(net.minecraft.util.RandomSource rng, boolean bare) {
         int r = rng.nextInt(10);
-        if (r < 2) return Blocks.COARSE_DIRT;
+        if (r < 2) return bare ? Blocks.GRAVEL : Blocks.COARSE_DIRT;
         if (r < 5) return Blocks.GRAVEL;
         if (r < 8) return ModBlocks.SINTER.get();
         return Blocks.TUFF;

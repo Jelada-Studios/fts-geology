@@ -156,6 +156,8 @@ public final class SoilProfile {
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return;
         if (TerrainProbe.hasFluidAbove(level, x, z)) return;    // a lake bed is not a soil profile
+        // Nor a caldera's floor, which is ash and altered rock; see ThermalBiomes.isCaldera.
+        if (com.jeladastudios.ftsgeology.tectonics.ThermalBiomes.isCaldera(level.getLevel(), x, z)) return;
 
         BlockPos at = new BlockPos(x, g, z);
         BlockState here = level.getBlockState(at);

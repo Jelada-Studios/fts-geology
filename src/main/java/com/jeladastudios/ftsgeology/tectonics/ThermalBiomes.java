@@ -71,6 +71,15 @@ public final class ThermalBiomes {
         return lookup(level, blockX, blockZ).label();
     }
 
+    /**
+     * Is this a caldera's floor (Terralith's {@code caldera} and the like)? The mod lays no soil of its own there: the
+     * ground inside a collapsed volcano is ash, pumice and hydrothermally altered rock, and the soil it painted
+     * round its springs and vents read as a lawn in a crater.
+     */
+    public static boolean isCaldera(ServerLevel level, int blockX, int blockZ) {
+        return lookup(level, blockX, blockZ).fragment().equals("caldera");
+    }
+
     /** True unless the world generator has already put a collapsed edifice here. */
     public static boolean allowsVolcano(ServerLevel level, int blockX, int blockZ) {
         return lookup(level, blockX, blockZ).allowsVolcano();

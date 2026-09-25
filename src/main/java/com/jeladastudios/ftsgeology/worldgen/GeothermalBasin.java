@@ -210,12 +210,14 @@ public final class GeothermalBasin {
         double wet = ValueNoise.noise(x + 4096, z - 4096, 19.0);
 
         TerrainProbe.clearGroundCover(level, x, g, z, 2);
+        // A caldera's floor gets no soil of the mod's: its wet hollows are crusted, not mud.
+        boolean bare = com.jeladastudios.ftsgeology.tectonics.ThermalBiomes.isCaldera(level.getLevel(), x, z);
 
         if (over(wet, 0.52, 0.20, rng) && s > 0.45) {
             // A mud flat: mud pots among vanilla mud, not one block stamped over and over.
             level.setBlock(at, TfcCompat.translate(level, at, rng.nextInt(7) == 0
                     ? ModBlocks.MUD_POT.get().defaultBlockState()
-                    : Blocks.MUD.defaultBlockState()), FLAGS);
+                    : bare ? ModBlocks.SINTER_CRUST.get().defaultBlockState() : Blocks.MUD.defaultBlockState()), FLAGS);
             if (rng.nextInt(440) == 0) HotspotSigns.chimney(level, at, rng);
             return true;
         }
@@ -229,7 +231,7 @@ public final class GeothermalBasin {
 
         // Between the flats, ground the runoff has poisoned - the same palette the halo round a
         // single spring already uses, so the two meet without a seam.
-        Block b = rng.nextInt(3) == 0 ? ModBlocks.SINTER_CRUST.get() : HotSpringSites.haloBlock(rng);
+        Block b = rng.nextInt(3) == 0 ? ModBlocks.SINTER_CRUST.get() : HotSpringSites.haloBlock(rng, bare);
         level.setBlock(at, TfcCompat.translate(level, at, b.defaultBlockState()), FLAGS);
         return true;
     }

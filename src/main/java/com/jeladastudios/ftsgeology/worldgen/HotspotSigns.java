@@ -164,6 +164,7 @@ public final class HotspotSigns {
      * @param band 0 on the trace itself, rising outward
      */
     private static void paint(WorldGenLevel level, int x, int z, int band, RandomSource rng) {
+        boolean bare = com.jeladastudios.ftsgeology.tectonics.ThermalBiomes.isCaldera(level.getLevel(), x, z);
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return;
         if (g <= level.getSeaLevel()) return;                    // not on the sea floor
@@ -189,7 +190,7 @@ public final class HotspotSigns {
             // mixed with the vanilla article they read as a wet patch with pots in it.
             int roll = rng.nextInt(6);
             set(level, at, roll == 0 ? ModBlocks.MUD_POT.get().defaultBlockState()
-                    : roll <= 2 ? Blocks.MUD.defaultBlockState()
+                    : roll <= 2 && !bare ? Blocks.MUD.defaultBlockState()
                     : ModBlocks.SINTER_CRUST.get().defaultBlockState());
         } else if (band == 1) {
             // Beside it: sulfur condensing out of the vapour.
@@ -198,8 +199,9 @@ public final class HotspotSigns {
                     : ModBlocks.NATIVE_SULFUR.get().defaultBlockState());
         } else {
             // Out at the edge: ground the runoff has bleached, dying into ordinary soil.
+            // In a caldera there is no soil to die into: the altered ground runs out into gravel.
             set(level, at, rng.nextInt(4) == 0
-                    ? Blocks.COARSE_DIRT.defaultBlockState()
+                    ? (bare ? Blocks.GRAVEL : Blocks.COARSE_DIRT).defaultBlockState()
                     : ModBlocks.SINTER_CRUST.get().defaultBlockState());
         }
     }
