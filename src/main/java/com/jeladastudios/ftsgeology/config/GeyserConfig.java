@@ -169,6 +169,7 @@ public final class GeyserConfig {
 
     // --- Hydrology (groundwater) ---------------------------------------------
     public static final ForgeConfigSpec.BooleanValue RIVERS;                 // default ON, experimental
+    public static final ForgeConfigSpec.BooleanValue KARST;                  // rivers sink, caves, sinkholes
     public static final ForgeConfigSpec.BooleanValue WATER_TABLE_ENABLED;
     public static final ForgeConfigSpec.DoubleValue WATER_TABLE_SUBDUAL;      // relief it copies, 0..1
     public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_TEMPERATE; // blocks below the land
@@ -897,6 +898,13 @@ public final class GeyserConfig {
                         "a seam. Set it before a world is made, not after.",
                         "Off, the world keeps vanilla's own rivers and nothing else.")
                 .define("rivers", true);
+        KARST = b
+                .comment("Karst, in the mod's own world types: where marble or calcite lies close under a platform,",
+                        "a foreland or a fold belt, in the regions that have it, the ground takes its water",
+                        "underground. Some rivers sink at a swallow hole, run on in a cave under a dry valley and",
+                        "come up again at a spring further down, and the ground is pocked with sinkholes. Like the",
+                        "rivers, it shapes the world as it is made: set it before a world is made.")
+                .define("karst", true);
         WATER_TABLE_ENABLED = b
                 .comment("Model a groundwater table under the world.",
                         "Nothing here places or edits a block on its own. It answers one question -",

@@ -659,7 +659,14 @@ public final class TerrainCommands {
             ctx.getSource().sendSuccess(() -> Component.literal("No river network: this world type traces none."), false);
             return 0;
         }
-        final String out = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.audit(at.getX(), at.getZ(), half);
+        // Wet where the generator puts water over the ground: the sea, or the aquifer at sea level over a hollow.
+        ServerLevel level = ctx.getSource().getLevel();
+        var gen = level.getChunkSource().getGenerator();
+        var random = level.getChunkSource().randomState();
+        java.util.function.BiPredicate<Integer, Integer> wet = (x, z) ->
+                gen.getBaseHeight(x, z, net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, level, random)
+                        > gen.getBaseHeight(x, z, net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG, level, random);
+        final String out = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.audit(at.getX(), at.getZ(), half, wet);
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(out);
         ctx.getSource().sendSuccess(() -> Component.literal(out), false);
         return 1;

@@ -34,6 +34,19 @@ public final class DrainageLattice {
     /** The ground, in blocks, with no river cut into it. */
     public interface Ground {
         double heightAt(int x, int z);
+
+        /**
+         * Whether the world holds water over its ground here. Asked only where the ground above lies a little under sea
+         * level, which it reads too smoothly to tell a shallow sea from a plain standing just out of the water.
+         */
+        default boolean wet(int x, int z) {
+            return true;
+        }
+
+        /** Whether the rock under the ground here dissolves, for a river to sink into it. See {@link Karst}. */
+        default boolean soluble(int x, int z, double ground) {
+            return false;
+        }
     }
 
     // === Settings ===========================================================
@@ -42,6 +55,14 @@ public final class DrainageLattice {
     static final int TILE = 16;
     /** How far a node's four candidates may wander from their quarter, as a share of the cell. */
     private static final double JITTER = 0.08;
+    /**
+     * How far under sea level the ground has to lie to be the sea whatever the world builds over it. Nearer the surface
+     * the ground here is read off the offset alone, and the world's own surface stands up to several blocks over it:
+     * measured on both world types, over half the nodes a block under the line and a tenth of those four to eight
+     * under were dry land in the world, and from eight down almost none. Taken for the sea, a low plain took every
+     * river crossing it in and ended it in the middle of the grass.
+     */
+    private static final double SURE_SEA = 8.0;
     /** How far under the ground half way along an edge the water may still pass there: a channel cuts that much. */
     private static final double SILL_CUT = 8.0;
 
@@ -166,7 +187,14 @@ public final class DrainageLattice {
         }
         // The roll, and a last hair of the node's own hash so that no two nodes are ever exactly level.
         double roll = ROLL * roll(i, j) + 1e-3 * (SeedHash.rand01(SeedHash.mix(h ^ 0x3C1L)) - 0.5);
-        return new double[]{bx, bz, best + roll};
+        double g = best + roll;
+        // Ground just under the line that the world leaves dry stands just out of the water, in the same order it lay
+        // in: the sea's own level would take it for the sea, and left under it, it drained nowhere -- the sea stands
+        // over it -- and every river that reached it stopped there.
+        if (g <= sea && g > sea - SURE_SEA && !ground.wet((int) Math.floor(bx), (int) Math.floor(bz))) {
+            g = sea + 1.0 + (g - (sea - SURE_SEA)) / SURE_SEA;
+        }
+        return new double[]{bx, bz, g};
     }
 
     /** Smooth value noise over the node lattice, in [-1, 1]. */
@@ -318,6 +346,21 @@ public final class DrainageLattice {
 
     // === The raw way down ==================================================
 
+    /** Whether the rock under a node dissolves, for a river crossing it to sink. */
+    public boolean soluble(long k) {
+        return ground.soluble((int) Math.floor(x(k)), (int) Math.floor(z(k)), g(k));
+    }
+
+    /** Whether a node is the sea: every river that reaches it ends there. */
+    public boolean isSea(long k) {
+        return raw(k) == NONE;
+    }
+
+    /** The sea's test for a node: under sea level. Dry ground just under it was lifted over it as it was placed. */
+    private boolean seaGround(long k, double gk) {
+        return gk <= sea;
+    }
+
     /** The slot of a node's steepest way down over the bare ground, {@link #NONE} for the sea, {@link #PIT}. */
     private byte raw(long k) {
         int i = ki(k), j = kj(k);
@@ -326,7 +369,7 @@ public final class DrainageLattice {
         byte hit = t.raw[l];
         if (hit != UNKNOWN) return hit;
         double gk = t.g[l];
-        byte best = gk <= sea ? NONE : PIT;
+        byte best = seaGround(k, gk) ? NONE : PIT;
         if (best == PIT) {
             double steep = 0;
             for (int s = 0; s < 8; s++) {
@@ -374,7 +417,12 @@ public final class DrainageLattice {
         return made;
     }
 
-    /** Out from a pit in order of the level the water must reach, until it finds ground lower than the pit's floor. */
+    /**
+     * Out from a pit in order of the level the water must reach, until it finds ground lower than the pit's floor or the
+     * sea. The sea's own ground can lie over a pit's floor: a hollow in a plain just out of the water, beside a shallow
+     * sea whose floor the raw ground puts higher. Looking only for lower ground, the search ran on across the sea until
+     * it gave up, and a river that reached the hollow ended in it.
+     */
     private Pit search(long p) {
         pitsFound.increment();
         double floor = g(p);
@@ -390,7 +438,7 @@ public final class DrainageLattice {
             double lv = open.topLevel();
             long v = open.pop();
             if (!done.add(v)) continue;
-            if (g(v) < floor) {
+            if (g(v) < floor || v != p && raw(v) == NONE) {
                 // The lake holds everything the water reached below its spill level.
                 long[] u = under.toLongArray();
                 int keep = 0;
@@ -442,12 +490,12 @@ public final class DrainageLattice {
                     break;
                 }
                 double gc = g(cur);
-                if (gc <= sea) {
+                byte r = raw(cur);
+                if (r == NONE) {
                     setFill(cur, sea);
                     base = sea;
                     break;
                 }
-                byte r = raw(cur);
                 if (r == PIT) {
                     Pit pit = pit(cur);
                     if (pit.closed) {
@@ -510,8 +558,8 @@ public final class DrainageLattice {
             if (fill(cur) <= pit.spill) return cur;
             long next = pit.below;
             while (true) {
-                if (g(next) <= sea) return cur;
                 byte r = raw(next);
+                if (r == NONE) return cur;
                 if (r == PIT) break;
                 next = step(next, r);
             }
@@ -620,7 +668,7 @@ public final class DrainageLattice {
         if (hit == LAKE) return lakeNext(k);
         double f = fill(k);
         double gk = t.g[l];
-        if (gk <= sea) {
+        if (raw(k) == NONE) {
             t.flow[l] = NONE;
             return Long.MIN_VALUE;
         }

@@ -122,6 +122,8 @@ public final class RiverWater {
                     }
                 }
                 if (a.distance() == Double.MAX_VALUE) continue;
+                // A river gone underground leaves its valley dry: its water is in the cave under it (KarstCaves).
+                if (a.sunk()) continue;
                 int w = (int) Math.floor(a.water());
                 // At the mouth the ocean is the river's surface. The fill used to stop the moment the traced water
                 // reached sea level, which left the last stretch of channel -- tens of blocks of it on a flat
@@ -162,9 +164,10 @@ public final class RiverWater {
                     continue;
                 }
                 // Which way the water runs here, for the surface to be drawn running and a swimmer to be carried, out
-                // through the mouth into the sea. A lake stands still.
-                BlockState run = a.lake() ? water
-                        : water.setValue(RiverWaterFluid.FLOW, RiverWaterFluid.wayOf(a.fx(), a.fz()));
+                // through the mouth into the sea. A lake's own hollow stands still, having no way of its own; the
+                // stretches of a river counted with a lake it runs into or out of -- its plunge pool, its backwater --
+                // still run the river's way, where they used to stand still as the lake's for tens of blocks.
+                BlockState run = water.setValue(RiverWaterFluid.FLOW, RiverWaterFluid.wayOf(a.fx(), a.fz()));
                 int here = 0;
                 for (int y = g + 1; y <= w; y++) {
                     BlockState was = level.getBlockState(at.set(x, y, z));
@@ -172,7 +175,8 @@ public final class RiverWater {
                     // The top of the sea in a river's mouth is the river's: vanilla water there freezes over in the cold,
                     // and a river's mouth does not. Seagrass and kelp reaching up into it go too: each holds vanilla water
                     // of its own, drawn as a block of a different water standing in the river.
-                    if (mouth && y >= w - MOUTH_TOP + 1 && (was.is(Blocks.WATER) || seaPlant(was))) {
+                    // A lake at sea level is still water: the sea's own freezes over it as a lake's would.
+                    if (mouth && !a.lake() && y >= w - MOUTH_TOP + 1 && (was.is(Blocks.WATER) || seaPlant(was))) {
                         level.setBlock(at, run, FLAGS);
                         here++;
                         continue;
@@ -221,7 +225,7 @@ public final class RiverWater {
                             + "{} lake columns iced, {} glacier columns, {} hollows stopped up, {} steps hung with falling water, {} lake shore columns taken down, {} lake necks filled, {} plants cleared off the water, {} lake floor columns eased; {}; {}; {}",
                     CHUNKS.get(), CANDIDATES.sum(), KEPT.sum(), WET.sum(), LEVELLED.sum(), DROPPED.sum(),
                     SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(), PLUGGED.sum(), CURTAINS.sum(), SHORED.sum(), GAPS.sum(), REEDS.sum(), EASED.sum(),
-                    RiverNetwork.summary(), GeologyChunkGenerator.summary(), SnowCover.summary() + "; " + SnowLineSpawns.summary());
+                    RiverNetwork.summary(), GeologyChunkGenerator.summary(), SnowCover.summary() + "; " + SnowLineSpawns.summary() + "; " + KarstCaves.summary() + "; " + Dolines.summary());
         }
         return placed;
     }
@@ -284,11 +288,13 @@ public final class RiverWater {
      */
     private static int waterTop(int x, int z, int sea) {
         RiverNetwork.At a = RiverNetwork.at(x, z);
-        if (a.distance() == Double.MAX_VALUE) return Integer.MIN_VALUE;
+        if (a.distance() == Double.MAX_VALUE || a.sunk()) return Integer.MIN_VALUE;
         int w = (int) Math.floor(a.water());
-        // At the mouth the sea is the other bank.
-        if (w <= sea) return Integer.MIN_VALUE;
         if (a.floor() > w - 0.5) return Integer.MIN_VALUE;
+        // At the mouth the water stands at the sea's own level, as the fill lays it. Called dry, the last step down to
+        // it -- two blocks wherever a river on a low plain sank to sea level long before it reached the coast -- got no
+        // falling water, and the bank beside it was built up across the channel: a lip of clay and mud like a dam.
+        if (w <= sea) return sea - 1;
         return a.lake() && lakeWall(x, z, w, sea) ? Integer.MIN_VALUE : w;
     }
 
@@ -537,7 +543,7 @@ public final class RiverWater {
                 int x = cp.getMinBlockX() + dx, z = cp.getMinBlockZ() + dz;
                 // The water's top as the fill laid it, the mouth's included: a river at the sea stands at the sea's level.
                 RiverNetwork.At a = RiverNetwork.at(x, z);
-                if (a.distance() == Double.MAX_VALUE) continue;
+                if (a.distance() == Double.MAX_VALUE || a.sunk()) continue;
                 int w = (int) Math.floor(a.water());
                 if (a.floor() > w - 0.5) continue;
                 if (w <= sea) w = sea - 1;
@@ -548,7 +554,8 @@ public final class RiverWater {
                     boolean wetUnder = under.is(ModBlocks.RIVER_WATER.get());
                     at.set(x, y, z);
                     if (y <= w && (wetUnder || under.isSolidRender(level, at.below()))) {
-                        level.setBlock(at, water, FLAGS);
+                        // Running the river's way, as the water round it does, not a still block in a running river.
+                        level.setBlock(at, water.setValue(RiverWaterFluid.FLOW, RiverWaterFluid.wayOf(a.fx(), a.fz())), FLAGS);
                         REEDS.increment();
                     } else if (y > w && wetUnder) {
                         level.setBlock(at, Blocks.AIR.defaultBlockState(), FLAGS);

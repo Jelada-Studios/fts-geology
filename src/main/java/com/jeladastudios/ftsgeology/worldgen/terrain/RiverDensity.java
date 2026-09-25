@@ -69,6 +69,16 @@ public final class RiverDensity implements DensityFunction {
     private final DensityFunction raw;
     private final Mode mode;
 
+    /**
+     * Set on a thread while it builds a column for the network to read ({@link RawGround#wet}): asking the network for its
+     * rivers there would be asking it for itself.
+     */
+    private static final ThreadLocal<boolean[]> BARE = ThreadLocal.withInitial(() -> new boolean[1]);
+
+    static void bare(boolean on) {
+        BARE.get()[0] = on;
+    }
+
     public RiverDensity(DensityFunction raw, String mode) {
         this(raw, Mode.valueOf(mode.toUpperCase(Locale.ROOT)));
     }
@@ -81,6 +91,9 @@ public final class RiverDensity implements DensityFunction {
     @Override
     public double compute(FunctionContext ctx) {
         if (!RiverNetwork.ready()) return mode == Mode.FLOOR ? NONE_HIGH : 0.0;
+        // The column the network reads the sea off: the ground beside a river -- no channel cut, but held as flat as a
+        // river's banks are, since a river ending there is what the answer is for.
+        if (BARE.get()[0]) return mode == Mode.FLOOR ? NONE_HIGH : 1.0;
         int x = ctx.blockX(), z = ctx.blockZ();
         return switch (mode) {
             case FLOOR -> {

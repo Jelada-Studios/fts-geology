@@ -65,6 +65,17 @@ public final class GeologyChunkGenerator extends NoiseBasedChunkGenerator {
         return CODEC;
     }
 
+    /**
+     * Set up as the world opens, before a chunk or a biome is asked for: the river network is handed this generator
+     * here, to read the sea off the terrain ({@link RawGround#wet}).
+     */
+    @Override
+    public ChunkGeneratorStructureState createState(net.minecraft.core.HolderLookup<net.minecraft.world.level.levelgen.structure.StructureSet> sets,
+                                                     net.minecraft.world.level.levelgen.RandomState state, long seed) {
+        RawGround.bindTerrain(this, state);
+        return super.createState(sets, state, seed);
+    }
+
     /** How deep under a river's bed, and how far out past its edge, the carvers are kept off. */
     private static final int GUARD_UNDER = 12, GUARD_SIDE = 3;
 
@@ -138,7 +149,10 @@ public final class GeologyChunkGenerator extends NoiseBasedChunkGenerator {
         }
     }
 
-    /** Whether water reaches a piece: a channel, its banks or a lake within a couple of blocks of it, or the sea under it. */
+    /**
+     * Whether water reaches a piece -- a channel, its banks or a lake within a couple of blocks of it, or the sea under it
+     * -- or a sinkhole opens under it.
+     */
     private static boolean wet(BoundingBox box) {
         int x0 = box.minX() - MARGIN, x1 = box.maxX() + MARGIN, z0 = box.minZ() - MARGIN, z1 = box.maxZ() + MARGIN;
         for (int x = x0; ; x = Math.min(x + STEP, x1)) {
@@ -149,6 +163,8 @@ public final class GeologyChunkGenerator extends NoiseBasedChunkGenerator {
                 // Nor on the sea: a piece laid over ground the sea covers is built on a foundation the generator
                 // raises out of the water, and at a river's mouth that foundation shut the river off from the sea.
                 if (RawGround.heightAt(x, z) < SEA_DRY) return true;
+                // Nor in a sinkhole, which is cut after the village is laid out.
+                if (com.jeladastudios.ftsgeology.worldgen.Dolines.covering(x, z) != null) return true;
                 if (z == z1) break;
             }
             if (x == x1) break;

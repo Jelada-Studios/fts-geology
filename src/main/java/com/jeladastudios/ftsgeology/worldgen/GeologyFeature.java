@@ -60,7 +60,11 @@ public class GeologyFeature extends Feature<NoneFeatureConfiguration> {
             long t3 = System.nanoTime();
             placed += LavaTubes.generate(level, cp);
             long t4 = System.nanoTime();
+            // Karst: the sinkholes, cut before the plants that grow on their floors; and after the river water, the caves
+            // sunk rivers run in, whose swallow holes take the river's water in where it reaches them.
+            placed += Dolines.generate(level, cp);
             RiverWater.generate(level, cp);
+            placed += KarstCaves.generate(level, cp);
             long t5 = System.nanoTime();
             GenCost.add(GenCost.DEEP, t1 - t0);
             GenCost.add(GenCost.RIDGE, t2 - t1);

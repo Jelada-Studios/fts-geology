@@ -91,6 +91,15 @@ public final class FindCommands {
             return s == null ? null : new Hit(s[0], s[1], (int) Math.round(Math.hypot(s[0] - at.getX(), s[1] - at.getZ())));
         }
         if (what.equals("valley")) return searchValley(level, at);
+        // Karst stands on the seed too: a sinkhole on its grid, a swallow hole where the river network sinks a river.
+        if (what.equals("sinkhole") || what.equals("swallowhole")) {
+            if (!com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level)) return null;
+            double[] s = what.equals("sinkhole")
+                    ? com.jeladastudios.ftsgeology.worldgen.Dolines.nearest(at.getX(), at.getZ(), 300)
+                    : com.jeladastudios.ftsgeology.hydrology.RiverNetwork.nearestSwallow(at.getX(), at.getZ(), 24);
+            return s == null ? null : new Hit((int) Math.floor(s[0]), (int) Math.floor(s[1]),
+                    (int) Math.round(Math.hypot(s[0] - at.getX(), s[1] - at.getZ())));
+        }
         // A named mountain stands in one place in a world, worked out from the seed: there is nothing to spiral for.
         for (String name : com.jeladastudios.ftsgeology.worldgen.terrain.DemLibrary.LANDMARKS) {
             if (!what.equals(name)) continue;

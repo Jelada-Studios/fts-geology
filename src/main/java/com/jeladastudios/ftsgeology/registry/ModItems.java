@@ -250,7 +250,7 @@ public final class ModItems {
     // discoverable, and in a classroom it is the difference between a demonstration and a lesson.
 
     public static final RegistryObject<Item> GEOTHERMAL_TURBINE = ITEMS.register("geothermal_turbine",
-            () -> new DescribedBlockItem(ModBlocks.GEOTHERMAL_TURBINE.get(), new Item.Properties(), 3));
+            () -> new DescribedBlockItem(ModBlocks.GEOTHERMAL_TURBINE.get(), new Item.Properties(), 3, "electrodynamics"));
 
     public static final RegistryObject<Item> WELL_CASING = ITEMS.register("well_casing",
             () -> new DescribedBlockItem(ModBlocks.WELL_CASING.get(), new Item.Properties(), 2));

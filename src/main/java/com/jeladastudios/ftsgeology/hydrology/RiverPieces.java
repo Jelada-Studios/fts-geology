@@ -149,7 +149,8 @@ final class RiverPieces {
 
     final LongAdder channels = new LongAdder(), joins = new LongAdder(), fallbacks = new LongAdder(),
             dams = new LongAdder(), gorges = new LongAdder(), eyes = new LongAdder(), heldOver = new LongAdder(), pools = new LongAdder(), inlets = new LongAdder(), inletOpen = new LongAdder(), inletBig = new LongAdder(), inletShut = new LongAdder(), bankClamps = new LongAdder(), lakeMasks = new LongAdder(), sinks = new LongAdder(),
-            mouths = new LongAdder(), dryJoins = new LongAdder(), gridReads = new LongAdder(), backwater = new LongAdder();
+            mouths = new LongAdder(), dryJoins = new LongAdder(), gridReads = new LongAdder(), backwater = new LongAdder(),
+            sunk = new LongAdder();
 
     RiverPieces(DrainageLattice lat, DrainageLattice.Ground ground, double horizontal, int areaMin) {
         this.lat = lat;
@@ -205,16 +206,16 @@ final class RiverPieces {
 
     /** A node that carries a river of its own. */
     boolean isRiver(long v) {
-        return lat.g(v) > lat.sea && !underLake(v) && lat.area(v) >= areaMin;
+        return !lat.isSea(v) && !underLake(v) && lat.area(v) >= areaMin;
     }
 
     /** A node that rivers can end in: a river, the sea, or a lake. */
     private boolean takesRivers(long v) {
-        return lat.g(v) <= lat.sea || underLake(v) || isRiver(v);
+        return lat.isSea(v) || underLake(v) || isRiver(v);
     }
 
     private RiverNetwork.Point[] build(long v, Long2ObjectOpenHashMap<RiverNetwork.Point[]> local) {
-        if (lat.g(v) <= lat.sea) return sea(v, local);
+        if (lat.isSea(v)) return sea(v, local);
         if (underLake(v)) return lake(v, local);
         if (lat.area(v) < areaMin) return NONE;
         return channel(v, local);
@@ -250,7 +251,7 @@ final class RiverPieces {
      * everywhere else -- a shallow hollow the river cuts through included -- the node's own ground.
      */
     double level(long v) {
-        if (lat.g(v) <= lat.sea) return lat.sea;
+        if (lat.isSea(v)) return lat.sea;
         return underLake(v) ? lat.fill(v) : lat.g(v);
     }
 
@@ -701,20 +702,23 @@ final class RiverPieces {
         return ds;
     }
 
-    /** Where a river that comes in ends: its water, its width and how far down its river it is. */
-    private record End(double water, double half, double length) {}
+    /**
+     * Where a river that comes in ends: its water, its width and how far down its river it is, and how many more cells it
+     * is still to run underground, or -1 where it runs in the open.
+     */
+    private record End(double water, double half, double length, int under) {}
 
     private End end(long d, Long2ObjectOpenHashMap<RiverNetwork.Point[]> local) {
         if (underLake(d)) {
             LakeMask mask = maskOf(d);
-            return mask == null ? null : new End(mask.water, halfFor(lat.area(d)), FROM_LAKE);
+            return mask == null ? null : new End(mask.water, halfFor(lat.area(d)), FROM_LAKE, -1);
         }
         RiverNetwork.Point[] ps = get(d, local);
         RiverNetwork.Point last = null;
         for (RiverNetwork.Point p : ps) if (p.kind() == CHANNEL) last = p;
         if (last == null) return null;
         return new End(last.waterEnd(), last.halfWidth(),
-                last.fromHead() + Math.hypot(last.ex() - last.x(), last.ez() - last.z()));
+                last.fromHead() + Math.hypot(last.ex() - last.x(), last.ez() - last.z()), last.under() - 1);
     }
 
     private RiverNetwork.Point[] channel(long u, Long2ObjectOpenHashMap<RiverNetwork.Point[]> local) {
@@ -725,6 +729,7 @@ final class RiverPieces {
         // Where the water comes in: the biggest of the rivers above, and the lowest water any of them brings.
         long main = Long.MIN_VALUE;
         double wIn = fu - 1.0, lenIn = 0;
+        int mainUnder = -1;
         for (long d : ds) {
             End e = end(d, local);
             if (e == null) continue;
@@ -732,6 +737,7 @@ final class RiverPieces {
                 main = d;
                 lenIn = e.length();
                 wIn = e.water();
+                mainUnder = e.under();
             } else {
                 wIn = Math.min(wIn, e.water());
             }
@@ -768,7 +774,7 @@ final class RiverPieces {
             float bed = (float) (w - LAKE_BED * h);
             float ux = (float) lat.x(u), uz = (float) lat.z(u);
             pts.add(new RiverNetwork.Point(ux, uz, ux, uz, w, w, bed, bed, (float) (SINK_HALF * lat.cell), FROM_LAKE,
-                    0f, 0f, LAKE));
+                    0f, 0f, LAKE, (byte) 0));
         }
         // The other rivers that come in, biggest first, each carried to the nearest water already drawn in this cell.
         List<double[]> segs = new ArrayList<>();
@@ -777,7 +783,31 @@ final class RiverPieces {
             if (d == main) continue;
             join(c, d, u, segs, pts, local, null, 0, null, false);
         }
+        // Through soluble rock the river may sink here and run on underground, the rivers that join it with it.
+        byte under = under(u, r, main, mainUnder);
+        if (under > 0) {
+            sunk.increment();
+            for (int i = 0; i < pts.size(); i++) {
+                RiverNetwork.Point p = pts.get(i);
+                if (!p.lake()) pts.set(i, p.withUnder(under));
+            }
+        }
         return pts.toArray(NONE);
+    }
+
+    /**
+     * Whether a river runs underground through this cell, and for how many cells more ({@link RiverNetwork.Point#under}).
+     * It sinks where it crosses into soluble rock -- at a swallow hole where its water comes in -- now and then, only a
+     * modest river, and only where it runs on into another river cell: never straight into a lake or the sea. Sunk, it
+     * stays under for a cell or three while the rock is still soluble, and comes up again at the head of the next cell.
+     */
+    private byte under(long u, long r, long main, int mainUnder) {
+        if (main == Long.MIN_VALUE || r == Long.MIN_VALUE || underLake(main) || lat.isSea(r) || underLake(r)) return 0;
+        if (mainUnder > 0) return lat.soluble(u) ? (byte) mainUnder : 0;
+        if (mainUnder == 0 || lat.area(u) > Karst.SINK_AREA_MAX || !lat.soluble(u)) return 0;
+        long hash = SeedHash.hash(seed, DrainageLattice.ki(u), DrainageLattice.kj(u), 0x5A1CL);
+        if (SeedHash.rand01(hash) >= Karst.SINK_SHARE) return 0;
+        return (byte) (1 + (int) (SeedHash.rand01(SeedHash.mix(hash)) * Karst.SINK_CELLS));
     }
 
     /**
@@ -1025,7 +1055,7 @@ final class RiverPieces {
             if (cutS > 0) gorges.increment();
             pts.add(new RiverNetwork.Point((float) qx[q], (float) qz[q], (float) qx[q + 1], (float) qz[q + 1],
                     (float) qw[q], (float) qw[q + 1], (float) bedS, (float) bedE,
-                    (float) hw, (float) (lenIn + step * q), (float) cutS, (float) cutE, kind));
+                    (float) hw, (float) (lenIn + step * q), (float) cutS, (float) cutE, kind, (byte) 0));
         }
         return pts;
     }
@@ -1052,7 +1082,7 @@ final class RiverPieces {
         if (rim - 1.0 < w) return;
         float bed = (float) (w - depthFor(half));
         pts.add(0, new RiverNetwork.Point((float) cx, (float) cz, (float) cx, (float) cz, (float) w, (float) w,
-                bed, bed, (float) half, 0f, 0f, 0f, CHANNEL));
+                bed, bed, (float) half, 0f, 0f, 0f, CHANNEL, (byte) 0));
         eyes.increment();
     }
 
