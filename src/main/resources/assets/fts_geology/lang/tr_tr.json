@@ -397,7 +397,7 @@
   "block.fts_geology.geothermal_turbine.tooltip.1": "Yeraltındaki sıcak suyun buharıyla döner.",
   "block.fts_geology.geothermal_turbine.tooltip.2": "Kuyu borusu döşenmiş bir kuyuya ya da gayzer ağzına koy.",
   "block.fts_geology.geothermal_turbine.tooltip.3": "FE yanlardan ve üstten çıkar. Ayrıntı Arazi Rehberi'nde.",
-  "block.fts_geology.geothermal_turbine.tooltip.electrodynamics": "Electrodynamics: kablo doğrudan almaz; giriş portu türbine bakan Battery Box gücü arkasındaki kabloya verir.",
+  "block.fts_geology.geothermal_turbine.tooltip.electrodynamics": "Electrodynamics: kabloları ve makineleri gücü doğrudan türbinden alır, 120 V.",
   "block.fts_geology.well_casing.tooltip.1": "Türbinin altındaki deliği bununla döşe,",
   "block.fts_geology.well_casing.tooltip.2": "kaplıca yatağına ya da haznesine kadar.",
   "message.fts_geology.turbine.geyser": "Gayzeri kapatıyor: buharı fışkırmak yerine türbini döndürüyor.",

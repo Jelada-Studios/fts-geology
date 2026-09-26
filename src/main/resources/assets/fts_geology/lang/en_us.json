@@ -407,7 +407,7 @@
   "block.fts_geology.geothermal_turbine.tooltip.1": "Runs on steam from hot water underground.",
   "block.fts_geology.geothermal_turbine.tooltip.2": "Set it on a well of Well Casing, or on a geyser's vent.",
   "block.fts_geology.geothermal_turbine.tooltip.3": "FE from its sides and top. See the Field Guide.",
-  "block.fts_geology.geothermal_turbine.tooltip.electrodynamics": "Electrodynamics: wires do not take it; a Battery Box with its input port on the turbine passes it to the wire on its back.",
+  "block.fts_geology.geothermal_turbine.tooltip.electrodynamics": "Electrodynamics: its wires and machines take the power straight from the turbine, at 120 V.",
   "block.fts_geology.well_casing.tooltip.1": "Line a hole under a turbine with it,",
   "block.fts_geology.well_casing.tooltip.2": "down to a hot spring's bed or chamber.",
   "message.fts_geology.turbine.geyser": "Capping a geyser: its steam turns the turbine instead of erupting.",

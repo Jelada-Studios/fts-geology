@@ -1,6 +1,7 @@
 package com.jeladastudios.ftsgeology.blockentity;
 
 import com.jeladastudios.ftsgeology.block.GeothermalTurbineBlock;
+import com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.registry.ModBlockEntities;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
@@ -78,6 +79,9 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
 
     private final Buffer energy = new Buffer();
     private final LazyOptional<IEnergyStorage> handle = LazyOptional.of(() -> energy);
+    /** The same store as Electrodynamics' electricity, where it is installed: its wires take nothing else. */
+    private final LazyOptional<Object> volts = ElectrodynamicsPower.generator(energy::getEnergyStored, () -> CAPACITY,
+            energy::set, this::setChanged);
 
     /** What the ground under it gives, before sharing, and what it made on the last tick after sharing. */
     private int well;
@@ -258,10 +262,14 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
             if (d == Direction.DOWN) continue;
             BlockEntity other = level.getBlockEntity(pos.relative(d));
             if (other == null) continue;
-            IEnergyStorage into = other.getCapability(ForgeCapabilities.ENERGY, d.getOpposite()).orElse(null);
-            if (into == null || !into.canReceive()) continue;
             int offered = energy.extractEnergy(PUSH_PER_TICK, true);
-            int taken = into.receiveEnergy(offered, false);
+            // Electrodynamics' electricity where the block takes it -- a wire takes nothing else -- and Forge Energy where not.
+            int taken = ElectrodynamicsPower.give(other, d.getOpposite(), offered);
+            if (taken < 0) {
+                IEnergyStorage into = other.getCapability(ForgeCapabilities.ENERGY, d.getOpposite()).orElse(null);
+                if (into == null || !into.canReceive()) continue;
+                taken = into.receiveEnergy(offered, false);
+            }
             if (taken > 0) {
                 energy.extractEnergy(taken, false);
                 setChanged();
@@ -329,6 +337,7 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
     @Override
     public <T> @NotNull LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
         if (cap == ForgeCapabilities.ENERGY && side != Direction.DOWN) return handle.cast();
+        if (ElectrodynamicsPower.is(cap) && side != Direction.DOWN) return volts.cast();
         return super.getCapability(cap, side);
     }
 
@@ -336,6 +345,7 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
     public void invalidateCaps() {
         super.invalidateCaps();
         handle.invalidate();
+        volts.invalidate();
     }
 
     @Override
