@@ -374,8 +374,9 @@ public final class VolcanoEruption {
     }
 
     /**
-     * At eruption end, re-lines the summit crater at the summit's own Y: molten inside, cooled rock
-     * on the rim. Uses the real carved crater radius, so the rim lands on the rim.
+     * At eruption end, re-lines the summit crater at the summit's own Y: the cells built as lava refilled, and the
+     * lava's open edges walled. A volcano saved before it kept that list gets the disc it always had instead: molten
+     * inside the carved crater radius, cooled rock on the rim.
      */
     public static void formCrater(ServerLevel level, BlockPos summit, int craterR, long[] molten) {
         // Refill every cell built as lava, including a caldera's lake and a fissure's ponds.
@@ -387,6 +388,65 @@ public final class VolcanoEruption {
                 }
             }
         }
+        // With the list, the list is the crater. A round disc over a shield's lobed lake flooded the ground between
+        // its lobes, rimless, and the lava ran down the flank after every eruption.
+        if (molten == null || molten.length == 0) fillCraterDisc(level, summit, craterR);
+        sealMoltenEdges(level, molten, summit, craterR + 1);
+        // What ran off the summit and is no longer fed: a lake walled only now left its old overflow standing on the
+        // flank, and running lava nothing feeds and nothing ticks stays where it is.
+        int reach = craterR;
+        if (molten != null) {
+            for (long key : molten) {
+                BlockPos p = BlockPos.of(key);
+                reach = Math.max(reach, (int) Math.ceil(Math.hypot(p.getX() - summit.getX(), p.getZ() - summit.getZ())));
+            }
+        }
+        drainRunningLava(level, summit, reach + DRAIN_PAST_LAKE, DRAIN_DEPTH);
+    }
+
+    /** How far past the summit's lava, and how far under it, running lava is drained at the end of an eruption. */
+    private static final int DRAIN_PAST_LAKE = 24, DRAIN_DEPTH = 48;
+
+    /**
+     * Takes the running lava round a summit, within {@code radius} of it and from {@code depth} under it to a few blocks
+     * over it. Only the chunk sections whose palette holds running lava are looked through.
+     */
+    private static void drainRunningLava(ServerLevel level, BlockPos summit, int radius, int depth) {
+        int y0 = summit.getY() - depth, y1 = summit.getY() + 4;
+        long r2 = (long) radius * radius;
+        java.util.function.Predicate<BlockState> running = s -> s.getFluidState().is(net.minecraft.tags.FluidTags.LAVA)
+                && !s.getFluidState().isSource();
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        for (int cx = (summit.getX() - radius) >> 4; cx <= (summit.getX() + radius) >> 4; cx++) {
+            for (int cz = (summit.getZ() - radius) >> 4; cz <= (summit.getZ() + radius) >> 4; cz++) {
+                if (!level.hasChunk(cx, cz)) continue;
+                net.minecraft.world.level.chunk.LevelChunk chunk = level.getChunk(cx, cz);
+                for (int sy = y0 >> 4; sy <= y1 >> 4; sy++) {
+                    int index = chunk.getSectionIndexFromSectionY(sy);
+                    if (index < 0 || index >= chunk.getSections().length) continue;
+                    net.minecraft.world.level.chunk.LevelChunkSection section = chunk.getSection(index);
+                    if (section.hasOnlyAir() || !section.getStates().maybeHas(running)) continue;
+                    for (int lx = 0; lx < 16; lx++) {
+                        for (int lz = 0; lz < 16; lz++) {
+                            int x = (cx << 4) + lx, z = (cz << 4) + lz;
+                            long dx = x - summit.getX(), dz = z - summit.getZ();
+                            if (dx * dx + dz * dz > r2) continue;
+                            for (int ly = 0; ly < 16; ly++) {
+                                int y = (sy << 4) + ly;
+                                if (y < y0 || y > y1) continue;
+                                if (!running.test(section.getBlockState(lx, ly, lz))) continue;
+                                p.set(x, y, z);
+                                level.setBlock(p, TfcCompat.translate(level, p, Blocks.AIR.defaultBlockState()), 3);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** The crater of a volcano saved without its list of lava cells: molten inside the radius, cooled rock on the rim. */
+    private static void fillCraterDisc(ServerLevel level, BlockPos summit, int craterR) {
         int r = Math.max(1, craterR);
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {
@@ -405,6 +465,46 @@ public final class VolcanoEruption {
                         level.setBlock(p, TfcCompat.translate(level, p, (level.random.nextInt(3) == 0
                                 ? Blocks.MAGMA_BLOCK : Blocks.BASALT).defaultBlockState()), 3);
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * Walls the lava of a volcano's summit where it stands open: beside each cell of it, a cell of air or plants, or
+     * lava running out of it, that is not itself lava standing still becomes basalt. The lava is the cells it was built
+     * with and, within {@code radius} of {@code summit} at the summit's own height, any other still lava there, which is
+     * what the round crater disc of earlier eruptions left between a shield's lobes. A shield's lake lobed past the
+     * square its summit was carved in was left without a rim there on the tall world's big shields, and the lake ran
+     * down the flank; walled at the end of every eruption, one built that way holds after its next. Costs a look at
+     * four neighbours a cell.
+     */
+    public static void sealMoltenEdges(ServerLevel level, long[] molten, BlockPos summit, int radius) {
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet cells = molten == null
+                ? new it.unimi.dsi.fastutil.longs.LongOpenHashSet()
+                : new it.unimi.dsi.fastutil.longs.LongOpenHashSet(molten);
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                if (dx * dx + dz * dz > radius * radius) continue;
+                BlockPos p = summit.offset(dx, 0, dz);
+                FluidState fs = level.getFluidState(p);
+                if (fs.is(net.minecraft.tags.FluidTags.LAVA) && fs.isSource()) cells.add(p.asLong());
+            }
+        }
+        if (cells.isEmpty()) return;
+        BlockPos.MutableBlockPos n = new BlockPos.MutableBlockPos();
+        for (long key : cells.toLongArray()) {
+            BlockPos p = BlockPos.of(key);
+            if (!level.getFluidState(p).is(net.minecraft.tags.FluidTags.LAVA)) continue;
+            for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                n.setWithOffset(p, d);
+                if (cells.contains(n.asLong())) continue;
+                BlockState s = level.getBlockState(n);
+                if (s.is(Blocks.BEDROCK) || com.jeladastudios.ftsgeology.eruption.EruptionHandler.isPlayerPlaced(s)) continue;
+                FluidState fs = s.getFluidState();
+                boolean runningOut = fs.is(net.minecraft.tags.FluidTags.LAVA) && !fs.isSource();
+                if (s.isAir() || com.jeladastudios.ftsgeology.worldgen.TerrainProbe.isVegetation(s) || runningOut) {
+                    level.setBlock(n, TfcCompat.translate(level, n, Blocks.BASALT.defaultBlockState()), 3);
                 }
             }
         }

@@ -338,11 +338,18 @@ public final class VolcanoEdifice {
     /** Clears plants and neighbouring trees' crowns left above a column's new top during generation. */
     static void clearCover(LevelAccessor level, int x, int fromY, int z) {
         int top = Math.min(fromY + 40, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z));
+        boolean crown = false;
         for (int y = fromY + 1; y <= top; y++) {
             BlockPos p = new BlockPos(x, y, z);
             BlockState s = level.getBlockState(p);
-            if (s.isAir()) continue;
-            if (!(TerrainProbe.isTreePart(s) || TerrainProbe.isVegetation(s))) return;
+            if (s.isAir()) {
+                crown = false;
+                continue;
+            }
+            // What was laid on the leaves just taken -- a path a village projected onto a tree's crown -- goes with
+            // them, or it hangs in the air over the new slope.
+            if (!(TerrainProbe.isTreePart(s) || TerrainProbe.isVegetation(s) || crown)) return;
+            crown = s.is(BlockTags.LEAVES);
             level.setBlock(p, TfcCompat.translate(level, p, Blocks.AIR.defaultBlockState()), 2);
         }
     }

@@ -141,12 +141,20 @@ public final class TerrainProbe {
     }
 
     private static int walkDown(LevelReader level, BlockPos.MutableBlockPos m, int x, int y, int z, int floor) {
-        for (int steps = 0; steps < MAX_WALK_DOWN && y > floor; steps++, y--) {
+        int limit = MAX_WALK_DOWN;
+        for (int steps = 0; steps < limit && y > floor; steps++, y--) {
             m.set(x, y, z);
             BlockState s = level.getBlockState(m);
             if (s.isAir()) continue;
             if (!s.getFluidState().isEmpty()) continue;   // water or lava sitting on the ground
             if (isVegetation(s) || isTreePart(s)) continue;
+            // Laid on a tree's crown, not on the ground: a village path projected onto the leaves a neighbouring chunk's
+            // tree hung over the chunk edge. Read as ground, a volcano built its flank up from it, a pillar forty
+            // blocks over the slope round it. The crown can stand well clear of the ground, so the walk goes on further.
+            if (level.getBlockState(m.set(x, y - 1, z)).is(BlockTags.LEAVES)) {
+                limit = Math.max(limit, steps + 2 * MAX_WALK_DOWN);
+                continue;
+            }
             return y;                                     // first genuine ground block
         }
         return Integer.MIN_VALUE;

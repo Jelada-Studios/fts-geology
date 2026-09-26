@@ -151,19 +151,30 @@ public final class VolcanoSummit {
         c.coreCraterR = poolR;
     }
 
+    /** How far a shield's lava lake lobes out, as shares of its crater radius: twice round and five times round. */
+    static final double LAKE_LOBE_2 = 0.38, LAKE_LOBE_5 = 0.20;
+
+    /** The farthest a shield's lava lake and its rim reach from the centre. */
+    static int lakeReach(Ctx c) {
+        return (int) Math.ceil(c.craterR * (1.0 + LAKE_LOBE_2 + LAKE_LOBE_5)) + 1;
+    }
+
     /**
      * A shield's summit: a broad, shallow, ragged lava lake sitting one block below its own rim, so
      * it is physically incapable of spilling down the flanks.
      */
     static void carveLavaLake(ServerLevel level, Ctx c) {
         int lakeY = c.summitY - 1;
-        int reach = c.craterR + 3;
+        // As far as the lake's widest lobe. Only the crater and three over were walked, so a lobe past that was cut
+        // off square at the lava with no rim, and the summit sweep, capped at forty blocks, never reached it on the
+        // tall world's big shields: the lake ran down the flank.
+        int reach = lakeReach(c);
         for (int dx = -reach; dx <= reach; dx++) {
             for (int dz = -reach; dz <= reach; dz++) {
                 double dist = Math.sqrt(dx * dx + dz * dz);
                 double ang = Math.atan2(dz, dx);
-                double rr = c.craterR * (1.0 + 0.38 * Math.sin(2 * ang + c.phaseA)
-                        + 0.20 * Math.sin(5 * ang + c.phaseC));
+                double rr = c.craterR * (1.0 + LAKE_LOBE_2 * Math.sin(2 * ang + c.phaseA)
+                        + LAKE_LOBE_5 * Math.sin(5 * ang + c.phaseC));
                 if (dist > rr) continue;
                 BlockPos surf = new BlockPos(c.x + dx, lakeY, c.z + dz);
                 setRock(level, surf.below(), Blocks.BASALT.defaultBlockState());
@@ -772,6 +783,8 @@ public final class VolcanoSummit {
      */
     static void sealExposedLava(ServerLevel level, Ctx c) {
         if (c.vent == null) return;
+        // The lava it was built with, however far that reaches: the sweeps below stop at forty-odd blocks.
+        VolcanoEruption.sealMoltenEdges(level, c.molten.stream().mapToLong(BlockPos::asLong).toArray(), c.vent, 0);
         // The summit and its throat, wide enough for a fissure's ponds, capped for a huge shield.
         int summitR = Math.min(Math.max(c.craterR + 5, c.coneBaseR + 4), 40);
         int hiY = Math.max(c.summitY, c.vent.getY()) + 3;
