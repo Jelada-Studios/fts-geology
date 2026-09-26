@@ -37,8 +37,12 @@ public final class SnowCover {
 
     /** The snow line of the world being played, in blocks: higher in the tall world, whose mountains are. */
     public static int line() {
-        double h = TerrainContext.params().horizontal();
-        return (int) Math.round(SNOW_LINE * (1.0 + (h - 1.0) / 1.5));
+        return lineAt(TerrainContext.params().horizontal());
+    }
+
+    /** The snow line of a world laid out {@code horizontal} times wider. */
+    public static int lineAt(double horizontal) {
+        return (int) Math.round(SNOW_LINE * (1.0 + (horizontal - 1.0) / 1.5));
     }
 
     public static void generate(WorldGenLevel level, ChunkPos cp) {

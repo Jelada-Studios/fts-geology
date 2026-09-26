@@ -35,7 +35,9 @@ public final class TerrainContext {
     public static void onServerAboutToStart(ServerAboutToStartEvent event) {
         seed = event.getServer().getWorldData().worldGenOptions().seed();
         known = true;
-        GeologyParams.take(isTall(event.getServer()) ? TALL_HORIZONTAL : 1.0);
+        boolean tall = isTall(event.getServer());
+        GeologyParams.take(tall ? TALL_HORIZONTAL : 1.0);
+        com.jeladastudios.ftsgeology.compat.ThinAirHeights.open(tall, TALL_HORIZONTAL, seaLevel(event.getServer()));
         TerrainCache.clear();
         GeologyWorld.clear();
         OverworldSurfaceRule.open(event.getServer());
@@ -56,9 +58,19 @@ public final class TerrainContext {
                 && noise.generatorSettings().is(GeologyWorld.SETTINGS_TALL);
     }
 
+    /** The overworld's sea level, read off its generator's settings; the vanilla 63 where it has none. */
+    private static int seaLevel(net.minecraft.server.MinecraftServer server) {
+        net.minecraft.world.level.dimension.LevelStem stem = server.registryAccess()
+                .registryOrThrow(net.minecraft.core.registries.Registries.LEVEL_STEM)
+                .get(net.minecraft.world.level.dimension.LevelStem.OVERWORLD);
+        return stem != null && stem.generator() instanceof net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator noise
+                ? noise.generatorSettings().value().seaLevel() : 63;
+    }
+
     @SubscribeEvent
     public static void onServerStopped(ServerStoppedEvent event) {
         known = false;
+        com.jeladastudios.ftsgeology.compat.ThinAirHeights.close();
         GeologyParams.forget();
         TerrainCache.clear();
         GeologyWorld.clear();
