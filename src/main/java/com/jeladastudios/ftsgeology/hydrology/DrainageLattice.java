@@ -140,6 +140,8 @@ public final class DrainageLattice {
 
     static final class Tile {
         final float[] x = new float[TILE * TILE], z = new float[TILE * TILE], g = new float[TILE * TILE];
+        /** Nodes the world leaves dry under the sea line, lifted just out of it as they were placed. */
+        final boolean[] lifted = new boolean[TILE * TILE];
         /** Sills of the edges a node owns: east, north, and the diagonal of the square it is the south-west corner of. */
         final float[] sillE = new float[TILE * TILE], sillN = new float[TILE * TILE], sillD = new float[TILE * TILE];
         /** Which diagonal that square has: south-west to north-east, or south-east to north-west. */
@@ -193,8 +195,9 @@ public final class DrainageLattice {
         // over it -- and every river that reached it stopped there.
         if (g <= sea && g > sea - SURE_SEA && !ground.wet((int) Math.floor(bx), (int) Math.floor(bz))) {
             g = sea + 1.0 + (g - (sea - SURE_SEA)) / SURE_SEA;
+            return new double[]{bx, bz, g, 1.0};
         }
-        return new double[]{bx, bz, g};
+        return new double[]{bx, bz, g, 0.0};
     }
 
     /** Smooth value noise over the node lattice, in [-1, 1]. */
@@ -242,6 +245,7 @@ public final class DrainageLattice {
                 t.x[l] = (float) p[0];
                 t.z[l] = (float) p[1];
                 t.g[l] = (float) p[2];
+                t.lifted[l] = p[3] != 0.0;
                 t.sillE[l] = sill(p, e);
                 t.sillN[l] = sill(p, no);
                 // The square's diagonal: whichever lies inside it, and where both do, the lower one, so water crossing
@@ -293,6 +297,15 @@ public final class DrainageLattice {
     public double g(long k) {
         int i = ki(k), j = kj(k);
         return tileOf(i, j).g[local(i, j)];
+    }
+
+    /**
+     * Whether a node is ground the world leaves dry under the sea line, lifted out of it as it was placed: its height
+     * here is a stand-in, and the world's own surface over it stands anywhere up to several blocks higher.
+     */
+    public boolean lifted(long k) {
+        int i = ki(k), j = kj(k);
+        return tileOf(i, j).lifted[local(i, j)];
     }
 
     /** The sill of the edge from (i, j) in a slot, or NaN where that slot has no edge. */

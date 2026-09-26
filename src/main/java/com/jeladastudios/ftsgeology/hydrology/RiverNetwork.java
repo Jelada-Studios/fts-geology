@@ -78,9 +78,9 @@ public final class RiverNetwork {
         }
 
         /**
-         * Whether this length runs underground, through soluble rock ({@link Karst}): the river sank into a swallow hole
-         * upstream and comes up again further down, and the valley over it is dry. Counted down the chain: 1 is the
-         * last length of a sunk stretch, higher the lengths before it.
+         * Whether this length runs underground, through soluble rock ({@link Karst}): the river fell into a swallow hole
+         * where its stretch underground starts and comes out where it ends, and the valley over it is left dry and
+         * uncut. The cave's water is worked out from the whole stretch ({@code KarstCaves}).
          */
         public boolean sunk() {
             return under > 0;
@@ -291,6 +291,8 @@ public final class RiverNetwork {
         At a = at(x, z);
         if (a.distance == Double.MAX_VALUE) return Double.MAX_VALUE;
         double f = a.floor();
+        // Over a river gone underground the valley is left as it was: the cave is cut under it afterwards (KarstCaves).
+        if (a.sunk) return Double.MAX_VALUE;
         double top = a.water + BANK_RISE * horizontal;
         // Through a hill the wall climbs on up the gorge, as far as the cut the trace allowed there.
         if (a.cut > 0) top = Math.max(top, a.bed + a.cut);
@@ -543,10 +545,10 @@ public final class RiverNetwork {
         if (l == null || pc == null) return "no river network";
         return String.format(Locale.ROOT,
                 "%d channel nodes (%d joins, %d with nothing to join, %d not traced, %d dam samples, %d gorge lengths, %d spring eyes, %d inlets cut through a bar (%d open, %d big, %d shut), %d plunge pools, %d backwater points, %d held under a "
-                        + "bank), %d lakes drawn, %d mouths, %d sinks, %d cells run underground; %d hollows (%d closed), %d lakes, %d ground reads "
+                        + "bank), %d lakes drawn (%d on a plain cut through), %d mouths, %d sinks, %d cells sunk into a cave; %d hollows (%d closed), %d lakes, %d ground reads "
                         + "and %d on the grid; %d squares in %.0f ms, slowest %.0f ms",
                 pc.channels.sum(), pc.joins.sum(), pc.dryJoins.sum(), pc.fallbacks.sum(), pc.dams.sum(), pc.gorges.sum(), pc.eyes.sum(), pc.inlets.sum(), pc.inletOpen.sum(), pc.inletBig.sum(), pc.inletShut.sum(), pc.pools.sum(), pc.backwater.sum(),
-                pc.bankClamps.sum(), pc.lakeMasks.sum(), pc.mouths.sum(), pc.sinks.sum(), pc.sunk.sum(), l.pitsFoundCount(),
+                pc.bankClamps.sum(), pc.lakeMasks.sum(), pc.plainLakes.sum(), pc.mouths.sum(), pc.sinks.sum(), pc.sunk.sum(), l.pitsFoundCount(),
                 l.closedCount(), l.lakesCount(), l.readsCount(), pc.gridReads.sum(), SQUARES.sum(),
                 SQUARE_NANOS.sum() / 1e6, SLOWEST.get() / 1e6);
     }
@@ -837,7 +839,23 @@ public final class RiverNetwork {
                 + (wet == null ? "" : String.format(Locale.ROOT,
                 "; dry mouths %d of %d%s; sea nodes dry in the world by depth 0-1,1-2,2-4,4-8,8-16,deeper: %d/%d %d/%d %d/%d %d/%d %d/%d %d/%d",
                 mouthsDry, mouths, firstDryMouth + (sinkAt.length() > 0 ? "; sinks at" + sinkAt : ""), seaDry[0], seaNodes[0], seaDry[1], seaNodes[1], seaDry[2], seaNodes[2],
-                seaDry[3], seaNodes[3], seaDry[4], seaNodes[4], seaDry[5], seaNodes[5]));
+                seaDry[3], seaNodes[3], seaDry[4], seaNodes[4], seaDry[5], seaNodes[5]))
+                + swallows(cx - half, cz - half, cx + half, cz + half);
+    }
+
+    /** How many rivers sink in a box, and where the first few do, for the audit. */
+    private static String swallows(int x0, int z0, int x1, int z1) {
+        List<Point> sunk = sunkNear(x0, z0, x1, z1);
+        java.util.Set<Long> ends = new java.util.HashSet<>();
+        for (Point p : sunk) ends.add(((long) Math.round(p.ex * 16f) << 32) ^ (Math.round(p.ez * 16f) & 0xFFFFFFFFL));
+        int n = 0;
+        StringBuilder at = new StringBuilder();
+        for (Point p : sunk) {
+            if (ends.contains(((long) Math.round(p.x * 16f) << 32) ^ (Math.round(p.z * 16f) & 0xFFFFFFFFL))) continue;
+            if (p.x < x0 || p.x > x1 || p.z < z0 || p.z > z1) continue;
+            if (n++ < 8) at.append(String.format(Locale.ROOT, " %.0f,%.0f", p.x, p.z));
+        }
+        return String.format(Locale.ROOT, "; swallow holes %d%s", n, n > 0 ? " at" + at : "");
     }
 
     /** Whether the node a river runs into draws something that starts where the river ends. */

@@ -91,7 +91,7 @@ public final class FindCommands {
             return s == null ? null : new Hit(s[0], s[1], (int) Math.round(Math.hypot(s[0] - at.getX(), s[1] - at.getZ())));
         }
         if (what.equals("valley")) return searchValley(level, at);
-        // Karst stands on the seed too: a sinkhole on its grid, a swallow hole where the river network sinks a river.
+        // Karst stands on the seed too: a sinkhole on its grid, a swallow hole where the network takes a river into a hill.
         if (what.equals("sinkhole") || what.equals("swallowhole")) {
             if (!com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level)) return null;
             double[] s = what.equals("sinkhole")

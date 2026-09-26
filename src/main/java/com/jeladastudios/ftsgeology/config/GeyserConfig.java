@@ -899,10 +899,10 @@ public final class GeyserConfig {
                         "Off, the world keeps vanilla's own rivers and nothing else.")
                 .define("rivers", true);
         KARST = b
-                .comment("Karst, in the mod's own world types: where marble or calcite lies close under a platform,",
-                        "a foreland or a fold belt, in the regions that have it, the ground takes its water",
-                        "underground. Some rivers sink at a swallow hole, run on in a cave under a dry valley and",
-                        "come up again at a spring further down, and the ground is pocked with sinkholes. Like the",
+                .comment("Karst, in the mod's own world types: where marble or calcite lies close under a plateau's",
+                        "flat beds, a platform's or a foreland's, in the regions that have it, the ground takes its",
+                        "water underground. It is pocked with sinkholes, and now and then a small river falls into a",
+                        "swallow hole, runs on in a cave under its dry valley and comes out further down. Like the",
                         "rivers, it shapes the world as it is made: set it before a world is made.")
                 .define("karst", true);
         WATER_TABLE_ENABLED = b

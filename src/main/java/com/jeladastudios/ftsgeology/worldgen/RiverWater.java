@@ -70,6 +70,8 @@ public final class RiverWater {
      * into.
      */
     private static final int LAKE_LEVEL = 2;
+    /** How far under a lake's water its shore is taken down to. */
+    private static final int LAKE_SHELF = 2;
     /** How far a river beside a lake may run below the lake's water before no falling water is hung from the lake down to it. */
     private static final int LAKE_WALL = 2;
 
@@ -369,6 +371,9 @@ public final class RiverWater {
             for (int dz = 0; dz < 16; dz++) {
                 int x = cp.getMinBlockX() + dx, z = cp.getMinBlockZ() + dz;
                 if (waterTop(x, z, sea) != Integer.MIN_VALUE) continue;
+                // Over a cave the ground is the hill's, and the cave's mouth is cut into it after: a bank built up there
+                // was a lip of soil capped with the surface's own block across the mouth.
+                if (RiverNetwork.at(x, z).sunk()) continue;
                 int want = Integer.MIN_VALUE;
                 for (int[] d : SIDES) want = Math.max(want, waterTop(x + d[0], z + d[1], sea));
                 if (want == Integer.MIN_VALUE) continue;
@@ -475,6 +480,9 @@ public final class RiverWater {
         // which read as a river broken off and starting again further down.
         if (g - w > Math.round(LEVEL_SHAVE * RiverNetwork.horizontal())) return Integer.MIN_VALUE;
         int bedY = Math.min(w - 1, (int) Math.floor(a.floor()));
+        // A lake's shore taken down is a shelf under its water, not dug to the lake's bed: dug to the bed, it was a
+        // trench along the shore with the ground left standing behind it a cliff above the water.
+        if (a.lake()) bedY = Math.max(bedY, w - LAKE_SHELF);
         if (bedY < level.getMinBuildHeight() + 1) return Integer.MIN_VALUE;
         // The floor of the channel has to be there to stand on -- a cave the carvers ran under the bed is stopped up,
         // where it was left as a crust across the river -- and everything over it has to be ours to take.

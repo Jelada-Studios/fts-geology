@@ -8,12 +8,16 @@ import com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext;
 /**
  * Karst: ground that water dissolves.
  *
- * <p>Where marble or calcite lies close under the surface of a platform, a foreland or a fold belt, rain soaked through
- * the soil carries carbon dioxide down into the rock and eats it out along its joints. The ground takes its drainage
- * underground: a river that crosses onto it sinks at a swallow hole, runs on in a cave under its own valley -- left dry
- * over it -- and comes up again at a spring further down, where the rock runs out or the cave reaches the valley floor;
- * the surface between is pocked with sinkholes, some fallen through into the caves under them. The Reka sinks at
- * Škocjan and comes up in the Timavo; the Danube itself loses part of its water at Immendingen.</p>
+ * <p>Where marble or calcite lies close under the surface of a platform or a foreland -- the flat-lying limestone of a
+ * plateau, not the folded rock of a mountain belt -- rain soaked through the soil carries carbon dioxide down into the
+ * rock and eats it out along its joints. The surface is pocked with sinkholes, some fallen through into the hollows
+ * under them, and now and then a river crossing onto the rock sinks at a swallow hole, runs on in a cave under its
+ * valley -- left dry over it -- and comes out again further down, into the river it feeds. The Reka sinks at Škocjan
+ * and comes up in the Timavo.</p>
+ *
+ * <p>The cave slopes down with the river and never lower than where it comes out, so the water runs downhill all the
+ * way and leaves the cave at the level of the river below: over its last stretch the cave's roof has thinned away and it
+ * runs in a slot open to the sky.</p>
  *
  * <p>Not all such ground is karst: a region either has it or has not, as the karst of the Dinarides, the Causses or
  * the Yucatán is a region. The rest of it drains at the surface as anywhere else.</p>
@@ -23,11 +27,14 @@ public final class Karst {
     private Karst() {}
 
     /** The largest river that sinks, by the cells it drains: a big river's water is more than its bed can take. */
-    static final int SINK_AREA_MAX = 256;
-    /** The share of the river cells crossing onto soluble rock where the river sinks. */
-    static final double SINK_SHARE = 0.5;
-    /** Up to how many cells a sunk river runs underground before it comes up. */
-    static final int SINK_CELLS = 3;
+    static final int SINK_AREA_MAX = 512;
+    /**
+     * How far a river has to fall across a cell to sink there, in blocks at the normal world's layout: the cave slopes
+     * down with it no lower than where it comes out, and over a smaller fall it would have no roof.
+     */
+    static final double CAVE_DROP = 5.0;
+    /** The fewest lengths of river a cave runs for: shorter, it would be a hole through a bank. */
+    static final int TUNNEL_MIN = 2;
 
     /** The share of the ground with soluble beds under it that is karst country. */
     private static final double COUNTRY = 0.55;
@@ -44,10 +51,9 @@ public final class Karst {
         long seed = TerrainContext.seed();
         if (country(seed, x, z, RiverNetwork.horizontal()) > COUNTRY) return false;
         Lithology.Column c = Lithology.column(seed, TerrainContext.params(), x, z);
-        if (c.setting() != Lithology.Setting.PLATFORM && c.setting() != Lithology.Setting.FORELAND
-                && c.setting() != Lithology.Setting.FOLD_BELT) {
-            return false;
-        }
+        // A plateau's beds: in a mountain belt the rock is folded, faulted and mostly not limestone, and the rivers
+        // there are mountain rivers.
+        if (c.setting() != Lithology.Setting.PLATFORM && c.setting() != Lithology.Setting.FORELAND) return false;
         int top = (int) Math.floor(ground);
         for (int d = 1; d <= REACH; d += 2) {
             Lithology.Rock r = Lithology.rockAt(seed, c, x, top - d, z, top);
