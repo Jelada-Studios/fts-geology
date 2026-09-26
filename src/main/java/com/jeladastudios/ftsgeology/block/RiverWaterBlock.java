@@ -20,17 +20,21 @@ public class RiverWaterBlock extends LiquidBlock {
 
     public RiverWaterBlock(Supplier<? extends FlowingFluid> fluid, Properties properties) {
         super(fluid, properties);
+        // Full by default: a river laid before the surface existed is read back without it and stays as it was.
+        registerDefaultState(defaultBlockState().setValue(RiverWaterFluid.SURFACE, 8));
     }
 
     @Override
     protected void createBlockStateDefinition(@Nonnull StateDefinition.Builder<Block, BlockState> builder) {
         super.createBlockStateDefinition(builder);
-        builder.add(RiverWaterFluid.FLOW);
+        builder.add(RiverWaterFluid.FLOW, RiverWaterFluid.SURFACE);
     }
 
     @Override
     @Nonnull
     public FluidState getFluidState(@Nonnull BlockState state) {
-        return super.getFluidState(state).setValue(RiverWaterFluid.FLOW, state.getValue(RiverWaterFluid.FLOW));
+        FluidState fluid = super.getFluidState(state).setValue(RiverWaterFluid.FLOW, state.getValue(RiverWaterFluid.FLOW));
+        return fluid.hasProperty(RiverWaterFluid.SURFACE)
+                ? fluid.setValue(RiverWaterFluid.SURFACE, state.getValue(RiverWaterFluid.SURFACE)) : fluid;
     }
 }
