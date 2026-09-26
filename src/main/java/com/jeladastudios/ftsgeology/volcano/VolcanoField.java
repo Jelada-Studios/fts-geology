@@ -455,8 +455,9 @@ public final class VolcanoField {
 
         boolean ocean = GeyserConfig.OCEAN_VOLCANOES.get();
         // The land caldera is out: its 300-block columns stalled the generator's workers under a terrain mod. The
-        // code stays; the sites that would have been calderas are shields over plumes and stratovolcanoes on arcs.
-        boolean calderas = false;
+        // code stays; the sites that would have been calderas on land are shields over plumes and stratovolcanoes on
+        // arcs. In the sea an arc's caldera is a flooded one, an island ring a quarter of that across.
+        boolean landCalderas = false;
         // A plume first: fewer of them, and the grander sight. A centre just outside the usable part
         // of the cell is pulled in.
         for (int[] p : HotspotMap.plumeCentres(level, minX - plumePull(), minZ - plumePull(),
@@ -481,7 +482,7 @@ public final class VolcanoField {
                 if (s != null) return new Cell(s, refused);
             }
             // A really large hotspot volcano has often emptied its chamber and fallen in.
-            VolcanoType type = calderas && rand01(hash(seed, 0, 0, 0xCA1DL)) < 0.34
+            VolcanoType type = landCalderas && rand01(hash(seed, 0, 0, 0xCA1DL)) < 0.34
                     ? VolcanoType.CALDERA : VolcanoType.SHIELD;
             Site s = SiteCheck.checkNear(level, x, z, type, seed, refused, null, minX, minZ, maxX, maxZ, structures);
             if (s != null) return new Cell(s, refused);
@@ -502,7 +503,7 @@ public final class VolcanoField {
             if (s.faultType() == FaultType.CONVERGENT_SUBDUCTION && !s.onArc(com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().faultWidth())) continue;
             VolcanoType type = switch (s.faultType()) {
                 // A quarter of the arc volcanoes have blown their tops off, as at Crater Lake or Aso.
-                case CONVERGENT_SUBDUCTION -> calderas && rand01(hash(seed, i, 4, 0xCA2DL)) < 0.25
+                case CONVERGENT_SUBDUCTION -> rand01(hash(seed, i, 4, 0xCA2DL)) < 0.25
                         ? VolcanoType.CALDERA : VolcanoType.STRATOVOLCANO;
                 // A third of the rift volcanoes have built a broad basalt shield, as many in Iceland have.
                 case DIVERGENT -> rand01(hash(seed, i, 5, 0x5E1DL)) < 0.35
@@ -536,6 +537,7 @@ public final class VolcanoField {
                 }
                 if (island != null) return new Cell(island, refused);
             }
+            if (type == VolcanoType.CALDERA && !landCalderas) type = VolcanoType.STRATOVOLCANO;
             Site site = SiteCheck.checkNear(level, x, z, type, seed, refused, s.faultType(), minX, minZ, maxX, maxZ,
                     structures);
             if (site != null) return new Cell(site, refused);

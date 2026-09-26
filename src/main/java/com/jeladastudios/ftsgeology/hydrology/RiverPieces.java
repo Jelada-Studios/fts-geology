@@ -614,7 +614,7 @@ final class RiverPieces {
         int[][] four = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
         for (int head = 0; head < queue.size(); head++) {
             long k = queue.getLong(head);
-            int i = (int) (k >> 32), j = (int) k;
+            int i = (int) k, j = (int) (k >>> 32);
             for (int[] d : four) {
                 int ni = i + d[0], nj = j + d[1];
                 long nk = ColumnCache.key(ni, nj);
@@ -635,7 +635,7 @@ final class RiverPieces {
         double[][] eight = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {diag, diag}, {diag, -diag}, {-diag, diag}, {-diag, -diag}};
         for (int c = 0; c < queue.size(); c++) {
             long k = queue.getLong(c);
-            int i = (int) (k >> 32), j = (int) k;
+            int i = (int) k, j = (int) (k >>> 32);
             boolean shore = false;
             for (int[] d : four) if (!from.containsKey(ColumnCache.key(i + d[0], j + d[1]))) { shore = true; break; }
             if (!shore) continue;
@@ -677,7 +677,7 @@ final class RiverPieces {
         List<double[]> path = new ArrayList<>();
         for (int c = bestCell; c >= 0; c = from.get(queue.getLong(c))) {
             long k = queue.getLong(c);
-            path.add(new double[]{ex + (int) (k >> 32) * s, ez + (int) k * s});
+            path.add(new double[]{ex + (int) k * s, ez + (int) (k >>> 32) * s});
         }
         java.util.Collections.reverse(path);
         path.set(0, new double[]{ex, ez});
