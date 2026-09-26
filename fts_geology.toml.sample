@@ -638,10 +638,10 @@
 	#pool's own bed makes less. Turbines within eight blocks of each other draw on the same
 	#heat and share it, so a field of them makes little more than one well sited.
 	#Range: 1 ~ 100000
-	turbineMaxFePerTick = 120
+	turbineMaxFePerTick = 480
 	#Forge Energy per tick over the faintest heat a turbine will run on at all.
 	#Range: 0 ~ 100000
-	turbineMinFePerTick = 20
+	turbineMinFePerTick = 80
 	#How deep a turbine's well may run, in lengths of well casing. A hot spring's reservoir
 	#sits thirty to sixty blocks under its pool; a natural geyser's chamber is down near the
 	#bottom of the world, out of reach unless this is raised.

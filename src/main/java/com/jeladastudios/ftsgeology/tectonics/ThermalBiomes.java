@@ -40,7 +40,7 @@ public final class ThermalBiomes {
     }
 
     /** The share of hot springs a Yellowstone keeps. */
-    private static final double YELLOWSTONE_SPRINGS = 0.7;
+    private static final double YELLOWSTONE_SPRINGS = 0.56;
 
     private static final Match[] MATCHES = {
             // Terralith's Yellowstone paints its own sinter and pools; the mod's springs on top of them crowded it,

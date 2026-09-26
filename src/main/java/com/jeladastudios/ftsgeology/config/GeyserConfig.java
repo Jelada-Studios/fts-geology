@@ -877,10 +877,10 @@ public final class GeyserConfig {
                         "ground: a hot spring's or geyser's deep chamber with its magma bed. A short well to a",
                         "pool's own bed makes less. Turbines within eight blocks of each other draw on the same",
                         "heat and share it, so a field of them makes little more than one well sited.")
-                .defineInRange("turbineMaxFePerTick", 120, 1, 100000);
+                .defineInRange("turbineMaxFePerTick", 480, 1, 100000);
         TURBINE_MIN_FE = b
                 .comment("Forge Energy per tick over the faintest heat a turbine will run on at all.")
-                .defineInRange("turbineMinFePerTick", 20, 0, 100000);
+                .defineInRange("turbineMinFePerTick", 80, 0, 100000);
         TURBINE_WELL_DEPTH = b
                 .comment("How deep a turbine's well may run, in lengths of well casing. A hot spring's reservoir",
                         "sits thirty to sixty blocks under its pool; a natural geyser's chamber is down near the",

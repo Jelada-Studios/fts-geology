@@ -90,9 +90,10 @@ public final class TerrainFields {
 
     /**
      * How much narrower a rift is than its first drawing, in both worlds: at full width it read as a lowland, and at
-     * three quarters still as a broad basin more than a trough. The rock laid in the rift's floor narrows with it.
+     * three quarters, or half, still as a broad basin more than a trough. The rock laid in the rift's floor narrows
+     * with it.
      */
-    public static final double RIFT_NARROW = 0.525;
+    public static final double RIFT_NARROW = 0.3675;
 
     /**
      * A column's distance from a rift's axis, in fault widths, measured on a shorter ruler.
