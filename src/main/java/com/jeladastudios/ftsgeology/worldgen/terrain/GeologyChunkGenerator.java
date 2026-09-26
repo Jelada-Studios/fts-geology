@@ -14,10 +14,13 @@ import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
+import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureType;
+import net.minecraft.world.level.levelgen.structure.TerrainAdjustment;
 import net.minecraft.world.level.levelgen.structure.StructurePiece;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.level.levelgen.structure.pieces.PiecesContainer;
@@ -125,7 +128,7 @@ public final class GeologyChunkGenerator extends NoiseBasedChunkGenerator {
         for (Map.Entry<Structure, StructureStart> e : new ArrayList<>(chunk.getAllStarts().entrySet())) {
             Structure structure = e.getKey();
             StructureStart start = e.getValue();
-            if (!start.isValid() || !all.wrapAsHolder(structure).is(StructureTags.VILLAGE)) continue;
+            if (!start.isValid() || !settlement(all.wrapAsHolder(structure))) continue;
             List<StructurePiece> pieces = start.getPieces();
             if (pieces.isEmpty()) continue;
             VILLAGES.increment();
@@ -147,6 +150,19 @@ public final class GeologyChunkGenerator extends NoiseBasedChunkGenerator {
                 tell(start, pieces.size() - keep.size(), pieces.size(), false);
             }
         }
+    }
+
+    /**
+     * Whether a structure is a settlement laid out over the ground: a village, or anything built the way a village is --
+     * pieces joined on the surface, the ground banked up under them -- as an outpost or another mod's walled town is,
+     * which the village tag does not name.
+     */
+    private static boolean settlement(Holder<Structure> holder) {
+        if (holder.is(StructureTags.VILLAGE)) return true;
+        if (holder.unwrapKey().map(k -> k.location().getPath().contains("village")).orElse(false)) return true;
+        Structure s = holder.value();
+        return s.type() == StructureType.JIGSAW && s.step() == GenerationStep.Decoration.SURFACE_STRUCTURES
+                && s.terrainAdaptation() == TerrainAdjustment.BEARD_THIN;
     }
 
     /**
