@@ -51,10 +51,6 @@ public final class VolcanoJob {
         steps.add(step);
     }
 
-    public int size() {
-        return steps.size();
-    }
-
     // === The queue ==========================================================
 
     private static final List<VolcanoJob> QUEUE = new ArrayList<>();

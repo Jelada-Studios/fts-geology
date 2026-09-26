@@ -51,15 +51,6 @@ public final class WaterTable {
             return localSurface > seaLevel && head >= localSurface;
         }
 
-        /**
-         * How hard the water is pushing out, in blocks of excess head. Zero away from a spring
-         * line; a few blocks in a strong valley-floor spring. Callers use it to decide how big a
-         * seep should be.
-         */
-        public int artesianHead() {
-            return Math.max(0, head - localSurface);
-        }
-
         /** Blocks of dry ground between the surface and the water. What a well has to be dug. */
         public int depthToWater() {
             return Math.max(0, localSurface - tableY);

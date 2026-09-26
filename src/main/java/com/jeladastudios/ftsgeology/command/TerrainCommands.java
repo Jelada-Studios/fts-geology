@@ -1,30 +1,18 @@
 package com.jeladastudios.ftsgeology.command;
 
 import com.mojang.brigadier.context.CommandContext;
-import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
-import com.jeladastudios.ftsgeology.tectonics.DepthScale;
-import com.jeladastudios.ftsgeology.tectonics.FaultType;
-import com.jeladastudios.ftsgeology.tectonics.GeothermalSuitability;
-import com.jeladastudios.ftsgeology.tectonics.HotspotMap;
-import com.jeladastudios.ftsgeology.tectonics.PlateKind;
-import com.jeladastudios.ftsgeology.tectonics.PlateSample;
-import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerLevel;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import static com.jeladastudios.ftsgeology.command.TectonicCommands.*;
-import static com.jeladastudios.ftsgeology.command.FindCommands.*;
 
-import static com.jeladastudios.ftsgeology.command.InspectCommands.*;
 
 /** /geology terrain: the ground the generator makes, measured without loading a chunk, and its climate and rivers. */
 public final class TerrainCommands {

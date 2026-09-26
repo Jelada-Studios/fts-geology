@@ -31,21 +31,29 @@ public final class GeothermalSuitability {
 
     private GeothermalSuitability() {}
 
-    /**
-     * Placement multipliers for one column, on top of the configured base chance. Volcano is 0..1;
-     * geyser and hot spring may exceed 1 inside a hotspot basin. {@code reasonKey} is a translation
-     * key explaining the verdict.
-     */
     /** 1 across the middle of a subduction zone, where the arc stands, falling to 0 at the trench and the far edge. */
     static double arcBand(double across) {
         return Mth.clamp(Math.min((across - 0.10) / 0.15, (0.90 - across) / 0.15), 0.0, 1.0);
     }
 
-    public record Suitability(double volcano, double geyser, double hotSpring, String reasonKey) {
+    /**
+     * Placement multipliers for one column, on top of the configured base chance. Volcano is 0..1;
+     * geyser and hot spring may exceed 1 inside a hotspot basin. {@code reasonKey} is a translation
+     * key explaining the verdict.
+     */
+    public record Suitability(double volcano, double geyser, double hotSpring, String reasonKey) {}
 
-        public boolean anything() {
-            return volcano > 0 || geyser > 0 || hotSpring > 0;
-        }
+    /**
+     * How hot the ground is from the boundary here: its stress over a spreading rift or a subduction arc, where magma
+     * comes up, and 0 anywhere else. Stress already folds in the distance to the fault, so the heat fades out as the
+     * boundary does rather than ending at a radius.
+     */
+    public static double boundaryHeat(ServerLevel level, int x, int z) {
+        PlateSample plate = TectonicMap.sampleCached(level, x, z);
+        return switch (plate.faultType()) {
+            case DIVERGENT, CONVERGENT_SUBDUCTION -> plate.stress();
+            default -> 0.0;
+        };
     }
 
     public static Suitability at(ServerLevel level, int x, int z) {

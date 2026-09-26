@@ -96,10 +96,6 @@ public final class VolcanoBuilder {
         return VolcanoJob.enqueue(job);
     }
 
-    public static boolean build(ServerLevel level, BlockPos base, int magnitude, VolcanoType type) {
-        return build(level, base, magnitude, type, VolcanoSize.SMALL);
-    }
-
     /**
      * Plans a volcano of an explicit shape and size and queues it for construction.
      *

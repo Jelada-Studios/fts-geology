@@ -1,7 +1,6 @@
 package com.jeladastudios.ftsgeology.worldgen.terrain;
 
 import com.jeladastudios.ftsgeology.tectonics.GeologyParams;
-import com.jeladastudios.ftsgeology.tectonics.PlateSample;
 import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 import com.jeladastudios.ftsgeology.util.ColumnCache;
 import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyRoles.Role;
@@ -19,11 +18,6 @@ public final class TerrainCache {
     private static final ColumnCache<TectonicMap.Edges> PLATES = new ColumnCache<>(16);
     private static final ColumnCache<Role> ROLES = new ColumnCache<>(16);
     private static volatile long forSeed;
-
-    /** The plate against its nearest boundary. */
-    public static PlateSample sample(long seed, GeologyParams params, int x, int z) {
-        return edges(seed, params, x, z).first();
-    }
 
     /** The plate against its nearest boundary and the next nearest. */
     public static TectonicMap.Edges edges(long seed, GeologyParams params, int x, int z) {

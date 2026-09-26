@@ -18,10 +18,8 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
@@ -124,16 +122,11 @@ public final class KarstCaves {
      */
     private static List<Length> stretches(List<RiverNetwork.Point> sunk, double depth) {
         Map<Long, RiverNetwork.Point> byStart = new HashMap<>();
-        Set<Long> ends = new HashSet<>();
-        for (RiverNetwork.Point p : sunk) {
-            byStart.put(key(p.x(), p.z()), p);
-            ends.add(key(p.ex(), p.ez()));
-        }
+        for (RiverNetwork.Point p : sunk) byStart.put(RiverNetwork.joint(p.x(), p.z()), p);
         List<List<RiverNetwork.Point>> mains = new ArrayList<>(), joins = new ArrayList<>();
-        for (RiverNetwork.Point head : sunk) {
-            if (ends.contains(key(head.x(), head.z()))) continue;
+        for (RiverNetwork.Point head : RiverNetwork.swallowHeads(sunk)) {
             List<RiverNetwork.Point> run = new ArrayList<>();
-            for (RiverNetwork.Point p = head; p != null && run.size() < 256; p = byStart.get(key(p.ex(), p.ez()))) run.add(p);
+            for (RiverNetwork.Point p = head; p != null && run.size() < 256; p = byStart.get(RiverNetwork.joint(p.ex(), p.ez()))) run.add(p);
             (head.channel() ? mains : joins).add(run);
         }
         List<Length> out = new ArrayList<>();
@@ -167,10 +160,6 @@ public final class KarstCaves {
             }
         }
         return best <= 400.0 ? Math.min(cave, otherwise) : otherwise;
-    }
-
-    private static long key(float x, float z) {
-        return ((long) Math.round(x * 16.0f) << 32) ^ (Math.round(z * 16.0f) & 0xFFFFFFFFL);
     }
 
     /**

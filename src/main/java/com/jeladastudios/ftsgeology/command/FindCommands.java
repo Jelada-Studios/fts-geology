@@ -2,7 +2,6 @@ package com.jeladastudios.ftsgeology.command;
 
 import com.mojang.brigadier.context.CommandContext;
 import com.jeladastudios.ftsgeology.GeysersMod;
-import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.tectonics.FaultType;
 import com.jeladastudios.ftsgeology.tectonics.HotspotMap;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
@@ -17,7 +16,6 @@ import com.jeladastudios.ftsgeology.volcano.VolcanoField;
 import com.jeladastudios.ftsgeology.volcano.VolcanoType;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
-import static com.jeladastudios.ftsgeology.command.TectonicCommands.*;
 import static com.jeladastudios.ftsgeology.command.InspectCommands.*;
 
 /** /geology find and field: locating settings and large volcanoes. */

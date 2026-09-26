@@ -17,7 +17,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
-import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -116,7 +115,7 @@ public final class Earthquake {
     }
 
     /**
-     * Triggers a quake of an explicit type, so all three deformation styles can be demonstrated
+     * Triggers a quake of an explicit type, so every deformation style can be demonstrated
      * side by side on flat ground regardless of the local geology.
      */
     public static void trigger(ServerLevel level, BlockPos epicentre, FaultType type,

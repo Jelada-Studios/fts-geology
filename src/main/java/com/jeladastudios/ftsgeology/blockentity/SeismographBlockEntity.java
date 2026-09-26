@@ -107,7 +107,7 @@ public class SeismographBlockEntity extends BlockEntity {
                 level.updateNeighborsAt(pos, state.getBlock());
                 be.setChanged();
             } else if (now % 8L == 0L) {
-                be.siren(server, pos, now);
+                be.siren(server, pos);
             }
         }
 
@@ -161,7 +161,7 @@ public class SeismographBlockEntity extends BlockEntity {
      * The visible half of the alert. The siren is one ten-second clip started when the warning
      * begins; retriggering it would stack overlapping copies.
      */
-    private void siren(ServerLevel level, BlockPos pos, long now) {
+    private void siren(ServerLevel level, BlockPos pos) {
         level.sendParticles(ParticleTypes.NOTE,
                 pos.getX() + 0.5, pos.getY() + 1.05, pos.getZ() + 0.5, 1, 0.2, 0.0, 0.2, 0.0);
     }

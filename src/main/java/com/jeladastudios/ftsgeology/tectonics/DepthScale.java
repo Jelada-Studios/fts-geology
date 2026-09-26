@@ -24,8 +24,6 @@ public final class DepthScale {
 
     private DepthScale() {}
 
-    /** Real-world thickness of continental crust, in metres - the reference the scale is fitted to. */
-    public static final double CONTINENTAL_CRUST_M = 35_000.0;
 
     /** How many metres one block of depth represents. */
     public static double metresPerBlock() {
@@ -45,13 +43,6 @@ public final class DepthScale {
         return GeyserConfig.METRES_PER_BLOCK_HORIZONTAL.get();
     }
 
-    /**
-     * Depth below the surface, in metres, of a block at {@code y} in a column whose ground level is
-     * {@code surfaceY}. Negative above ground.
-     */
-    public static double depthMetres(int surfaceY, int y) {
-        return (surfaceY - y) * metresPerBlock();
-    }
 
     /** Depth in metres of the very bottom of the buildable world, i.e. the base of our scaled crust. */
     public static double crustBaseMetres(LevelReader level, int surfaceY) {
@@ -66,14 +57,5 @@ public final class DepthScale {
         double abs = Math.abs(metres);
         if (abs >= 1000.0) return String.format(Locale.ROOT, "%.1f km", metres / 1000.0);
         return String.format(Locale.ROOT, "%.0f m", metres);
-    }
-
-    /**
-     * Converts a virtual depth in metres back to a block Y, clamped into the world. Used when a
-     * modelled event that lives below bedrock still has to show its effects somewhere real.
-     */
-    public static int blockYForDepth(LevelReader level, int surfaceY, double metres) {
-        int y = surfaceY - (int) Math.round(metres / metresPerBlock());
-        return Math.max(level.getMinBuildHeight(), Math.min(level.getMaxBuildHeight() - 1, y));
     }
 }

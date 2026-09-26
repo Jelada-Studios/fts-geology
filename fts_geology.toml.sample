@@ -95,15 +95,6 @@
 	#the raw number is tuned for what you should see along an active arc or rift.
 	#Range: 0.0 ~ 1.0
 	chamberSpawnChance = 0.03
-	#Carve a thin vent from the deep chamber up to the surface so eruptions
-	#reach daylight. Build-safe: the carve aborts (leaving the vent buried) the
-	#moment it would touch anything that isn't natural terrain.
-	carveSurfaceShaft = true
-	#Safety cap on how many blocks a surface shaft may rise from the cap. Must be
-	#tall enough to reach big-mountain surfaces (Terralith peaks) â€” else the vent
-	#gets stuck inside the mountain and never surfaces.
-	#Range: 1 ~ 512
-	shaftMaxLength = 384
 	#Ticks after a Geyser Igniter block is placed before it forms a geyser below
 	#it and vanishes. 300 = 15 seconds.
 	#Range: 20 ~ 24000

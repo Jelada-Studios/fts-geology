@@ -33,7 +33,6 @@ public final class VolcanoSummit {
 
     static void buildSummit(ServerLevel level, Ctx c) {
         switch (c.type.summitStyle()) {
-            case FUNNEL_PIT -> carveFunnelPit(level, c);
             case LAVA_LAKE -> carveLavaLake(level, c);
             case COLLAPSE_FLOOR -> seatCalderaVent(level, c);
             case FISSURE_PONDS -> carveFissureLine(level, c);
@@ -70,17 +69,6 @@ public final class VolcanoSummit {
         c.vent = new BlockPos(c.x, g == Integer.MIN_VALUE ? c.summitY : g, c.z);
     }
 
-    /**
-     * A stratovolcano's crater: a funnel stepping down to a lava lake on a real floor, shallow enough
-     * that the lake glows in view from the rim, as at Villarrica or Nyiragongo.
-     */
-    static void carveFunnelPit(ServerLevel level, Ctx c) {
-        int reach = (int) Math.ceil(c.craterR * 1.18) + 2;
-        for (int d = 0; d <= funnelDepth(c); d++) {
-            for (int dx = -reach; dx <= reach; dx++) carveFunnelRow(level, c, d, dx);
-        }
-        seatFunnelLake(level, c);
-    }
 
     /** A lake about half the crater across, so it reads as a lake from above. */
     static int funnelPoolR(Ctx c) {
@@ -377,10 +365,6 @@ public final class VolcanoSummit {
                 }
             }
         }
-    }
-
-    static void fillLavaDisc(ServerLevel level, int cx, int cy, int cz, int r, int thickness) {
-        for (int dx = -r - 1; dx <= r + 1; dx++) fillLavaDiscRow(level, cx, cy, cz, r, thickness, dx);
     }
 
     /** Queues a volcano's magma chamber a row per step, so a big one does not fill a tick on its own. */

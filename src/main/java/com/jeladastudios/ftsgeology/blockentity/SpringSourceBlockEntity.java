@@ -8,7 +8,6 @@ import com.jeladastudios.ftsgeology.quake.QuakeQuiet;
 import com.jeladastudios.ftsgeology.registry.ModBlockEntities;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.worldgen.HotSpringShape;
-import com.jeladastudios.ftsgeology.worldgen.HotSpringSites;
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -21,10 +20,6 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -124,20 +119,6 @@ public class SpringSourceBlockEntity extends BlockEntity {
         setChanged();
     }
 
-    /** The oldest this spring may get. */
-    public int maxStage() {
-        return maxStage;
-    }
-
-    /**
-     * Runs the spring straight to maturity, for world generation: a new world should have old springs
-     * in it. Same code path as slow growth.
-     *
-     * @return true if a spring was built here
-     */
-    public boolean growToMaturity(ServerLevel level) {
-        return growTo(level, FINAL_STAGE);
-    }
 
     /** Runs the spring up to a given age at once, stage by stage, exactly as slow growth does. */
     public boolean growTo(ServerLevel level, int target) {

@@ -1,6 +1,5 @@
 package com.jeladastudios.ftsgeology.worldgen.terrain;
 
-import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.hydrology.RiverNetwork;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -175,7 +174,7 @@ public final class GeologyChunkGenerator extends NoiseBasedChunkGenerator {
             for (int z = z0; ; z = Math.min(z + STEP, z1)) {
                 RiverNetwork.At a = RiverNetwork.at(x, z);
                 // The water stands out to where the cut wall climbs through it, a block and a half past the bed.
-                if (a.distance() != Double.MAX_VALUE && a.distance() <= a.halfWidth() + 1.5) return true;
+                if (a.within(1.5)) return true;
                 // Nor on the sea: a piece laid over ground the sea covers is built on a foundation the generator
                 // raises out of the water, and at a river's mouth that foundation shut the river off from the sea.
                 if (RawGround.heightAt(x, z) < SEA_DRY) return true;

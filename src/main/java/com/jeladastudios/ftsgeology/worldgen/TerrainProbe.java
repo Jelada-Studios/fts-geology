@@ -230,47 +230,6 @@ public final class TerrainProbe {
     }
 
     /**
-     * Verdict on whether a patch of ground can host a feature that must not leak.
-     *
-     * @param ok      true when the site passed every check
-     * @param groundY the level the whole patch sits at
-     * @param reason  short explanation, for the inspection commands
-     */
-    public record Site(boolean ok, int groundY, String reason) {
-        public static Site no(String reason) { return new Site(false, Integer.MIN_VALUE, reason); }
-    }
-
-    /**
-     * Looks for ground that a recessed basin can be cut into without leaking.
-     *
-     * <p>Strict on purpose, so lava or water seated here has nowhere to go: one consistent level
-     * (within {@code tolerance}), no standing fluid, clear of the sea.</p>
-     *
-     * @param radius    half-width of the patch that has to be level
-     * @param tolerance how many blocks of height variation are tolerated across it
-     */
-    public static Site findLevelSite(LevelReader level, int x, int z, int radius, int tolerance) {
-        int centre = groundY(level, x, z);
-        if (centre == Integer.MIN_VALUE) return Site.no("no ground here");
-        if (centre <= level.getMinBuildHeight() + 6) return Site.no("too close to bedrock");
-        if (centre >= level.getMaxBuildHeight() - 8) return Site.no("too close to the build ceiling");
-
-        int guard = radius + 1;   // also check a ring OUTSIDE the feature, so it cannot spill over
-        int lo = centre, hi = centre;
-        for (int dx = -guard; dx <= guard; dx++) {
-            for (int dz = -guard; dz <= guard; dz++) {
-                int g = groundY(level, x + dx, z + dz);
-                if (g == Integer.MIN_VALUE) return Site.no("open air or void nearby");
-                if (hasFluidAbove(level, x + dx, z + dz)) return Site.no("standing water or lava nearby");
-                lo = Math.min(lo, g);
-                hi = Math.max(hi, g);
-                if (hi - lo > tolerance) return Site.no("ground is too uneven");
-            }
-        }
-        return new Site(true, centre, "level, dry ground");
-    }
-
-    /**
      * Removes plant cover from a column so nothing is left to catch fire or float over a new basin.
      * Only ever clears {@link #isVegetation} blocks, so builds and trees are untouched. Written without
      * neighbour shape updates, which load edge chunks, so the top of a tall plant or cane is taken too.

@@ -112,8 +112,6 @@ public class GeyserCoreBlockEntity extends BlockEntity {
 
     /** Last mouth resolved by the pathfinder (transient cache for the per-tick jet). */
     private transient BlockPos currentMouth;
-    /** Ceiling used by the last resolve — the target surface Y. Water only spouts once we reach it. */
-    private transient int currentCeilingY = Integer.MAX_VALUE;
 
     /**
      * Packed positions of secondary fumaroles — the cave/air breakthroughs of the root-vent
@@ -387,7 +385,7 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         }
 
         temperatureC += heatGain - cooling;
-        temperatureC = clamp(temperatureC, 20.0, GeyserConfig.MAX_TEMPERATURE_C.get());
+        temperatureC = Mth.clamp(temperatureC, 20.0, GeyserConfig.MAX_TEMPERATURE_C.get());
 
         double boiling = GeyserConfig.BOILING_POINT_C.get();
 
@@ -450,7 +448,7 @@ public class GeyserCoreBlockEntity extends BlockEntity {
             case PRESSURIZING -> {
                 EruptionHandler.emitSteamWisps(level, mouth, 1.0f);
                 if (pressure >= crackP) {
-                    EruptionHandler.erodeCrust(level, mouth, pressure);
+                    EruptionHandler.erodeCrust(level, mouth);
                 }
                 if (capped) {
                     latentSteam = 0.0;          // drawn off through the turbine, never built into an eruption
@@ -580,7 +578,6 @@ public class GeyserCoreBlockEntity extends BlockEntity {
             ventTopY = mouth.getY(); // advance the frontier so next second resumes here
         }
         this.currentMouth = mouth;
-        this.currentCeilingY = ceilingY;
         return mouth;
     }
 
@@ -612,7 +609,6 @@ public class GeyserCoreBlockEntity extends BlockEntity {
     public Phase getPhase() { return phase; }
     public double getPressure() { return pressure; }
     public double getTemperatureC() { return temperatureC; }
-    public int getEruptionCount() { return eruptionCount; }
     public int getMagnitude() { return magnitude; }
     public int getEruptionTicks() { return eruptionTicks; }
     public double getWaterVolume() { return waterVolume; }
@@ -621,7 +617,6 @@ public class GeyserCoreBlockEntity extends BlockEntity {
     public int getVentMouthYRaw() { return ventMouthY; }
     public int getVentTopY() { return ventTopY; }
     public int getTickCount() { return tickCount; }
-    public boolean isEmergent() { return emergent; }
     public void setEmergent(boolean e) { this.emergent = e; setChanged(); }
 
     /** Assigned once at generation time. Clamped to [{@link #MIN_MAGNITUDE}, {@link #MAX_MAGNITUDE}]. */
@@ -631,7 +626,6 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         setChanged();
     }
 
-    public int getVentMouthY() { return ventMouthY; }
 
     /**
      * The core whose vent opens just under or at this spot, or null: its axis within {@link #CAP_REACH} blocks, its
@@ -772,9 +766,5 @@ public class GeyserCoreBlockEntity extends BlockEntity {
             for (long key : tag.getLongArray("SpilledWater")) spilledWater.add(key);
         }
         chamberCells = tag.contains("ChamberCells") ? tag.getLongArray("ChamberCells") : null;
-    }
-
-    private static double clamp(double v, double lo, double hi) {
-        return v < lo ? lo : Math.min(v, hi);
     }
 }

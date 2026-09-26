@@ -78,10 +78,6 @@ public final class DeepStructure {
 
         ServerLevel world = level.getLevel();
         PlateSample centre = TectonicMap.sampleCached(world, cp.getMinBlockX() + 8, cp.getMinBlockZ() + 8);
-        if (report != null) {
-            report.type = centre.faultType().toString();
-            report.stress = centre.stress();
-        }
         // Cheap early out only; the real gate is per column and fades. Generous, because a chunk's
         // corner can be more stressed than its middle.
         if (centre.stress() < 0.10) {
@@ -127,13 +123,7 @@ public final class DeepStructure {
                 default -> 0;
             };
             budget -= placed;
-            if (report != null) {
-                report.blocks += placed;
-                if (placed > 0) {
-                    report.lowest = Math.min(report.lowest, floor);
-                    report.highest = Math.max(report.highest, top);
-                }
-            }
+            if (report != null) report.blocks += placed;
         }
         if (report != null && report.blocks == 0 && report.note == null) {
             report.note = "budget exhausted or nothing matched in this chunk";
@@ -143,11 +133,7 @@ public final class DeepStructure {
 
     /** What one chunk's worth of generation actually did, for the inspection command. */
     public static final class Report {
-        public String type = "?";
-        public double stress;
         public int blocks;
-        public int lowest = Integer.MAX_VALUE;
-        public int highest = Integer.MIN_VALUE;
         public String note;
     }
 

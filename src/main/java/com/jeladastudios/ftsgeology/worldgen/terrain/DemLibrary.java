@@ -46,7 +46,7 @@ public final class DemLibrary {
     private static final double PERIOD = 400 * 90.0;
     private static final double OVERLAP = 0.1;
 
-    private record Crop(String name, short[] v, int w, int h, double mpp, double mean, double peak) {}
+    private record Crop(short[] v, int w, int h, double mpp, double mean, double peak) {}
 
     private static final class Holder {
         static final Crop[] YOUNG_NORMAL = load(YOUNG);
@@ -203,7 +203,7 @@ public final class DemLibrary {
                     sum += v[i];
                     top = Math.max(top, v[i]);
                 }
-                out.add(new Crop(n, v, w, h, mpp, sum / (double) v.length, top));
+                out.add(new Crop(v, w, h, mpp, sum / (double) v.length, top));
             } catch (IOException e) {
                 GeysersMod.LOGGER.warn("Mountain crop {} could not be read: {}", n, e.toString());
             }

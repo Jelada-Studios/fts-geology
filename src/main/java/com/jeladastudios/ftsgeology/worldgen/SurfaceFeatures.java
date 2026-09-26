@@ -53,12 +53,7 @@ public final class SurfaceFeatures {
     /** 0 on ordinary country, rising to 1 over a plume, a spreading ridge or a subduction arc. */
     static double geothermalGround(ServerLevel level, int x, int z) {
         double plume = com.jeladastudios.ftsgeology.tectonics.HotspotMap.sample(level, x, z).strength();
-        com.jeladastudios.ftsgeology.tectonics.PlateSample plate =
-                com.jeladastudios.ftsgeology.tectonics.TectonicMap.sampleCached(level, x, z);
-        double boundary = switch (plate.faultType()) {
-            case DIVERGENT, CONVERGENT_SUBDUCTION -> plate.stress();
-            default -> 0.0;
-        };
+        double boundary = com.jeladastudios.ftsgeology.tectonics.GeothermalSuitability.boundaryHeat(level, x, z);
         // Doubled before clamping, so the full boost covers a corridor's working width, not only its
         // centre line.
         return Math.min(1.0, Math.max(plume, boundary) * 2.0);
@@ -178,50 +173,24 @@ public final class SurfaceFeatures {
         if (!columnIsCarvable(level, corePos, chamberH, maxY)) return 0;
 
         int magnitude = pickMagnitude(rng);
-        buildSystem(level, corePos, chamberH, magnitude, rng, false, true); // natural: build-safe deep shaft + branches
+        buildSystem(level, corePos, chamberH, magnitude, rng);
         GeysersMod.LOGGER.debug("Geyser system (magnitude {}) placed at {}", magnitude, corePos);
         return 0;
     }
 
     /**
      * Places a full deep geyser system with its core at {@code corePos}, after the same safety check
-     * as natural generation. Prefer {@link #forcePlaceNearSurface} for deliberate placements.
+     * as natural generation.
      */
     public static boolean forcePlace(ServerLevel level, BlockPos corePos, int magnitude, RandomSource rng) {
         int maxY = GeyserConfig.RETROGEN_MAX_Y.get();
         int chamberH = GeyserConfig.CHAMBER_TARGET_HEIGHT.get();
         if (corePos.getY() + chamberH + 1 >= maxY) return false;        // must fit below the ceiling
         if (corePos.getY() <= level.getMinBuildHeight() + 1) return false; // no room beneath for the heat source
-        buildSystem(level, corePos, chamberH, magnitude, rng, true, true);
+        buildSystem(level, corePos, chamberH, magnitude, rng);
         return true;
     }
 
-    /**
-     * Builds a geyser just below the surface at this column, for an igniter or the spawn command: a
-     * shallow core and chamber and a 1-2 block shaft to daylight. Ignores the deep Y ceiling on purpose.
-     *
-     * @return true if a geyser was built, false if the column had no room
-     */
-    public static boolean forcePlaceNearSurface(ServerLevel level, int x, int z, int magnitude, RandomSource rng) {
-        int chamberH = GeyserConfig.CHAMBER_TARGET_HEIGHT.get();
-        int surfaceY = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z); // air just above topmost solid
-        // Bury the whole structure a few blocks down: chamber top ends ~2 below the surface, leaving
-        // a 1–2 block shaft up to daylight.
-        int coreY = surfaceY - chamberH - 3;
-        if (coreY <= level.getMinBuildHeight() + 2) return false; // not enough room beneath for the heat bed
-        BlockPos corePos = new BlockPos(x, coreY, z);
-        // Aggressive short shaft (clears the last couple of natural blocks to the surface); no root
-        // branches near the surface — they'd scar the ground with holes.
-        buildSystem(level, corePos, chamberH, magnitude, rng, true, false);
-        return true;
-    }
-
-    /**
-     * Carves a small flush hot-spring pool on the surface: a shallow water basin with a calcite
-     * floor and a hidden {@code HotSpring} bed, warmed by a contained lava/magma cell a couple of
-     * blocks below (which also reads as warm to Tough As Nails). Aborts near builds or on unsuitable
-     * ground so it never scars terrain badly.
-     */
     /** Does the groundwater let a spring come up here: always on a spring line, with falling odds over dry ground. */
     private static boolean waterAllows(ServerLevel level, int x, int z, RandomSource rng) {
         if (!GeyserConfig.WATER_TABLE_ENABLED.get()) return true;
@@ -296,8 +265,7 @@ public final class SurfaceFeatures {
         return true;
     }
 
-    static void buildSystem(ServerLevel level, BlockPos core, int chamberH, int magnitude,
-                                    RandomSource rng, boolean aggressiveShaft, boolean growBranches) {
+    static void buildSystem(ServerLevel level, BlockPos core, int chamberH, int magnitude, RandomSource rng) {
         // A water basin over a heat bed, capped by rock; width and depth scale with magnitude.
         int rad = Mth.clamp(magnitude / 5, 1, 3);          // 1 -> 3x3, 3 -> 7x7
         // Mostly water with just a shallow air gap under the cap — a water reservoir, not an air
@@ -326,19 +294,16 @@ public final class SurfaceFeatures {
 
         // 4. No pre-carved shaft: during eruptions VentPathfinder bores up a few blocks a second,
         //    erupting into any cave on the way, up to a fixed ceiling of the original ground plus a
-        //    short chimney. ({@code aggressiveShaft} is unused but kept for the API.)
+        //    short chimney.
         int surfaceY = level.getHeight(Heightmap.Types.WORLD_SURFACE, core.getX(), core.getZ());
         if (coreBe != null) {
             coreBe.setVentMouthY(surfaceY + SURFACE_CHIMNEY_HEIGHT);
         }
 
-        // 6. Grow root-like side vents; record cave/air breakthroughs as secondary fumaroles.
-        //    Skipped for near-surface (igniter) geysers — branches would poke holes in the ground.
-        if (growBranches) {
-            List<BlockPos> tips = VentNetwork.growBranches(level, core, chamberH, magnitude, rng);
-            if (coreBe != null && !tips.isEmpty()) {
-                coreBe.setFumaroleTips(tips);
-            }
+        // 5. Grow root-like side vents; record cave/air breakthroughs as secondary fumaroles.
+        List<BlockPos> tips = VentNetwork.growBranches(level, core, chamberH, magnitude, rng);
+        if (coreBe != null && !tips.isEmpty()) {
+            coreBe.setFumaroleTips(tips);
         }
     }
 
@@ -369,54 +334,5 @@ public final class SurfaceFeatures {
                 }
             }
         }
-    }
-
-    /**
-     * Carves a one-wide vent from above the rock cap toward the surface, through terrain and
-     * vegetation, stopping at a built block. Returns the highest cell cleared, or
-     * {@link Integer#MIN_VALUE}; the eruption pathfinder bores the rest.
-     */
-    static int carveVentShaft(ServerLevel level, BlockPos core, int chamberH, boolean aggressive) {
-        if (!GeyserConfig.CARVE_SURFACE_SHAFT.get()) return Integer.MIN_VALUE;
-
-        int startY = core.getY() + chamberH + 1; // straight above the open chamber top
-        int groundTop = level.getHeight(Heightmap.Types.WORLD_SURFACE, core.getX(), core.getZ()) - 1;
-        if (groundTop <= startY) return Integer.MIN_VALUE; // already open, or too shallow to bother
-
-        // At least 500 blocks whatever the config says, so a tall peak cannot trap the vent.
-        int cap = Math.max(GeyserConfig.SHAFT_MAX_LENGTH.get(), 500);
-        int endY = Math.min(groundTop, startY + cap);
-        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-
-        int reached = Integer.MIN_VALUE;
-        for (int y = startY; y <= endY; y++) {
-            m.set(core.getX(), y, core.getZ());
-            BlockState s = level.getBlockState(m);
-            // Natural gen stops at builds; an aggressive (command/igniter) carve clears everything
-            // except bedrock so it always reaches daylight.
-            boolean blocked = aggressive ? s.is(Blocks.BEDROCK) : !isShaftClearable(s);
-            if (blocked) break;
-            if (!s.isAir()) {
-                level.setBlock(m.immutable(), Blocks.AIR.defaultBlockState(), FLAGS);
-            }
-            reached = y;
-        }
-        return reached; // highest cleared cell (surface opening), or MIN_VALUE if none
-    }
-
-    /** Natural terrain plus vegetation/plants the shaft may burn through (but not manufactured blocks). */
-    static boolean isShaftClearable(BlockState s) {
-        return EruptionHandler.isNaturalTerrain(s)
-                || s.is(net.minecraft.tags.BlockTags.LOGS)
-                || s.is(net.minecraft.tags.BlockTags.LEAVES)
-                || s.is(net.minecraft.tags.BlockTags.FLOWERS)
-                || s.is(net.minecraft.tags.BlockTags.SAPLINGS)
-                || s.is(net.minecraft.tags.BlockTags.CROPS)
-                || s.is(net.minecraft.world.level.block.Blocks.GRASS)
-                || s.is(net.minecraft.world.level.block.Blocks.TALL_GRASS)
-                || s.is(net.minecraft.world.level.block.Blocks.FERN)
-                || s.is(net.minecraft.world.level.block.Blocks.LARGE_FERN)
-                || s.is(net.minecraft.world.level.block.Blocks.VINE)
-                || s.is(net.minecraft.world.level.block.Blocks.SNOW);
     }
 }

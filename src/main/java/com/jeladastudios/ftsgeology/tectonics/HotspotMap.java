@@ -36,10 +36,6 @@ public final class HotspotMap {
             boolean onTrail) {
 
         public static final Hotspot NONE = new Hotspot(0.0, Double.MAX_VALUE, 1.0, false);
-
-        public boolean active() {
-            return strength > 0.0;
-        }
     }
 
     /**
@@ -216,10 +212,9 @@ public final class HotspotMap {
     /**
      * A plume under an oceanic plate and the way its islands are carried off it.
      *
-     * @param dirX    unit direction the plate moves, X part: older islands lie further along it
-     * @param plateId the plate over the plume
+     * @param dirX unit direction the plate moves, X part: older islands lie further along it
      */
-    public record Trail(double x, double z, double dirX, double dirZ, long plateId) {}
+    public record Trail(double x, double z, double dirX, double dirZ) {}
 
     /**
      * The plumes under oceanic plates whose track of {@code length} blocks can reach into this box of blocks. The
@@ -237,11 +232,10 @@ public final class HotspotMap {
                 if (!cellHasPlume(seed, cx, cz, density)) continue;
                 double px = plumeX(seed, cx, cz, scale), pz = plumeZ(seed, cx, cz, scale);
                 if (px < minX - length || px > maxX + length || pz < minZ - length || pz > maxZ + length) continue;
-                PlateSample plate = TectonicMap.sampleCached(level, (int) Math.floor(px), (int) Math.floor(pz));
                 double[] v = plumeDrift(level, seed, cx, cz, px, pz);
                 double len = Math.sqrt(v[0] * v[0] + v[1] * v[1]);
                 if (len < 1.0e-6) continue;
-                out.add(new Trail(px, pz, v[0] / len, v[1] / len, plate.plateId()));
+                out.add(new Trail(px, pz, v[0] / len, v[1] / len));
             }
         }
         return out;

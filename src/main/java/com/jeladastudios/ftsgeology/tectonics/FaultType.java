@@ -17,15 +17,6 @@ public enum FaultType {
     /** Not near a boundary at all: stable plate interior. */
     INTERIOR;
 
-    public boolean isConvergent() {
-        return this == CONVERGENT_SUBDUCTION || this == CONVERGENT_COLLISION;
-    }
-
-    /** True where magma reaches the surface: subduction arcs and spreading rifts. */
-    public boolean isVolcanic() {
-        return this == CONVERGENT_SUBDUCTION || this == DIVERGENT;
-    }
-
     /** Rough depth character of quakes on this kind of boundary; 0 when it is not seismic. */
     public int typicalQuakeDepth() {
         return switch (this) {

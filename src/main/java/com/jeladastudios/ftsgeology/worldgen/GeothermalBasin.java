@@ -8,8 +8,7 @@ import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.quake.QuakeQuiet;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.tectonics.HotspotMap;
-import com.jeladastudios.ftsgeology.tectonics.PlateSample;
-import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
+import com.jeladastudios.ftsgeology.tectonics.GeothermalSuitability;
 import com.jeladastudios.ftsgeology.tectonics.ThermalBiomes;
 import com.jeladastudios.ftsgeology.util.SeedHash;
 import com.jeladastudios.ftsgeology.util.ValueNoise;
@@ -162,13 +161,7 @@ public final class GeothermalBasin {
      * source. Sampled at the chunk corners through the quart-cached tectonic map.
      */
     private static double boundary(ServerLevel level, int x, int z) {
-        PlateSample plate = TectonicMap.sampleCached(level, x, z);
-        return switch (plate.faultType()) {
-            // Stress already folds in distance to the fault, so the field fades out as the boundary
-            // does rather than ending at a radius.
-            case DIVERGENT, CONVERGENT_SUBDUCTION -> plate.stress();
-            default -> 0.0;
-        };
+        return GeothermalSuitability.boundaryHeat(level, x, z);
     }
 
     /** Flat enough to be floor rather than the bank above it. */

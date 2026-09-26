@@ -13,7 +13,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.levelgen.Heightmap;
 import static com.jeladastudios.ftsgeology.volcano.CalderaEdifice.*;
 import static com.jeladastudios.ftsgeology.volcano.ApronEdifice.*;
@@ -502,11 +501,7 @@ public final class VolcanoEdifice {
         return (rng.nextInt(3) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT).defaultBlockState();
     }
 
-    /**
-     * What a flank wears in the volcanic highland where any other volcano would grass over: the tuff, ash gravel
-     * and old basalt of the plateau round it, so the mountain reads as part of its country rather than a green
-     * hill set down on it.
-     */
+    /** An arc stratocone's flank in the volcanic highland, below its tree line: forest floor. */
     static BlockState forestFloor(RandomSource rng) {
         // An arc's stratocone is forested to its tree line, as the Cascades and Kamchatka are: the highland round it is
         // conifer country, and the tuff and ash gravel that stood in for grass here made the whole mountain one grey
@@ -515,6 +510,11 @@ public final class VolcanoEdifice {
         return (r < 12 ? Blocks.GRASS_BLOCK : r < 17 ? Blocks.PODZOL : Blocks.COARSE_DIRT).defaultBlockState();
     }
 
+    /**
+     * What a flank wears in the volcanic highland where any other volcano would grass over: the tuff, ash gravel
+     * and old basalt of the plateau round it, so the mountain reads as part of its country rather than a green
+     * hill set down on it.
+     */
     static BlockState highlandSkin(RandomSource rng) {
         int r = rng.nextInt(10);
         return (r < 5 ? Blocks.TUFF : r < 8 ? Blocks.GRAVEL : Blocks.BASALT).defaultBlockState();

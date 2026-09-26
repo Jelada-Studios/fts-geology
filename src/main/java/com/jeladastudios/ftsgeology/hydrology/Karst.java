@@ -63,7 +63,7 @@ public final class Karst {
     }
 
     /** Smooth value noise over the karst countries, in [0, 1]: under {@link #COUNTRY} is karst. */
-    static double country(long seed, int x, int z, double h) {
+    private static double country(long seed, int x, int z, double h) {
         double cell = COUNTRY_CELL * h;
         double fx = x / cell, fz = z / cell;
         int x0 = (int) Math.floor(fx), z0 = (int) Math.floor(fz);

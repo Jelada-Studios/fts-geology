@@ -1,6 +1,5 @@
 package com.jeladastudios.ftsgeology.quake;
 
-import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;

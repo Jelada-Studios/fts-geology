@@ -1,6 +1,5 @@
 package com.jeladastudios.ftsgeology.hydrology;
 
-import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.tectonics.GeothermalSuitability;

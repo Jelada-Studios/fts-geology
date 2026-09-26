@@ -165,6 +165,11 @@ public final class RiverNetwork {
             return distance <= halfWidth;
         }
 
+        /** Whether the channel or a lake reaches within {@code margin} blocks past its flat bed; never where there is no river. */
+        public boolean within(double margin) {
+            return distance <= halfWidth + margin;
+        }
+
         /** The channel floor over this column: flat across the bed, then up two blocks for every block out. */
         public double floor() {
             return bed + RiverPieces.WALL * Math.max(0.0, distance - halfWidth);
@@ -346,7 +351,6 @@ public final class RiverNetwork {
         return Math.max(least, a.cut - RiverPieces.WALL * Math.max(0.0, a.distance - a.halfWidth));
     }
 
-    /** Whether the nearest water here is a lake's rather than a channel's. */
     /**
      * The water of a lake this column stands in a gap of, or NaN. A lake's extent is worked out on a grid, from the raw
      * ground at each grid point; a neck of lower ground between two arms of one lake, narrower than the grid, came out
@@ -372,10 +376,6 @@ public final class RiverNetwork {
     private static boolean wetAlong(RiverPieces.LakeMask m, int x, int z, int dx, int dz, int reach) {
         for (int k = 1; k <= reach; k++) if (m.depthAt(x + dx * k, z + dz * k) > 0) return true;
         return false;
-    }
-
-    public static boolean lakeAt(int x, int z) {
-        return at(x, z).lake();
     }
 
     /** 1 over a channel and its banks, fading out over a few blocks: where no cave may open. */
@@ -409,6 +409,20 @@ public final class RiverNetwork {
                 }
             }
         }
+        return out;
+    }
+
+    /** Where a length starts or ends, to a sixteenth of a block: two lengths joined end to start share it. */
+    public static long joint(float x, float z) {
+        return ((long) Math.round(x * 16.0f) << 32) ^ (Math.round(z * 16.0f) & 0xFFFFFFFFL);
+    }
+
+    /** Of these underground lengths, the ones a stretch starts with, no other of them running into it: its swallow hole. */
+    public static List<Point> swallowHeads(List<Point> sunk) {
+        java.util.Set<Long> ends = new java.util.HashSet<>();
+        for (Point p : sunk) ends.add(joint(p.ex, p.ez));
+        List<Point> out = new ArrayList<>();
+        for (Point p : sunk) if (!ends.contains(joint(p.x, p.z))) out.add(p);
         return out;
     }
 
@@ -845,20 +859,15 @@ public final class RiverNetwork {
 
     /** How many rivers sink in a box, and where the first few do, for the audit. */
     private static String swallows(int x0, int z0, int x1, int z1) {
-        List<Point> sunk = sunkNear(x0, z0, x1, z1);
-        java.util.Set<Long> ends = new java.util.HashSet<>();
-        for (Point p : sunk) ends.add(((long) Math.round(p.ex * 16f) << 32) ^ (Math.round(p.ez * 16f) & 0xFFFFFFFFL));
         int n = 0;
         StringBuilder at = new StringBuilder();
-        for (Point p : sunk) {
-            if (ends.contains(((long) Math.round(p.x * 16f) << 32) ^ (Math.round(p.z * 16f) & 0xFFFFFFFFL))) continue;
+        for (Point p : swallowHeads(sunkNear(x0, z0, x1, z1))) {
             if (p.x < x0 || p.x > x1 || p.z < z0 || p.z > z1) continue;
             if (n++ < 8) at.append(String.format(Locale.ROOT, " %.0f,%.0f", p.x, p.z));
         }
         return String.format(Locale.ROOT, "; swallow holes %d%s", n, n > 0 ? " at" + at : "");
     }
 
-    /** Whether the node a river runs into draws something that starts where the river ends. */
     /** Whether a turn between two lengths bends on a circle less than two channel widths across. */
     private static boolean tight(Point a, Point b, double degrees) {
         if (degrees < 5) return false;
@@ -876,6 +885,7 @@ public final class RiverNetwork {
         return Math.toDegrees(Math.acos(c));
     }
 
+    /** Whether the node a river runs into draws something that starts where the river ends. */
     private static boolean takenOn(Point[] next, double x, double z) {
         for (Point p : next) if (same(p.x, p.z, x, z)) return true;
         return false;
@@ -928,14 +938,5 @@ public final class RiverNetwork {
 
     private static double orient(double[] s, double x, double z) {
         return (s[2] - s[0]) * (z - s[1]) - (s[3] - s[1]) * (x - s[0]);
-    }
-
-    /** The lattice and the pieces, for the audit. */
-    static DrainageLattice lattice() {
-        return lattice;
-    }
-
-    static RiverPieces pieces() {
-        return pieces;
     }
 }

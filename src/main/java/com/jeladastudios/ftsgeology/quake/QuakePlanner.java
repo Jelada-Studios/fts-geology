@@ -192,6 +192,9 @@ public final class QuakePlanner {
         void visit(int x, int z, double across, double strikeX, double strikeZ, double slip);
     }
 
+    /** How far past a chunk's edge a clipped walk still looks, so the columns on its border see their neighbours. */
+    static final int CLIP_MARGIN = 10;
+
     /**
      * Visits every integer column of one trace segment's corridor exactly once.
      *
@@ -202,19 +205,9 @@ public final class QuakePlanner {
      *
      * @param bodyOnly first pass: only columns squarely alongside this segment, so each gets its own
      *                 segment's slip. The second pass fills the joints.
-     */
-    private static void forEachCorridorColumn(TracePoint tp, TracePoint next, int band,
-                                              boolean bodyOnly, ColumnVisitor v) {
-        forEachCorridorColumn(tp, next, band, bodyOnly, null, v);
-    }
-
-    /** How far past a chunk's edge a clipped walk still looks, so the columns on its border see their neighbours. */
-    static final int CLIP_MARGIN = 10;
-
-    /**
-     * As above, clipped to one chunk and a margin when {@code clip} is given: replaying a parked rupture
-     * walked the whole corridor's lattice for every chunk it came to, two hundred thousand cells to keep a
-     * few hundred.
+     * @param clip     when given, only one chunk and a margin: replaying a parked rupture walked the whole
+     *                 corridor's lattice for every chunk it came to, two hundred thousand cells to keep a
+     *                 few hundred.
      */
     private static void forEachCorridorColumn(TracePoint tp, TracePoint next, int band,
                                               boolean bodyOnly, ChunkPos clip, ColumnVisitor v) {
@@ -791,7 +784,6 @@ public final class QuakePlanner {
         if (Math.abs(across) > beltHalf) return 0;
 
         int maxLift = Mth.clamp((int) Math.round(slip * magnitudeAmplitude(magnitude, 18.0)), 1, 18);
-        if (maxLift < 1) return 0;
 
         // The two flanks are not the same width: the plateau reaches right across the overriding
         // side, while the range front is packed into a little over half that on the other.

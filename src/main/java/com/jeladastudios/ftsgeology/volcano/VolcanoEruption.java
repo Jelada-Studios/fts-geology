@@ -11,7 +11,6 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.Vec3;
@@ -25,7 +24,7 @@ public final class VolcanoEruption {
      * Pre-eruption warning: a low rumble from the crater. The black smoke that goes with it is drawn
      * by the client from the state the core sends - see ClientEruptions.
      */
-    public static void rumble(ServerLevel level, BlockPos summit, int magnitude, long time) {
+    public static void rumble(ServerLevel level, BlockPos summit, long time) {
         if (time % 40L == 0L) {
             level.playSound(null, summit, SoundEvents.AMBIENT_BASALT_DELTAS_MOOD.value(), SoundSource.BLOCKS,
                     1.5f, 0.4f);
@@ -400,7 +399,7 @@ public final class VolcanoEruption {
                 if (d2 < (r - 1) * (r - 1)) {
                     // The whole floor inside the rim, air only, so basalt the eruption laid down stays.
                     if (fs.isEmpty()) level.setBlock(p, TfcCompat.translate(level, p, Blocks.LAVA.defaultBlockState()), 3);
-                } else if (d2 >= (r - 1) * (r - 1)) {
+                } else {
                     // rim: cooled volcanic rock, occasionally still smouldering
                     if (!s.isAir() && fs.isEmpty()) {
                         level.setBlock(p, TfcCompat.translate(level, p, (level.random.nextInt(3) == 0

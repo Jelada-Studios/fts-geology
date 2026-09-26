@@ -191,10 +191,6 @@ public final class TerrainFields {
     private static final double CRUST_BLEND = 1.0;
 
     /**
-     * The plate the terrain sees at a column: the sample at the warped coordinate, which is where the coast, the
-     * belt and the arc all really are. Cached on a four-block grid.
-     */
-    /**
      * The plate against the boundary that shapes the ground here. Usually the nearest one; but where a second
      * boundary is almost as near and lifts the ground more, it is that one: the roles and the rock follow the
      * mountains, which the two-boundary blend in {@link #field} raises, instead of the nearest line on the map.
@@ -514,9 +510,6 @@ public final class TerrainFields {
         FaultType k = s.boundaryType();
         return k == FaultType.DIVERGENT || k == FaultType.INTERIOR ? 0.0 : belt(s, p);
     }
-
-    /** Where a subduction margin's own mountains stand: the arc and its front, not the country behind it. */
-    private static final double RANGE_ARC_TO = 0.75;
 
     /**
      * How far a column lies across a subduction boundary, signed: positive on the plate riding over, negative on

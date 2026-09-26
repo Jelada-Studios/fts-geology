@@ -41,8 +41,6 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue CHAMBER_SPAWN_CHANCE; // per candidate column
     public static final ForgeConfigSpec.BooleanValue RETROGEN_ENABLED;
     public static final ForgeConfigSpec.IntValue RETROGEN_CHUNKS_PER_TICK;
-    public static final ForgeConfigSpec.BooleanValue CARVE_SURFACE_SHAFT; // connect vent to surface
-    public static final ForgeConfigSpec.IntValue SHAFT_MAX_LENGTH;         // safety cap on shaft height
     public static final ForgeConfigSpec.IntValue IGNITER_DELAY_TICKS;      // placed igniter -> geyser delay
 
     // --- Basin water budget -------------------------------------------------
@@ -285,16 +283,6 @@ public final class GeyserConfig {
                         "Suitability multiplies this down to near zero outside volcanic settings, so",
                         "the raw number is tuned for what you should see along an active arc or rift.")
                 .defineInRange("chamberSpawnChance", 0.030D, 0.0D, 1.0D);
-        CARVE_SURFACE_SHAFT = b
-                .comment("Carve a thin vent from the deep chamber up to the surface so eruptions",
-                        "reach daylight. Build-safe: the carve aborts (leaving the vent buried) the",
-                        "moment it would touch anything that isn't natural terrain.")
-                .define("carveSurfaceShaft", true);
-        SHAFT_MAX_LENGTH = b
-                .comment("Safety cap on how many blocks a surface shaft may rise from the cap. Must be",
-                        "tall enough to reach big-mountain surfaces (Terralith peaks) — else the vent",
-                        "gets stuck inside the mountain and never surfaces.")
-                .defineInRange("shaftMaxLength", 384, 1, 512);
         IGNITER_DELAY_TICKS = b
                 .comment("Ticks after a Geyser Igniter block is placed before it forms a geyser below",
                         "it and vanishes. 300 = 15 seconds.")

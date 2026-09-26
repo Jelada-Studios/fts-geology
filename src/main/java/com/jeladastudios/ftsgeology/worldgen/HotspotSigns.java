@@ -6,6 +6,7 @@ import com.jeladastudios.ftsgeology.block.SteamVentBlock;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.tectonics.HotspotMap;
+import com.jeladastudios.ftsgeology.tectonics.GeothermalSuitability;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
 import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 import com.jeladastudios.ftsgeology.util.SeedHash;
@@ -91,11 +92,7 @@ public final class HotspotSigns {
      * subduction arcs, the settings with shallow magma under them.
      */
     private static double boundaryHeat(ServerLevel level, int x, int z) {
-        PlateSample plate = TectonicMap.sampleCached(level, x, z);
-        return switch (plate.faultType()) {
-            case DIVERGENT, CONVERGENT_SUBDUCTION -> plate.stress();
-            default -> 0.0;
-        };
+        return GeothermalSuitability.boundaryHeat(level, x, z);
     }
 
     /**

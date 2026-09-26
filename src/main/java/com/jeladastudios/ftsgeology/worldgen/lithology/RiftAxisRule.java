@@ -8,7 +8,6 @@ import com.mojang.serialization.MapCodec;
 import net.minecraft.util.KeyDispatchDataCodec;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.SurfaceRules;
 
 /**
@@ -42,18 +41,16 @@ public record RiftAxisRule() implements SurfaceRules.RuleSource {
 
     @Override
     public SurfaceRules.SurfaceRule apply(SurfaceRules.Context context) {
-        return new Pass(context.chunk, TerrainContext.seed());
+        return new Pass(TerrainContext.seed());
     }
 
     /** One chunk: each column decided the first time one of its blocks is asked about. */
     private static final class Pass implements SurfaceRules.SurfaceRule {
-        private final ChunkAccess chunk;
         private final long seed;
         /** 0 not yet looked at, 1 off the strip, 2 basalt, 3 smooth basalt, 4 blackstone. */
         private final byte[] strip = new byte[256];
 
-        Pass(ChunkAccess chunk, long seed) {
-            this.chunk = chunk;
+        Pass(long seed) {
             this.seed = seed;
         }
 
@@ -78,8 +75,7 @@ public record RiftAxisRule() implements SurfaceRules.RuleSource {
             if (d > half) return 1;
             // A river keeps its own bed and banks: the flow does not run across a channel cut into it since.
             RiverNetwork.At a = RiverNetwork.at(x, z);
-            if (a.distance() != Double.MAX_VALUE
-                    && a.distance() <= a.halfWidth() + RIVER_BANK * p.horizontal()) return 1;
+            if (a.within(RIVER_BANK * p.horizontal())) return 1;
             double kind = ValueNoise.noise(x - 5003, z + 877, 7.0);
             return (byte) (kind > 0.45 ? 3 : kind < -0.55 ? 4 : 2);
         }

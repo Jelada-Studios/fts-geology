@@ -148,7 +148,7 @@ final class RiverPieces {
     private final SetCache<LakeMask> masks = new SetCache<>(10);
 
     final LongAdder channels = new LongAdder(), joins = new LongAdder(), fallbacks = new LongAdder(),
-            dams = new LongAdder(), gorges = new LongAdder(), eyes = new LongAdder(), heldOver = new LongAdder(), pools = new LongAdder(), inlets = new LongAdder(), inletOpen = new LongAdder(), inletBig = new LongAdder(), inletShut = new LongAdder(), bankClamps = new LongAdder(), lakeMasks = new LongAdder(), sinks = new LongAdder(),
+            dams = new LongAdder(), gorges = new LongAdder(), eyes = new LongAdder(), pools = new LongAdder(), inlets = new LongAdder(), inletOpen = new LongAdder(), inletBig = new LongAdder(), inletShut = new LongAdder(), bankClamps = new LongAdder(), lakeMasks = new LongAdder(), sinks = new LongAdder(),
             mouths = new LongAdder(), dryJoins = new LongAdder(), gridReads = new LongAdder(), backwater = new LongAdder(),
             sunk = new LongAdder(), plainLakes = new LongAdder();
 
@@ -1013,7 +1013,6 @@ final class RiverPieces {
             // Held up to the floor only as far as a bank can be built up to hold it; past that the water steps down.
             double lw = Math.min(w, Math.max(Math.min(floorW, rim - 1.0 + BANK_HOLD), Math.min(target, rim - 1.0)));
             if (rim - 1.0 < Math.min(w, target)) bankClamps.increment();
-            if (lw > rim - 1.0 + 1e-6) heldOver.increment();
             w = lw;
             qx[q] = x;
             qz[q] = z;

@@ -94,6 +94,7 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.worldgen.LavaTubes.clear();
         com.jeladastudios.ftsgeology.worldgen.OreGenesis.clear();
         com.jeladastudios.ftsgeology.worldgen.GeothermalBasin.clear();
+        com.jeladastudios.ftsgeology.worldgen.RetrogenHandler.clear();
         TfcCompat.clear();
         // And quakes still mid-application, so a half-applied rupture cannot write into the next world.
         com.jeladastudios.ftsgeology.quake.Earthquake.cancelAll();
@@ -111,8 +112,7 @@ public class GeysersMod {
                         .withStyle(net.minecraft.ChatFormatting.GRAY));
     }
 
-    /** Adds the technical block items to the Natural Blocks creative tab for testing/debugging. */
-    @SubscribeEvent
+    /** Adds the technical block items to the creative tabs for testing and debugging; on the mod bus (see the constructor). */
     public void onBuildCreativeTabs(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             // The instruments belong with the tools, not with the terrain: they are the only

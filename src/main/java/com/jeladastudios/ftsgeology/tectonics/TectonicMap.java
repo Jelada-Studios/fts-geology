@@ -9,7 +9,6 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.tags.BiomeTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
@@ -59,22 +58,12 @@ public final class TectonicMap {
         return compute(level.getSeed(), blockX, blockZ, level, GeologyParams.current());
     }
 
-    /** The same picture from the seed alone, as the terrain generator asks for it: crust from the seed. */
-    public static PlateSample sampleSeeded(long seed, int blockX, int blockZ, GeologyParams params) {
-        return compute(seed, blockX, blockZ, null, params);
-    }
 
     /** A plate's crust from the seed: {@code oceanShare} of the plates are oceanic. */
     static PlateKind seededKind(long seed, long plateId, GeologyParams params) {
         return rand01(mix(plateId ^ seed ^ 0x0CEA4L)) < params.oceanShare() ? PlateKind.OCEANIC : PlateKind.CONTINENTAL;
     }
 
-    /**
-     * A column's plate against its nearest boundary and against the next nearest. The terrain blends the two where
-     * they are almost as near, so the ground does not jump along the line where one boundary hands over to another.
-     *
-     * @param gap how much further away the second boundary is, in blocks
-     */
     /**
      * A column's nearest boundary and every other within {@link #NEIGHBOUR_REACH} of being as near, nearest first, with
      * how much further than the first each lies. The terrain blends them all by distance: a column near where
@@ -101,11 +90,6 @@ public final class TectonicMap {
         public double gap() {
             return gaps.length > 0 ? gaps[0] : Double.MAX_VALUE;
         }
-
-        /** How much further the third lies than the first, or infinitely far. */
-        public double gap3() {
-            return gaps.length > 1 ? gaps[1] : Double.MAX_VALUE;
-        }
     }
 
     private static final PlateSample[] NO_SAMPLES = new PlateSample[0];
@@ -131,7 +115,6 @@ public final class TectonicMap {
                                       boolean withSecond) {
         double scale = params.plateScale();
         double jitter = params.plateJitter();
-        double faultWidth = params.faultWidth();
 
         double px = blockX, pz = blockZ;
         int gx = Mth.floor(px / scale);
@@ -160,7 +143,7 @@ public final class TectonicMap {
         //    so the distance to an edge is the distance to that bisector: exact, unlike the common
         //    second-nearest-minus-nearest approximation, which bulges where three plates meet.
         java.util.List<double[]> edges = new java.util.ArrayList<>();
-        collectEdges(seed, bgx, bgz, bx, bz, px, pz, scale, jitter, false, bgx, bgz, edges);
+        collectEdges(seed, bgx, bgz, bx, bz, px, pz, scale, jitter, edges);
         double[] own = edges.get(0);
         for (double[] e : edges) if (e[0] < own[0]) own = e;
         double faultDistance = Math.max(0.0, own[0]);
@@ -191,7 +174,7 @@ public final class TectonicMap {
                 // That plate lies past the bisector between its centre and this one's, so it is at least this far.
                 if (((sx - px) * (sx - px) + (sz - pz) * (sz - pz) - ownD2) / (2.0 * sep) >= reach) continue;
                 java.util.List<double[]> theirs = new java.util.ArrayList<>();
-                collectEdges(seed, cx, cz, sx, sz, px, pz, scale, jitter, false, cx, cz, theirs);
+                collectEdges(seed, cx, cz, sx, sz, px, pz, scale, jitter, theirs);
                 double near = Double.MAX_VALUE;
                 for (double[] e : theirs) near = Math.min(near, e[0]);
                 if (near >= reach) continue;
@@ -243,12 +226,10 @@ public final class TectonicMap {
      * The edges between one plate's cell and every cell round it, as candidate boundaries for a column:
      * {distance, normal x, normal z, the cell across, the cell that owns the edge}. The distance is to the edge
      * itself -- the stretch of the bisector between its two junctions -- so the column's own plate and the plate
-     * across the line measure every boundary alike. The cell to skip, for the plate across, is the column's own,
-     * whose edge with the neighbour is the shared line already in the list.
+     * across the line measure every boundary alike.
      */
     private static void collectEdges(long seed, int cgx, int cgz, double cx, double cz,
-                                     double px, double pz, double scale, double jitter, boolean absolute,
-                                     int skipGx, int skipGz, java.util.List<double[]> out) {
+                                     double px, double pz, double scale, double jitter, java.util.List<double[]> out) {
         double[] siteXs = new double[25], siteZs = new double[25];
         for (int ox = -2; ox <= 2; ox++) {
             for (int oz = -2; oz <= 2; oz++) {
@@ -260,7 +241,7 @@ public final class TectonicMap {
         for (int ox = -2; ox <= 2; ox++) {
             for (int oz = -2; oz <= 2; oz++) {
                 int gx = cgx + ox, gz = cgz + oz;
-                if ((gx == cgx && gz == cgz) || (absolute && gx == skipGx && gz == skipGz)) continue;
+                if (gx == cgx && gz == cgz) continue;
                 int self = (ox + 2) * 5 + oz + 2;
                 double sx = siteXs[self];
                 double sz = siteZs[self];
@@ -449,7 +430,4 @@ public final class TectonicMap {
             return rand01(mix(id)) < 0.45 ? PlateKind.OCEANIC : PlateKind.CONTINENTAL;
         }
     }
-
-    // === Hashing ============================================================
-
 }

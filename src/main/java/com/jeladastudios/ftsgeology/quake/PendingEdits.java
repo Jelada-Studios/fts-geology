@@ -181,8 +181,4 @@ public final class PendingEdits {
         WAITING.clear();
         READY.clear();
     }
-
-    public static int pendingChunks() {
-        return WAITING.size();
-    }
 }

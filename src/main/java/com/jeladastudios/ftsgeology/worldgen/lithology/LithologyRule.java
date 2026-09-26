@@ -189,8 +189,7 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
         private boolean riverAt(int i, int x, int z) {
             if (river[i] == 0) {
                 RiverNetwork.At a = RiverNetwork.at(x, z);
-                boolean wet = a.distance() != Double.MAX_VALUE
-                        && a.distance() <= a.halfWidth() + RIVER_BANK * TerrainContext.params().horizontal();
+                boolean wet = a.within(RIVER_BANK * TerrainContext.params().horizontal());
                 river[i] = (byte) (wet ? 2 : 1);
             }
             return river[i] == 2;

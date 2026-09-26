@@ -13,19 +13,12 @@ import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
 import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.LevelHeightAccessor;
-import net.minecraft.world.level.NoiseColumn;
-import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
-import net.minecraft.world.level.levelgen.RandomState;
-import org.apache.commons.lang3.mutable.MutableObject;
-import java.util.function.Predicate;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureSet;
@@ -34,11 +27,8 @@ import net.minecraft.world.level.levelgen.structure.placement.RandomSpreadStruct
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static com.jeladastudios.ftsgeology.volcano.VolcanoField.*;
 
@@ -280,20 +270,6 @@ final class SiteCheck {
      * Whether a large volcano of this type can stand here, from the generator's own terrain rather than
      * the world, which for most of these cells does not exist yet.
      */
-    /** How many of the columns sampled inside this radius hold a traced river's water. */
-    private static int tracedRiver(int x, int z, int radius) {
-        if (!com.jeladastudios.ftsgeology.hydrology.RiverNetwork.ready()) return 0;
-        int hits = 0;
-        for (int dx = -radius; dx <= radius; dx += 24) {
-            for (int dz = -radius; dz <= radius; dz += 24) {
-                if (dx * dx + dz * dz > radius * radius) continue;
-                var at = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.at(x + dx, z + dz);
-                if (at.distance() <= at.halfWidth() + 8) hits++;
-            }
-        }
-        return hits;
-    }
-
     static Site check(ServerLevel level, int x, int z, VolcanoType type, long seed, int[] refused,
                               Map<StructureKey, Boolean> structures) {
         int magnitude = magnitudeAt(seed, x, z);

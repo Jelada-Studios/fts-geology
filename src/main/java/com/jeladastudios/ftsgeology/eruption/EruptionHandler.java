@@ -33,30 +33,12 @@ public final class EruptionHandler {
 
     private EruptionHandler() {}
 
-    /** Max height the fallback dynamic finder walks above the core before giving up. */
-    private static final int MAX_VENT_HEIGHT = 384;
 
     /** Ceiling on the upward velocity any geyser gives an entity per tick, so overlapping vents cannot launch it. */
     private static final double MAX_UPDRAFT = 1.3;
 
-    /** The jet only grabs entities this far below the mouth, so a deep vent does not carry you up its whole shaft. */
-    private static final int JET_REACH = 8;
 
     // === Vent geometry ======================================================
-
-    /** Fallback ceiling for a buried geyser: the highest open cell straight above the core. */
-    public static int findVentMouthYDynamic(ServerLevel level, BlockPos core) {
-        int y = core.getY() + 1;
-        int topLimit = Math.min(core.getY() + MAX_VENT_HEIGHT, level.getMaxBuildHeight() - 1);
-        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos(core.getX(), y, core.getZ());
-        while (y < topLimit) {
-            m.setY(y);
-            BlockState s = level.getBlockState(m);
-            if (s.isSolidRender(level, m) && !isSoftRock(s)) break;
-            y++;
-        }
-        return y - 1;
-    }
 
     private static boolean isSoftRock(BlockState s) {
         return s.is(Blocks.GRAVEL) || s.is(Blocks.COBBLESTONE) || s.is(Blocks.COBBLED_DEEPSLATE);
@@ -130,7 +112,7 @@ public final class EruptionHandler {
      * rises — the visible "the ground is about to give" cue on still-buried vents. Never edits at
      * or above the safety ceiling.
      */
-    public static void erodeCrust(ServerLevel level, BlockPos mouth, double pressure) {
+    public static void erodeCrust(ServerLevel level, BlockPos mouth) {
         BlockPos capPos = mouth.above();
         if (capPos.getY() >= GeyserConfig.RETROGEN_MAX_Y.get()) return;
         BlockState cap = level.getBlockState(capPos);

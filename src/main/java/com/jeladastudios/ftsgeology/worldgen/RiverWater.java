@@ -1,6 +1,5 @@
 package com.jeladastudios.ftsgeology.worldgen;
 
-import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
@@ -529,11 +528,6 @@ public final class RiverWater {
     }
 
     /**
-     * Stops up a hollow under a channel's floor with the rock under it, so the floor at {@code y} is solid. A cave the
-     * carvers ran along under a river left the ground over it as a crust; the water was dropped there, and the crust
-     * stood across the river as a bar of grass. Only down to a few blocks, and never through what a player built.
-     */
-    /**
      * Takes the plants out of the river after the world has grown them. The water goes in before the vegetation step,
      * and a patch of grass or flowers laid down after it could still leave a tuft standing at the water's level, in a
      * cube of water of its own, in the middle of the river. Run at the last step of generation: a plant at or under the
@@ -603,6 +597,11 @@ public final class RiverWater {
         return laid;
     }
 
+    /**
+     * Stops up a hollow under a channel's floor with the rock under it, so the floor at {@code y} is solid. A cave the
+     * carvers ran along under a river left the ground over it as a crust; the water was dropped there, and the crust
+     * stood across the river as a bar of grass. Only down to a few blocks, and never through what a player built.
+     */
     private static boolean plug(WorldGenLevel level, BlockPos.MutableBlockPos at, int x, int y, int z) {
         int bottom = y;
         int least = Math.max(level.getMinBuildHeight() + 1, y - PLUG_DEEP);

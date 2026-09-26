@@ -377,7 +377,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
 
         // Per-tick spectacle.
         if (be.phase == Phase.RUMBLING) {
-            VolcanoEruption.rumble(server, summit, be.magnitude, server.getGameTime());
+            VolcanoEruption.rumble(server, summit, server.getGameTime());
         } else if (be.phase == Phase.ERUPTING) {
             be.eruptionTicks++;
             VolcanoEruption.tickEruption(server, summit, be.magnitude, be.eruptionTicks);

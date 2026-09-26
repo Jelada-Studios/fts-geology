@@ -8,7 +8,6 @@ import com.jeladastudios.ftsgeology.tectonics.PlateSample;
 import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 import com.jeladastudios.ftsgeology.util.SeedHash;
 import com.jeladastudios.ftsgeology.util.ValueNoise;
-import com.jeladastudios.ftsgeology.volcano.OceanEdifice;
 import com.jeladastudios.ftsgeology.volcano.OceanColumn;
 import com.jeladastudios.ftsgeology.volcano.VolcanoField;
 import net.minecraft.core.BlockPos;

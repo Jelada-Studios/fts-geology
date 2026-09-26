@@ -171,7 +171,7 @@ public final class DrainageLattice {
      */
     private static final double ROLL = 0.35, ROLL_NODES = 5.0;
 
-    /** Where a node stands and how high: the lowest of four jittered points in its cell. {x, z, height} */
+    /** Where a node stands and how high: the lowest of four jittered points in its cell. {x, z, height, lifted 1 or 0} */
     private double[] place(int i, int j) {
         long h = SeedHash.hash(seed, i, j, 0x7A3DL);
         double best = Double.MAX_VALUE, bx = 0, bz = 0;
@@ -370,7 +370,7 @@ public final class DrainageLattice {
     }
 
     /** The sea's test for a node: under sea level. Dry ground just under it was lifted over it as it was placed. */
-    private boolean seaGround(long k, double gk) {
+    private boolean seaGround(double gk) {
         return gk <= sea;
     }
 
@@ -382,7 +382,7 @@ public final class DrainageLattice {
         byte hit = t.raw[l];
         if (hit != UNKNOWN) return hit;
         double gk = t.g[l];
-        byte best = seaGround(k, gk) ? NONE : PIT;
+        byte best = seaGround(gk) ? NONE : PIT;
         if (best == PIT) {
             double steep = 0;
             for (int s = 0; s < 8; s++) {

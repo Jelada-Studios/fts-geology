@@ -89,7 +89,7 @@ public final class SoilProfile {
                 double keep = (n - PATCH_CUT - QUIET_CUT * (1.0 - gate)) / 0.05;
                 if (keep <= 0.0 || (keep < 1.0 && rng.nextDouble() > keep)) continue;
 
-                paint(level, x, z, rng);
+                paint(level, x, z);
             }
         }
     }
@@ -158,7 +158,7 @@ public final class SoilProfile {
     }
 
     /** One column of soil, if there is soil there and named rock under it. */
-    private static void paint(WorldGenLevel level, int x, int z, RandomSource rng) {
+    private static void paint(WorldGenLevel level, int x, int z) {
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return;
         if (TerrainProbe.hasFluidAbove(level, x, z)) return;    // a lake bed is not a soil profile

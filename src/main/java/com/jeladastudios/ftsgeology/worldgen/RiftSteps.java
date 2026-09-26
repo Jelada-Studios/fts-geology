@@ -26,7 +26,7 @@ public final class RiftSteps {
 
     private static final int FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
 
-    private static Map<Block, Block> slabs;
+    private static volatile Map<Block, Block> slabs;
 
     /** The slab of each rock that has one. Basalt has none in this version; blackstone's is the same dark rock. */
     private static Map<Block, Block> slabs() {

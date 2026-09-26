@@ -296,10 +296,6 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
         return out;
     }
 
-    public int perTick() {
-        return perTick;
-    }
-
     @Override
     public void onLoad() {
         super.onLoad();

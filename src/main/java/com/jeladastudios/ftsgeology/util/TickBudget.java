@@ -34,11 +34,6 @@ public final class TickBudget {
         deadline = System.nanoTime() + total;
     }
 
-    /** True once the mod has used up its slot in this tick. */
-    public static boolean expired() {
-        return System.nanoTime() >= deadline;
-    }
-
     /** Nanoseconds left of the whole mod's budget. */
     public static long remaining() {
         return Math.max(0L, deadline - System.nanoTime());

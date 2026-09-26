@@ -44,7 +44,7 @@ public final class GeologyRoles {
     private static final double FLAT = 0.1;
     /**
      * How strong a plume's dome has to be under a geothermal basin: the same strength at which
-     * { GeothermalBasin} starts laying its sinter and mud down, so the biome covers the ground the mod
+     * {@link com.jeladastudios.ftsgeology.worldgen.GeothermalBasin} starts laying its sinter and mud down, so the biome covers the ground the mod
      * already paints rather than a smaller circle inside it.
      */
     private static final double BASIN_PLUME = 0.30;

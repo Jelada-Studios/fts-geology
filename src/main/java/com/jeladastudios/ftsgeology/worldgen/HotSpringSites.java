@@ -55,7 +55,7 @@ public final class HotSpringSites {
     private static boolean besideRiver(int x, int z) {
         if (!RiverNetwork.ready()) return false;
         RiverNetwork.At a = RiverNetwork.at(x, z);
-        return a.distance() != Double.MAX_VALUE && a.distance() <= a.halfWidth() + 4.0;
+        return a.within(4.0);
     }
 
     /** Says at debug level why a site was turned down, so a country with no springs can be read from the log. */

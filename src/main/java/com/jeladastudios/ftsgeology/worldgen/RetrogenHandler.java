@@ -3,7 +3,6 @@ package com.jeladastudios.ftsgeology.worldgen;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.util.TickBudget;
-import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -64,6 +63,18 @@ public final class RetrogenHandler {
 
     public static final String PAINT_TAG = "fts_surface_painted";
 
+    /**
+     * Forgets every chunk: the server is going down, and the next may be another world. The keys name the dimension
+     * but not the world, so a second world opened in the same game found the first one's chunks already done and left
+     * its own without their springs and deep rock.
+     */
+    public static void clear() {
+        PROCESSED.clear();
+        DEEP_CURRENT.clear();
+        PAINT_CURRENT.clear();
+        QUEUE.clear();
+    }
+
     // === NBT stamp read/write ==============================================
 
     @SubscribeEvent
@@ -119,9 +130,6 @@ public final class RetrogenHandler {
         // stale deep geology is queued deep-only.
         QUEUE.add(new QueuedChunk(level.dimension(), chunk.getPos(), surfaceDone));
     }
-
-    /** How far a volcano writes from its centre - its field of hot springs reaches furthest. */
-    static final int VOLCANO_REACH = 48;
 
     /**
      * One chunk waiting for its geology, held until the world is running and calm.

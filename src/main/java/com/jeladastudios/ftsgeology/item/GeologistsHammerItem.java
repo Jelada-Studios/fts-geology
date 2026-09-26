@@ -39,8 +39,6 @@ public class GeologistsHammerItem extends Item {
     /** How far down one strike can read. Deeper than this and you need to dig and strike again. */
     private static final int SECTION_DEPTH = 24;
 
-    /** Beds thinner than this are folded into the one above; a section is not a block list. */
-    private static final int MIN_BED = 1;
 
     public GeologistsHammerItem(Properties props) {
         super(props);
@@ -118,9 +116,8 @@ public class GeologistsHammerItem extends Item {
         return out;
     }
 
-    /** One bed of the log, if it is thick enough to be one. */
+    /** One bed of the log. */
     private static int emit(List<Component> out, BlockState s, int blocks) {
-        if (blocks < MIN_BED) return 0;
         RockTypes.Rock r = RockTypes.classify(s);
         double metres = blocks * DepthScale.metresPerBlock();
         out.add(Component.translatable("message.fts_geology.hammer.bed",

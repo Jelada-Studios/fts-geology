@@ -1,19 +1,9 @@
 package com.jeladastudios.ftsgeology.volcano;
 
-import com.jeladastudios.ftsgeology.registry.ModBlocks;
-import com.jeladastudios.ftsgeology.util.SeedHash;
 import com.jeladastudios.ftsgeology.util.ValueNoise;
 import com.jeladastudios.ftsgeology.volcano.VolcanoPlan.Ctx;
-import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
-import net.minecraft.core.BlockPos;
-import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 import static com.jeladastudios.ftsgeology.volcano.OceanColumn.*;
 
 /**

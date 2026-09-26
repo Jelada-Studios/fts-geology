@@ -22,7 +22,6 @@ import java.util.Locale;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import static com.jeladastudios.ftsgeology.command.TectonicCommands.*;
-import static com.jeladastudios.ftsgeology.command.FindCommands.*;
 
 /** /geology plate, map, column, deepgen and suitability: read-only views of the model. */
 public final class InspectCommands {

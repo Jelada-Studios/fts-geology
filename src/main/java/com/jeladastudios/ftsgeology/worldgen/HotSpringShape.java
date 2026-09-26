@@ -21,7 +21,7 @@ import java.util.Set;
  * What a hot spring looks like, as a pure function of place and stage.
  *
  * <p>Where and when a spring appears is decided elsewhere; this only builds the shape, so it can be
- * called by hand from {@code /geology place hotspring <stage>}. The water sits one block under the
+ * built again at a larger stage. The water sits one block under the
  * untouched ground in a ring outside the pool, so the pool is recessed into the land and building a
  * larger stage cannot drift downward.</p>
  */
@@ -76,20 +76,6 @@ public final class HotSpringShape {
                 x, z, stage, why,
                 datumY == Integer.MIN_VALUE ? "none" : datumY,
                 waterY == Integer.MIN_VALUE ? "none" : waterY, cells);
-    }
-
-    /**
-     * Builds a hot spring of the given stage centred here, replacing whatever earlier stage was
-     * there.
-     *
-     * @return the pool cells, or an empty list if this spot will not hold a spring
-     */
-    public static List<BlockPos> build(ServerLevel level, int x, int z, int stage) {
-        return build(level, x, z, stage, Integer.MIN_VALUE);
-    }
-
-    public static List<BlockPos> build(ServerLevel level, int x, int z, int stage, int datumY) {
-        return build(level, x, z, stage, datumY, true);
     }
 
     /**

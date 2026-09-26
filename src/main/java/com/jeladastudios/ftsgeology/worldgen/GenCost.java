@@ -1,6 +1,5 @@
 package com.jeladastudios.ftsgeology.worldgen;
 
-import com.jeladastudios.ftsgeology.GeysersMod;
 
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;

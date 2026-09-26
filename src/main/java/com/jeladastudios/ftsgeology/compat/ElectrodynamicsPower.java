@@ -53,10 +53,6 @@ public final class ElectrodynamicsPower {
         }
     }
 
-    public static boolean active() {
-        return API != null;
-    }
-
     /** Whether a capability asked of a block is Voltaic's electricity. */
     public static boolean is(Capability<?> cap) {
         return API != null && cap == API.capability();

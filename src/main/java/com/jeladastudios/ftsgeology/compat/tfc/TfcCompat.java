@@ -54,7 +54,6 @@ public final class TfcCompat {
 
     private static final TagKey<Biome> TFC_OCEAN = TagKey.create(Registries.BIOME, new ResourceLocation("tfc", "is_ocean"));
     private static final TagKey<Biome> TFC_RIVER = TagKey.create(Registries.BIOME, new ResourceLocation("tfc", "is_river"));
-    private static final TagKey<Biome> TFC_LAKE = TagKey.create(Registries.BIOME, new ResourceLocation("tfc", "is_lake"));
 
     /** Sea, by vanilla's tags or TFC's. */
     public static boolean ocean(Holder<Biome> b) {
@@ -64,11 +63,6 @@ public final class TfcCompat {
     /** A river, by vanilla's tag or TFC's. */
     public static boolean river(Holder<Biome> b) {
         return b.is(BiomeTags.IS_RIVER) || b.is(TFC_RIVER);
-    }
-
-    /** A lake, which vanilla has no tag for and TFC does. */
-    public static boolean lake(Holder<Biome> b) {
-        return b.is(TFC_LAKE);
     }
 
     /** A beach: vanilla's tag, or TFC's shore and tidal flats, which it does not tag. */
