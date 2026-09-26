@@ -456,18 +456,21 @@ public final class VolcanoField {
         boolean ocean = GeyserConfig.OCEAN_VOLCANOES.get();
         // The land caldera is out: its 300-block columns stalled the generator's workers under a terrain mod. The
         // code stays; the sites that would have been calderas on land are shields over plumes and stratovolcanoes on
-        // arcs. In the sea an arc's caldera is a flooded one, an island ring a quarter of that across.
+        // arcs. In the sea a caldera is a flooded one, an island ring a quarter of that across.
         boolean landCalderas = false;
+        // A really large hotspot volcano has often emptied its chamber and fallen in.
+        boolean fallen = rand01(hash(seed, 0, 0, 0xCA1DL)) < 0.34;
         // A plume first: fewer of them, and the grander sight. A centre just outside the usable part
         // of the cell is pulled in.
         for (int[] p : HotspotMap.plumeCentres(level, minX - plumePull(), minZ - plumePull(),
                 maxX + plumePull(), maxZ + plumePull())) {
             int x = Mth.clamp(p[0], minX, maxX), z = Mth.clamp(p[1], minZ, maxZ);
             if (HotspotMap.plumeStrength(level, x, z) < 0.4) continue;
-            // Under the open sea a plume builds an island up from the sea floor, as at Hawaii.
+            // Under the open sea a plume builds an island up from the sea floor, as at Hawaii, and one that has fallen
+            // in is a ring of island round a drowned floor.
             if (ocean && oceanDepth(level, x, z) >= SiteCheck.ISLAND_DEPTH) {
-                Site s = SiteCheck.checkOcean(level, x, z, VolcanoType.SHIELD, VolcanoSetting.ISLAND, 0.0, seed, refused,
-                        structures);
+                VolcanoType isle = fallen ? VolcanoType.CALDERA : VolcanoType.SHIELD;
+                Site s = SiteCheck.checkOcean(level, x, z, isle, VolcanoSetting.ISLAND, 0.0, seed, refused, structures);
                 // An island needs open sea round it as well; the plume's dome is wide, so the sea round it is tried.
                 int[] uncounted = new int[refused.length];
                 for (int i = 0; s == null && i < 8; i++) {
@@ -476,14 +479,11 @@ public final class VolcanoField {
                     int sx = x + (int) Math.round(Math.cos(a) * r), sz = z + (int) Math.round(Math.sin(a) * r);
                     if (sx < minX || sx > maxX || sz < minZ || sz > maxZ) continue;
                     if (HotspotMap.plumeStrength(level, sx, sz) < 0.4 || oceanDepth(level, sx, sz) < SiteCheck.ISLAND_DEPTH) continue;
-                    s = SiteCheck.checkOcean(level, sx, sz, VolcanoType.SHIELD, VolcanoSetting.ISLAND, 0.0, seed, uncounted,
-                            structures);
+                    s = SiteCheck.checkOcean(level, sx, sz, isle, VolcanoSetting.ISLAND, 0.0, seed, uncounted, structures);
                 }
                 if (s != null) return new Cell(s, refused);
             }
-            // A really large hotspot volcano has often emptied its chamber and fallen in.
-            VolcanoType type = landCalderas && rand01(hash(seed, 0, 0, 0xCA1DL)) < 0.34
-                    ? VolcanoType.CALDERA : VolcanoType.SHIELD;
+            VolcanoType type = landCalderas && fallen ? VolcanoType.CALDERA : VolcanoType.SHIELD;
             Site s = SiteCheck.checkNear(level, x, z, type, seed, refused, null, minX, minZ, maxX, maxZ, structures);
             if (s != null) return new Cell(s, refused);
         }

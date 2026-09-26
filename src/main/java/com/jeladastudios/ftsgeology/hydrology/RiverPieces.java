@@ -802,7 +802,8 @@ final class RiverPieces {
      * river it feeds at that river's own level. Only a modest river, only where it falls far enough across the cell for
      * the cave to have a roof -- the cave slopes down with it and can go no lower than where it comes out --
      * only where none of the rivers coming in is underground already, and only where it runs on into another river:
-     * never into a lake or the sea, never at its source. The rivers that join it in the cell sink with it, each at a
+     * never into a lake or the sea, never at its source; and of those, only {@link Karst#SINK_SHARE} of them, by a roll
+     * of the cell. The rivers that join it in the cell sink with it, each at a
      * swallow hole of its own, their caves meeting its cave at its water.
      *
      * <p>A cave run on under the river's bed to the cell's end came up again the height of the shaft under the river it
@@ -812,6 +813,8 @@ final class RiverPieces {
                         Long2ObjectOpenHashMap<RiverNetwork.Point[]> local) {
         if (main == Long.MIN_VALUE || r == Long.MIN_VALUE || underLake(main) || lat.isSea(r) || underLake(r)) return;
         if (lat.area(u) > Karst.SINK_AREA_MAX || !lat.soluble(u)) return;
+        long roll = SeedHash.hash(seed, DrainageLattice.ki(u), DrainageLattice.kj(u), 0x5B1CL);
+        if (SeedHash.rand01(roll) >= Karst.SINK_SHARE) return;
         double first = Double.NaN, last = Double.NaN;
         int lengths = 0;
         for (RiverNetwork.Point p : pts) {

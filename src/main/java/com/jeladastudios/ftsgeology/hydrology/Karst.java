@@ -35,6 +35,11 @@ public final class Karst {
     static final double CAVE_DROP = 5.0;
     /** The fewest lengths of river a cave runs for: shorter, it would be a hole through a bank. */
     static final int TUNNEL_MIN = 2;
+    /**
+     * The share of the rivers that could sink that do. Every one of them sinking was too many to the eye: most of a
+     * karst country's rivers still run at the surface, over beds their own silt has sealed.
+     */
+    static final double SINK_SHARE = 0.5;
 
     /** The share of the ground with soluble beds under it that is karst country. */
     private static final double COUNTRY = 0.55;
