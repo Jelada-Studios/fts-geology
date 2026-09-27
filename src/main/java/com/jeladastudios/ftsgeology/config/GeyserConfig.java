@@ -698,6 +698,8 @@ public final class GeyserConfig {
                         "then glass, which breaks, then wool, planks, cobblestone and bricks, while obsidian and",
                         "metal blocks hold. A magnitude 5 takes the odd block off a sand house; a great earthquake",
                         "near its fault brings walls down. Blocks with contents, such as chests, are left alone.",
+                        "Lanterns, torches, flower pots, candles, paintings and item frames come down first, and",
+                        "dust sifts from the ceiling over a player indoors.",
                         "Separate from quakesBreakBuilds, which lets the rupture itself move a build.")
                 .define("shakingLoosensBuilds", true);
         SHAKING_DAMAGE = b

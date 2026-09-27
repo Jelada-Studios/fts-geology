@@ -347,6 +347,7 @@ public final class Earthquake {
             }
 
             dust(level, p, falloff);
+            ShakingDamage.ceilingDust(level, p, falloff);
         }
     }
 

@@ -10,6 +10,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.entity.decoration.HangingEntity;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -80,11 +81,20 @@ public final class ShakingDamage {
             net.minecraft.core.Direction.SOUTH, net.minecraft.core.Direction.WEST, net.minecraft.core.Direction.EAST,
             net.minecraft.core.Direction.DOWN};
 
+    /**
+     * How readily an ornament comes down: a lantern, a torch, a flower pot, a candle, a painting, an item frame. Hung or
+     * stood rather than built in, and the first things to fall in a real earthquake whatever they are made of.
+     */
+    private static final double ORNAMENT = 0.7;
+
     private static final LongAdder KNOCKED = new LongAdder(), SHATTERED = new LongAdder(), CHUNKS = new LongAdder(),
-            OF_STRUCTURES = new LongAdder();
+            OF_STRUCTURES = new LongAdder(), ORNAMENTS = new LongAdder();
 
     /** A block shaken loose, to come off at its moment if it is still what was there. */
     private record Loose(ResourceKey<Level> dimension, BlockPos pos, BlockState state, long due) {}
+
+    /** A painting or an item frame shaken off its wall, to come down at its moment. */
+    private record LooseHanging(ResourceKey<Level> dimension, java.util.UUID id, long due) {}
 
     /** One quake's shaking: the chunks still to go through. */
     private static final class Job {
@@ -107,6 +117,8 @@ public final class ShakingDamage {
 
     private static final Deque<Job> JOBS = new ArrayDeque<>();
     private static final PriorityQueue<Loose> DUE = new PriorityQueue<>(Comparator.comparingLong(Loose::due));
+    private static final PriorityQueue<LooseHanging> HANGING =
+            new PriorityQueue<>(Comparator.comparingLong(LooseHanging::due));
 
     /** How far from the rupture buildings are shaken: as far as a player feels it. */
     public static double reach(double magnitude) {
@@ -143,7 +155,7 @@ public final class ShakingDamage {
 
     /** Goes through queued chunks and lets due blocks come off, for at most {@code nanos}. Server thread. */
     public static void drain(MinecraftServer server, long nanos) {
-        if (JOBS.isEmpty() && DUE.isEmpty()) return;
+        if (JOBS.isEmpty() && DUE.isEmpty() && HANGING.isEmpty()) return;
         long deadline = System.nanoTime() + nanos;
         long now = server.getTickCount();
         while (!DUE.isEmpty() && DUE.peek().due() <= now && System.nanoTime() < deadline) {
@@ -152,6 +164,16 @@ public final class ShakingDamage {
             if (level == null || !level.isLoaded(l.pos())) continue;
             if (level.getBlockState(l.pos()) != l.state()) continue;   // changed meanwhile: left as it now is
             fall(level, l.pos(), l.state());
+        }
+        while (!HANGING.isEmpty() && HANGING.peek().due() <= now && System.nanoTime() < deadline) {
+            LooseHanging l = HANGING.poll();
+            ServerLevel level = server.getLevel(l.dimension());
+            if (level == null) continue;
+            if (level.getEntity(l.id()) instanceof HangingEntity hung && hung.isAlive()) {
+                hung.dropItem(null);                 // with its own sound, and what a frame held
+                hung.discard();
+                ORNAMENTS.increment();
+            }
         }
         while (!JOBS.isEmpty() && System.nanoTime() < deadline) {
             Job job = JOBS.peek();
@@ -166,6 +188,11 @@ public final class ShakingDamage {
     }
 
     private static void fall(ServerLevel level, BlockPos pos, BlockState state) {
+        if (ornament(state)) {
+            level.destroyBlock(pos, true);           // comes down as what it drops: a lantern, a pot and its flower
+            ORNAMENTS.increment();
+            return;
+        }
         if (state.getSoundType() == SoundType.GLASS) {
             level.destroyBlock(pos, false);          // glass breaks where it stands, with its own sound
             SHATTERED.increment();
@@ -215,7 +242,7 @@ public final class ShakingDamage {
                     break;
                 }
             }
-            if (!placedIn[i] && !inBox && !section.getStates().maybeHas(ShakingDamage::worked)) continue;
+            if (!placedIn[i] && !inBox && !section.getStates().maybeHas(ShakingDamage::fitting)) continue;
             for (int ly = 0; ly < 16; ly++) {
                 int y = y0 + ly;
                 if (y < floor) continue;
@@ -223,6 +250,17 @@ public final class ShakingDamage {
                     for (int lx = 0; lx < 16; lx++) {
                         BlockState s = section.getBlockState(lx, ly, lz);
                         if (s.isAir()) continue;
+                        if (ornament(s)) {
+                            // Hung or stood, not built in: no open face needed, and it comes down as what it drops.
+                            if (level.random.nextDouble() >= Math.min(CAP, ORNAMENT * shaking)) continue;
+                            int x = cp.getMinBlockX() + lx, z = cp.getMinBlockZ() + lz;
+                            m.set(x, y, z);
+                            if (!(placed.contains(m.asLong()) || EruptionHandler.isPlayerPlaced(s)
+                                    || (inBox && inside(built, x, y, z)))) continue;
+                            if (job.loosened++ >= MOST) return;
+                            DUE.add(new Loose(level.dimension(), m.immutable(), s, now + level.random.nextInt(job.spread)));
+                            continue;
+                        }
                         double weak = weakness(s);
                         if (weak <= 0) continue;
                         // The roll first: it is cheap, and only the few blocks that come up are looked at closely.
@@ -242,6 +280,69 @@ public final class ShakingDamage {
                 }
             }
         }
+        // Paintings and item frames: only players and structures hang them, so every one is a building's.
+        net.minecraft.world.phys.AABB area = new net.minecraft.world.phys.AABB(cp.getMinBlockX(), floor,
+                cp.getMinBlockZ(), cp.getMaxBlockX() + 1, level.getMaxBuildHeight(), cp.getMaxBlockZ() + 1);
+        for (HangingEntity hung : level.getEntitiesOfClass(HangingEntity.class, area,
+                e -> e instanceof net.minecraft.world.entity.decoration.Painting
+                        || e instanceof net.minecraft.world.entity.decoration.ItemFrame)) {
+            if (level.random.nextDouble() >= Math.min(CAP, ORNAMENT * shaking)) continue;
+            HANGING.add(new LooseHanging(level.dimension(), hung.getUUID(), now + level.random.nextInt(job.spread)));
+        }
+    }
+
+    /** How far over a player a ceiling is looked for, and how often, one in so many times, it creaks. */
+    private static final int CEILING = 8, CREAK = 8;
+
+    /**
+     * Dust sifting down from the ceiling over a player indoors while the ground shakes, of what the ceiling is made
+     * of, and now and then the creak of it. Called a few times a second for each player the quake shakes.
+     */
+    public static void ceilingDust(ServerLevel level, net.minecraft.server.level.ServerPlayer player, double falloff) {
+        if (!GeyserConfig.SHAKING_LOOSENS_BUILDS.get() || level.getGameTime() % 3L != 0L) return;
+        BlockPos head = BlockPos.containing(player.getEyePosition());
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int ceiling = Integer.MIN_VALUE;
+        for (int dy = 1; dy <= CEILING; dy++) {
+            if (!level.getBlockState(m.set(head.getX(), head.getY() + dy, head.getZ())).isAir()) {
+                ceiling = head.getY() + dy;
+                break;
+            }
+        }
+        if (ceiling == Integer.MIN_VALUE) return;               // under the open sky
+        int puffs = 1 + (int) Math.round(falloff * 3);
+        for (int i = 0; i < puffs; i++) {
+            int x = head.getX() + level.random.nextInt(7) - 3, z = head.getZ() + level.random.nextInt(7) - 3;
+            if (!level.hasChunkAt(m.set(x, ceiling, z))) continue;
+            BlockState s = level.getBlockState(m);
+            if (s.isAir() || !s.getFluidState().isEmpty()) continue;
+            level.sendParticles(player, new net.minecraft.core.particles.BlockParticleOption(
+                            net.minecraft.core.particles.ParticleTypes.FALLING_DUST, s), false,
+                    x + 0.5, ceiling - 0.05, z + 0.5, 2, 0.35, 0.0, 0.35, 0.0);
+        }
+        if (level.random.nextInt(CREAK) == 0) {
+            level.playSound(null, head.getX() + 0.5, ceiling, head.getZ() + 0.5,
+                    net.minecraft.sounds.SoundEvents.GRAVEL_FALL, net.minecraft.sounds.SoundSource.BLOCKS,
+                    0.35F, 0.55F + level.random.nextFloat() * 0.2F);
+        }
+    }
+
+    /**
+     * What a building has hung or stood about it rather than built into it: lanterns, torches, flower pots, candles.
+     * Never a redstone torch.
+     */
+    private static boolean ornament(BlockState s) {
+        Block b = s.getBlock();
+        return b instanceof net.minecraft.world.level.block.LanternBlock
+                || (b instanceof net.minecraft.world.level.block.TorchBlock
+                        && !(b instanceof net.minecraft.world.level.block.RedstoneTorchBlock))   // a circuit is not an ornament
+                || b instanceof net.minecraft.world.level.block.FlowerPotBlock
+                || b instanceof net.minecraft.world.level.block.CandleBlock;
+    }
+
+    /** Anything in a section that can make it worth going through: a worked block or an ornament. */
+    private static boolean fitting(BlockState s) {
+        return worked(s) || (ornament(s) && EruptionHandler.isPlayerPlaced(s));
     }
 
     /**
@@ -340,13 +441,14 @@ public final class ShakingDamage {
     }
 
     public static String summary() {
-        return String.format(java.util.Locale.ROOT, "shaking: %d chunks gone through, %d blocks shaken off, %d panes broken, %d loosened in a structure",
-                CHUNKS.sum(), KNOCKED.sum(), SHATTERED.sum(), OF_STRUCTURES.sum());
+        return String.format(java.util.Locale.ROOT, "shaking: %d chunks gone through, %d blocks shaken off, %d panes broken, %d ornaments down, %d loosened in a structure",
+                CHUNKS.sum(), KNOCKED.sum(), SHATTERED.sum(), ORNAMENTS.sum(), OF_STRUCTURES.sum());
     }
 
     public static void clear() {
         JOBS.clear();
         DUE.clear();
+        HANGING.clear();
     }
 
     @SubscribeEvent
