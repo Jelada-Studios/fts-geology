@@ -10,7 +10,7 @@ import net.minecraft.network.chat.FormattedText;
  */
 public class FieldGuideClient {
 
-    public static final int PAGE_COUNT = 24;
+    public static final int PAGE_COUNT = 32;
 
     public static void openBook() {
         Minecraft.getInstance().setScreen(new BookViewScreen(new BookViewScreen.BookAccess() {
