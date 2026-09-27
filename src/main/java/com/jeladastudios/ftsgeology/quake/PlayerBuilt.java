@@ -59,6 +59,17 @@ public final class PlayerBuilt {
         if (chunk != null) chunk.setUnsaved(true);
     }
 
+    /** A placed block moved: by liquefaction settling its column, say. */
+    static void move(ServerLevel level, long from, BlockPos to) {
+        LongSet set = PLACED.get(key(level, BlockPos.getX(from) >> 4, BlockPos.getZ(from) >> 4));
+        if (set != null) {
+            synchronized (set) {
+                set.remove(from);
+            }
+        }
+        mark(level, to);
+    }
+
     @SubscribeEvent
     public static void onBreak(BlockEvent.BreakEvent event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;

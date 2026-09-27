@@ -108,18 +108,24 @@ public final class ShakingDamage {
     /** One quake's shaking: the chunks still to go through. */
     private static final class Job {
         final ResourceKey<Level> dimension;
+        final BlockPos epicentre;
         final List<QuakePlanner.TracePoint> trace;
-        final double magnitude;
-        final int spread;
+        final double magnitude, depthMetres;
         final Deque<ChunkPos> chunks;
         int loosened;
+        /** When the rupture starts, the waves with it. */
+        final long startAt;
+        /** Filled per chunk: when its S wave arrives, and how long it shakes. */
+        int delay, spread;
 
-        Job(ResourceKey<Level> dimension, List<QuakePlanner.TracePoint> trace, double magnitude, int spread,
-            Deque<ChunkPos> chunks) {
+        Job(ResourceKey<Level> dimension, BlockPos epicentre, List<QuakePlanner.TracePoint> trace, double magnitude,
+            double depthMetres, long startAt, Deque<ChunkPos> chunks) {
             this.dimension = dimension;
+            this.startAt = startAt;
+            this.epicentre = epicentre;
             this.trace = trace;
             this.magnitude = magnitude;
-            this.spread = spread;
+            this.depthMetres = depthMetres;
             this.chunks = chunks;
         }
     }
@@ -129,17 +135,25 @@ public final class ShakingDamage {
     private static final PriorityQueue<LooseHanging> HANGING =
             new PriorityQueue<>(Comparator.comparingLong(LooseHanging::due));
 
-    /** How far from the rupture buildings are shaken: as far as a player feels it. */
+    /** The least intensity that still shakes a block loose now and then. */
+    private static final double DAMAGING = 4.0;
+
+    /**
+     * How far from the rupture buildings are shaken: as far out as the shaking stays damaging, a few hundred blocks
+     * for a magnitude 6 and far more for a great earthquake, up to the config's cap. Only loaded chunks are gone
+     * through, so the cost follows where the players are.
+     */
     public static double reach(double magnitude) {
-        return 40 + magnitude * 14;
+        return Math.min(GeyserConfig.QUAKE_DAMAGE_RANGE.get(),
+                Math.max(40 + magnitude * 14, FeltShaking.distanceFor(magnitude, DAMAGING)));
     }
 
     /**
-     * The shaking starts: every loaded chunk within reach of the rupture is queued. Server thread.
-     *
-     * @param ticks how long the ground shakes, over which what comes loose comes off
+     * The shaking starts: every loaded chunk within reach of the rupture is queued. What comes loose in a chunk comes
+     * off while its own shaking lasts, after the S wave reaches it. Server thread.
      */
-    public static void start(ServerLevel level, List<QuakePlanner.TracePoint> trace, double magnitude, int ticks) {
+    public static void start(ServerLevel level, BlockPos epicentre, List<QuakePlanner.TracePoint> trace,
+                             double magnitude, double depthMetres, long startAt) {
         if (!(builds() || trees()) || GeyserConfig.SHAKING_DAMAGE.get() <= 0 || trace.isEmpty()) return;
         double reach = reach(magnitude);
         int minX = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
@@ -157,7 +171,7 @@ public final class ShakingDamage {
                 if (distance(trace, cx * 16 + 8, cz * 16 + 8) <= reach + 12) chunks.add(new ChunkPos(cx, cz));
             }
         }
-        if (!chunks.isEmpty()) JOBS.add(new Job(level.dimension(), trace, magnitude, Math.max(20, ticks), chunks));
+        if (!chunks.isEmpty()) JOBS.add(new Job(level.dimension(), epicentre, trace, magnitude, depthMetres, startAt, chunks));
     }
 
     /** Goes through queued chunks and lets due blocks come off, for at most {@code nanos}. Server thread. */
@@ -233,8 +247,13 @@ public final class ShakingDamage {
         LevelChunk chunk = level.getChunkSource().getChunkNow(cp.x, cp.z);
         if (chunk == null) return;
         CHUNKS.increment();
-        double d = distance(job.trace, cp.getMiddleBlockX(), cp.getMiddleBlockZ());
+        double[] far = new double[1];
+        QuakePlanner.TracePoint at = FeltShaking.nearest(job.trace, cp.getMiddleBlockX(), cp.getMiddleBlockZ(), far);
+        double d = far[0];
         double intensity = job.magnitude - 2.0 * Math.log10(1.0 + d / FALLOFF);
+        job.delay = (int) Math.max(0L, job.startAt - now) + FeltShaking.ruptureDelay(job.epicentre, at)
+                + FeltShaking.travelTicks(d, job.depthMetres, com.jeladastudios.ftsgeology.instrument.SeismicWave.VS);
+        job.spread = Math.max(20, FeltShaking.durationTicks(job.magnitude, d));
         double shaking = BASE * GeyserConfig.SHAKING_DAMAGE.get() * Math.pow(10.0, PER_INTENSITY * (intensity - 5.0));
         if (shaking < 1.0e-4) return;
 
@@ -281,7 +300,7 @@ public final class ShakingDamage {
                             if (!(placed.contains(m.asLong()) || EruptionHandler.isPlayerPlaced(s)
                                     || (inBox && inside(built, x, y, z)))) continue;
                             if (job.loosened++ >= MOST) return;
-                            DUE.add(new Loose(level.dimension(), m.immutable(), s, now + level.random.nextInt(job.spread)));
+                            DUE.add(new Loose(level.dimension(), m.immutable(), s, now + job.delay + level.random.nextInt(job.spread)));
                             continue;
                         }
                         double weak = weakness(s);
@@ -298,7 +317,7 @@ public final class ShakingDamage {
                         if (s.is(BlockTags.LOGS) && trunk(level, m)) continue;
                         if (made) OF_STRUCTURES.increment();
                         if (job.loosened++ >= MOST) return;
-                        DUE.add(new Loose(level.dimension(), m.immutable(), s, now + level.random.nextInt(job.spread)));
+                        DUE.add(new Loose(level.dimension(), m.immutable(), s, now + job.delay + level.random.nextInt(job.spread)));
                     }
                 }
             }
@@ -310,7 +329,7 @@ public final class ShakingDamage {
                 e -> e instanceof net.minecraft.world.entity.decoration.Painting
                         || e instanceof net.minecraft.world.entity.decoration.ItemFrame)) {
             if (level.random.nextDouble() >= Math.min(CAP, ORNAMENT * shaking)) continue;
-            HANGING.add(new LooseHanging(level.dimension(), hung.getUUID(), now + level.random.nextInt(job.spread)));
+            HANGING.add(new LooseHanging(level.dimension(), hung.getUUID(), now + job.delay + level.random.nextInt(job.spread)));
         }
     }
 
@@ -339,7 +358,7 @@ public final class ShakingDamage {
                 }
                 if (!DynamicTreesFelling.isRooty(under)) continue;
                 if (level.random.nextDouble() >= chance) continue;
-                DUE.add(new Loose(level.dimension(), new BlockPos(x, y, z), s, now + level.random.nextInt(job.spread)));
+                DUE.add(new Loose(level.dimension(), new BlockPos(x, y, z), s, now + job.delay + level.random.nextInt(job.spread)));
             }
         }
     }
@@ -431,7 +450,7 @@ public final class ShakingDamage {
     }
 
     /** The ground a structure is built on and into, which the shaking leaves to the rupture. */
-    private static boolean ground(BlockState s) {
+    static boolean ground(BlockState s) {
         return s.is(BlockTags.DIRT) || s.is(Blocks.DIRT_PATH) || s.is(Blocks.FARMLAND)
                 || s.is(BlockTags.BASE_STONE_OVERWORLD) || s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVEL)
                 || s.is(BlockTags.LEAVES) || s.is(BlockTags.SNOW) || s.is(BlockTags.ICE)
@@ -458,7 +477,7 @@ public final class ShakingDamage {
     }
 
     /** The boxes of the pieces of structures in a chunk that reach up to where buildings are shaken. */
-    private static List<BoundingBox> structureBoxes(ServerLevel level, LevelChunk chunk, int floor) {
+    static List<BoundingBox> structureBoxes(ServerLevel level, LevelChunk chunk, int floor) {
         List<BoundingBox> out = new ArrayList<>();
         if (chunk.getAllReferences().isEmpty()) return out;
         try {
@@ -478,7 +497,7 @@ public final class ShakingDamage {
         return out;
     }
 
-    private static boolean inside(List<BoundingBox> boxes, int x, int y, int z) {
+    static boolean inside(List<BoundingBox> boxes, int x, int y, int z) {
         for (BoundingBox b : boxes) if (b.isInside(x, y, z)) return true;
         return false;
     }

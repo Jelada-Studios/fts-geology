@@ -146,6 +146,15 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue CAVE_COLLAPSE_DEPTH;           // how deep a probe looks
     public static final ForgeConfigSpec.IntValue QUAKE_BLOCKS_PER_TICK;    // main-thread apply budget
     public static final ForgeConfigSpec.IntValue QUAKE_WARNING_TICKS;      // alert window before the ground moves
+    public static final ForgeConfigSpec.IntValue QUAKE_FELT_RANGE;         // farthest a quake's shaking is felt
+    public static final ForgeConfigSpec.IntValue QUAKE_DAMAGE_RANGE;       // farthest the shaking loosens builds
+    public static final ForgeConfigSpec.BooleanValue QUAKE_AFTERSHOCKS;
+    public static final ForgeConfigSpec.BooleanValue QUAKE_LIQUEFACTION;
+    public static final ForgeConfigSpec.BooleanValue QUAKE_LANDSLIDES;
+    public static final ForgeConfigSpec.DoubleValue AFTERSHOCK_RATE;
+    public static final ForgeConfigSpec.IntValue AFTERSHOCK_MAX;
+    public static final ForgeConfigSpec.DoubleValue AFTERSHOCK_DAYS;
+    public static final ForgeConfigSpec.DoubleValue FORESHOCK_SHARE;
     public static final ForgeConfigSpec.IntValue QUAKE_AMBIENT_INTERVAL;   // ticks between ambient rolls
     public static final ForgeConfigSpec.IntValue QUAKE_SEARCH_RADIUS;      // how far from a player to look
     public static final ForgeConfigSpec.DoubleValue QUAKE_RECURRENCE_DAYS; // mean interval between ruptures
@@ -200,6 +209,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue TURBINE_MAX_FE;      // FE/t of a turbine over the hottest ground
     public static final ForgeConfigSpec.IntValue TURBINE_MIN_FE;      // FE/t over the faintest heat it runs on
     public static final ForgeConfigSpec.IntValue TURBINE_WELL_DEPTH;  // lengths of casing a well may run to
+    public static final ForgeConfigSpec.IntValue CORE_DRILL_DEPTH;    // blocks the hand core drill bores down
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
 
@@ -768,6 +778,46 @@ public final class GeyserConfig {
                         "20 = 1 second; 200 is ten seconds. Set 0 for no warning: the ground moves at",
                         "once and the siren and the shaking coincide.")
                 .defineInRange("quakeWarningTicks", 200, 0, 1200);
+        QUAKE_FELT_RANGE = b
+                .comment("The farthest from the rupture, in blocks, a quake's shaking is felt. Each player feels",
+                        "it as strongly as their distance allows: a quick jolt and a rumble as the P wave arrives,",
+                        "then the S wave's heavy shaking, seconds later the further out they are. A magnitude 6",
+                        "is felt some nine hundred blocks out, a great earthquake thousands.")
+                .defineInRange("quakeFeltRange", 4000, 64, 50000);
+        QUAKE_DAMAGE_RANGE = b
+                .comment("The farthest from the rupture, in blocks, the shaking loosens blocks off buildings. Only",
+                        "loaded chunks are gone through.")
+                .defineInRange("quakeDamageRange", 1500, 64, 20000);
+        QUAKE_LIQUEFACTION = b
+                .comment("Strong shaking (about Mercalli VII and up) liquefies loose wet ground: sand, silt, gravel and",
+                        "soil by a river, lake or sea, on a floodplain, or over a high water table. Sand boils open,",
+                        "what players and villages built on it settles a block into it -- unevenly, so a house can",
+                        "crack across -- and whoever stands on it is held fast for a few seconds.")
+                .define("quakeLiquefaction", true);
+        QUAKE_LANDSLIDES = b
+                .comment("Strong shaking (about Mercalli VI and up) brings down the loose cover of steep natural slopes:",
+                        "soil, scree, sand and snow slide down as one mass, trees and all, heap up at the foot and leave",
+                        "a scar. Never on a slope a player or a village built on, never beside water.")
+                .define("quakeLandslides", true);
+        QUAKE_AFTERSHOCKS = b
+                .comment("After a quake of magnitude 5.5 or more the fault goes on slipping for days: aftershocks",
+                        "along it, many at first and fewer later (Omori's law), the largest about 1.2 below the main",
+                        "shock. Those of 5.5 and up near a player break the ground too; the rest are felt and recorded.",
+                        "Also lets a great earthquake be announced by a foreshock minutes before it.")
+                .define("quakeAftershocks", true);
+        AFTERSHOCK_RATE = b
+                .comment("How many aftershocks: 1 is the natural number for the main shock's size, 0.5 half as many.")
+                .defineInRange("aftershockRate", 1.0, 0.0, 10.0);
+        AFTERSHOCK_MAX = b
+                .comment("The most aftershocks one quake has.")
+                .defineInRange("aftershockMax", 30, 1, 500);
+        AFTERSHOCK_DAYS = b
+                .comment("Over how many in-game days a sequence dies away.")
+                .defineInRange("aftershockDays", 3.0, 0.1, 100.0);
+        FORESHOCK_SHARE = b
+                .comment("Share of the great ambient earthquakes (magnitude 7 and up) that a foreshock, about two",
+                        "magnitudes smaller, comes before by one to five minutes.")
+                .defineInRange("foreshockShare", 0.3, 0.0, 1.0);
         QUAKE_AMBIENT_INTERVAL = b
                 .comment("Ticks between ambient earthquake rolls. 0 disables ambient quakes entirely",
                         "(the /geology quake command still works).")
@@ -925,6 +975,10 @@ public final class GeyserConfig {
                         "sits thirty to sixty blocks under its pool; a natural geyser's chamber is down near the",
                         "bottom of the world, out of reach unless this is raised.")
                 .defineInRange("turbineWellMaxDepth", 96, 1, 512);
+        CORE_DRILL_DEPTH = b
+                .comment("How many blocks down the core drill bores from the block it is set on. Its core logs every",
+                        "bed it went through, any deposit named for what laid it, and the water table.")
+                .defineInRange("coreDrillDepth", 64, 8, 512);
         b.pop();
 
         b.push("hydrology");

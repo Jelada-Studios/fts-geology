@@ -52,6 +52,7 @@ public final class VolcanoEruption {
         }
 
         ashfall(level, summit, magnitude);
+        if (eruptionTicks % 100 == 0) com.jeladastudios.ftsgeology.advancement.GeologyTrigger.awardNear(level, summit.getX(), summit.getZ(), 200, "eruption");
         // The mountain shakes while it is going off, and much less far out than a quake does: an
         // eruption is felt on its own slopes, not across a county.
         if (eruptionTicks % 5 == 0) {

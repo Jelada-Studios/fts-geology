@@ -25,6 +25,8 @@ public final class ClientShake {
     /** Ticks left of the decay. */
     private static int remaining;
     private static int total;
+    /** How quick the swaying is; see ShakePacket. */
+    private static float speed = 1.0f;
 
     /** Game time the last instruction arrived, so two in one tick can be told from two in a row. */
     private static long lastAt = Long.MIN_VALUE;
@@ -35,6 +37,10 @@ public final class ClientShake {
      * player walks away.
      */
     public static void add(float newIntensity, int ticks) {
+        add(newIntensity, ticks, 1.0f);
+    }
+
+    public static void add(float newIntensity, int ticks, float newSpeed) {
         long now = Minecraft.getInstance().level == null
                 ? 0L : Minecraft.getInstance().level.getGameTime();
 
@@ -45,6 +51,7 @@ public final class ClientShake {
         intensity = value;
         remaining = ticks;
         total = Math.max(1, ticks);
+        speed = Math.max(0.1f, newSpeed);
     }
 
     /** Stops any shake at once. Used when leaving a world, so it cannot survive into the next one. */
@@ -75,7 +82,7 @@ public final class ClientShake {
         // Several sine waves at unrelated speeds rather than a random offset per frame. Random
         // offsets read as a flicker; this reads as something heavy moving, and each axis gets its
         // own set so the three do not march in step.
-        double t = (Minecraft.getInstance().level.getGameTime() + event.getPartialTick()) * 0.6;
+        double t = (Minecraft.getInstance().level.getGameTime() + event.getPartialTick()) * 0.6 * speed;
         float yaw = wobble(t, 1.00, 2.31, 3.77) * amp;
         float pitch = wobble(t, 1.43, 2.71, 4.19) * amp * 0.7f;
         // Roll is the one that sells it - the horizon tipping is what a camera does in an

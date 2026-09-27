@@ -19,16 +19,18 @@ import java.util.function.Supplier;
  *
  * @param intensity peak angular displacement in degrees, before the client's own decay
  * @param ticks     how long it takes to decay to nothing
+ * @param speed     how quick the swaying is: 1 for the heavy S wave, faster for the P wave's jolt
  */
-public record ShakePacket(float intensity, int ticks) {
+public record ShakePacket(float intensity, int ticks, float speed) {
 
     public static void encode(ShakePacket p, FriendlyByteBuf buf) {
         buf.writeFloat(p.intensity);
         buf.writeVarInt(p.ticks);
+        buf.writeFloat(p.speed);
     }
 
     public static ShakePacket decode(FriendlyByteBuf buf) {
-        return new ShakePacket(buf.readFloat(), buf.readVarInt());
+        return new ShakePacket(buf.readFloat(), buf.readVarInt(), buf.readFloat());
     }
 
     public static void handle(ShakePacket p, Supplier<NetworkEvent.Context> ctx) {
@@ -37,7 +39,7 @@ public record ShakePacket(float intensity, int ticks) {
                 // dedicated server loading it at all would be a crash on the first quake.
                 DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
                         () -> () -> com.jeladastudios.ftsgeology.client.ClientShake.add(
-                                p.intensity(), p.ticks())));
+                                p.intensity(), p.ticks(), p.speed())));
         ctx.get().setPacketHandled(true);
     }
 }

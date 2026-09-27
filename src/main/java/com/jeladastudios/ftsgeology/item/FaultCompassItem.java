@@ -56,6 +56,9 @@ public class FaultCompassItem extends Item {
                 String.format(Locale.ROOT, "%.1f", s.plateSpeed()),
                 bearing(s.plateBearing())).withStyle(ChatFormatting.GOLD));
 
+        if (s.onFault() && player instanceof net.minecraft.server.level.ServerPlayer sp) {
+            com.jeladastudios.ftsgeology.advancement.GeologyTrigger.award(sp, "fault_near");
+        }
         if (!s.onFault()) {
             // Plate interior. Saying "no fault found" would be wrong - there is one, it is just
             // further away than this instrument can resolve, which is exactly the situation most

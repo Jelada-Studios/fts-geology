@@ -137,11 +137,14 @@ public class SeismographBlockEntity extends BlockEntity {
         if (!SeismicWave.detectable(amp)) return;       // lost in the drum's own noise
 
         readings.add(0, new Reading(e.id(), SeismicWave.spSeconds(d), amp, e.gameTime()));
+        com.jeladastudios.ftsgeology.advancement.GeologyTrigger.awardNear(level, pos.getX(), pos.getZ(), 32, "seismogram");
         while (readings.size() > LOG_SIZE) readings.remove(readings.size() - 1);
 
         int sig = SeismicWave.signal(amp);
         // Caught before the ground moves: warning phase. Otherwise the arrival is treated as now.
-        long groundMoves = e.gameTime() + GeyserConfig.QUAKE_WARNING_TICKS.get();
+        // The shaking here comes with the S wave, later the further the station is from the rupture.
+        long groundMoves = e.gameTime() + GeyserConfig.QUAKE_WARNING_TICKS.get()
+                + com.jeladastudios.ftsgeology.quake.FeltShaking.travelTicks(flat, e.depthMetres(), SeismicWave.VS);
         if (groundMoves > level.getGameTime() + 5L) {
             warnUntil = groundMoves;
             pendingSignal = sig;

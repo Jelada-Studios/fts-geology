@@ -11,6 +11,17 @@
 #  Every value is hot-reloadable. Ticks: 20 = 1 second.
 # =====================================================================
 
+[diagnostics]
+	#Write the mod's running counts and events to the log: rivers, villages and hot springs as
+	#the world is made, retrogen, volcanoes finishing and waking, quakes, springs growing. For
+	#testing and for bug reports; off, the log keeps only warnings and one-off notes.
+	verboseLog = false
+	#If the server thread goes this many seconds without finishing a tick, write every
+	#thread's stack to logs/fts_geology_stall.txt, once per stall. The stacks show what the
+	#game was waiting on when it froze. Nothing else is read or written. 0 turns it off.
+	#Range: 0 ~ 3600
+	stallReportSeconds = 30
+
 [thermodynamics]
 	#Degrees Celsius added per tick for each adjacent lava/magma block.
 	#Lowered so setups don't boil almost instantly â€” gives time to react in a base.
@@ -604,6 +615,43 @@
 	#dramatic without gutting the landscape.
 	#Range: 2 ~ 128
 	quakeMaxFissureDepth = 15
+	#The farthest from the rupture, in blocks, a quake's shaking is felt. Each player feels
+	#it as strongly as their distance allows: a quick jolt and a rumble as the P wave arrives,
+	#then the S wave's heavy shaking, seconds later the further out they are. A magnitude 6
+	#is felt some nine hundred blocks out, a great earthquake thousands.
+	#Range: 64 ~ 50000
+	quakeFeltRange = 4000
+	#The farthest from the rupture, in blocks, the shaking loosens blocks off buildings. Only
+	#loaded chunks are gone through.
+	#Range: 64 ~ 20000
+	quakeDamageRange = 1500
+	#Strong shaking (about Mercalli VII and up) liquefies loose wet ground: sand, silt, gravel and
+	#soil by a river, lake or sea, on a floodplain, or over a high water table. Sand boils open,
+	#what players and villages built on it settles a block into it -- unevenly, so a house can
+	#crack across -- and whoever stands on it is held fast for a few seconds.
+	quakeLiquefaction = true
+	#Strong shaking (about Mercalli VI and up) brings down the loose cover of steep natural slopes:
+	#soil, scree, sand and snow slide down as one mass, trees and all, heap up at the foot and leave
+	#a scar. Never on a slope a player or a village built on, never beside water.
+	quakeLandslides = true
+	#After a quake of magnitude 5.5 or more the fault goes on slipping for days: aftershocks
+	#along it, many at first and fewer later (Omori's law), the largest about 1.2 below the main
+	#shock. Those of 5.5 and up near a player break the ground too; the rest are felt and recorded.
+	#Also lets a great earthquake be announced by a foreshock minutes before it.
+	quakeAftershocks = true
+	#How many aftershocks: 1 is the natural number for the main shock's size, 0.5 half as many.
+	#Range: 0.0 ~ 10.0
+	aftershockRate = 1.0
+	#The most aftershocks one quake has.
+	#Range: 1 ~ 500
+	aftershockMax = 30
+	#Over how many in-game days a sequence dies away.
+	#Range: 0.1 ~ 100.0
+	aftershockDays = 3.0
+	#Share of the great ambient earthquakes (magnitude 7 and up) that a foreshock, about two
+	#magnitudes smaller, comes before by one to five minutes.
+	#Range: 0.0 ~ 1.0
+	foreshockShare = 0.3
 
 [sulfur]
 	#Native sulfur crusts around volcanic fumaroles and vents.
@@ -640,17 +688,6 @@
 	#Off, Distant Horizons generates the far chunks its own way.
 	distantHorizonsTerrain = true
 
-[diagnostics]
-	#Write the mod's running counts and events to the log: rivers, villages and hot springs as
-	#the world is made, retrogen, volcanoes finishing and waking, quakes, springs growing. For
-	#testing and for bug reports; off, the log keeps only warnings and one-off notes.
-	verboseLog = false
-	#If the server thread goes this many seconds without finishing a tick, write every
-	#thread's stack to logs/fts_geology_stall.txt, once per stall. The stacks show what the
-	#game was waiting on when it froze. Nothing else is read or written. 0 turns it off.
-	#Range: 0 ~ 3600
-	stallReportSeconds = 30
-
 [instruments]
 	#How far away, in blocks, a seismograph will look at an earthquake at all.
 	#This is a housekeeping bound, not the physics: what really decides whether
@@ -675,6 +712,10 @@
 	#bottom of the world, out of reach unless this is raised.
 	#Range: 1 ~ 512
 	turbineWellMaxDepth = 96
+	#How many blocks down the core drill bores from the block it is set on. Its core logs every
+	#bed it went through, any deposit named for what laid it, and the water table.
+	#Range: 8 ~ 512
+	coreDrillDepth = 64
 
 [hydrology]
 	#Trace rivers down the raw ground and fill them, in the mod's own world types only.

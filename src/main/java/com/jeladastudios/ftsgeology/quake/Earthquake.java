@@ -16,8 +16,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -67,11 +65,6 @@ public final class Earthquake {
         /** When the ground may start moving: the warning window lets seismographs sound first. */
         long startAt;
         int shakeTicks;
-        /**
-         * How long the ground goes on rumbling. Separate from {@link #shakeTicks}: strong motion is
-         * over in tens of seconds, while a large quake's deformation takes minutes to apply.
-         */
-        final int rumbleTicks;
         int applied;
         int ticks;
         /** Whether the shaking of buildings has been set going; see {@link ShakingDamage}. */
@@ -93,8 +86,6 @@ public final class Earthquake {
             // lasts tens of seconds.
             this.shakeTicks = Mth.clamp(plan.edits().size()
                     / Math.max(1, GeyserConfig.QUAKE_BLOCKS_PER_TICK.get()) + 40, 40, 400);
-            // About twenty seconds for a small tremor, a full minute for a great earthquake.
-            this.rumbleTicks = Mth.clamp((int) Math.round(plan.magnitude() * 145), 400, 1300);
         }
     }
 
@@ -131,6 +122,12 @@ public final class Earthquake {
      */
     public static void trigger(ServerLevel level, BlockPos epicentre, FaultType type,
                                double magnitude, double strikeX, double strikeZ, boolean forced) {
+        trigger(level, epicentre, type, magnitude, strikeX, strikeZ, forced, false);
+    }
+
+    /** @param aftershock true for one of another quake's aftershocks, which has none of its own */
+    public static void trigger(ServerLevel level, BlockPos epicentre, FaultType type,
+                               double magnitude, double strikeX, double strikeZ, boolean forced, boolean aftershock) {
         if (!GeyserConfig.QUAKES_ENABLED.get() || type == FaultType.INTERIOR) return;
 
         // Put the hypocentre on the fault first, so quakes fired from different spots follow one line.
@@ -182,10 +179,14 @@ public final class Earthquake {
         com.jeladastudios.ftsgeology.instrument.SeismicNetwork
                 .record(level, epicentreOnFault, type, magnitude, depthM);
 
-        announce(level, epicentreOnFault, type, magnitude, depthM);
+        announce(level, trace, epicentreOnFault, type, magnitude, depthM, aftershock);
 
         // The ground is held back by the warning window, which gives the planning below that long.
         long startAt = level.getGameTime() + GeyserConfig.QUAKE_WARNING_TICKS.get();
+        // Its waves go out from the rupture as it runs, and are felt wherever each player is.
+        FeltShaking.start(level, epicentreOnFault, trace, magnitude, depthM, startAt);
+        // And the fault goes on slipping for days.
+        if (!aftershock) Aftershocks.afterMain(level, trace, type, magnitude);
 
         // Worker thread: the expensive half. Touches nothing but the immutable snapshot.
         CompletableFuture
@@ -210,6 +211,25 @@ public final class Earthquake {
                 });
     }
 
+    /**
+     * A quake too small to break the ground, or one out where nobody is: filed for the instruments, and felt by
+     * whoever is near enough, but with no rupture. An aftershock's smaller jolts are these.
+     */
+    public static void tremor(ServerLevel level, BlockPos at, FaultType type, double magnitude,
+                              double strikeX, double strikeZ, boolean aftershock) {
+        if (!GeyserConfig.QUAKES_ENABLED.get() || type == FaultType.INTERIOR) return;
+        double depthM = quakeDepthMetres(type, level.random);
+        com.jeladastudios.ftsgeology.instrument.SeismicNetwork.record(level, at, type, magnitude, depthM);
+        List<QuakePlanner.TracePoint> trace = List.of(new QuakePlanner.TracePoint(at.getX(), at.getZ(), strikeX, strikeZ, 0.0));
+        announce(level, trace, at, type, magnitude, depthM, aftershock);
+        long startAt = level.getGameTime() + GeyserConfig.QUAKE_WARNING_TICKS.get();
+        FeltShaking.start(level, at, trace, magnitude, depthM, startAt);
+        ShakingDamage.start(level, at, trace, magnitude, depthM, startAt);
+        Landslides.start(level, at, trace, magnitude, depthM, startAt);
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("tremor: M{} at {} {}{}",
+                String.format(Locale.ROOT, "%.1f", magnitude), at.getX(), at.getZ(), aftershock ? ", an aftershock" : "");
+    }
+
     /** Stops every running quake and forgets everything parked. */
     public static int cancelAll() {
         int n = ACTIVE.size();
@@ -218,6 +238,8 @@ public final class Earthquake {
         Weathering.clear();
         QuakeQuiet.clear();     // nothing left to settle, so nothing left to wait for
         ShakingDamage.clear();
+        Liquefaction.clear();
+        Landslides.clear();
         return n;
     }
 
@@ -227,6 +249,8 @@ public final class Earthquake {
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END || event.getServer() == null) return;
         applyPending(event);
+        FeltShaking.tick(event.getServer());
+        Aftershocks.tick(event.getServer());
         tickAmbient(event);
     }
 
@@ -250,6 +274,14 @@ public final class Earthquake {
         ShakingDamage.drain(event.getServer(),
                 com.jeladastudios.ftsgeology.util.TickBudget.slice(0.2));
 
+        // Wet sand going quick under the shaking: boils, and what stands on it settling.
+        Liquefaction.drain(event.getServer(),
+                com.jeladastudios.ftsgeology.util.TickBudget.slice(0.15));
+
+        // Steep slopes shedding their cover.
+        Landslides.drain(event.getServer(),
+                com.jeladastudios.ftsgeology.util.TickBudget.slice(0.15));
+
         // Release quiet zones whose own debris has landed; after the drains, so it can happen this tick.
         for (ServerLevel l : event.getServer().getAllLevels()) {
             QuakeQuiet.tick(l);
@@ -270,7 +302,12 @@ public final class Earthquake {
             if (level.getGameTime() < run.startAt) return false;
             if (!run.shaking) {
                 run.shaking = true;
-                ShakingDamage.start(level, run.trace, run.plan.magnitude(), run.shakeTicks);
+                ShakingDamage.start(level, run.epicentre, run.trace, run.plan.magnitude(), run.depthMetres,
+                        level.getGameTime());
+                Liquefaction.start(level, run.epicentre, run.trace, run.plan.magnitude(), run.depthMetres,
+                        level.getGameTime());
+                Landslides.start(level, run.epicentre, run.trace, run.plan.magnitude(), run.depthMetres,
+                        level.getGameTime());
             }
 
             int placed = 0;
@@ -301,12 +338,12 @@ public final class Earthquake {
                 com.jeladastudios.ftsgeology.util.Diagnostics.info("quake apply: {} placed, {} left, {} ticks",
                         run.applied, run.pending.size(), run.ticks);
             }
-            shake(level, run);
             run.shakeTicks--;
             boolean done = run.pending.isEmpty() && run.shakeTicks <= 0;
             if (done) {
                 com.jeladastudios.ftsgeology.util.Diagnostics.info("quake finished: {} blocks over {} ticks", run.applied, run.ticks);
-                com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", ShakingDamage.summary());
+                com.jeladastudios.ftsgeology.util.Diagnostics.info("{}; {}; {}; {}", ShakingDamage.summary(),
+                        FeltShaking.summary(), Liquefaction.summary(), Landslides.summary());
                 // The shaking stops, but the ground it left is raw. Let it relax.
                 Weathering.enqueue(level, run.plan.edits());
                 // And the caves under it: an arch that stood for ten thousand years can fail in a minute.
@@ -319,78 +356,6 @@ public final class Earthquake {
             }
             return done;
         });
-    }
-
-    /** Rattles players near the epicentre while the ground is still moving. */
-    private static void shake(ServerLevel level, Running run) {
-        rumble(level, run);   // outlives the camera shake; see Running.rumbleTicks
-        if (run.shakeTicks <= 0) return;
-        double radius = 40 + run.plan.magnitude() * 14;
-        double r2 = radius * radius;
-        for (ServerPlayer p : level.players()) {
-            double d2 = p.distanceToSqr(run.epicentre.getX() + 0.5, p.getY(), run.epicentre.getZ() + 0.5);
-            if (d2 > r2) continue;
-            double falloff = 1.0 - Math.sqrt(d2) / radius;
-            double kick = 0.035 * falloff * (0.4 + run.plan.magnitude() / 9.0);
-            Vec3 v = p.getDeltaMovement();
-            p.setDeltaMovement(
-                    v.x + (level.random.nextDouble() - 0.5) * kick,
-                    v.y + (p.onGround() ? level.random.nextDouble() * kick * 0.6 : 0.0),
-                    v.z + (level.random.nextDouble() - 0.5) * kick);
-            p.hurtMarked = true;
-
-            // The view moving. Re-sent a few times a second; the packet's run-out outlasts the gap,
-            // so a shake fades on its own if the packets stop.
-            if (level.getGameTime() % 5L == 0L) {
-                float strength = (float) (falloff * (0.6 + run.plan.magnitude() / 3.0));
-                com.jeladastudios.ftsgeology.network.ModNetwork.sendShake(p, strength, 20);
-            }
-
-            dust(level, p, falloff);
-            ShakingDamage.ceilingDust(level, p, falloff);
-        }
-    }
-
-    /**
-     * Dust shaken off the ground around a player while the rupture runs. Rides the player loop
-     * above, so it searches nothing and writes no blocks.
-     */
-    private static void dust(ServerLevel level, ServerPlayer p, double falloff) {
-        // A few times a second rather than every tick. Twenty puffs a second per player reads as fog.
-        if (level.getGameTime() % 3L != 0L) return;
-
-        int puffs = 1 + (int) Math.round(falloff * 4);
-        for (int i = 0; i < puffs; i++) {
-            int x = Mth.floor(p.getX()) + level.random.nextInt(25) - 12;
-            int z = Mth.floor(p.getZ()) + level.random.nextInt(25) - 12;
-            if (!level.hasChunkAt(new BlockPos(x, level.getSeaLevel(), z))) continue;
-
-            int g = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
-            BlockPos ground = new BlockPos(x, g - 1, z);
-            net.minecraft.world.level.block.state.BlockState s = level.getBlockState(ground);
-            // Nothing to shake loose off water, and nothing to see off air.
-            if (s.isAir() || !s.getFluidState().isEmpty()) continue;
-
-            // Made of the ground it comes off: yellow over sand, black over basalt.
-            level.sendParticles(
-                    new net.minecraft.core.particles.BlockParticleOption(
-                            net.minecraft.core.particles.ParticleTypes.BLOCK, s),
-                    x + 0.5, g + 0.1, z + 0.5,
-                    3, 0.4, 0.15, 0.4, 0.02);
-        }
-    }
-
-    /**
-     * The ground noise, restarted at the clip's length until the rumble is over. Volume above 1 sets
-     * the audible radius (sixteen blocks per unit), so it carries about as far as the ground moves.
-     */
-    private static void rumble(ServerLevel level, Running run) {
-        if (run.ticks > run.rumbleTicks) return;
-        if (run.ticks % 420 != 1) return;              // the clip is 21 seconds long
-        level.playSound(null, run.epicentre,
-                com.jeladastudios.ftsgeology.registry.ModSounds.QUAKE_RUMBLE.get(),
-                net.minecraft.sounds.SoundSource.BLOCKS,
-                (float) Mth.clamp(4.0 + run.plan.magnitude(), 4.0, 12.0), 1.0f);
     }
 
     // === Ambient quakes =====================================================
@@ -427,9 +392,12 @@ public final class Earthquake {
 
             int y = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, x, z);
             if (y == Integer.MIN_VALUE) continue;
-            trigger(level, new BlockPos(x, y, z), s.faultType(),
-                    rollMagnitude(s.faultType(), s.stress(), level.random),
-                    s.faultStrikeX(), s.faultStrikeZ());
+            BlockPos epi = new BlockPos(x, y, z);
+            double m = rollMagnitude(s.faultType(), s.stress(), level.random);
+            // A great earthquake may be announced minutes before by a smaller one on the same spot.
+            if (!Aftershocks.foreshock(level, epi, s.faultType(), m, s.faultStrikeX(), s.faultStrikeZ())) {
+                trigger(level, epi, s.faultType(), m, s.faultStrikeX(), s.faultStrikeZ());
+            }
             return; // at most one ambient quake per roll
         }
     }
@@ -464,20 +432,24 @@ public final class Earthquake {
         return base * (0.5 + rng.nextDouble());
     }
 
-    private static void announce(ServerLevel level, BlockPos at, FaultType type,
-                                 double magnitude, double depthMetres) {
+    /**
+     * Told at once to everyone who will feel it: the alert travels at the speed of light, the shaking at the speed of
+     * the waves, so a player far out has seconds to spare.
+     */
+    private static void announce(ServerLevel level, List<QuakePlanner.TracePoint> trace, BlockPos at, FaultType type,
+                                 double magnitude, double depthMetres, boolean aftershock) {
         // The magnitude is formatted here, not in the lang file: Minecraft's translation formatter
         // only understands %s, %d and positional %N$s, and throws on a %.1f.
-        Component msg = Component.translatable("message.fts_geology.earthquake",
+        Component msg = Component.translatable(aftershock ? "message.fts_geology.aftershock" : "message.fts_geology.earthquake",
                 String.format(Locale.ROOT, "%.1f", magnitude), label(type), DepthScale.format(depthMetres))
                 .withStyle(ChatFormatting.RED);
         double radius = 260 + magnitude * 60;
         double r2 = radius * radius;
+        java.util.Set<ServerPlayer> told = new java.util.HashSet<>(FeltShaking.within(level, trace, magnitude));
         for (ServerPlayer p : level.players()) {
-            if (p.distanceToSqr(at.getX() + 0.5, p.getY(), at.getZ() + 0.5) <= r2) {
-                p.sendSystemMessage(msg);
-            }
+            if (p.distanceToSqr(at.getX() + 0.5, p.getY(), at.getZ() + 0.5) <= r2) told.add(p);
         }
+        for (ServerPlayer p : told) p.sendSystemMessage(msg);
     }
 
     private static String label(FaultType type) {

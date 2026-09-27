@@ -91,6 +91,14 @@ public final class TectonicCommands {
                                             .withStyle(ChatFormatting.YELLOW), true);
                                     return 1;
                                 }))
+                                .then(Commands.literal("aftershocks")
+                                        .executes(TectonicCommands::aftershocks)
+                                        .then(Commands.literal("clear").executes(ctx -> {
+                                            int n = com.jeladastudios.ftsgeology.quake.Aftershocks.clear(ctx.getSource().getLevel());
+                                            ctx.getSource().sendSuccess(() -> Component.translatable(
+                                                    "command.fts_geology.aftershocks_cleared", n).withStyle(ChatFormatting.YELLOW), true);
+                                            return n;
+                                        })))
                                 .then(Commands.argument("faultType", StringArgumentType.word())
                                         .suggests((c, b) -> SharedSuggestionProvider.suggest(FAULTS, b))
                                         .executes(ctx -> quake(ctx,
@@ -197,6 +205,27 @@ public final class TectonicCommands {
         GeysersMod.LOGGER.info("{}", line);
         ctx.getSource().sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
         return 1;
+    }
+
+    /** The shocks still to come here: how many, and the next few with their size, distance and time. */
+    static int aftershocks(com.mojang.brigadier.context.CommandContext<net.minecraft.commands.CommandSourceStack> ctx) {
+        net.minecraft.server.level.ServerLevel level = ctx.getSource().getLevel();
+        java.util.List<com.jeladastudios.ftsgeology.quake.Aftershocks.Shock> due =
+                com.jeladastudios.ftsgeology.quake.Aftershocks.pending(level);
+        ctx.getSource().sendSuccess(() -> Component.translatable("command.fts_geology.aftershocks_due", due.size())
+                .withStyle(ChatFormatting.GOLD), false);
+        net.minecraft.world.phys.Vec3 at = ctx.getSource().getPosition();
+        long now = level.getGameTime();
+        for (int i = 0; i < Math.min(8, due.size()); i++) {
+            var s = due.get(i);
+            String m = String.format(java.util.Locale.ROOT, "%.1f", s.magnitude());
+            long secs = Math.max(0, (s.at() - now) / 20);
+            int dist = (int) Math.round(Math.hypot(s.x() - at.x, s.z() - at.z));
+            ctx.getSource().sendSuccess(() -> Component.translatable(s.main()
+                            ? "command.fts_geology.aftershocks_main" : "command.fts_geology.aftershocks_line",
+                    m, s.x(), s.z(), dist, secs), false);
+        }
+        return due.size();
     }
 
     static final String[] SETTINGS = {"subduction", "rift", "collision", "transform", "hotspot", "tube", "valley",

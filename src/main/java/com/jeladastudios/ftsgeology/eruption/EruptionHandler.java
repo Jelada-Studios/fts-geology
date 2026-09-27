@@ -130,6 +130,7 @@ public final class EruptionHandler {
 
     /** Non-destructive blast at the mouth (knockback + sound only) for natural geysers. */
     public static void primaryBlast(ServerLevel level, BlockPos mouth, int magnitude) {
+        com.jeladastudios.ftsgeology.advancement.GeologyTrigger.awardNear(level, mouth.getX(), mouth.getZ(), 48, "geyser");
         double power = GeyserConfig.EXPLOSION_POWER.get() * (0.6 + magnitude / 12.0);
         level.explode(null, mouth.getX() + 0.5, mouth.getY() + 0.5, mouth.getZ() + 0.5,
                 (float) power, Level.ExplosionInteraction.NONE);

@@ -31,7 +31,7 @@ public final class ModNetwork {
 
     private ModNetwork() {}
 
-    private static final String VERSION = "1";
+    private static final String VERSION = "2";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(GeysersMod.MODID, "main"),
@@ -68,7 +68,12 @@ public final class ModNetwork {
 
     /** Tells one player their view is being shaken this hard for this long. */
     public static void sendShake(ServerPlayer player, float intensity, int ticks) {
-        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new ShakePacket(intensity, ticks));
+        sendShake(player, intensity, ticks, 1.0f);
+    }
+
+    /** The same, swaying at {@code speed} times the usual pace: the P wave's quick jolt. */
+    public static void sendShake(ServerPlayer player, float intensity, int ticks, float speed) {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new ShakePacket(intensity, ticks, speed));
     }
 
     /** Convenience for a source that shakes everyone near it - an eruption, say. */
