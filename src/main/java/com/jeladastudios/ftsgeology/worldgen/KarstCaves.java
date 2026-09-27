@@ -66,7 +66,6 @@ public final class KarstCaves {
         List<Length> lengths = stretches(RiverNetwork.sunkNear(x0 - m, z0 - m, x0 + 15 + m, z0 + 15 + m), DEPTH * h);
         if (lengths.isEmpty()) return 0;
         int[] tops = new int[256];
-        int[] surfaces = new int[256];
         java.util.Arrays.fill(tops, Integer.MIN_VALUE);
         int placed = 0;
         BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();
@@ -94,8 +93,7 @@ public final class KarstCaves {
                 double wide = p.halfWidth() + WIDER * h;
                 if (bestD > wide) continue;
                 double t = bestT;
-                double caveWater = best.cave() + (best.caveEnd() - best.cave()) * t;
-                int w = (int) Math.floor(caveWater);
+                int w = (int) Math.floor(best.cave() + (best.caveEnd() - best.cave()) * t);
                 double deep = (p.water() - p.bed()) + ((p.waterEnd() - p.bedEnd()) - (p.water() - p.bed())) * t;
                 int fy = w - Math.max(1, (int) Math.round(deep));
                 double height = Math.max(HEIGHT_MIN, Math.min(HEIGHT_MAX, 2.0 + 0.5 * p.halfWidth())) * (1.0 + 0.3 * (h - 1.0));
@@ -105,17 +103,14 @@ public final class KarstCaves {
                 if (ground == Integer.MIN_VALUE || fy < level.getMinBuildHeight() + 1) continue;
                 BlockState water = ModBlocks.RIVER_WATER.get().defaultBlockState()
                         .setValue(RiverWaterFluid.FLOW, RiverWaterFluid.wayOf(p.ex() - p.x(), p.ez() - p.z()));
-                // The top block as high as the cave's water stands inside it, so it slopes as the river's does outside.
-                int surface = RiverWaterFluid.surfaceOf(caveWater);
-                int cut = cut(level, at, x, z, fy, w, top, ground, water, water.setValue(RiverWaterFluid.SURFACE, surface));
+                int cut = cut(level, at, x, z, fy, w, top, ground, water);
                 if (cut < 0) continue;
                 placed += cut;
                 tops[dx + 16 * dz] = w;
-                surfaces[dx + 16 * dz] = surface;
                 COLUMNS.increment();
             }
         }
-        placed += falls(level, at, x0, z0, tops, surfaces);
+        placed += falls(level, at, x0, z0, tops);
         for (Length l : lengths) if (l.first()) placed += shaft(level, cp, at, l);
         return placed;
     }
@@ -172,7 +167,7 @@ public final class KarstCaves {
      * for a roof, open to the sky. The floor is rock. Returns the blocks placed, or -1 where the column is not ours to cut.
      */
     private static int cut(WorldGenLevel level, BlockPos.MutableBlockPos at, int x, int z, int fy, int w, int top, int ground,
-                           BlockState water, BlockState surface) {
+                           BlockState water) {
         boolean window = ground - ROOF - 1 < top;
         int cut = window ? Math.max(top, ground) : top;
         if (!clear(level, at, x, fy + 1, cut, z)) {
@@ -187,7 +182,7 @@ public final class KarstCaves {
         }
         int placed = 0;
         for (int y = fy + 1; y <= cut; y++) {
-            level.setBlock(at.set(x, y, z), y < w ? water : y == w ? surface : air, FLAGS);
+            level.setBlock(at.set(x, y, z), y <= w ? water : air, FLAGS);
             placed++;
         }
         // The floor holds and is rock: a hollow under it is stopped, and soil the surface left on it -- mud, dirt, sand,
@@ -240,13 +235,9 @@ public final class KarstCaves {
 
     /**
      * Where the cave's water steps down from one column to the next, the step is hung with falling water, as the river's
-     * falls are in the open; a face of standing water was left otherwise, held up by nothing. A step of one block under a skin of
-     * water is left to the sloping surface.
+     * falls are in the open; a face of standing water was left otherwise, held up by nothing.
      */
-    /** A top block of cave water under this many ninths is a skin, not the brim of a fall; as for the open rivers. */
-    private static final int SKIN = 5;
-
-    private static int falls(WorldGenLevel level, BlockPos.MutableBlockPos at, int x0, int z0, int[] tops, int[] surfaces) {
+    private static int falls(WorldGenLevel level, BlockPos.MutableBlockPos at, int x0, int z0, int[] tops) {
         int placed = 0;
         int[][] sides = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
         for (int dx = 0; dx < 16; dx++) {
@@ -258,12 +249,9 @@ public final class KarstCaves {
                     if (nx < 0 || nx > 15 || nz < 0 || nz > 15) continue;
                     int nw = tops[nx + 16 * nz];
                     if (nw == Integer.MIN_VALUE || nw >= w) continue;
-                    // Over a skin of water the fall stops a block under it, and a step of one is no fall at all.
-                    int end = surfaces[dx + 16 * dz] < SKIN ? w - 1 : w;
-                    if (end <= nw) continue;
                     BlockState falling = ModBlocks.RIVER_WATER.get().defaultBlockState().setValue(LiquidBlock.LEVEL, 8)
                             .setValue(RiverWaterFluid.FLOW, RiverWaterFluid.wayOf(s[0], s[1]));
-                    for (int y = nw + 1; y <= end; y++) {
+                    for (int y = nw + 1; y <= w; y++) {
                         if (!level.getBlockState(at.set(x0 + nx, y, z0 + nz)).isAir()) break;
                         level.setBlock(at, falling, FLAGS);
                         placed++;

@@ -32,20 +32,6 @@ public abstract class RiverWaterFluid extends ForgeFlowingFluid {
      */
     public static final IntegerProperty FLOW = IntegerProperty.create("flow", 0, 8);
 
-    /**
-     * How high a still block's surface stands, in ninths of a block as a flowing block's level is: 8 is a full source's,
-     * 1 a skin of water over the block under it. Laid on the top block of a river from where the traced surface falls
-     * inside it, so the surface slopes down the valley instead of standing in flat pools a block apart; the renderer
-     * averages each corner over its neighbours and draws the slope smooth. Only still water has it.
-     */
-    public static final IntegerProperty SURFACE = IntegerProperty.create("surface", 1, 8);
-
-    /** The surface of a top block whose water stands at {@code water}: its height inside the block, in ninths. */
-    public static int surfaceOf(double water) {
-        int s = (int) Math.round((water - Math.floor(water)) * 9.0);
-        return Math.max(1, Math.min(8, s));
-    }
-
     /** How hard the current carries a player: a gentle drift, not the push of a waterfall. */
     private static final double CURRENT = 0.5;
 
@@ -77,8 +63,7 @@ public abstract class RiverWaterFluid extends ForgeFlowingFluid {
     @Override
     @Nonnull
     protected BlockState createLegacyBlock(@Nonnull FluidState state) {
-        BlockState block = super.createLegacyBlock(state).setValue(FLOW, state.getValue(FLOW));
-        return state.hasProperty(SURFACE) ? block.setValue(SURFACE, state.getValue(SURFACE)) : block;
+        return super.createLegacyBlock(state).setValue(FLOW, state.getValue(FLOW));
     }
 
     /** Nothing to do, ever: the generator decided where this water is and it stays there. */
@@ -127,24 +112,11 @@ public abstract class RiverWaterFluid extends ForgeFlowingFluid {
     public static class Source extends RiverWaterFluid {
         public Source(Properties properties) {
             super(properties);
-            registerDefaultState(getStateDefinition().any().setValue(SURFACE, 8));
-        }
-
-        @Override
-        protected void createFluidStateDefinition(@Nonnull StateDefinition.Builder<Fluid, FluidState> builder) {
-            super.createFluidStateDefinition(builder);
-            builder.add(SURFACE);
         }
 
         @Override
         public int getAmount(@Nonnull FluidState state) {
             return 8;
-        }
-
-        /** Still a source whatever its surface: only how high the water is drawn and swum in changes. */
-        @Override
-        public float getOwnHeight(@Nonnull FluidState state) {
-            return state.getValue(SURFACE) / 9.0F;
         }
 
         @Override

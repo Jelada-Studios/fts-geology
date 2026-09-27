@@ -60,8 +60,6 @@ public final class RiverWater {
     private static final int PLUG_DEEP = 12;
     /** The highest step down whose face is hung with falling water, in blocks. */
     private static final int CURTAIN_MAX = 16;
-    /** A top block's surface under this many ninths is a skin, not the brim of a fall. */
-    private static final int SKIN = 5;
     /** The blocks at the top of the sea in a river's mouth that are the river's water. */
     private static final int MOUTH_TOP = 3;
     /**
@@ -171,10 +169,6 @@ public final class RiverWater {
                 // stretches of a river counted with a lake it runs into or out of -- its plunge pool, its backwater --
                 // still run the river's way, where they used to stand still as the lake's for tens of blocks.
                 BlockState run = water.setValue(RiverWaterFluid.FLOW, RiverWaterFluid.wayOf(a.fx(), a.fz()));
-                // The top block stands as high as the traced surface inside it, so the river slopes down its valley.
-                // A lake is level and stays full: lowered, the whole of it lay in a hollow under its shore. The top of
-                // the sea in a mouth stays full too, as the sea's own is.
-                BlockState top = run.setValue(RiverWaterFluid.SURFACE, surfaceAt(a, sea));
                 int here = 0;
                 for (int y = g + 1; y <= w; y++) {
                     BlockState was = level.getBlockState(at.set(x, y, z));
@@ -193,7 +187,7 @@ public final class RiverWater {
                         here++;
                         continue;
                     }
-                    level.setBlock(at, y == w ? top : run, FLAGS);
+                    level.setBlock(at, run, FLAGS);
                     placed++;
                     here++;
                 }
@@ -293,11 +287,6 @@ public final class RiverWater {
      * The top of the water a column is to hold, or {@link Integer#MIN_VALUE} where it holds none. Worked out from the
      * river network alone, so a column can tell what its neighbour in the next chunk will hold without reading it.
      */
-    /** The surface of a column's top block of water: the river's own inside the block, a lake's or the sea's full. */
-    private static int surfaceAt(RiverNetwork.At a, int sea) {
-        return a.lake() || Math.floor(a.water()) <= sea ? 8 : RiverWaterFluid.surfaceOf(a.water());
-    }
-
     private static int waterTop(int x, int z, int sea) {
         RiverNetwork.At a = RiverNetwork.at(x, z);
         if (a.distance() == Double.MAX_VALUE || a.sunk()) return Integer.MIN_VALUE;
@@ -332,11 +321,10 @@ public final class RiverWater {
 
     /**
      * Falling water down the face of every step in a river: where a column's neighbour holds its water higher, the
-     * air over this column's water, up to the neighbour's -- or to under it, where the neighbour's top block is only a
-     * skin -- takes the falling form of the river's water. A river's single step is left to its sloping surface. A still
-     * river comes down a valley a block at a time, and each step used to show its bare bed on the riser; a lake's edge
-     * over the river leaving it stood as a sheet of water with nothing falling from it. The neighbour's water is read
-     * off the network, so the next chunk need not be built.
+     * air over this column's water, up to the neighbour's, takes the falling form of the river's water. A still
+     * river comes down a valley a block at a time, and each step used to show its bare bed on the riser; a lake's
+     * edge over the river leaving it stood as a sheet of water with nothing falling from it. The neighbour's water is
+     * read off the network, so the next chunk need not be built.
      */
     private static int curtains(WorldGenLevel level, ChunkPos cp, int sea, BlockPos.MutableBlockPos at) {
         BlockState falling = ModBlocks.RIVER_WATER.get().defaultBlockState().setValue(LiquidBlock.LEVEL, 8);
@@ -355,12 +343,6 @@ public final class RiverWater {
                         from = d;
                     }
                 }
-                // Where the higher water's top block is only a skin, the fall stops a block under it: drawn up to the
-                // water beside, its own top meets that skin, where laid in the skin's block too it stood over it. So a
-                // step of one block in a river is no fall at all -- the surfaces on either side slope into each other --
-                // while a lake's full edge over a river still has its water falling from the brim.
-                if (from != null && top <= w + CURTAIN_MAX
-                        && surfaceAt(RiverNetwork.at(x + from[0], z + from[1]), sea) < SKIN) top--;
                 top = Math.min(top, w + CURTAIN_MAX);
                 if (top <= w) continue;
                 // Falling the way the water comes over the step: from the higher water beside, down into this column. Drawn
