@@ -1,0 +1,36 @@
+{
+  "parent": "fts_geology:geology/probe",
+  "display": {
+    "icon": {
+      "item": "fts_geology:geothermal_turbine"
+    },
+    "title": {
+      "translate": "advancements.fts_geology.turbine.title"
+    },
+    "description": {
+      "translate": "advancements.fts_geology.turbine.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "placed": {
+      "trigger": "minecraft:placed_block",
+      "conditions": {
+        "location": [
+          {
+            "condition": "minecraft:block_state_property",
+            "block": "fts_geology:geothermal_turbine"
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "placed"
+    ]
+  ]
+}

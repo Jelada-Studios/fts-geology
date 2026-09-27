@@ -63,6 +63,9 @@ public class GeysersMod {
         // instance's defaultconfigs/ folder is copied into each new world.
         ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, GeyserConfig.SPEC, "fts_geology.toml");
 
+        // The geology advancements' trigger, registered before advancements are read.
+        com.jeladastudios.ftsgeology.advancement.GeologyTrigger.init();
+
         // Above the snow line only the animals of the high snow are born (game bus event).
         MinecraftForge.EVENT_BUS.addListener(com.jeladastudios.ftsgeology.worldgen.SnowLineSpawns::check);
 
@@ -126,6 +129,9 @@ public class GeysersMod {
             event.accept(ModItems.WELL_CASING.get());
             event.accept(ModItems.GEOLOGISTS_HAMMER.get());
             event.accept(ModItems.FAULT_COMPASS.get());
+            event.accept(ModItems.CORE_DRILL.get());
+            event.accept(ModItems.GEOTHERMAL_PROBE.get());
+            event.accept(ModItems.GEOLOGY_MAP.get());
             event.accept(ModItems.FIELD_GUIDE.get());
         }
         if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {

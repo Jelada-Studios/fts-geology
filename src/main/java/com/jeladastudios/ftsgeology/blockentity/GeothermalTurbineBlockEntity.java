@@ -49,9 +49,9 @@ import java.util.Map;
 public class GeothermalTurbineBlockEntity extends BlockEntity {
 
     /** How far round a well's foot the reservoir is read, either way. */
-    private static final int FOOT = 2;
+    public static final int FOOT = 2;
     /** Heat that runs a turbine flat out: a reservoir's magma bed, or a pool's beds and more. */
-    private static final double HEAT_FULL = 8.0;
+    public static final double HEAT_FULL = 8.0;
     /** How far apart two turbines have to stand before they stop sharing a reservoir. */
     private static final int SHARE_RADIUS = 8;
     /** Ticks between two readings of the ground: the reservoir does not change from one tick to the next. */
@@ -198,14 +198,14 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
     }
 
     /** One of the mod's own hot water reservoirs or the ways up from them: what a well has to reach. */
-    private static boolean isReservoir(BlockState s) {
+    public static boolean isReservoir(BlockState s) {
         return s.is(ModBlocks.HOT_SPRING.get()) || s.is(ModBlocks.STEAM_VENT.get()) || s.is(ModBlocks.MUD_POT.get())
                 || s.is(ModBlocks.GEYSER_CORE.get()) || s.is(ModBlocks.GEYSER_CHAMBER.get())
                 || s.is(ModBlocks.SPRING_SOURCE.get()) || s.is(ModBlocks.VOLCANO_CORE.get());
     }
 
     /** How much heat one block round the well's foot gives. */
-    private static double heatOf(BlockState s) {
+    public static double heatOf(BlockState s) {
         if (s.is(Blocks.MAGMA_BLOCK)) return 1.0;
         if (s.is(ModBlocks.GEYSER_CHAMBER.get()) || s.is(ModBlocks.GEYSER_CORE.get())
                 || s.is(ModBlocks.SPRING_SOURCE.get()) || s.is(ModBlocks.VOLCANO_CORE.get())) return 3.0;

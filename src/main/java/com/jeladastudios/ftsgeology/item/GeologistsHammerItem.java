@@ -68,6 +68,20 @@ public class GeologistsHammerItem extends Item {
 
         for (Component line : section(level, pos)) ctx.getPlayer().sendSystemMessage(line);
 
+        // A mineral is read for the deposit it belongs to, and the ground round it for the ore of it.
+        if (level instanceof net.minecraft.server.level.ServerLevel server
+                && ctx.getPlayer() instanceof net.minecraft.server.level.ServerPlayer player) {
+            if (com.jeladastudios.ftsgeology.instrument.Prospecting.readable(struck)) {
+                boolean[] found = new boolean[1];
+                for (Component line : com.jeladastudios.ftsgeology.instrument.Prospecting.read(server, pos, struck, found)) {
+                    player.sendSystemMessage(line);
+                }
+                if (found[0]) com.jeladastudios.ftsgeology.advancement.GeologyTrigger.award(player, "prospect");
+                player.getCooldowns().addCooldown(this, 20);
+            }
+            com.jeladastudios.ftsgeology.advancement.GeologyTrigger.award(player, "hammer_rock");
+        }
+
         level.playSound(null, pos, SoundEvents.STONE_HIT, SoundSource.PLAYERS, 0.9f, 1.4f);
         ctx.getItemInHand().hurtAndBreak(1, ctx.getPlayer(),
                 p -> p.broadcastBreakEvent(ctx.getHand()));

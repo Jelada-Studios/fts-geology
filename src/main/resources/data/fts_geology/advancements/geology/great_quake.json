@@ -1,0 +1,31 @@
+{
+  "parent": "fts_geology:geology/felt_quake",
+  "display": {
+    "icon": {
+      "item": "minecraft:cracked_deepslate_bricks"
+    },
+    "title": {
+      "translate": "advancements.fts_geology.great_quake.title"
+    },
+    "description": {
+      "translate": "advancements.fts_geology.great_quake.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "e": {
+      "trigger": "fts_geology:geology",
+      "conditions": {
+        "event": "great_quake"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "e"
+    ]
+  ]
+}

@@ -278,5 +278,21 @@ public final class ModItems {
     public static final RegistryObject<Item> FIELD_GUIDE = ITEMS.register("field_guide",
             () -> new FieldGuideItem(new Item.Properties().stacksTo(1)));
 
+    /** Bores down from a block and brings up the core: the beds under it, deposits named, the water table. */
+    public static final RegistryObject<Item> CORE_DRILL = ITEMS.register("core_drill",
+            () -> new com.jeladastudios.ftsgeology.item.CoreDrillItem(new Item.Properties().durability(64)));
+
+    /** What the core drill brings up. */
+    public static final RegistryObject<Item> CORE_SAMPLE = ITEMS.register("core_sample",
+            () -> new com.jeladastudios.ftsgeology.item.CoreSampleItem(new Item.Properties().stacksTo(1)));
+
+    /** Heat flow, geothermal suitability, and whether a well here would reach a reservoir. */
+    public static final RegistryObject<Item> GEOTHERMAL_PROBE = ITEMS.register("geothermal_probe",
+            () -> new com.jeladastudios.ftsgeology.item.GeothermalProbeItem(new Item.Properties().stacksTo(1)));
+
+    /** A blank geological map; opened, it fills in with the rock and the faults as its holder walks. */
+    public static final RegistryObject<Item> GEOLOGY_MAP = ITEMS.register("geology_map",
+            () -> new com.jeladastudios.ftsgeology.item.GeologyMapItem(new Item.Properties()));
+
     private ModItems() {}
 }

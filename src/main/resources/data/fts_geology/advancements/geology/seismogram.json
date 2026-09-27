@@ -1,0 +1,31 @@
+{
+  "parent": "fts_geology:geology/fault",
+  "display": {
+    "icon": {
+      "item": "fts_geology:seismograph"
+    },
+    "title": {
+      "translate": "advancements.fts_geology.seismogram.title"
+    },
+    "description": {
+      "translate": "advancements.fts_geology.seismogram.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "e": {
+      "trigger": "fts_geology:geology",
+      "conditions": {
+        "event": "seismogram"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "e"
+    ]
+  ]
+}

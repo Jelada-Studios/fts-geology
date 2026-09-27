@@ -1,0 +1,31 @@
+{
+  "parent": "fts_geology:geology/root",
+  "display": {
+    "icon": {
+      "item": "fts_geology:geothermal_probe"
+    },
+    "title": {
+      "translate": "advancements.fts_geology.probe.title"
+    },
+    "description": {
+      "translate": "advancements.fts_geology.probe.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "e": {
+      "trigger": "fts_geology:geology",
+      "conditions": {
+        "event": "probe_heat"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "e"
+    ]
+  ]
+}

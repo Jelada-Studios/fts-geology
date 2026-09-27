@@ -1,0 +1,63 @@
+{
+  "display": {
+    "icon": {
+      "item": "fts_geology:geologists_hammer"
+    },
+    "title": {
+      "translate": "advancements.fts_geology.root.title"
+    },
+    "description": {
+      "translate": "advancements.fts_geology.root.description"
+    },
+    "frame": "task",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false,
+    "background": "minecraft:textures/block/tuff.png"
+  },
+  "criteria": {
+    "hammer": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "fts_geology:geologists_hammer"
+            ]
+          }
+        ]
+      }
+    },
+    "guide": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "fts_geology:field_guide"
+            ]
+          }
+        ]
+      }
+    },
+    "compass": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "fts_geology:fault_compass"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "hammer",
+      "guide",
+      "compass"
+    ]
+  ]
+}

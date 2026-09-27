@@ -1,0 +1,31 @@
+{
+  "parent": "fts_geology:geology/probe",
+  "display": {
+    "icon": {
+      "item": "fts_geology:sinter"
+    },
+    "title": {
+      "translate": "advancements.fts_geology.geyser.title"
+    },
+    "description": {
+      "translate": "advancements.fts_geology.geyser.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "e": {
+      "trigger": "fts_geology:geology",
+      "conditions": {
+        "event": "geyser"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "e"
+    ]
+  ]
+}

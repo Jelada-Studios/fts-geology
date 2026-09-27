@@ -1,0 +1,31 @@
+{
+  "parent": "fts_geology:geology/core",
+  "display": {
+    "icon": {
+      "item": "fts_geology:chalcopyrite"
+    },
+    "title": {
+      "translate": "advancements.fts_geology.core_deposit.title"
+    },
+    "description": {
+      "translate": "advancements.fts_geology.core_deposit.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "e": {
+      "trigger": "fts_geology:geology",
+      "conditions": {
+        "event": "core_deposit"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "e"
+    ]
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "parent": "fts_geology:geology/felt_quake",
+  "display": {
+    "icon": {
+      "item": "minecraft:gravel"
+    },
+    "title": {
+      "translate": "advancements.fts_geology.landslide.title"
+    },
+    "description": {
+      "translate": "advancements.fts_geology.landslide.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "e": {
+      "trigger": "fts_geology:geology",
+      "conditions": {
+        "event": "landslide"
+      }
+    }
+  },
+  "requirements": [
+    [
+      "e"
+    ]
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "parent": "fts_geology:geology/map",
+  "display": {
+    "icon": {
+      "item": "minecraft:snow_block"
+    },
+    "title": {
+      "translate": "advancements.fts_geology.everest.title"
+    },
+    "description": {
+      "translate": "advancements.fts_geology.everest.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "b": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": [
+          {
+            "condition": "minecraft:entity_properties",
+            "entity": "this",
+            "predicate": {
+              "location": {
+                "biome": "fts_geology:everest"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "b"
+    ]
+  ]
+}

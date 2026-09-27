@@ -178,11 +178,11 @@ public final class InspectCommands {
      * Renders a decimal for display: the translation formatter throws on {@code %.2f}, and
      * {@link Locale#ROOT} keeps the separator a dot.
      */
-    static String dec(double v, int places) {
+    public static String dec(double v, int places) {
         return String.format(Locale.ROOT, "%." + places + "f", v);
     }
 
-    static String bar(double v) {
+    public static String bar(double v) {
         int filled = (int) Math.round(Math.max(0.0, Math.min(1.0, v)) * 10);
         return "[" + "#".repeat(filled) + "-".repeat(10 - filled) + "]";
     }
@@ -236,7 +236,7 @@ public final class InspectCommands {
     record OreRun(int topY, int bottomY, String blockName, String genesisKey) {}
 
     /** The process that left this block where it is, as a translation key, or null where that cannot be known. */
-    static String oreGenesisKey(net.minecraft.world.level.block.state.BlockState st) {
+    public static String oreGenesisKey(net.minecraft.world.level.block.state.BlockState st) {
         if (st.is(ModBlocks.COOLING_LAVA_CRUST.get())) return "command.fts_geology.column.horizon.magma_sill";
         if (st.is(ModBlocks.CHALCOPYRITE.get())) return "command.fts_geology.column.ore.chalcopyrite";
         if (st.is(ModBlocks.MALACHITE.get())) return "command.fts_geology.column.ore.malachite";
