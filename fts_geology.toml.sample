@@ -624,6 +624,11 @@
 	#version of the mod: what a new version changes in the terrain shows only in ground
 	#generated from then on.
 	olderWorldNotice = true
+	#With Distant Horizons installed, draw the far terrain of the mod's world types straight from
+	#the plate model instead of generating chunks there: many times faster and lighter on memory,
+	#without trees' shapes, villages or caves, which appear once the ground is really generated.
+	#Off, Distant Horizons generates the far chunks its own way.
+	distantHorizonsTerrain = true
 
 [diagnostics]
 	#Write the mod's running counts and events to the log: rivers, villages and hot springs as

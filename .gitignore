@@ -41,3 +41,6 @@ docs/
 
 # Log4j writes here when a scratchpad tool runs against the mod classes.
 /logs/
+
+# Local copies of optional mods' APIs, compiled against and never shipped (see build.gradle)
+libs/

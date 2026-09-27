@@ -165,6 +165,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue STALL_REPORT_SECONDS;       // default 30, 0 = off
     public static final ForgeConfigSpec.BooleanValue UPDATE_NOTICE;
     public static final ForgeConfigSpec.BooleanValue OLDER_WORLD_NOTICE;
+    public static final ForgeConfigSpec.BooleanValue DH_TERRAIN;
     public static final ForgeConfigSpec.BooleanValue VERBOSE_LOG;            // default OFF
 
     // --- Hydrology (groundwater) ---------------------------------------------
@@ -864,6 +865,12 @@ public final class GeyserConfig {
                         "version of the mod: what a new version changes in the terrain shows only in ground",
                         "generated from then on.")
                 .define("olderWorldNotice", true);
+        DH_TERRAIN = b
+                .comment("With Distant Horizons installed, draw the far terrain of the mod's world types straight from",
+                        "the plate model instead of generating chunks there: many times faster and lighter on memory,",
+                        "without trees' shapes, villages or caves, which appear once the ground is really generated.",
+                        "Off, Distant Horizons generates the far chunks its own way.")
+                .define("distantHorizonsTerrain", true);
         b.pop();
 
         b.push("diagnostics");

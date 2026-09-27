@@ -48,11 +48,19 @@ minecraft {
 
 repositories {
     mavenCentral()
+    // Distant Horizons' API, for the optional far-terrain generator: compiled against, never shipped.
+    exclusiveContent {
+        forRepository { maven { url = 'https://api.modrinth.com/maven' } }
+        filter { includeGroup 'maven.modrinth' }
+    }
 }
 
 dependencies {
     minecraft 'net.minecraftforge:forge:1.20.1-47.2.0'
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+    // The API of the Distant Horizons the mod is tested with (3.3.2); a copy in libs/ is used when there is one.
+    def dhApi = file('libs/DistantHorizonsApi-7.2.0.jar')
+    compileOnly dhApi.exists() ? files(dhApi) : 'maven.modrinth:DistantHorizonsApi:7.2.0'
 }
 
 tasks.named('jar') {

@@ -54,6 +54,10 @@ public class GeysersMod {
         modBus.addListener((net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent e) ->
                 e.enqueueWork(com.jeladastudios.ftsgeology.network.ModNetwork::register));
 
+        // Distant Horizons' far terrain from the plate model, when it is installed.
+        modBus.addListener((net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent e) ->
+                e.enqueueWork(com.jeladastudios.ftsgeology.compat.dh.DhTerrain::init));
+
         // SERVER, not COMMON: every setting decides what the world does, and SERVER configs are synced
         // to clients on join. The file lives in <world>/serverconfig/fts_geology.toml; a file in the
         // instance's defaultconfigs/ folder is copied into each new world.
