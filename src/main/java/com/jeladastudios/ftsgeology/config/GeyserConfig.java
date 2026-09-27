@@ -76,6 +76,8 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue VOLCANO_ERUPT_TICKS;       // how long lava fountains
     public static final ForgeConfigSpec.IntValue VOLCANO_BOMBS_PER_ERUPTION;
     public static final ForgeConfigSpec.IntValue VOLCANO_RESERVOIR_RADIUS;  // deep magma-chamber radius
+    public static final ForgeConfigSpec.DoubleValue VOLCANO_BOMB_REACH;
+    public static final ForgeConfigSpec.BooleanValue VOLCANO_BOMBS_MELT_IN_LAVA;
     public static final ForgeConfigSpec.IntValue VOLCANO_CRATER_RADIUS;     // summit crater/lava-pool radius
     public static final ForgeConfigSpec.IntValue VOLCANO_LAVA_BUDGET;       // lava cells per eruption
     public static final ForgeConfigSpec.BooleanValue QUAKE_TRIGGERS_ERUPTIONS; // big quakes set nearby volcanoes off
@@ -180,6 +182,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue QUAKES_BREAK_STRUCTURES;
     public static final ForgeConfigSpec.BooleanValue SHAKING_LOOSENS_BUILDS;
     public static final ForgeConfigSpec.DoubleValue SHAKING_DAMAGE;
+    public static final ForgeConfigSpec.BooleanValue SHAKING_FELLS_TREES;
     public static final ForgeConfigSpec.DoubleValue SPRING_STAGE_ONE_DAYS;
     public static final ForgeConfigSpec.DoubleValue SPRING_STAGE_TWO_DAYS;
     public static final ForgeConfigSpec.DoubleValue SPRING_STAGE_THREE_DAYS;
@@ -344,6 +347,14 @@ public final class GeyserConfig {
         VOLCANO_BOMBS_PER_ERUPTION = b
                 .comment("Roughly how many volcanic bombs (basalt/magma) are thrown over an eruption.")
                 .defineInRange("volcanoBombsPerEruption", 40, 0, 400);
+        VOLCANO_BOMB_REACH = b
+                .comment("How far volcanic bombs are thrown: 1 lands them over the crater rim and down the flanks,",
+                        "a large volcano's out to some eighty blocks past its rim; 2 twice as far.")
+                .defineInRange("volcanoBombReach", 1.0, 0.2, 4.0);
+        VOLCANO_BOMBS_MELT_IN_LAVA = b
+                .comment("A bomb that comes down in lava, such as the volcano's own crater lake, sinks into it",
+                        "instead of setting there as a block of basalt.")
+                .define("volcanoBombsMeltInLava", true);
         VOLCANO_RESERVOIR_RADIUS = b
                 .comment("Radius of the deep magma chamber carved under a volcano.")
                 .defineInRange("volcanoReservoirRadius", 10, 2, 24);
@@ -707,6 +718,10 @@ public final class GeyserConfig {
                 .comment("How hard the shaking is on buildings: 1 is the default, 2 about twice as many blocks,",
                         "0.5 half as many.")
                 .defineInRange("shakingDamage", 1.0, 0.0, 10.0);
+        SHAKING_FELLS_TREES = b
+                .comment("With Dynamic Trees installed, strong shaking brings its trees down whole, falling over as",
+                        "a felled tree does and leaving their logs. Only Dynamic Trees' trees: a vanilla tree stands.")
+                .define("shakingFellsTrees", true);
         UNSUPPORTED_BLOCKS_FALL = b
                 .comment("After the ground moves, bring down anything the quake left hanging in the",
                         "air. Nothing is destroyed: the stack is set back down on the new ground, so a",

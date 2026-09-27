@@ -32,7 +32,7 @@ public final class VolcanoEruption {
     }
 
     /** Per-tick eruption spectacle: fire fountain particles, the odd bomb, ambient roar. */
-    public static void tickEruption(ServerLevel level, BlockPos summit, int magnitude, int eruptionTicks) {
+    public static void tickEruption(ServerLevel level, BlockPos summit, int magnitude, int craterR, int eruptionTicks) {
         double x = summit.getX() + 0.5, z = summit.getZ() + 0.5;
         // Fire fountain: lava + flame + smoke shooting up.
         level.sendParticles(ParticleTypes.LAVA, x, summit.getY() + 1.0, z, 6, 0.5, 0.3, 0.5, 0.0);
@@ -45,14 +45,13 @@ public final class VolcanoEruption {
         // Space the bombs roughly evenly across the eruption.
         int interval = Math.max(2, eruptTicks / Math.max(1, bombs));
         if (eruptionTicks % interval == 0) {
-            throwBomb(level, summit, magnitude);
+            throwBomb(level, summit, magnitude, craterR);
         }
         if (eruptionTicks % 30 == 0) {
             level.playSound(null, summit, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 1.2f, 0.5f);
         }
 
         ashfall(level, summit, magnitude);
-        trailBombs(level);
         // The mountain shakes while it is going off, and much less far out than a quake does: an
         // eruption is felt on its own slopes, not across a county.
         if (eruptionTicks % 5 == 0) {
@@ -169,41 +168,117 @@ public final class VolcanoEruption {
         return true;
     }
 
-    /** Hurls a volcanic bomb: one block of basalt arcs out and scorches one block where it lands. */
-    public static void throwBomb(ServerLevel level, BlockPos summit, int magnitude) {
-        int reach = 6 + magnitude;                          // how far bombs land
-        int tx = summit.getX() + level.random.nextInt(reach * 2 + 1) - reach;
-        int tz = summit.getZ() + level.random.nextInt(reach * 2 + 1) - reach;
+    /** How far past the crater's rim bombs reach, per unit of magnitude beyond six, at the default reach. */
+    private static final double BOMB_REACH = 2.5;
+    /** The most ticks a bomb is flown for when its throw is worked out; a falling block gives up at 600. */
+    private static final int BOMB_FLIGHT = 300;
+
+    /**
+     * Hurls a volcanic bomb: one block of basalt thrown out over the crater's rim, to come down on the flanks and lie
+     * where it lands. Most fall within a crater's width or two of the rim, the odd one far down the mountain.
+     */
+    public static void throwBomb(ServerLevel level, BlockPos summit, int magnitude, int craterR) {
+        double inner = craterR + 4;
+        double outer = inner + BOMB_REACH * (6 + magnitude) * GeyserConfig.VOLCANO_BOMB_REACH.get();
+        double d = inner + (outer - inner) * Math.pow(level.random.nextDouble(), 1.5);
+        double a = level.random.nextDouble() * Math.PI * 2;
+        int tx = summit.getX() + (int) Math.round(Math.cos(a) * d);
+        int tz = summit.getZ() + (int) Math.round(Math.sin(a) * d);
+        if (!level.hasChunkAt(new BlockPos(tx, summit.getY(), tz))) return;
         int tg = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, tx, tz);
         if (tg == Integer.MIN_VALUE) return;
-        int ty = tg + 1;   // the air cell above real ground, so bombs never land on a treetop
-        BlockPos target = new BlockPos(tx, ty, tz);
 
-        // Visual: ONE chunk of rock flung toward the target with an upward arc.
-        Vec3 dir = new Vec3(tx - summit.getX(), 0, tz - summit.getZ()).normalize();
-        FallingBlockEntity bomb = FallingBlockEntity.fall(level, summit.above(2),
-                Blocks.BASALT.defaultBlockState());
-        double horiz = 0.35 + level.random.nextDouble() * (0.3 + magnitude / 30.0);
-        bomb.setDeltaMovement(new Vec3(
-                dir.x * horiz + (level.random.nextDouble() - 0.5) * 0.2,
-                0.9 + level.random.nextDouble() * 0.5,
-                dir.z * horiz + (level.random.nextDouble() - 0.5) * 0.2));
-        bomb.setHurtsEntities(3.0f, 12);
-        bomb.hurtMarked = true;
-        IN_FLIGHT.add(bomb);
-
-        // Impact: a single scorched block at the landing spot.
-        impact(level, target, summit.getY());
+        // Thrown so as to come down on the target: the rise decides how long it flies, and the push out is what covers
+        // the distance over that time, as a falling block flies -- pulled down, then slowed by the air, every tick.
+        // Thrown high enough to clear the crater's rim on its way: from a vent at the foot of a funnel, a low throw hit the
+        // funnel's wall and fell back in.
+        BlockPos from = summit.above(2);
+        double dx = Math.cos(a), dz = Math.sin(a);
+        int rim = Integer.MIN_VALUE;
+        for (int r = Math.max(1, craterR - 4); r <= craterR + 6; r++) {
+            rim = Math.max(rim, com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level,
+                    summit.getX() + (int) Math.round(dx * r), summit.getZ() + (int) Math.round(dz * r)));
+        }
+        for (double rise = 0.9 + level.random.nextDouble() * 0.6; rise <= BOMB_RISE; rise += 0.1) {
+            int ticks = flight(from.getY(), tg + 1.0, rise);
+            if (ticks < 0) continue;
+            double push = d / ((1 - Math.pow(0.98, ticks)) / 0.02);
+            if (!clears(from.getY(), rise, push, Math.max(1, craterR - 4), craterR + 6, rim + 2)) continue;
+            FallingBlockEntity bomb = FallingBlockEntity.fall(level, from, Blocks.BASALT.defaultBlockState());
+            bomb.setDeltaMovement(new Vec3(dx * push, rise, dz * push));
+            bomb.setHurtsEntities(3.0f, 12);
+            bomb.hurtMarked = true;
+            IN_FLIGHT.put(bomb, summit);
+            THROWN++;
+            return;
+        }
     }
 
-    /** Bombs in the air, held here to draw their trail, since FallingBlockEntity offers no hook. */
-    private static final java.util.List<FallingBlockEntity> IN_FLIGHT = new java.util.ArrayList<>();
+    /** The hardest a bomb is thrown up, in blocks a tick. */
+    private static final double BOMB_RISE = 3.0;
 
-    /** Smoke and fire off the back of a bomb, so it reads as thrown rock and not a gliding block. */
-    private static void trailBombs(ServerLevel level) {
+    /**
+     * Ticks a bomb thrown up at {@code rise} from {@code y} takes to come back down to {@code ground}, or -1 if it never
+     * gets that high.
+     */
+    private static int flight(double y, double ground, double rise) {
+        double v = rise;
+        for (int t = 1; t <= BOMB_FLIGHT; t++) {
+            v -= 0.04;
+            y += v;
+            v *= 0.98;
+            if (v < 0 && y <= ground) return t;
+        }
+        return -1;
+    }
+
+    /** Whether a bomb thrown up at {@code rise} and out at {@code push} is over {@code rimY} from {@code in} out to {@code out}. */
+    private static boolean clears(double y, double rise, double push, double in, double out, int rimY) {
+        double v = rise, h = 0;
+        for (int t = 1; t <= BOMB_FLIGHT && h < out; t++) {
+            v -= 0.04;
+            y += v;
+            h += push;
+            v *= 0.98;
+            push *= 0.98;
+            if (h >= in && y < rimY) return false;
+        }
+        return h >= out;
+    }
+
+    /** Bombs in the air and the vents they came from, held here to draw their trail: FallingBlockEntity offers no hook. */
+    private static final java.util.Map<FallingBlockEntity, BlockPos> IN_FLIGHT = new java.util.LinkedHashMap<>();
+
+    /**
+     * Every tick while bombs are in the air, eruption or not: smoke and fire off the back of each, so it reads as thrown
+     * rock and not a gliding block; a bomb about to come down in lava sinks into it instead of setting there as a block,
+     * or a crater lake filled up with its own bombs; and the thud and dust of one landing.
+     */
+    public static void tickBombs(ServerLevel level) {
         if (IN_FLIGHT.isEmpty()) return;
-        IN_FLIGHT.removeIf(b -> !b.isAlive() || b.isRemoved() || b.level() != level);
-        for (FallingBlockEntity b : IN_FLIGHT) {
+        // Every volcano core in the world calls this each tick; once is enough.
+        if (level.getGameTime() == bombTick) return;
+        bombTick = level.getGameTime();
+        boolean melt = GeyserConfig.VOLCANO_BOMBS_MELT_IN_LAVA.get();
+        for (java.util.Iterator<java.util.Map.Entry<FallingBlockEntity, BlockPos>> it = IN_FLIGHT.entrySet().iterator(); it.hasNext(); ) {
+            java.util.Map.Entry<FallingBlockEntity, BlockPos> e = it.next();
+            FallingBlockEntity b = e.getKey();
+            if (b.level() != level) continue;
+            if (!b.isAlive() || b.isRemoved()) {
+                it.remove();
+                landed(level, b.position());
+                LANDED++;
+                LANDED_AT += Math.hypot(b.getX() - e.getValue().getX() - 0.5, b.getZ() - e.getValue().getZ() - 0.5);
+                continue;
+            }
+            if (melt && headsIntoLava(level, b)) {
+                level.sendParticles(ParticleTypes.LAVA, b.getX(), b.getY(), b.getZ(), 10, 0.4, 0.2, 0.4, 0.1);
+                level.playSound(null, b.blockPosition(), SoundEvents.LAVA_POP, SoundSource.BLOCKS, 1.5f, 0.7f);
+                b.discard();
+                it.remove();
+                MELTED++;
+                continue;
+            }
             level.sendParticles(ParticleTypes.LARGE_SMOKE, b.getX(), b.getY() + 0.2, b.getZ(),
                     2, 0.12, 0.12, 0.12, 0.01);
             level.sendParticles(ParticleTypes.FLAME, b.getX(), b.getY() + 0.2, b.getZ(),
@@ -211,22 +286,39 @@ public final class VolcanoEruption {
         }
     }
 
+    private static long bombTick = -1;
+
+    /** Bombs thrown, sunk in lava and landed, and how far from their vent all the landed ones came down, for the log. */
+    private static long THROWN, MELTED, LANDED;
+    private static double LANDED_AT;
+
+    public static String bombSummary() {
+        return String.format(java.util.Locale.ROOT, "bombs: %d thrown, %d sank in lava, %d landed %.0f blocks out on average",
+                THROWN, MELTED, LANDED, LANDED == 0 ? 0.0 : LANDED_AT / LANDED);
+    }
+
     /**
-     * Scorches one block where a bomb lands: the top solid cell of that column becomes basalt.
-     * Replaces rather than stacks and touches no neighbours, so nothing is left floating.
+     * Whether a bomb passes through lava before its next tick is over. Looked for along the whole way it is about to
+     * move and a block under it, since a fast bomb goes through a shallow lake and sets on its floor in a single tick.
      */
-    private static void impact(ServerLevel level, BlockPos target, int summitY) {
-        BlockPos ground = target.below(); // topmost solid block of this column
-        if (ground.getY() <= summitY) {   // never build above the original summit
-            BlockState s = level.getBlockState(ground);
-            if (!s.isAir() && !s.is(Blocks.BEDROCK) && s.getFluidState().isEmpty()) {
-                level.setBlock(ground, TfcCompat.translate(level, ground, Blocks.BASALT.defaultBlockState()), 3);
-            }
+    private static boolean headsIntoLava(ServerLevel level, FallingBlockEntity b) {
+        Vec3 p = b.position(), v = b.getDeltaMovement().add(0, -0.04, 0);
+        int steps = 1 + (int) Math.ceil(v.length() * 2);
+        BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();
+        for (int i = 0; i <= steps; i++) {
+            double f = i / (double) steps;
+            at.set(p.x + v.x * f, p.y + v.y * f, p.z + v.z * f);
+            if (level.getFluidState(at).is(net.minecraft.tags.FluidTags.LAVA)) return true;
         }
-        level.sendParticles(ParticleTypes.LAVA, target.getX() + 0.5, target.getY() + 0.3, target.getZ() + 0.5,
-                8, 0.4, 0.2, 0.4, 0.05);
-        level.sendParticles(ParticleTypes.LARGE_SMOKE, target.getX() + 0.5, target.getY() + 0.8, target.getZ() + 0.5,
-                6, 0.3, 0.2, 0.3, 0.02);
+        at.set(p.x + v.x, p.y + v.y - 1, p.z + v.z);
+        return v.y < 0 && level.getFluidState(at).is(net.minecraft.tags.FluidTags.LAVA);
+    }
+
+    /** The thud and the dust of a bomb coming down. */
+    private static void landed(ServerLevel level, Vec3 at) {
+        level.sendParticles(ParticleTypes.LAVA, at.x, at.y + 0.3, at.z, 8, 0.4, 0.2, 0.4, 0.05);
+        level.sendParticles(ParticleTypes.LARGE_SMOKE, at.x, at.y + 0.8, at.z, 6, 0.3, 0.2, 0.3, 0.02);
+        level.playSound(null, BlockPos.containing(at), SoundEvents.BASALT_BREAK, SoundSource.BLOCKS, 1.5f, 0.6f);
     }
 
     /** Idle black smoke from a lava pool cell or a surface vent. */
@@ -379,11 +471,14 @@ public final class VolcanoEruption {
      * inside the carved crater radius, cooled rock on the rim.
      */
     public static void formCrater(ServerLevel level, BlockPos summit, int craterR, long[] molten) {
-        // Refill every cell built as lava, including a caldera's lake and a fissure's ponds.
+        // Refill every cell built as lava, including a caldera's lake and a fissure's ponds. Basalt standing in one is a
+        // bomb that set there before bombs sank, and melts back into the lake.
+        boolean melt = GeyserConfig.VOLCANO_BOMBS_MELT_IN_LAVA.get();
         if (molten != null) {
             for (long key : molten) {
                 BlockPos p = BlockPos.of(key);
-                if (level.getBlockState(p).isAir()) {
+                BlockState s = level.getBlockState(p);
+                if (s.isAir() || (melt && s.is(Blocks.BASALT))) {
                     level.setBlock(p, TfcCompat.translate(level, p, Blocks.LAVA.defaultBlockState()), 3);
                 }
             }

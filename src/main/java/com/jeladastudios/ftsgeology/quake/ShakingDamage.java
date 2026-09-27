@@ -1,11 +1,13 @@
 package com.jeladastudios.ftsgeology.quake;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
+import com.jeladastudios.ftsgeology.compat.DynamicTreesFelling;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -87,8 +89,15 @@ public final class ShakingDamage {
      */
     private static final double ORNAMENT = 0.7;
 
+    /**
+     * How readily a tree of Dynamic Trees comes down, as a weakness: about one in twenty near the fault of a magnitude 6,
+     * one in five at 7, half at 8. How far down its crown a trunk is looked for.
+     */
+    private static final double TREE = 0.8;
+    private static final int CROWN = 40;
+
     private static final LongAdder KNOCKED = new LongAdder(), SHATTERED = new LongAdder(), CHUNKS = new LongAdder(),
-            OF_STRUCTURES = new LongAdder(), ORNAMENTS = new LongAdder();
+            OF_STRUCTURES = new LongAdder(), ORNAMENTS = new LongAdder(), TREES = new LongAdder();
 
     /** A block shaken loose, to come off at its moment if it is still what was there. */
     private record Loose(ResourceKey<Level> dimension, BlockPos pos, BlockState state, long due) {}
@@ -131,9 +140,7 @@ public final class ShakingDamage {
      * @param ticks how long the ground shakes, over which what comes loose comes off
      */
     public static void start(ServerLevel level, List<QuakePlanner.TracePoint> trace, double magnitude, int ticks) {
-        if (!GeyserConfig.SHAKING_LOOSENS_BUILDS.get() || GeyserConfig.SHAKING_DAMAGE.get() <= 0 || trace.isEmpty()) {
-            return;
-        }
+        if (!(builds() || trees()) || GeyserConfig.SHAKING_DAMAGE.get() <= 0 || trace.isEmpty()) return;
         double reach = reach(magnitude);
         int minX = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
         for (QuakePlanner.TracePoint t : trace) {
@@ -187,7 +194,21 @@ public final class ShakingDamage {
         }
     }
 
+    private static boolean builds() {
+        return GeyserConfig.SHAKING_LOOSENS_BUILDS.get();
+    }
+
+    private static boolean trees() {
+        return GeyserConfig.SHAKING_FELLS_TREES.get() && DynamicTreesFelling.present();
+    }
+
     private static void fall(ServerLevel level, BlockPos pos, BlockState state) {
+        if (DynamicTreesFelling.isBranch(state)) {
+            // Over the way the ground threw it: any side.
+            Direction side = Direction.Plane.HORIZONTAL.getRandomDirection(level.random);
+            if (DynamicTreesFelling.fell(level, pos, side)) TREES.increment();
+            return;
+        }
         if (ornament(state)) {
             level.destroyBlock(pos, true);           // comes down as what it drops: a lantern, a pot and its flower
             ORNAMENTS.increment();
@@ -222,6 +243,8 @@ public final class ShakingDamage {
             for (int lz = 0; lz < 16; lz++) floor = Math.min(floor, chunk.getHeight(Heightmap.Types.OCEAN_FLOOR, lx, lz));
         }
         floor -= BELOW_GROUND;
+        if (trees()) trees(level, job, chunk, cp, shaking, now);
+        if (!builds()) return;
         LongSet placed = PlayerBuilt.inChunk(level, cp.x, cp.z);
         List<BoundingBox> built = structureBoxes(level, chunk, floor);
         boolean[] placedIn = new boolean[chunk.getSectionsCount()];
@@ -288,6 +311,36 @@ public final class ShakingDamage {
                         || e instanceof net.minecraft.world.entity.decoration.ItemFrame)) {
             if (level.random.nextDouble() >= Math.min(CAP, ORNAMENT * shaking)) continue;
             HANGING.add(new LooseHanging(level.dimension(), hung.getUUID(), now + level.random.nextInt(job.spread)));
+        }
+    }
+
+    /**
+     * Rolls for each Dynamic Trees tree in a chunk. A tree is found from its crown down: the first branch under the top
+     * of a column, followed down the branch blocks to the rooted soil, is its trunk; a side branch ends in the air.
+     */
+    private static void trees(ServerLevel level, Job job, LevelChunk chunk, ChunkPos cp, double shaking, long now) {
+        double chance = Math.min(CAP, TREE * shaking);
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int lx = 0; lx < 16; lx++) {
+            for (int lz = 0; lz < 16; lz++) {
+                int top = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING, lx, lz);
+                int x = cp.getMinBlockX() + lx, z = cp.getMinBlockZ() + lz;
+                int y = top;
+                BlockState s = null;
+                for (; y > top - CROWN; y--) {
+                    s = chunk.getBlockState(m.set(x, y, z));
+                    if (DynamicTreesFelling.isBranch(s) || !(s.isAir() || s.is(BlockTags.LEAVES))) break;
+                }
+                if (s == null || !DynamicTreesFelling.isBranch(s)) continue;
+                BlockState under = chunk.getBlockState(m.set(x, y - 1, z));
+                while (DynamicTreesFelling.isBranch(under) && y > top - CROWN) {
+                    s = under;
+                    under = chunk.getBlockState(m.set(x, --y - 1, z));
+                }
+                if (!DynamicTreesFelling.isRooty(under)) continue;
+                if (level.random.nextDouble() >= chance) continue;
+                DUE.add(new Loose(level.dimension(), new BlockPos(x, y, z), s, now + level.random.nextInt(job.spread)));
+            }
         }
     }
 
@@ -441,8 +494,8 @@ public final class ShakingDamage {
     }
 
     public static String summary() {
-        return String.format(java.util.Locale.ROOT, "shaking: %d chunks gone through, %d blocks shaken off, %d panes broken, %d ornaments down, %d loosened in a structure",
-                CHUNKS.sum(), KNOCKED.sum(), SHATTERED.sum(), ORNAMENTS.sum(), OF_STRUCTURES.sum());
+        return String.format(java.util.Locale.ROOT, "shaking: %d chunks gone through, %d blocks shaken off, %d panes broken, %d ornaments down, %d loosened in a structure, %d trees felled",
+                CHUNKS.sum(), KNOCKED.sum(), SHATTERED.sum(), ORNAMENTS.sum(), OF_STRUCTURES.sum(), TREES.sum());
     }
 
     public static void clear() {

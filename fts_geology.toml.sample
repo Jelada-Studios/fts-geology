@@ -146,6 +146,13 @@
 	#Roughly how many volcanic bombs (basalt/magma) are thrown over an eruption.
 	#Range: 0 ~ 400
 	volcanoBombsPerEruption = 40
+	#How far volcanic bombs are thrown: 1 lands them over the crater rim and down the flanks,
+	#a large volcano's out to some eighty blocks past its rim; 2 twice as far.
+	#Range: 0.2 ~ 4.0
+	volcanoBombReach = 1.0
+	#A bomb that comes down in lava, such as the volcano's own crater lake, sinks into it
+	#instead of setting there as a block of basalt.
+	volcanoBombsMeltInLava = true
 	#Radius of the deep magma chamber carved under a volcano.
 	#Range: 2 ~ 24
 	volcanoReservoirRadius = 10
@@ -478,6 +485,9 @@
 	#0.5 half as many.
 	#Range: 0.0 ~ 10.0
 	shakingDamage = 1.0
+	#With Dynamic Trees installed, strong shaking brings its trees down whole, falling over as
+	#a felled tree does and leaving their logs. Only Dynamic Trees' trees: a vanilla tree stands.
+	shakingFellsTrees = true
 	#After the ground moves, bring down anything the quake left hanging in the
 	#air. Nothing is destroyed: the stack is set back down on the new ground, so a
 	#tree keeps its trunk and a wall keeps its blocks - they just end up lower.

@@ -375,12 +375,13 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         }
         BlockPos summit = pos.above(); // the crater vent sits just above the core
 
+        VolcanoEruption.tickBombs(server);
         // Per-tick spectacle.
         if (be.phase == Phase.RUMBLING) {
             VolcanoEruption.rumble(server, summit, server.getGameTime());
         } else if (be.phase == Phase.ERUPTING) {
             be.eruptionTicks++;
-            VolcanoEruption.tickEruption(server, summit, be.magnitude, be.eruptionTicks);
+            VolcanoEruption.tickEruption(server, summit, be.magnitude, be.craterR, be.eruptionTicks);
         }
         // The heartbeat the client draws the smoke from. Every two seconds is plenty: the client
         // holds the state for longer than that, and lets the smoke die only once beats stop coming.
@@ -454,6 +455,8 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                     for (long v : be.surfaceVents) {
                         VolcanoEruption.dryVent(server, BlockPos.of(v).above());
                     }
+                    com.jeladastudios.ftsgeology.util.Diagnostics.info("Volcano at {} is quiet again; {}", pos,
+                            VolcanoEruption.bombSummary());
                     be.phase = Phase.DORMANT;
                     be.timer = be.sealed ? sealedRoll(server) : dormantRoll(server);
                     be.broadcastEruption(server, summit);   // tells the client it is over
