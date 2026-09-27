@@ -614,6 +614,14 @@
 	#limit rather than anything here, and a player has no way of knowing that.
 	#Turn off if you are assembling a pack and would rather say it yourself.
 	suggestOptionalMods = true
+	#Tell a world's owner, or an operator, when they join and a newer version of the mod is
+	#out, as Forge's update check found it. Once a session. Forge's own check can be turned
+	#off in fml.toml (versionCheck), which silences this too.
+	updateNotice = true
+	#Tell a world's owner, or an operator, once, when the world was made with an older
+	#version of the mod: what a new version changes in the terrain shows only in ground
+	#generated from then on.
+	olderWorldNotice = true
 
 [diagnostics]
 	#Write the mod's running counts and events to the log: rivers, villages and hot springs as

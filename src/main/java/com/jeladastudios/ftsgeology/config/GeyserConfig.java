@@ -163,6 +163,8 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue SUGGEST_OPTIONAL_MODS;   // default ON
     public static final ForgeConfigSpec.BooleanValue TFC_COMPAT;             // write TFC blocks on a TFC world
     public static final ForgeConfigSpec.IntValue STALL_REPORT_SECONDS;       // default 30, 0 = off
+    public static final ForgeConfigSpec.BooleanValue UPDATE_NOTICE;
+    public static final ForgeConfigSpec.BooleanValue OLDER_WORLD_NOTICE;
     public static final ForgeConfigSpec.BooleanValue VERBOSE_LOG;            // default OFF
 
     // --- Hydrology (groundwater) ---------------------------------------------
@@ -850,6 +852,16 @@ public final class GeyserConfig {
                         "limit rather than anything here, and a player has no way of knowing that.",
                         "Turn off if you are assembling a pack and would rather say it yourself.")
                 .define("suggestOptionalMods", true);
+        UPDATE_NOTICE = b
+                .comment("Tell a world's owner, or an operator, when they join and a newer version of the mod is",
+                        "out, as Forge's update check found it. Once a session. Forge's own check can be turned",
+                        "off in fml.toml (versionCheck), which silences this too.")
+                .define("updateNotice", true);
+        OLDER_WORLD_NOTICE = b
+                .comment("Tell a world's owner, or an operator, once, when the world was made with an older",
+                        "version of the mod: what a new version changes in the terrain shows only in ground",
+                        "generated from then on.")
+                .define("olderWorldNotice", true);
         b.pop();
 
         b.push("diagnostics");
