@@ -175,6 +175,8 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_HUMID;
     public static final ForgeConfigSpec.BooleanValue SPRING_RENEWAL_ENABLED;
     public static final ForgeConfigSpec.BooleanValue QUAKES_BREAK_STRUCTURES;
+    public static final ForgeConfigSpec.BooleanValue SHAKING_LOOSENS_BUILDS;
+    public static final ForgeConfigSpec.DoubleValue SHAKING_DAMAGE;
     public static final ForgeConfigSpec.DoubleValue SPRING_STAGE_ONE_DAYS;
     public static final ForgeConfigSpec.DoubleValue SPRING_STAGE_TWO_DAYS;
     public static final ForgeConfigSpec.DoubleValue SPRING_STAGE_THREE_DAYS;
@@ -687,6 +689,19 @@ public final class GeyserConfig {
                         "into a village and make one of its houses yours and the quake will still",
                         "take it, because as far as the world is concerned it is still the village.")
                 .define("quakesBreakStructures", true);
+        SHAKING_LOOSENS_BUILDS = b
+                .comment("Let the shaking knock loose blocks off buildings: what players built and the villages and",
+                        "other structures the world made, never the ground or a tree. A block with a face in the open",
+                        "may be shaken off and fall; the weaker its material the likelier -- sand and gravel first,",
+                        "then glass, which breaks, then wool, planks, cobblestone and bricks, while obsidian and",
+                        "metal blocks hold. A magnitude 5 takes the odd block off a sand house; a great earthquake",
+                        "near its fault brings walls down. Blocks with contents, such as chests, are left alone.",
+                        "Separate from quakesBreakBuilds, which lets the rupture itself move a build.")
+                .define("shakingLoosensBuilds", true);
+        SHAKING_DAMAGE = b
+                .comment("How hard the shaking is on buildings: 1 is the default, 2 about twice as many blocks,",
+                        "0.5 half as many.")
+                .defineInRange("shakingDamage", 1.0, 0.0, 10.0);
         UNSUPPORTED_BLOCKS_FALL = b
                 .comment("After the ground moves, bring down anything the quake left hanging in the",
                         "air. Nothing is destroyed: the stack is set back down on the new ground, so a",

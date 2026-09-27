@@ -74,6 +74,8 @@ public final class Earthquake {
         final int rumbleTicks;
         int applied;
         int ticks;
+        /** Whether the shaking of buildings has been set going; see {@link ShakingDamage}. */
+        boolean shaking;
 
         Running(ResourceKey<Level> dimension, QuakePlanner.Plan plan, long startAt, FaultType type,
                 double depthMetres, long seed, boolean mayBreak, List<QuakePlanner.TracePoint> trace) {
@@ -215,6 +217,7 @@ public final class Earthquake {
         PendingEdits.clear();
         Weathering.clear();
         QuakeQuiet.clear();     // nothing left to settle, so nothing left to wait for
+        ShakingDamage.clear();
         return n;
     }
 
@@ -243,6 +246,10 @@ public final class Earthquake {
         CaveCollapse.drain(event.getServer(),
                 com.jeladastudios.ftsgeology.util.TickBudget.slice(0.2));
 
+        // Buildings shedding what the shaking loosened, a few chunks at a time while the ground moves.
+        ShakingDamage.drain(event.getServer(),
+                com.jeladastudios.ftsgeology.util.TickBudget.slice(0.2));
+
         // Release quiet zones whose own debris has landed; after the drains, so it can happen this tick.
         for (ServerLevel l : event.getServer().getAllLevels()) {
             QuakeQuiet.tick(l);
@@ -261,6 +268,10 @@ public final class Earthquake {
 
             // Still in the warning window: filed and alerting, but the ground holds until startAt.
             if (level.getGameTime() < run.startAt) return false;
+            if (!run.shaking) {
+                run.shaking = true;
+                ShakingDamage.start(level, run.trace, run.plan.magnitude(), run.shakeTicks);
+            }
 
             int placed = 0;
             int examined = 0;
@@ -295,6 +306,7 @@ public final class Earthquake {
             boolean done = run.pending.isEmpty() && run.shakeTicks <= 0;
             if (done) {
                 com.jeladastudios.ftsgeology.util.Diagnostics.info("quake finished: {} blocks over {} ticks", run.applied, run.ticks);
+                com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", ShakingDamage.summary());
                 // The shaking stops, but the ground it left is raw. Let it relax.
                 Weathering.enqueue(level, run.plan.edits());
                 // And the caves under it: an arch that stood for ten thousand years can fail in a minute.
