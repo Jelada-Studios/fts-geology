@@ -31,7 +31,7 @@ public final class ModNetwork {
 
     private ModNetwork() {}
 
-    private static final String VERSION = "2";
+    private static final String VERSION = "3";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(GeysersMod.MODID, "main"),
@@ -51,6 +51,11 @@ public final class ModNetwork {
                 .decoder(EruptionPacket::decode)
                 .consumerMainThread(EruptionPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(FlowPacket.class, id++)
+                .encoder(FlowPacket::encode)
+                .decoder(FlowPacket::decode)
+                .consumerMainThread(FlowPacket::handle)
+                .add();
     }
 
     /** How far away an eruption is still worth drawing: a column hundreds of blocks tall. */
@@ -61,6 +66,16 @@ public final class ModNetwork {
         double r2 = ERUPTION_RANGE * ERUPTION_RANGE;
         for (ServerPlayer p : level.players()) {
             double dx = p.getX() - packet.summit().getX(), dz = p.getZ() - packet.summit().getZ();
+            if (dx * dx + dz * dz > r2) continue;
+            CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), packet);
+        }
+    }
+
+    /** Tells everyone near enough to see it where a pyroclastic flow's front is. */
+    public static void sendFlow(ServerLevel level, FlowPacket packet) {
+        double r2 = ERUPTION_RANGE * ERUPTION_RANGE;
+        for (ServerPlayer p : level.players()) {
+            double dx = p.getX() - packet.x(), dz = p.getZ() - packet.z();
             if (dx * dx + dz * dz > r2) continue;
             CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), packet);
         }

@@ -124,29 +124,55 @@ public final class VolcanoEruption {
      * buried, and once the ash is a few layers deep the tilled soil under it goes back to dirt. Shovelled off,
      * the ground can be tilled and sown again.</p>
      */
-    private static void settle(ServerLevel level, BlockPos at) {
+    private static boolean settle(ServerLevel level, BlockPos at) {
         BlockState here = level.getBlockState(at);
         BlockState ash = com.jeladastudios.ftsgeology.registry.ModBlocks.VOLCANIC_ASH.get()
                 .defaultBlockState();
         BlockState below = level.getBlockState(at.below());
         boolean field = below.getBlock() instanceof net.minecraft.world.level.block.FarmBlock;
-        if (field && !GeyserConfig.ASHFALL_BURIES_CROPS.get()) return;
+        if (field && !GeyserConfig.ASHFALL_BURIES_CROPS.get()) return false;
 
         if (here.is(ash.getBlock())) {
             int layers = here.getValue(
                     com.jeladastudios.ftsgeology.block.VolcanicAshBlock.LAYERS);
-            if (layers >= 8) return;                       // as deep as it goes
+            if (layers >= 8) return false;                 // as deep as it goes
             level.setBlock(at, TfcCompat.translate(level, at, here.setValue(
                     com.jeladastudios.ftsgeology.block.VolcanicAshBlock.LAYERS, layers + 1)), 2);
             if (field && layers + 1 >= FIELD_LOST_LAYERS) {
                 net.minecraft.world.level.block.FarmBlock.turnToDirt(null, below, level, at.below());
             }
-            return;
+            AshLoad.layered(level, at, layers + 1);
+            return true;
         }
         // Ash falls through a tuft of grass, or a crop, and buries it; it does not stack on top of it.
-        if (!here.isAir() && !com.jeladastudios.ftsgeology.worldgen.TerrainProbe.isVegetation(here)) return;
-        if (!ash.canSurvive(level, at)) return;
+        if (!here.isAir() && !com.jeladastudios.ftsgeology.worldgen.TerrainProbe.isVegetation(here)) return false;
+        if (!ash.canSurvive(level, at)) return false;
         level.setBlock(at, TfcCompat.translate(level, at, ash), 2);
+        AshLoad.layered(level, at, 1);
+        return true;
+    }
+
+    /**
+     * Lays {@code layers} layers of ash on a column whose ground is at {@code groundY}: onto ash already lying there,
+     * and on up over a full block of it. Returns how many went down.
+     */
+    public static int layAsh(ServerLevel level, int x, int groundY, int z, int layers) {
+        net.minecraft.world.level.block.Block block = com.jeladastudios.ftsgeology.registry.ModBlocks.VOLCANIC_ASH.get();
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos(x, groundY, z);
+        int laid = 0;
+        for (int i = 0; i < layers && m.getY() < level.getMaxBuildHeight() - 2; i++) {
+            BlockState g = level.getBlockState(m);
+            while (g.is(block) && g.getValue(com.jeladastudios.ftsgeology.block.VolcanicAshBlock.LAYERS) >= 8) {
+                m.move(0, 1, 0);
+                g = level.getBlockState(m);
+            }
+            boolean onto = g.is(block);
+            BlockPos at = onto ? m.immutable() : m.above();
+            if (!settle(level, at)) break;
+            laid++;
+            if (!onto) m.move(0, 1, 0);
+        }
+        return laid;
     }
 
     /** Layers of ash over a field at which its tilled soil is lost. */

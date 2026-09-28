@@ -56,6 +56,9 @@ public class HotSpringBlockEntity extends BlockEntity {
             int r = GeyserConfig.HOT_SPRING_RADIUS.get();
             float temperature = server.getBiome(pos).value().getBaseTemperature();
             int puffs = temperature < 0.2f ? 6 : temperature < 0.9f ? 4 : 2;
+            // A restless volcano nearby warms the water: the pool steams and bubbles harder.
+            double unrest = com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.near(server, pos);
+            puffs = (int) Math.round(puffs * (1.0 + 2.0 * unrest));
             for (int i = 0; i < puffs; i++) {
                 int dx = server.random.nextInt(r * 2 + 1) - r;
                 int dz = server.random.nextInt(r * 2 + 1) - r;
@@ -65,7 +68,7 @@ public class HotSpringBlockEntity extends BlockEntity {
                         surface.getX() + 0.5, surface.getY() + 0.2, surface.getZ() + 0.5,
                         1, 0.35, 0.02, 0.35, 0.006);
                 // The odd bubble breaking at the surface, where the water is being warmed.
-                if (server.random.nextInt(4) == 0) {
+                if (server.random.nextInt(unrest > 0.3 ? 2 : 4) == 0) {
                     server.sendParticles(ParticleTypes.BUBBLE_POP,
                             surface.getX() + 0.5, surface.getY() - 0.3, surface.getZ() + 0.5,
                             1, 0.3, 0.05, 0.3, 0.0);
@@ -84,9 +87,10 @@ public class HotSpringBlockEntity extends BlockEntity {
                     e.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 60, 0, true, false));
                 }
             }
-            // Not while the ground is moving: this writes air and water over an 8-block box every
-            // second, which fights the deformation and the blocks settling out of it.
-            if (!com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(server, pos)) {
+            // Not while the ground is moving: this writes air and water over an 8-block box, which fights
+            // the deformation and the blocks settling out of it. Every five seconds: snow melts no faster than
+            // that, and looking over the box every second was most of what a spring cost the server.
+            if (time % 100L == 0L && !com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(server, pos)) {
                 thawAround(server, pos, r);
             }
         }

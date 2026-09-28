@@ -104,9 +104,21 @@ public final class VolcanoBuilder {
      */
     public static boolean build(ServerLevel level, BlockPos base, int magnitude, VolcanoType type,
                                 VolcanoSize size) {
+        return build(level, base, magnitude, type, size, false);
+    }
+
+    /** As {@link #build(ServerLevel, BlockPos, int, VolcanoSize)}, for a volcano world generation raises. */
+    public static boolean buildNatural(ServerLevel level, BlockPos summit, int magnitude, VolcanoSize size) {
+        VolcanoType type = VolcanoType.forLocation(level, summit.getX(), summit.getZ(), magnitude, level.random);
+        return build(level, summit, magnitude, type, size, true);
+    }
+
+    private static boolean build(ServerLevel level, BlockPos base, int magnitude, VolcanoType type,
+                                 VolcanoSize size, boolean natural) {
         if (size == VolcanoSize.LARGE) return false;
         Ctx c = layout(level, base, magnitude, type, size);
         if (c == null) return false;
+        c.natural = natural;
 
         VolcanoJob job = new VolcanoJob(level, size + " " + type + " @ " + c.x + "," + c.z);
 
@@ -193,6 +205,12 @@ public final class VolcanoBuilder {
 
     /** Plans a large volcano from its field seed. The same site gives the same mountain on any thread. */
     static Ctx fieldCtx(ServerLevel level, VolcanoField.Site site) {
+        Ctx c = fieldPlan(level, site);
+        if (c != null) c.natural = true;
+        return c;
+    }
+
+    private static Ctx fieldPlan(ServerLevel level, VolcanoField.Site site) {
         Ctx c = plan(level, site.x(), site.baseY(), site.z(), site.magnitude(), site.type(),
                 VolcanoSize.LARGE, RandomSource.create(site.seed()),
                 TectonicMap.sampleCached(level, site.x(), site.z()), site.setting(), site.age(), level.getSeaLevel(),

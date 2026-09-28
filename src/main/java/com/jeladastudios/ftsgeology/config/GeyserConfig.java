@@ -87,6 +87,12 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue DORMANT_VOLCANO_QUIET_FACTOR; // how much longer a dormant one sleeps
     public static final ForgeConfigSpec.BooleanValue VOLCANIC_ASHFALL;      // default ON
     public static final ForgeConfigSpec.BooleanValue ASHFALL_BURIES_CROPS;  // default ON
+    public static final ForgeConfigSpec.BooleanValue VOLCANO_UNREST;        // swarm, warming springs before an eruption
+    public static final ForgeConfigSpec.IntValue VOLCANO_UNREST_TICKS;
+    public static final ForgeConfigSpec.IntValue PYROCLASTIC_FLOWS;         // per eruption of an explosive volcano
+    public static final ForgeConfigSpec.DoubleValue PYROCLASTIC_FLOW_REACH;
+    public static final ForgeConfigSpec.BooleanValue VOLCANIC_GAS;          // CO2 in hollows while restless
+    public static final ForgeConfigSpec.BooleanValue ASH_LOAD_COLLAPSES_ROOFS;
     public static final ForgeConfigSpec.BooleanValue SOIL_FROM_BEDROCK;     // default ON
 
     // --- Cooldown / recharge cycle -----------------------------------------
@@ -402,6 +408,38 @@ public final class GeyserConfig {
                         "the ash, and under three layers or more its tilled soil goes back to dirt. Shovel",
                         "the ash off, till and sow again. Off, ash never settles on farmland.")
                 .define("ashfallBuriesCrops", true);
+        VOLCANO_UNREST = b
+                .comment("Warning signs before an eruption, as magma rises under the volcano: a swarm of small",
+                        "earthquakes under the mountain that seismographs record (and sound a warning for once it",
+                        "comes thick and fast), hot springs and geysers round it warming, the ground swelling",
+                        "(the geothermal probe measures it) and the fumaroles smoking harder.")
+                .define("volcanoUnrest", true);
+        VOLCANO_UNREST_TICKS = b
+                .comment("How long before an eruption the unrest starts (3600 = 3 min). A dormant volcano, sealed",
+                        "over, wakes twice as slowly.")
+                .defineInRange("volcanoUnrestTicks", 3600, 200, 72000);
+        PYROCLASTIC_FLOWS = b
+                .comment("Pyroclastic flows an eruption of a stratovolcano or a caldera sends down its flanks: part",
+                        "of the column falls back and runs down the valleys as a glowing avalanche of ash and gas,",
+                        "faster than anyone can run. It burns whatever is caught in it, strips the plants and the",
+                        "trees' leaves, shatters glass, sets wooden buildings alight and leaves a bed of ash along",
+                        "the valley, deepest where it stops. Shields and fissures, with their runny lava, send none.",
+                        "0 turns them off.")
+                .defineInRange("pyroclasticFlows", 2, 0, 8);
+        PYROCLASTIC_FLOW_REACH = b
+                .comment("How far pyroclastic flows run: 1 takes a large volcano's some two hundred blocks out from",
+                        "its crater down a valley; less on open slopes, where they spread and stop sooner.")
+                .defineInRange("pyroclasticFlowReach", 1.0, 0.25, 3.0);
+        VOLCANIC_GAS = b
+                .comment("Carbon dioxide seeping out of a restless or erupting volcano collects, unseen, in its",
+                        "crater and in hollows on its flanks. Breathing it makes you sick and weak, and it",
+                        "suffocates whatever keeps its head down in it; torches, candles and campfires go out in it.")
+                .define("volcanicGas", true);
+        ASH_LOAD_COLLAPSES_ROOFS = b
+                .comment("Ash piling up on a roof can bring it down, as it did round Pinatubo in 1991: glass and",
+                        "wool give way under a couple of layers, wood under a few more, stone under most of a",
+                        "block; less in the rain, since wet ash is twice as heavy. Obsidian and metal hold.")
+                .define("ashLoadCollapsesRoofs", true);
         VOLCANIC_ASHFALL = b
                 .comment("Let an eruption lay ash on the ground downwind of the volcano.",
                         "The eruption column is the thing you see from a distance, and what comes",

@@ -63,6 +63,22 @@ public class SeismographBlockEntity extends BlockEntity {
     }
 
     private final List<Reading> readings = new ArrayList<>();
+
+    /**
+     * One small quake of a volcano's swarm as this drum drew it. Kept apart from the readings: a swarm is dozens of
+     * them, and would scroll every earthquake off the paper.
+     */
+    private record Tremor(long gameTime, double magnitude, double distanceMetres) {}
+
+    /** How long a swarm's tremors are kept, and the window a warning counts them in, in ticks. */
+    private static final long SWARM_KEPT = 12000L, SWARM_COUNTED = 1200L;
+    /** Tremors in the counting window that sound the swarm warning, and the least time between two warnings. */
+    private static final int SWARM_ALARM = 6;
+    private static final long SWARM_ALARM_AGAIN = 6000L;
+    private static final int SWARM_SIZE = 48;
+
+    private final List<Tremor> swarm = new ArrayList<>();
+    private long swarmAlarm = Long.MIN_VALUE;
     /** Newest network event this station has already worked through. */
     private long seen = -1L;
     /** Ticks left of shaking. */
@@ -135,6 +151,10 @@ public class SeismographBlockEntity extends BlockEntity {
         double d = SeismicWave.hypocentralMetres(flat, e.depthMetres());
         double amp = Math.min(SeismicWave.CLIP_MM, SeismicWave.amplitudeMm(e.magnitude(), d));
         if (!SeismicWave.detectable(amp)) return;       // lost in the drum's own noise
+        if (e.volcanic()) {
+            tremor(level, pos, state, e, amp, d);
+            return;
+        }
 
         readings.add(0, new Reading(e.id(), SeismicWave.spSeconds(d), amp, e.gameTime()));
         com.jeladastudios.ftsgeology.advancement.GeologyTrigger.awardNear(level, pos.getX(), pos.getZ(), 32, "seismogram");
@@ -158,6 +178,53 @@ public class SeismographBlockEntity extends BlockEntity {
         }
         level.updateNeighborsAt(pos, state.getBlock());
         setChanged();
+    }
+
+    /**
+     * A tremor of a volcano's swarm: the needle twitches and the drum keeps it, but the siren sounds only when the
+     * tremors come thick and fast, which is the sign an eruption is near.
+     */
+    private void tremor(ServerLevel level, BlockPos pos, BlockState state, SeismicNetwork.Event e, double amp,
+                        double metres) {
+        long now = level.getGameTime();
+        swarm.add(new Tremor(e.gameTime(), e.magnitude(), metres));
+        swarm.removeIf(t -> now - t.gameTime() > SWARM_KEPT);
+        while (swarm.size() > SWARM_SIZE) swarm.remove(0);
+        if (warnUntil == 0) {
+            signal = Math.min(SeismicWave.signal(amp), 6);
+            shake = Math.max(shake, 30);
+        }
+        long recent = swarm.stream().filter(t -> now - t.gameTime() <= SWARM_COUNTED).count();
+        if (recent >= SWARM_ALARM && (swarmAlarm == Long.MIN_VALUE || now - swarmAlarm >= SWARM_ALARM_AGAIN)) {
+            swarmAlarm = now;
+            warnUntil = now + 200L;
+            pendingSignal = 8;
+            level.playSound(null, pos, ModSounds.QUAKE_SIREN.get(), SoundSource.BLOCKS, 3.0f, 0.7f);
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("Seismograph at {} sounds a swarm warning: {} tremors in a minute",
+                    pos, recent);
+        }
+        level.updateNeighborsAt(pos, state.getBlock());
+        setChanged();
+    }
+
+    /** The swarm on the paper: how many tremors in the last ten minutes, the strongest, how far, and whether it is growing. */
+    private Component swarmLine(long now) {
+        List<Tremor> kept = swarm.stream().filter(t -> now - t.gameTime() <= SWARM_KEPT).toList();
+        if (kept.isEmpty()) return null;
+        double strongest = 0, near = Double.MAX_VALUE;
+        int late = 0, early = 0;
+        for (Tremor t : kept) {
+            strongest = Math.max(strongest, t.magnitude());
+            near = Math.min(near, t.distanceMetres());
+            long age = now - t.gameTime();
+            if (age <= 3000L) late++;
+            else if (age <= 6000L) early++;
+        }
+        boolean rising = late > early + 1;
+        return Component.translatable(rising ? "message.fts_geology.seismograph.swarm_rising"
+                        : "message.fts_geology.seismograph.swarm",
+                String.valueOf(kept.size()), String.format(Locale.ROOT, "%.1f", strongest), DepthScale.format(near))
+                .withStyle(rising ? ChatFormatting.RED : ChatFormatting.GOLD);
     }
 
     /**
@@ -185,9 +252,13 @@ public class SeismographBlockEntity extends BlockEntity {
      */
     public List<Component> report(long now) {
         List<Component> out = new ArrayList<>();
+        Component swarmed = swarmLine(now);
+        if (swarmed != null) out.add(swarmed);
         if (readings.isEmpty()) {
-            out.add(Component.translatable("message.fts_geology.seismograph.empty")
-                    .withStyle(ChatFormatting.GRAY));
+            if (swarmed == null) {
+                out.add(Component.translatable("message.fts_geology.seismograph.empty")
+                        .withStyle(ChatFormatting.GRAY));
+            }
             return out;
         }
         out.add(Component.translatable("message.fts_geology.seismograph.header",
@@ -234,6 +305,18 @@ public class SeismographBlockEntity extends BlockEntity {
             list.add(t);
         }
         tag.put("Readings", list);
+        if (!swarm.isEmpty()) {
+            ListTag tremors = new ListTag();
+            for (Tremor t : swarm) {
+                CompoundTag c = new CompoundTag();
+                c.putLong("At", t.gameTime());
+                c.putDouble("M", t.magnitude());
+                c.putDouble("D", t.distanceMetres());
+                tremors.add(c);
+            }
+            tag.put("Swarm", tremors);
+        }
+        tag.putLong("SwarmAlarm", swarmAlarm);
     }
 
     @Override
@@ -252,5 +335,12 @@ public class SeismographBlockEntity extends BlockEntity {
             readings.add(new Reading(c.getLong("Id"), c.getDouble("Sp"),
                     c.getDouble("Amp"), c.getLong("At")));
         }
+        swarm.clear();
+        for (Tag t : tag.getList("Swarm", Tag.TAG_COMPOUND)) {
+            if (swarm.size() >= SWARM_SIZE) break;
+            CompoundTag c = (CompoundTag) t;
+            swarm.add(new Tremor(c.getLong("At"), c.getDouble("M"), c.getDouble("D")));
+        }
+        swarmAlarm = tag.contains("SwarmAlarm") ? tag.getLong("SwarmAlarm") : Long.MIN_VALUE;
     }
 }

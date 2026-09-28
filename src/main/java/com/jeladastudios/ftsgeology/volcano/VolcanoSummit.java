@@ -349,9 +349,14 @@ public final class VolcanoSummit {
         if (level.getBlockEntity(corePos) instanceof VolcanoCoreBlockEntity core) {
             core.setMagnitude(c.magnitude);
             core.setCraterRadius(c.coreCraterR);
+            core.setKind(c.type);
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("Volcano core at {}: {} {}, magnitude {}, crater {}", corePos, c.size, c.type,
+                    c.magnitude, c.coreCraterR);
             core.setMoltenCells(c.molten);
             // A dormant volcano's core sleeps under its sealed crater.
             if (c.activity == VolcanoActivity.DORMANT) core.setSealed(c.seal, level);
+            // One the world raised is somewhere in its cycle when it is found, not about to go off.
+            else if (c.natural) core.wakeAtRandom(level);
             // What the mountain was, so it can be raised again after a quake: from the original base,
             // or a rebuild would stack a new cone on the ruins. A large volcano records none.
             if (c.size != VolcanoSize.LARGE) {

@@ -63,6 +63,15 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         setChanged();
     }
 
+    /**
+     * Starts a volcano the world raised at a random point of its quiet: found by a player, it is no more likely to be
+     * about to erupt than at any other time. One put down by a command or an igniter keeps the short first wait.
+     */
+    public void wakeAtRandom(ServerLevel level) {
+        timer = 1 + level.random.nextInt(Math.max(1, GeyserConfig.VOLCANO_DORMANT_MAX_TICKS.get()));
+        setChanged();
+    }
+
     private static int sealedRoll(ServerLevel level) {
         return (int) Math.min(Integer.MAX_VALUE / 2, dormantRoll(level) * GeyserConfig.DORMANT_VOLCANO_QUIET_FACTOR.get());
     }
@@ -143,6 +152,34 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         timer = delay;
         com.jeladastudios.ftsgeology.util.Diagnostics.info("Volcano at {} woken by an M{} quake {} blocks away, erupting in {} s", pos,
                 String.format(java.util.Locale.ROOT, "%.1f", q.magnitude()), (int) Math.round(q.distance()), delay / 20);
+    }
+
+    /**
+     * What kind of volcano this is, kept for every size: a stratovolcano or a caldera erupts explosively and sends
+     * pyroclastic flows down its flanks. Null on a core saved before it was kept, which is judged by its cone.
+     */
+    private com.jeladastudios.ftsgeology.volcano.VolcanoType kind;
+    /** For a core without a kind: 1 steep enough to be explosive, -1 not, 0 not looked at yet. Not saved. */
+    private int steep;
+    /** Whether the unrest before this eruption has begun; not saved, so a reload only logs it again. */
+    private boolean restless;
+    /** Pyroclastic flows sent down this eruption, saved so a restart mid-eruption does not send them again. */
+    private int flows;
+
+    public void setKind(com.jeladastudios.ftsgeology.volcano.VolcanoType k) {
+        this.kind = k;
+        setChanged();
+    }
+
+    /** Whether this volcano erupts explosively: a stratovolcano or a caldera, or for an older save, a steep cone. */
+    private boolean explosive(ServerLevel level, BlockPos summit) {
+        com.jeladastudios.ftsgeology.volcano.VolcanoType k = kind != null ? kind : type;
+        if (k != null) {
+            return k == com.jeladastudios.ftsgeology.volcano.VolcanoType.STRATOVOLCANO
+                    || k == com.jeladastudios.ftsgeology.volcano.VolcanoType.CALDERA;
+        }
+        if (steep == 0) steep = com.jeladastudios.ftsgeology.volcano.PyroclasticFlow.steepCone(level, summit, craterR) ? 1 : -1;
+        return steep > 0;
     }
 
     /** What this mountain was before anything happened to it, so it can be raised again. */
@@ -356,7 +393,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
 
     /** Tells nearby players what this volcano is doing, flank chimneys included, so their client can draw the smoke. */
     private void broadcastEruption(ServerLevel level, BlockPos summit) {
-        byte code = phase == Phase.ERUPTING ? (byte) 2 : phase == Phase.RUMBLING ? (byte) 1 : (byte) 0;
+        byte code = phase == Phase.ERUPTING ? (byte) 2 : phase == Phase.RUMBLING ? (byte) 1 : restless ? (byte) 3 : (byte) 0;
         double[] wind = VolcanoEruption.wind(summit);
         com.jeladastudios.ftsgeology.network.ModNetwork.sendEruption(level,
                 new com.jeladastudios.ftsgeology.network.EruptionPacket(summit, code, magnitude,
@@ -387,7 +424,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         }
         // The heartbeat the client draws the smoke from. Every two seconds is plenty: the client
         // holds the state for longer than that, and lets the smoke die only once beats stop coming.
-        if (be.phase != Phase.DORMANT && server.getGameTime() % 40L == 0L) be.broadcastEruption(server, summit);
+        if ((be.phase != Phase.DORMANT || be.restless) && server.getGameTime() % 40L == 0L) be.broadcastEruption(server, summit);
 
         if (server.getGameTime() % 20L != 0L) return; // the cycle ticks once a second
 
@@ -403,7 +440,21 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                 be.refillAfterQuake(server, pos);
                 if (!hasLava(server, pos)) return; // dead until it has lava again
                 be.answerQuake(server, pos);
-                be.idleSmoke(server, summit, 0.4f, true); // lazy smoke off the crater + a vent or two
+                // The last minutes before it erupts: magma rising, a swarm under the mountain, the springs warming.
+                int window = com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.window(be.sealed);
+                double unrest = 0.0;
+                if (GeyserConfig.VOLCANO_UNREST.get() && be.timer <= window) {
+                    unrest = 1.0 - be.timer / (double) window;
+                    if (!be.restless) {
+                        be.restless = true;
+                        com.jeladastudios.ftsgeology.util.Diagnostics.info("Volcano at {} is restless: a swarm under it, eruption in about {} s",
+                                pos, be.timer / 20);
+                        be.broadcastEruption(server, summit);
+                    }
+                    com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.tick(server, summit, be.magnitude, unrest, true);
+                    com.jeladastudios.ftsgeology.volcano.VolcanicGas.seep(server, summit, be.craterR, be.magnitude, be.surfaceVents);
+                }
+                be.idleSmoke(server, summit, (float) (0.4 + 0.6 * unrest), true); // lazy smoke, thickening as it wakes
                 if ((be.timer -= 20) <= 0) {
                     GeysersMod.LOGGER.debug("Volcano at {} begins to rumble", pos);
                     if (be.sealed) be.unseal(server, pos);
@@ -414,10 +465,13 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
             }
             case RUMBLING -> {
                 be.idleSmoke(server, summit, 1.0f, true); // building: heavier smoke from pool + all vents
+                com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.tick(server, summit, be.magnitude, 1.0, true);
+                com.jeladastudios.ftsgeology.volcano.VolcanicGas.seep(server, summit, be.craterR, be.magnitude, be.surfaceVents);
                 if ((be.timer -= 20) <= 0) {
                     be.phase = Phase.ERUPTING;
                     be.eruptionTicks = 0;
                     be.spilled = 0;
+                    be.flows = 0;
                     be.timer = GeyserConfig.VOLCANO_ERUPT_TICKS.get();
                     be.broadcastEruption(server, summit);
                 }
@@ -425,6 +479,17 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
             case ERUPTING -> {
                 // The flank vents smoke hardest while erupting.
                 be.idleSmoke(server, summit, 1.0f, false);
+                com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.tick(server, summit, be.magnitude, 1.0, false);
+                com.jeladastudios.ftsgeology.volcano.VolcanicGas.seep(server, summit, be.craterR, be.magnitude, be.surfaceVents);
+                // Part of the column falls back and runs down the mountain, spaced out over the eruption.
+                int flowsDue = GeyserConfig.PYROCLASTIC_FLOWS.get();
+                if (flowsDue > 0 && be.flows < flowsDue && be.explosive(server, summit)) {
+                    int spacing = Math.max(20, GeyserConfig.VOLCANO_ERUPT_TICKS.get() / (flowsDue + 1));
+                    if (be.eruptionTicks >= spacing * (be.flows + 1)) {
+                        be.flows++;
+                        com.jeladastudios.ftsgeology.volcano.PyroclasticFlow.start(server, summit, be.magnitude, be.craterR);
+                    }
+                }
                 // Well lava up the crater, to a budget, so the flow is a tongue and not a flood.
                 if (be.spilled < GeyserConfig.VOLCANO_LAVA_BUDGET.get()
                         && VolcanoEruption.spillLava(server, summit)) {
@@ -457,8 +522,12 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                     for (long v : be.surfaceVents) {
                         VolcanoEruption.dryVent(server, BlockPos.of(v).above());
                     }
-                    com.jeladastudios.ftsgeology.util.Diagnostics.info("Volcano at {} is quiet again; {}", pos,
-                            VolcanoEruption.bombSummary());
+                    com.jeladastudios.ftsgeology.util.Diagnostics.info("Volcano at {} is quiet again; {}; {}; {}; {}", pos,
+                            VolcanoEruption.bombSummary(), com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.summary(),
+                            com.jeladastudios.ftsgeology.volcano.VolcanicGas.summary(),
+                            com.jeladastudios.ftsgeology.volcano.AshLoad.summary());
+                    com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.settle(summit);
+                    be.restless = false;
                     be.phase = Phase.DORMANT;
                     be.timer = be.sealed ? sealedRoll(server) : dormantRoll(server);
                     be.broadcastEruption(server, summit);   // tells the client it is over
@@ -536,6 +605,8 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         if (sealed) tag.putBoolean("Sealed", true);
         if (sealCells.length > 0) tag.putLongArray("SealCells", sealCells);
         if (type != null) tag.putString("Type", type.name());
+        if (kind != null) tag.putString("Kind", kind.name());
+        if (flows > 0) tag.putInt("Flows", flows);
         if (originalBase != null) tag.putLong("OriginalBase", originalBase.asLong());
         tag.putInt("OriginalSummitY", originalSummitY);
         tag.putString("Size", size.name());
@@ -557,6 +628,15 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         rechargedFor = tag.contains("RechargedFor") ? tag.getLong("RechargedFor") : Long.MIN_VALUE;
         rebuiltFor = tag.contains("RebuiltFor") ? tag.getLong("RebuiltFor") : Long.MIN_VALUE;
         triggeredFor = tag.contains("TriggeredFor") ? tag.getLong("TriggeredFor") : Long.MIN_VALUE;
+        flows = tag.getInt("Flows");
+        kind = null;
+        if (tag.contains("Kind")) {
+            try {
+                kind = com.jeladastudios.ftsgeology.volcano.VolcanoType.valueOf(tag.getString("Kind"));
+            } catch (IllegalArgumentException ignored) {
+                // A kind from a future or renamed build: judged by the cone instead.
+            }
+        }
         sealed = tag.getBoolean("Sealed");
         sealCells = tag.contains("SealCells") ? tag.getLongArray("SealCells") : new long[0];
         type = readType(tag);

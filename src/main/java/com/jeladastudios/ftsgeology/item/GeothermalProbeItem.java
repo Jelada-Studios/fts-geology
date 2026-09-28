@@ -60,9 +60,25 @@ public class GeothermalProbeItem extends Item {
         double hot = Math.max(fit.volcano(), Math.max(fit.geyser(), fit.hotSpring()));
         // Heat flow: a normal continent warms by about 25 degrees a kilometre down; over a plume or a magma body many
         // times that.
-        int gradient = (int) Math.round(25 + 125 * hot);
+        double unrest = com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.near(level, new BlockPos(x, ground, z));
+        int gradient = (int) Math.round(25 + 125 * hot + 100 * unrest);
         out.add(Component.translatable("probe.fts_geology.header", gradient, 15 + gradient)
                 .withStyle(ChatFormatting.GOLD));
+        // Magma rising under a volcano nearby: the ground swells over it.
+        com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.Restless restless =
+                com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.nearest(level, x, z);
+        if (restless != null) {
+            int dx = restless.summit().getX() - x, dz = restless.summit().getZ() - z;
+            out.add(Component.translatable("probe.fts_geology.unrest",
+                    com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.swellCm(restless, x, z),
+                    (int) Math.round(Math.hypot(dx, dz)),
+                    Component.translatable("prospect.fts_geology.dir." + com.jeladastudios.ftsgeology.instrument.Prospecting
+                            .bearingOf(dx, dz))).withStyle(ChatFormatting.RED));
+        }
+        if (player != null && com.jeladastudios.ftsgeology.volcano.VolcanicGas.at(level, player.getX(), player.getY(),
+                player.getZ()) != null) {
+            out.add(Component.translatable("probe.fts_geology.gas").withStyle(ChatFormatting.DARK_RED));
+        }
         out.add(Component.translatable("command.fts_geology.suitability.volcano", InspectCommands.dec(fit.volcano(), 2),
                 InspectCommands.bar(fit.volcano())));
         out.add(Component.translatable("command.fts_geology.suitability.geyser", InspectCommands.dec(fit.geyser(), 2),

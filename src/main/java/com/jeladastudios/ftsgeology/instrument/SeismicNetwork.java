@@ -30,14 +30,14 @@ public final class SeismicNetwork {
     private SeismicNetwork() {}
 
     /** How many events are kept for stations to catch up on. */
-    private static final int HISTORY = 64;
+    private static final int HISTORY = 256;
 
     /**
      * One earthquake as the network knows it: where and when it happened, and how big it was.
      * A station never sees this record - it only ever sees what its own drum drew.
      */
     public record Event(long id, ResourceKey<Level> dimension, BlockPos hypocentre,
-                        FaultType type, double magnitude, double depthMetres, long gameTime) {}
+                        FaultType type, double magnitude, double depthMetres, long gameTime, boolean volcanic) {}
 
     private static final List<Event> LOG = new ArrayList<>();
     private static long nextId = 1L;
@@ -46,7 +46,18 @@ public final class SeismicNetwork {
     public static synchronized void record(ServerLevel level, BlockPos at, FaultType type,
                                            double magnitude, double depthMetres) {
         LOG.add(new Event(nextId++, level.dimension(), at.immutable(), type, magnitude,
-                depthMetres, level.getGameTime()));
+                depthMetres, level.getGameTime(), false));
+        while (LOG.size() > HISTORY) LOG.remove(0);
+    }
+
+    /**
+     * Files a small quake of a volcano's swarm, cracking rock over rising magma rather than a fault slipping.
+     * Stations keep these apart from earthquakes: see {@code SeismographBlockEntity}.
+     */
+    public static synchronized void recordVolcanic(ServerLevel level, BlockPos at, double magnitude,
+                                                   double depthMetres) {
+        LOG.add(new Event(nextId++, level.dimension(), at.immutable(), FaultType.INTERIOR, magnitude,
+                depthMetres, level.getGameTime(), true));
         while (LOG.size() > HISTORY) LOG.remove(0);
     }
 

@@ -377,6 +377,8 @@ public class GeyserCoreBlockEntity extends BlockEntity {
 
     private void advanceThermodynamics(ServerLevel level, BlockPos pos) {
         double heatGain = cachedHeatWeight * GeyserConfig.HEAT_PER_LAVA_NEIGHBOR.get() * 20.0; // per-second
+        // Magma rising under a restless volcano nearby heats the ground water: the geyser goes off more often.
+        heatGain *= 1.0 + 2.0 * com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.near(level, pos);
         double cooling = GeyserConfig.AMBIENT_COOLING_PER_TICK.get() * 20.0;
 
         // Cold surface water flooding in during recharge is a strong heat sink.

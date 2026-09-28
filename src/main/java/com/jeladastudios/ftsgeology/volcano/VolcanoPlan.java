@@ -95,6 +95,11 @@ public final class VolcanoPlan {
         OceanEdifice.Isle isle;
         /** How alive it is: a dormant volcano's crater is sealed, an extinct one has no core at all. */
         VolcanoActivity activity = VolcanoActivity.ACTIVE;
+        /**
+         * Raised by world generation rather than by a player: its core wakes at a random point of its cycle, where one
+         * put down by a command or an igniter goes off at once.
+         */
+        boolean natural;
         /** Standing in an arc's volcanic highland, where a flank stays tuff and scree instead of grassing over. */
         boolean highland;
         /** The crater cells a dormant volcano keeps crusted over, which turn to lava only while it erupts. */

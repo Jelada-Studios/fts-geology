@@ -230,7 +230,7 @@ public final class SurfaceFeatures {
         int magnitude = Math.min(19, 8 + (int) Math.round(8 * stress) + rng.nextInt(4) + (int) Math.round(4 * plume));
         com.jeladastudios.ftsgeology.volcano.VolcanoSize size =
                 com.jeladastudios.ftsgeology.volcano.VolcanoSize.forMagnitude(magnitude);
-        if (VolcanoBuilder.build(level, summit, magnitude, size)) {
+        if (VolcanoBuilder.buildNatural(level, summit, magnitude, size)) {
             GeysersMod.LOGGER.debug("Natural {} volcano (magnitude {}) placed at {}", size, magnitude, summit);
         }
     }
