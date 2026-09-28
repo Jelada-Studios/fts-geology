@@ -144,7 +144,7 @@ public class GeologyMapItem extends Item {
             if (px < 0 || pz < 0 || px >= 128 || pz >= 128) continue;
             if (data.colors[px + pz * 128] != 0) continue;
             int wx = data.centerX + (px - 64) * scale, wz = data.centerZ + (pz - 64) * scale;
-            if (!level.hasChunkAt(new BlockPos(wx, level.getSeaLevel(), wz))) continue;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(wx, level.getSeaLevel(), wz))) continue;
             PlateSample s = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sampleCached(level, wx, wz);
             data.updateColor(px, pz, colour(level, wx, wz, scale, s, px, pz));
             if (onLine(s, scale) && Math.floorMod((int) Math.round(s.along() / scale), ARROW_EVERY) == 0) {

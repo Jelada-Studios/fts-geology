@@ -222,7 +222,7 @@ public final class OceanicRidge {
     /** Writes one block, refusing bedrock and anything a player made. */
     private static boolean set(WorldGenLevel level, int x, int y, int z, BlockState state) {
         if (y <= level.getMinBuildHeight() || y >= level.getMaxBuildHeight()) return false;
-        if (!level.hasChunk(x >> 4, z >> 4)) return false;   // pillows and smokers reach over the edge
+        if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, x >> 4, z >> 4)) return false;   // pillows and smokers reach over the edge
         BlockPos p = new BlockPos(x, y, z);
         BlockState s = level.getBlockState(p);
         if (s == state) return false;   // already this: a write that changes nothing still costs one

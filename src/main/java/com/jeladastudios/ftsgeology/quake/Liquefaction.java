@@ -140,7 +140,7 @@ public final class Liquefaction {
             }
             if (due.at() > level.getGameTime()) break;
             DUE.poll();
-            if (!level.isLoaded(due.pos())) continue;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, due.pos())) continue;
             switch (due.kind()) {
                 case BOIL -> boil(level, due.pos());
                 case SETTLE -> settle(level, due.pos(), due.extra());
@@ -153,7 +153,7 @@ public final class Liquefaction {
             for (var e : RUNNING.entrySet()) {
                 ServerLevel level = server.getLevel(e.getValue());
                 BlockPos p = e.getKey();
-                if (level == null || !level.isLoaded(p) || !level.getFluidState(p).is(FluidTags.WATER)) continue;
+                if (level == null || !com.jeladastudios.ftsgeology.util.Loaded.at(level, p) || !level.getFluidState(p).is(FluidTags.WATER)) continue;
                 level.sendParticles(ParticleTypes.SPLASH, p.getX() + 0.5, p.getY() + 0.9, p.getZ() + 0.5,
                         6, 0.2, 0.3, 0.2, 0.3);
                 level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, Blocks.SAND.defaultBlockState()),
@@ -304,7 +304,7 @@ public final class Liquefaction {
                 if (dx * dx + dz * dz > 10) continue;
                 for (int dy = -2; dy <= 1; dy++) {
                     m.set(x + dx, top + dy, z + dz);
-                    if (!level.isLoaded(m)) continue;
+                    if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, m)) continue;
                     if (level.getFluidState(m).is(FluidTags.WATER)) return true;
                 }
             }

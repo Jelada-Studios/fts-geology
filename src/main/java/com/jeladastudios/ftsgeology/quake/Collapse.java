@@ -97,7 +97,7 @@ public final class Collapse {
             if (d.at() > level.getGameTime()) break;
             DUE.poll();
             BlockPos p = BlockPos.of(d.pos());
-            if (!level.isLoaded(p)) continue;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, p)) continue;
             if (d.column()) column(level, p, d);
             else down(level, p, level.getBlockState(p), d.pushX(), d.pushZ());
         }

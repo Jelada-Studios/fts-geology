@@ -219,7 +219,7 @@ public final class Structural {
             for (Direction d : Direction.Plane.HORIZONTAL) {
                 for (int k = 1; k <= 2; k++) {
                     int nx = x + d.getStepX() * k, nz = z + d.getStepZ() * k;
-                    if (!level.isLoaded(m.set(nx, ground, nz))) continue;
+                    if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, m.set(nx, ground, nz))) continue;
                     int h = level.getHeight(Heightmap.Types.WORLD_SURFACE, nx, nz) - 1 - ground;
                     round = Math.max(round, h);
                 }
@@ -253,7 +253,7 @@ public final class Structural {
             for (Direction d : Direction.Plane.HORIZONTAL) {
                 int nx = px + d.getStepX(), nz = pz + d.getStepZ();
                 long k = BlockPos.asLong(nx, y, nz);
-                if (seen.contains(k) || !level.isLoaded(m.set(nx, y, nz))) continue;
+                if (seen.contains(k) || !com.jeladastudios.ftsgeology.util.Loaded.at(level, m.set(nx, y, nz))) continue;
                 BlockState n = level.getBlockState(m);
                 if (n.isAir() || !n.getFluidState().isEmpty()) continue;
                 seen.add(k);

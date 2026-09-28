@@ -101,7 +101,7 @@ public class GeothermalProbeItem extends Item {
                 for (int dy = -foot; dy <= foot; dy++) {
                     for (int dz = -foot; dz <= foot; dz++) {
                         m.set(x + dx, y + dy, z + dz);
-                        if (!level.isLoaded(m)) continue;
+                        if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, m)) continue;
                         BlockState s = level.getBlockState(m);
                         if (GeothermalTurbineBlockEntity.isReservoir(s)) reservoir = true;
                         h += GeothermalTurbineBlockEntity.heatOf(s);
@@ -141,7 +141,7 @@ public class GeothermalProbeItem extends Item {
                 int d2 = dx * dx + dz * dz;
                 if (d2 >= best || d2 > LOOK * LOOK) continue;
                 m.set(x + dx, ground, z + dz);
-                if (!level.isLoaded(m)) continue;
+                if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, m)) continue;
                 int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x + dx, z + dz);
                 for (int y = top; y > top - 6; y--) {
                     BlockState s = level.getBlockState(m.set(x + dx, y, z + dz));

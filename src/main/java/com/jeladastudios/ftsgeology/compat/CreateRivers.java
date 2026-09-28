@@ -63,7 +63,7 @@ public final class CreateRivers {
         try {
             Level level = (Level) WORLD.invokeExact(pipe);
             BlockPos at = (BlockPos) OUTPUT.invokeExact(pipe);
-            if (level == null || at == null || !level.isLoaded(at)) return null;
+            if (level == null || at == null || !com.jeladastudios.ftsgeology.util.Loaded.at(level, at)) return null;
             FluidState state = level.getFluidState(at);
             if (!state.isSource() || !isRiver(state.getType())) return null;
             return new FluidStack(Fluids.WATER, 1000);

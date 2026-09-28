@@ -126,7 +126,7 @@ public final class Landslides {
             }
             if (s.at() > level.getGameTime()) break;
             DUE.poll();
-            if (level.isLoaded(s.seed())) slide(level, s);
+            if (com.jeladastudios.ftsgeology.util.Loaded.at(level, s.seed())) slide(level, s);
         }
         while (!JOBS.isEmpty() && System.nanoTime() < deadline) {
             Job job = JOBS.peek();
@@ -169,7 +169,7 @@ public final class Landslides {
                 int drop = 0;
                 for (Direction d : Direction.Plane.HORIZONTAL) {
                     BlockPos n = new BlockPos(x + d.getStepX() * SPAN, top, z + d.getStepZ() * SPAN);
-                    if (!level.isLoaded(n)) continue;
+                    if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, n)) continue;
                     int g = TerrainProbe.groundY(level, n.getX(), n.getZ());
                     if (g != Integer.MIN_VALUE && top - g > drop) {
                         drop = top - g;
@@ -221,7 +221,7 @@ public final class Landslides {
             for (int dz = -4; dz <= 4; dz += 2) {
                 for (int dy = -4; dy <= 1; dy++) {
                     m.set(x + dx, top + dy, z + dz);
-                    if (level.isLoaded(m) && !level.getFluidState(m).isEmpty()) return true;
+                    if (com.jeladastudios.ftsgeology.util.Loaded.at(level, m) && !level.getFluidState(m).isEmpty()) return true;
                 }
             }
         }
@@ -244,11 +244,11 @@ public final class Landslides {
                 if (dx * dx + dz * dz > s.radius() * s.radius() + 1) continue;
                 int x = seed.getX() + dx, z = seed.getZ() + dz;
                 BlockPos col = new BlockPos(x, seed.getY(), z);
-                if (!level.isLoaded(col)) continue;
+                if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, col)) continue;
                 int top = TerrainProbe.groundY(level, x, z);
                 if (top == Integer.MIN_VALUE) continue;
                 BlockPos below = new BlockPos(x + down.getStepX() * SPAN, top, z + down.getStepZ() * SPAN);
-                if (!level.isLoaded(below)) continue;
+                if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, below)) continue;
                 int g = TerrainProbe.groundY(level, below.getX(), below.getZ());
                 // Only the same slope: at least half as steep, and falling the same way.
                 if (g == Integer.MIN_VALUE || top - g < 2) continue;
@@ -309,7 +309,7 @@ public final class Landslides {
         int y = TerrainProbe.groundY(level, x, z);
         for (int i = 0; i < RUNOUT; i++) {
             int nx = x + down.getStepX(), nz = z + down.getStepZ();
-            if (!level.isLoaded(new BlockPos(nx, y, nz))) break;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(nx, y, nz))) break;
             int g = TerrainProbe.groundY(level, nx, nz);
             if (g == Integer.MIN_VALUE || g >= y) break;
             x = nx;
@@ -317,7 +317,7 @@ public final class Landslides {
             y = g;
         }
         BlockPos at = new BlockPos(x, y + 1, z);
-        if (level.isLoaded(at) && level.getBlockState(at).canBeReplaced()) level.setBlock(at, block, Block.UPDATE_ALL);
+        if (com.jeladastudios.ftsgeology.util.Loaded.at(level, at) && level.getBlockState(at).canBeReplaced()) level.setBlock(at, block, Block.UPDATE_ALL);
     }
 
     public static String summary() {

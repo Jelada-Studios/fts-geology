@@ -275,7 +275,7 @@ public final class FeltShaking {
         for (int i = 0; i < puffs; i++) {
             int x = Mth.floor(p.getX()) + level.random.nextInt(25) - 12;
             int z = Mth.floor(p.getZ()) + level.random.nextInt(25) - 12;
-            if (!level.hasChunkAt(new BlockPos(x, level.getSeaLevel(), z))) continue;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(x, level.getSeaLevel(), z))) continue;
             int g = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
             net.minecraft.world.level.block.state.BlockState s = level.getBlockState(new BlockPos(x, g - 1, z));
             if (s.isAir() || !s.getFluidState().isEmpty()) continue;

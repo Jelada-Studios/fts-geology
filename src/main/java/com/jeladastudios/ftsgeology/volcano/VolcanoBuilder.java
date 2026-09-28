@@ -410,7 +410,7 @@ public final class VolcanoBuilder {
     static boolean loaded(ServerLevel level, int x, int z, int radius) {
         for (int cx = (x - radius) >> 4; cx <= (x + radius) >> 4; cx++) {
             for (int cz = (z - radius) >> 4; cz <= (z + radius) >> 4; cz++) {
-                if (!level.hasChunk(cx, cz)) return false;
+                if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, cx, cz)) return false;
             }
         }
         return true;

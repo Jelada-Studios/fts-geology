@@ -38,7 +38,7 @@ public final class MagmaSealing {
         for (Direction d : Direction.values()) {
             if (!sealTop && d == Direction.UP) continue;
             BlockPos p = magma.relative(d);
-            if (!level.hasChunk(p.getX() >> 4, p.getZ() >> 4)) continue;   // never load a chunk for one face
+            if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, p.getX() >> 4, p.getZ() >> 4)) continue;   // never load a chunk for one face
             BlockState s = level.getBlockState(p);
             if (s.is(Blocks.BEDROCK) || s.is(Blocks.MAGMA_BLOCK)) continue;
             if (EruptionHandler.isPlayerPlaced(s)) continue;

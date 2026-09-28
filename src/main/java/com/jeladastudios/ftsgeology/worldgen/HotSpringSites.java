@@ -35,11 +35,11 @@ public final class HotSpringSites {
     /** Is there lava within {@code range} across and eight up or down of here? A bounded box, since springs are rare. */
     static boolean lavaNear(ServerLevel level, int x, int y, int z, int range) {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-        for (int dy = -8; dy <= 8; dy++) {
-            for (int dx = -range; dx <= range; dx++) {
-                for (int dz = -range; dz <= range; dz++) {
-                    if (!level.hasChunkAt(m.set(x + dx, y + dy, z + dz))) continue;
-                    if (level.getBlockState(m).getFluidState().is(net.minecraft.tags.FluidTags.LAVA)) return true;
+        for (int dx = -range; dx <= range; dx++) {
+            for (int dz = -range; dz <= range; dz++) {
+                if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, x + dx, z + dz)) continue;
+                for (int dy = -8; dy <= 8; dy++) {
+                    if (level.getBlockState(m.set(x + dx, y + dy, z + dz)).getFluidState().is(net.minecraft.tags.FluidTags.LAVA)) return true;
                 }
             }
         }

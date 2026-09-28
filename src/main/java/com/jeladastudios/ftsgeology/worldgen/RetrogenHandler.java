@@ -189,11 +189,11 @@ public final class RetrogenHandler {
 
     /** True when every chunk in the box is loaded. Corners first, since they are the likeliest missing. */
     static boolean areaLoaded(ServerLevel level, int minCx, int minCz, int maxCx, int maxCz) {
-        if (!level.hasChunk(minCx, minCz) || !level.hasChunk(maxCx, maxCz)
-                || !level.hasChunk(minCx, maxCz) || !level.hasChunk(maxCx, minCz)) return false;
+        if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, minCx, minCz) || !com.jeladastudios.ftsgeology.util.Loaded.chunk(level, maxCx, maxCz)
+                || !com.jeladastudios.ftsgeology.util.Loaded.chunk(level, minCx, maxCz) || !com.jeladastudios.ftsgeology.util.Loaded.chunk(level, maxCx, minCz)) return false;
         for (int cx = minCx; cx <= maxCx; cx++) {
             for (int cz = minCz; cz <= maxCz; cz++) {
-                if (!level.hasChunk(cx, cz)) return false;
+                if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, cx, cz)) return false;
             }
         }
         return true;

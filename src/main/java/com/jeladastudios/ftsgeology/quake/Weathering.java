@@ -294,7 +294,7 @@ public final class Weathering {
         if (excavatedTop == Integer.MIN_VALUE) return false;
         int g = solidAtOrBelow(level, x, excavatedTop, z);
         if (g == Integer.MIN_VALUE) return false;
-        if (!level.hasChunkAt(new BlockPos(x, g, z))) return false;
+        if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(x, g, z))) return false;
 
         boolean mayMoveBuilds = GeyserConfig.FALLING_INCLUDES_BUILDS.get();
 
@@ -398,7 +398,7 @@ public final class Weathering {
      * ground the quake moved, so natural hoodoos are never touched.
      */
     private static boolean topple(ServerLevel level, int x, int z) {
-        if (!level.hasChunkAt(new BlockPos(x, 0, z))) return false;
+        if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(x, 0, z))) return false;
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return false;
 
@@ -407,7 +407,7 @@ public final class Weathering {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         for (Direction d : Direction.Plane.HORIZONTAL) {
             int nx = x + d.getStepX(), nz = z + d.getStepZ();
-            if (!level.hasChunkAt(m.set(nx, g, nz))) return false;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, m.set(nx, g, nz))) return false;
             int n = TerrainProbe.groundY(level, nx, nz);
             if (n == Integer.MIN_VALUE) return false;
             around = Math.max(around, n);
@@ -451,7 +451,7 @@ public final class Weathering {
             for (int dz = -1; dz <= 1; dz++) {
                 if (dx == 0 && dz == 0) continue;
                 int nx = x + dx, nz = z + dz;
-                if (!level.hasChunkAt(m.set(nx, y, nz))) continue;
+                if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, m.set(nx, y, nz))) continue;
                 int t = TerrainProbe.groundY(level, nx, nz);
                 if (t == Integer.MIN_VALUE) continue;
                 if (t + 1 >= bestY) continue;
@@ -492,7 +492,7 @@ public final class Weathering {
                 for (int dz = -1; dz <= 1; dz++) {
                     if (dx == 0 && dz == 0) continue;
                     int nx = x + dx, nz = z + dz;
-                    if (!level.hasChunkAt(m.set(nx, from, nz))) continue;
+                    if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, m.set(nx, from, nz))) continue;
                     for (int y = from - 1; y <= from + 1; y++) {
                         if (!isTrunk(level.getBlockState(m.set(nx, y, nz)))) continue;
                         // Down to its own foot first, so no stump of it is left standing.
@@ -522,7 +522,7 @@ public final class Weathering {
         for (int dx = -reach; dx <= reach; dx++) {
             for (int dz = -reach; dz <= reach; dz++) {
                 int cx = x + dx, cz = z + dz;
-                if (!level.hasChunkAt(m.set(cx, floor, cz))) continue;
+                if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, m.set(cx, floor, cz))) continue;
                 for (int y = floor; y <= roof; y++) {
                     if (!TerrainProbe.isCrown(level.getBlockState(m.set(cx, y, cz)))) continue;
                     QuakeWrites.set(level, new BlockPos(cx, y, cz), Blocks.AIR.defaultBlockState());
@@ -610,7 +610,7 @@ public final class Weathering {
                 for (int dy = -1; dy <= 1; dy++) {
                     for (int dz = -1; dz <= 1; dz++) {
                         m.set(p.getX() + dx, p.getY() + dy, p.getZ() + dz);
-                        if (!level.isLoaded(m) || seen.contains(m.asLong()) || !isTrunk(level.getBlockState(m))) continue;
+                        if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, m) || seen.contains(m.asLong()) || !isTrunk(level.getBlockState(m))) continue;
                         seen.add(m.asLong());
                         queue.add(m.immutable());
                     }
@@ -640,7 +640,7 @@ public final class Weathering {
     private static boolean relax(ServerLevel level, int x, int z, long k, Job job) {
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return false;
-        if (!level.hasChunkAt(new BlockPos(x, g, z))) return false;
+        if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(x, g, z))) return false;
 
         BlockPos crest = new BlockPos(x, g, z);
         BlockState top = level.getBlockState(crest);
@@ -658,7 +658,7 @@ public final class Weathering {
             int nx = x + d.getStepX(), nz = z + d.getStepZ();
             // A neighbour in a chunk that is not loaded is never read: that would load it here, on the
             // server thread. The column waits for its next pass.
-            if (!level.hasChunkAt(m.set(nx, g, nz))) return false;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, m.set(nx, g, nz))) return false;
             int n = TerrainProbe.groundY(level, nx, nz);
             // A neighbour with no ground at all is a cliff edge or a cave mouth. Leave the column
             // alone rather than shovelling it into a hole.
@@ -708,13 +708,13 @@ public final class Weathering {
     private static boolean finish(ServerLevel level, int x, int z) {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         int g = TerrainProbe.groundY(level, x, z);
-        if (g == Integer.MIN_VALUE || !level.hasChunkAt(m.set(x, g, z))) return false;
+        if (g == Integer.MIN_VALUE || !com.jeladastudios.ftsgeology.util.Loaded.at(level, m.set(x, g, z))) return false;
         int highest = Integer.MIN_VALUE, lowest = Integer.MAX_VALUE;
         BlockState lowTop = null;
         int grown = 0, snowy = 0;
         for (Direction d : Direction.Plane.HORIZONTAL) {
             int nx = x + d.getStepX(), nz = z + d.getStepZ();
-            if (!level.hasChunkAt(m.set(nx, g, nz))) return false;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, m.set(nx, g, nz))) return false;
             int n = TerrainProbe.groundY(level, nx, nz);
             if (n == Integer.MIN_VALUE) return false;
             highest = Math.max(highest, n);

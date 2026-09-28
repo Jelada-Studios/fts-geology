@@ -103,7 +103,7 @@ public final class Prospecting {
         for (int dx = -ACROSS; dx <= ACROSS; dx++) {
             for (int dz = -ACROSS; dz <= ACROSS; dz++) {
                 m.set(at.getX() + dx, at.getY(), at.getZ() + dz);
-                if (!level.isLoaded(m)) continue;
+                if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, m)) continue;
                 for (int y = Math.min(level.getMaxBuildHeight() - 1, at.getY() + UP); y >= floor; y--) {
                     BlockState s = level.getBlockState(m.setY(y));
                     if (s.isAir() || s.getBlock() == self || RockTypes.classify(s) != RockTypes.Rock.ORE) continue;

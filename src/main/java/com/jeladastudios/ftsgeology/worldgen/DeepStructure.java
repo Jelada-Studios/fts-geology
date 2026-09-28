@@ -151,7 +151,7 @@ public final class DeepStructure {
         int lowest = ground, highest = ground;
         for (int[] d : NEIGHBOURS) {
             // A neighbour whose chunk is not loaded is left out; asking would load it.
-            if (!level.hasChunk((x + d[0]) >> 4, (z + d[1]) >> 4)) continue;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, (x + d[0]) >> 4, (z + d[1]) >> 4)) continue;
             int n = TerrainProbe.groundY(level, x + d[0], z + d[1]);
             if (n == Integer.MIN_VALUE) continue;
             lowest = Math.min(lowest, n);
@@ -477,7 +477,7 @@ public final class DeepStructure {
     private static boolean set(WorldGenLevel level, int x, int y, int z, Block block, int top) {
         if (y > top || y <= level.getMinBuildHeight()) return false;
         // A magma pocket near the edge reaches into the next chunk. Never load one to do it.
-        if (!level.hasChunk(x >> 4, z >> 4)) return false;
+        if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, x >> 4, z >> 4)) return false;
         BlockPos p = new BlockPos(x, y, z);
         BlockState s = level.getBlockState(p);
         // Already this rock: skip, since a no-op write through the live chunk still pays every hook.

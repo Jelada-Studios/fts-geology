@@ -173,7 +173,7 @@ public final class CaveCollapse {
             long k = job.columns[job.cursor];
             float s = job.shaking[job.cursor++];
             int x = (int) (k >> 32), z = (int) k;
-            if (!level.hasChunk(x >> 4, z >> 4)) {
+            if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, x >> 4, z >> 4)) {
                 Parked p = PARKED.computeIfAbsent(parkKey(job.dimension, x >> 4, z >> 4), c -> new Parked());
                 p.columns.add(k);
                 p.shaking.add(s);
@@ -249,7 +249,7 @@ public final class CaveCollapse {
             for (int dz = -radius; dz <= radius; dz++) {
                 if (dx * dx + dz * dz > radius * radius + radius) continue;
                 int cx = x + dx, cz = z + dz;
-                if (!level.hasChunk(cx >> 4, cz >> 4)) continue;
+                if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, cx >> 4, cz >> 4)) continue;
                 Cave c = caveUnder(level, cx, cz);
                 if (c == null || Math.abs(c.top() - cave.top()) > 4) continue;   // the same cave only
                 int n;
@@ -306,7 +306,7 @@ public final class CaveCollapse {
             for (int dir = -1; dir <= 1; dir += 2) {
                 for (int i = 1; i <= SPAN_REACH; i++) {
                     int cx = x + (axis == 0 ? i * dir : 0), cz = z + (axis == 1 ? i * dir : 0);
-                    if (!level.hasChunk(cx >> 4, cz >> 4) || !level.getBlockState(m.set(cx, y, cz)).isAir()) break;
+                    if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, cx >> 4, cz >> 4) || !level.getBlockState(m.set(cx, y, cz)).isAir()) break;
                     w++;
                 }
             }
@@ -403,7 +403,7 @@ public final class CaveCollapse {
                     int h = (int) Math.round(peak * (1.0 - d / (radius + 1.0)));
                     if (h <= 0) continue;
                     int cx = x + dx, cz = z + dz;
-                    if (!level.hasChunk(cx >> 4, cz >> 4)) continue;
+                    if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, cx >> 4, cz >> 4)) continue;
                     // The floor under this column: down from the fall's floor to the first solid, a little way only.
                     int y = floorY;
                     while (y - 1 > level.getMinBuildHeight() && y > floorY - 6 && level.getBlockState(m.set(cx, y - 1, cz)).isAir()) y--;

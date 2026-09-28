@@ -327,7 +327,7 @@ public final class VolcanoPlan {
                 if (d2 > springRadius * springRadius) continue;
                 boolean inner = d2 <= radius * radius;
                 int sx = c.x + dx, sz = c.z + dz;
-                if (!inner && !level.hasChunk(sx >> 4, sz >> 4)) continue;
+                if (!inner && !com.jeladastudios.ftsgeology.util.Loaded.chunk(level, sx >> 4, sz >> 4)) continue;
                 if (inner) samples++;
                 int g = TerrainProbe.groundY(level, sx, sz);
                 if (g == Integer.MIN_VALUE) {

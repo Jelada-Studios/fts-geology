@@ -181,7 +181,7 @@ public final class Aftershocks {
 
     private static void fire(ServerLevel level, Shock s) {
         int y = level.getSeaLevel();
-        if (level.hasChunkAt(new BlockPos(s.x(), y, s.z()))) {
+        if (com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(s.x(), y, s.z()))) {
             int g = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, s.x(), s.z());
             if (g != Integer.MIN_VALUE) y = g;
         }

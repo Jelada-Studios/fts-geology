@@ -350,7 +350,7 @@ public final class EruptionHandler {
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     m.set(bx + dx, by, bz + dz);
-                    if (!level.hasChunkAt(m)) continue;
+                    if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, m)) continue;
                     boolean ours = dx == 0 && dz == 0;
                     if (!ours && !spilled.contains(m.asLong()) && !isPromoted(level, m, spilled)) continue;
                     if (level.getBlockState(m).is(Blocks.WATER)) {

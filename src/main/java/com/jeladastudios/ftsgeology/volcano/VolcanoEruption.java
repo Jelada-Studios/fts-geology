@@ -92,7 +92,7 @@ public final class VolcanoEruption {
 
             // Thins out with distance as well: solid near the vent, patchy at the edge.
             if (level.random.nextDouble() > (1.0 - (d / reach) * 0.85) * lobe) continue;
-            if (!level.hasChunkAt(new BlockPos(x, level.getSeaLevel(), z))) continue;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(x, level.getSeaLevel(), z))) continue;
             if (com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(level, x, z)) continue;
 
             // Not into the crater the column comes out of.
@@ -211,7 +211,7 @@ public final class VolcanoEruption {
         double a = level.random.nextDouble() * Math.PI * 2;
         int tx = summit.getX() + (int) Math.round(Math.cos(a) * d);
         int tz = summit.getZ() + (int) Math.round(Math.sin(a) * d);
-        if (!level.hasChunkAt(new BlockPos(tx, summit.getY(), tz))) return;
+        if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(tx, summit.getY(), tz))) return;
         int tg = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, tx, tz);
         if (tg == Integer.MIN_VALUE) return;
 
@@ -541,7 +541,7 @@ public final class VolcanoEruption {
         BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
         for (int cx = (summit.getX() - radius) >> 4; cx <= (summit.getX() + radius) >> 4; cx++) {
             for (int cz = (summit.getZ() - radius) >> 4; cz <= (summit.getZ() + radius) >> 4; cz++) {
-                if (!level.hasChunk(cx, cz)) continue;
+                if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, cx, cz)) continue;
                 net.minecraft.world.level.chunk.LevelChunk chunk = level.getChunk(cx, cz);
                 for (int sy = y0 >> 4; sy <= y1 >> 4; sy++) {
                     int index = chunk.getSectionIndexFromSectionY(sy);

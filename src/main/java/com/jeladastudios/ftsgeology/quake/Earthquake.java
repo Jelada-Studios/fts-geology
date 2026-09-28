@@ -369,7 +369,7 @@ public final class Earthquake {
                 QuakePlanner.Edit e = run.pending.poll();
                 examined++;
                 long ck = net.minecraft.world.level.ChunkPos.asLong(e.pos().getX() >> 4, e.pos().getZ() >> 4);
-                if (!run.parked.contains(ck) && level.hasChunkAt(e.pos())) {
+                if (!run.parked.contains(ck) && com.jeladastudios.ftsgeology.util.Loaded.at(level, e.pos())) {
                     QuakeWrites.set(level, e.pos(), com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, e.pos(), e.state()));
                     placed++;
                 } else {

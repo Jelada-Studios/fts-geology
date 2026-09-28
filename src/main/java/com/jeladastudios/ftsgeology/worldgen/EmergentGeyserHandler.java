@@ -143,7 +143,7 @@ public final class EmergentGeyserHandler {
         while (!queue.isEmpty() && count < WATER_COUNT_CAP) {
             BlockPos p = queue.poll();
             // Never follow the water into a chunk that is not loaded.
-            if (!level.hasChunk(p.getX() >> 4, p.getZ() >> 4)) continue;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, p.getX() >> 4, p.getZ() >> 4)) continue;
             if (!level.getBlockState(p).getFluidState().is(FluidTags.WATER)) continue;
             count++;
             for (Direction d : Direction.values()) {
@@ -158,7 +158,7 @@ public final class EmergentGeyserHandler {
         int r = GeyserConfig.EMERGENT_MIN_SPACING.get();
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {
-                if (!level.hasChunk((rock.getX() + dx) >> 4, (rock.getZ() + dz) >> 4)) continue;
+                if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, (rock.getX() + dx) >> 4, (rock.getZ() + dz) >> 4)) continue;
                 for (int dy = -r; dy <= r; dy++) {
                     if (level.getBlockState(rock.offset(dx, dy, dz))
                             .is(ModBlocks.GEYSER_CORE.get())) return true;

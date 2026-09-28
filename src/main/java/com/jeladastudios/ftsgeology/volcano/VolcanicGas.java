@@ -126,7 +126,7 @@ public final class VolcanicGas {
             double a = i * Math.PI / 6;
             int x = summit.getX() + (int) Math.round(Math.cos(a) * (craterR + 2));
             int z = summit.getZ() + (int) Math.round(Math.sin(a) * (craterR + 2));
-            if (!level.hasChunkAt(new BlockPos(x, 0, z))) continue;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(x, 0, z))) continue;
             int g = TerrainProbe.groundY(level, x, z);
             if (g != Integer.MIN_VALUE) rim = Math.min(rim, g);
         }
@@ -164,7 +164,7 @@ public final class VolcanicGas {
 
     /** A hollow at a column, if its ground lies at least {@link #HOLLOW} under every point of a ring round it. */
     private static void hollow(ServerLevel level, int x, int z, List<Pocket> out) {
-        if (!level.hasChunkAt(new BlockPos(x, 0, z))) return;
+        if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(x, 0, z))) return;
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE || TerrainProbe.hasFluidAbove(level, x, z)) return;
         // Most columns are on a slope, and one step across tells: the cheap test first.
@@ -172,7 +172,7 @@ public final class VolcanicGas {
         for (int i = 0; i < 8 && spill >= g + HOLLOW; i++) {
             double a = i * Math.PI / 4;
             int rx = x + (int) Math.round(Math.cos(a) * 3), rz = z + (int) Math.round(Math.sin(a) * 3);
-            if (!level.hasChunkAt(new BlockPos(rx, 0, rz))) return;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(rx, 0, rz))) return;
             int r = TerrainProbe.groundY(level, rx, rz);
             if (r == Integer.MIN_VALUE) return;
             spill = Math.min(spill, r);

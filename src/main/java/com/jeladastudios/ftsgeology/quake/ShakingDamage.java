@@ -182,7 +182,7 @@ public final class ShakingDamage {
         while (!DUE.isEmpty() && DUE.peek().due() <= now && System.nanoTime() < deadline) {
             Loose l = DUE.poll();
             ServerLevel level = server.getLevel(l.dimension());
-            if (level == null || !level.isLoaded(l.pos())) continue;
+            if (level == null || !com.jeladastudios.ftsgeology.util.Loaded.at(level, l.pos())) continue;
             if (level.getBlockState(l.pos()) != l.state()) continue;   // changed meanwhile: left as it now is
             fall(level, l.pos(), l.state());
         }
@@ -387,7 +387,7 @@ public final class ShakingDamage {
         int puffs = 1 + (int) Math.round(falloff * 3);
         for (int i = 0; i < puffs; i++) {
             int x = head.getX() + level.random.nextInt(7) - 3, z = head.getZ() + level.random.nextInt(7) - 3;
-            if (!level.hasChunkAt(m.set(x, ceiling, z))) continue;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, m.set(x, ceiling, z))) continue;
             BlockState s = level.getBlockState(m);
             if (s.isAir() || !s.getFluidState().isEmpty()) continue;
             level.sendParticles(player, new net.minecraft.core.particles.BlockParticleOption(

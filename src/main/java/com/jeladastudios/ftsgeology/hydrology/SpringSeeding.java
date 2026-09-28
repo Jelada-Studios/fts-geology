@@ -63,7 +63,7 @@ public final class SpringSeeding {
         for (int i = 0; i < CANDIDATES; i++) {
             int x = epicentre.getX() + rng.nextInt(reach * 2 + 1) - reach;
             int z = epicentre.getZ() + rng.nextInt(reach * 2 + 1) - reach;
-            if (!level.isLoaded(new BlockPos(x, level.getSeaLevel(), z))) { unloaded++; continue; }
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(x, level.getSeaLevel(), z))) { unloaded++; continue; }
 
             // 1. Is there heat under here at all?
             GeothermalSuitability.Suitability s = GeothermalSuitability.at(level, x, z);

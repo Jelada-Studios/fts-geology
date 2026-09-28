@@ -70,7 +70,7 @@ public final class TerrainProbe {
      * their own.
      */
     public static void dropLooseCrowns(ServerLevel level, int x, int z) {
-        if (!level.hasChunk(x >> 4, z >> 4)) return;
+        if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, x >> 4, z >> 4)) return;
         int g = groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return;
         int top = Math.min(g + 40, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z));
@@ -114,7 +114,7 @@ public final class TerrainProbe {
                 for (net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
                     BlockPos q = p.relative(d);
                     if (q.getY() < floor || q.getY() > roof || !seen.add(q.asLong())) continue;
-                    if (!level.hasChunkAt(q)) continue;
+                    if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, q)) continue;
                     BlockState s = level.getBlockState(q);
                     if (trunk.test(s)) return true;
                     if (crown.test(s)) queue.add(q);

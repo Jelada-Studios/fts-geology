@@ -272,7 +272,7 @@ public final class HotSpringShape {
     public static boolean restoreBasin(ServerLevel level, long[] cells, int waterY) {
         if (cells.length == 0 || waterY <= level.getMinBuildHeight() + 8) return false;
         for (long c : cells) {
-            if (!level.hasChunkAt(new BlockPos(unpackX(c), waterY, unpackZ(c)))) return false;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(unpackX(c), waterY, unpackZ(c)))) return false;
         }
         for (long c : cells) {
             int x = unpackX(c), z = unpackZ(c);

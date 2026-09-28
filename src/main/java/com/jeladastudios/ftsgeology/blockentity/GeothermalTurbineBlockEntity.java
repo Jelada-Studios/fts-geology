@@ -151,7 +151,7 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
         int most = GeyserConfig.TURBINE_WELL_DEPTH.get();
         while (depth < most) {
             at.move(Direction.DOWN);
-            if (!level.isLoaded(at) || !level.getBlockState(at).is(ModBlocks.WELL_CASING.get())) break;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, at) || !level.getBlockState(at).is(ModBlocks.WELL_CASING.get())) break;
             depth++;
         }
         well = depth;
@@ -172,7 +172,7 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
                 for (int dy = -FOOT; dy <= FOOT; dy++) {
                     for (int dz = -FOOT; dz <= FOOT; dz++) {
                         at.set(fx + dx, fy + dy, fz + dz);
-                        if (!level.isLoaded(at)) continue;
+                        if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, at)) continue;
                         BlockState s = level.getBlockState(at);
                         if (isReservoir(s)) found = true;
                         h += heatOf(s);
