@@ -658,7 +658,7 @@ public final class TerrainFields {
     private static final double DEM_ARC_SEA = 0.8, DEM_ARC_LAND = 1.8;
 
     /** Metres of real ground a block stands for in the normal world; the tall world is the same ground at ten. */
-    static final double METRES_PER_BLOCK = 25.0;
+    public static final double METRES_PER_BLOCK = 25.0;
 
     /**
      * How tall the highest of the three named mountains stands over its own valley floor, in blocks.

@@ -59,6 +59,15 @@ public final class FindCommands {
                     GeysersMod.LOGGER.info("Nearest {}: {} {} {}, {} blocks away", what, hit.x(), found.y(), hit.z(),
                             hit.distance());
                     source.sendSuccess(() -> Component.translatable("command.fts_geology.nearest_s_d_d_d_about_d_blocks_away", what, hit.x(), found.y(), hit.z(), hit.distance()).withStyle(ChatFormatting.GREEN), false);
+                    // A named mountain's own fault: which, and where it passes nearest the summit.
+                    var fault = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.nearest(level, what);
+                    if (fault != null) {
+                        GeysersMod.LOGGER.info("{} fault: {} at {} {}, {} blocks from the summit", what, fault.name(),
+                                fault.x(), fault.z(), fault.distance());
+                        source.sendSuccess(() -> Component.translatable("command.fts_geology.landmark_fault",
+                                Component.translatable("landmark_fault.fts_geology." + what), fault.distance(), fault.x(),
+                                fault.z()).withStyle(ChatFormatting.GOLD), false);
+                    }
                     if (teleport) SiteTeleport.request(source, level, hit.x(), hit.z());
                 }, level.getServer())
                 .exceptionally(t -> {
@@ -106,8 +115,11 @@ public final class FindCommands {
             var site = com.jeladastudios.ftsgeology.worldgen.terrain.LandmarkSites.of(
                     com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(),
                     com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params(), name);
-            return site == null ? null : new Hit(site.x(), site.z(),
-                    (int) Math.round(Math.hypot(site.x() - at.getX(), site.z() - at.getZ())));
+            if (site == null) return null;
+            // The summit itself, where the mountain's own ground is known; the middle of its ground otherwise.
+            var peak = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.nearest(level, name);
+            int x = peak != null ? peak.summitX() : site.x(), z = peak != null ? peak.summitZ() : site.z();
+            return new Hit(x, z, (int) Math.round(Math.hypot(x - at.getX(), z - at.getZ())));
         }
         int step = 96;
         int maxRings = 220;                 // reaches out about 21k blocks
