@@ -38,8 +38,8 @@ import java.util.Map;
 /**
  * Carbon dioxide seeping out of a restless or erupting volcano. Heavier than air, it runs downhill and lies in the
  * crater and in hollows on the flanks, unseen and without a smell, as it did at Dieng in 1979 and still does round
- * Mammoth Mountain, where it has killed the trees and the odd skier who fell into a snow hollow. Whatever breathes it
- * is sickened and weakened, and whatever keeps its head down in it suffocates; flames go out in it.
+ * Mammoth Mountain, where it has killed the trees and the odd skier who fell into a snow hollow. Whatever puts its head
+ * in it is short of breath, then dizzy, and only what stays in it is harmed; flames go out in it.
  *
  * <p>A live volcano breathes it all the time: between eruptions it lies in the crater and round the vents on the
  * flanks, where the plants in it die off over the days, as the trees have round Mammoth Mountain; while the volcano
@@ -197,6 +197,7 @@ public final class VolcanicGas {
         long now = level.getGameTime();
         if (now % 20L != 0L) return;
         boolean douse = now % 100L == 0L;
+        if (douse) EXPOSED.values().removeIf(x -> now - x[1] > RECOVER);
         for (java.util.Iterator<Field> it = FIELDS.values().iterator(); it.hasNext(); ) {
             Field f = it.next();
             if (!f.dimension.equals(level.dimension())) continue;
@@ -215,22 +216,42 @@ public final class VolcanicGas {
         }
     }
 
-    /** Whatever breathes in a pocket: sickened and weakened with its feet in the gas, choking with its head in it. */
+    /**
+     * How many seconds running something has breathed the gas, and when it last did: a few breaths only make it short of
+     * breath, and only staying in it does harm. A breath out of the gas for {@link #RECOVER} ticks and it is over.
+     */
+    private static final Map<java.util.UUID, long[]> EXPOSED = new HashMap<>();
+    /** Seconds with the head in the gas before it tires, before the head swims, before it harms, and how often then. */
+    private static final int TIRES = 3, SWIMS = 10, HARMS = 20, HARM_EVERY = 4;
+    private static final long RECOVER = 200L;
+
+    /**
+     * Whatever breathes in a pocket, with its head in it (the gas lies low; standing in it to the knees does nothing):
+     * short of breath and slow at first, dizzy after a while, and only one that stays half a minute in it is harmed, a
+     * little at a time. The harm goes past armour and wears none of it, as a lack of air would.
+     */
     private static void breathe(ServerLevel level, Pocket p) {
         AABB box = new AABB(p.x() - p.r(), p.floor(), p.z() - p.r(), p.x() + p.r() + 1, p.top() + 1, p.z() + p.r() + 1);
         DamageSource source = null;
+        long now = level.getGameTime();
         for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, box, LivingEntity::isAlive)) {
             if (e instanceof Player pl && (pl.isCreative() || pl.isSpectator())) continue;
             if (e.getMobType() == MobType.UNDEAD) continue;                  // the dead do not breathe
-            if (!p.holds(e.getX(), e.getY(), e.getZ())) continue;
-            e.addEffect(new MobEffectInstance(MobEffects.CONFUSION, 160, 0, false, false));
             if (!p.holds(e.getX(), e.getEyeY(), e.getZ())) continue;
-            e.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 100, 0, false, false));
-            e.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 60, 0, false, false));
+            long[] x = EXPOSED.computeIfAbsent(e.getUUID(), u -> new long[2]);
+            if (x[1] == now) continue;                                       // in two pockets at once: one breath
+            if (now - x[1] > RECOVER) x[0] = 0;
+            x[0]++;
+            x[1] = now;
+            if (x[0] < TIRES) continue;
+            e.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 50, 0, false, false));
+            e.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 30, 0, false, false));
+            if (x[0] >= SWIMS) e.addEffect(new MobEffectInstance(MobEffects.CONFUSION, 80, 0, false, false));
+            if (x[0] < HARMS || (x[0] - HARMS) % HARM_EVERY != 0) continue;
             if (source == null) {
                 source = new DamageSource(level.registryAccess().registryOrThrow(Registries.DAMAGE_TYPE).getHolderOrThrow(DAMAGE));
             }
-            if (e.hurt(source, 2.0f)) sickened++;
+            if (e.hurt(source, 1.0f)) sickened++;
         }
     }
 
@@ -308,5 +329,6 @@ public final class VolcanicGas {
     @SubscribeEvent
     public static void onServerStopped(ServerStoppedEvent event) {
         FIELDS.clear();
+        EXPOSED.clear();
     }
 }
