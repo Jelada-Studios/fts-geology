@@ -74,6 +74,10 @@
     "fts_geology:azurite",
     "fts_geology:quartz_vein",
     "fts_geology:cinnabar",
-    "fts_geology:galena"
+    "fts_geology:galena",
+    "fts_geology:seismograph",
+    "fts_geology:geyser_igniter",
+    "fts_geology:volcano_igniter",
+    "fts_geology:hot_spring"
   ]
 }

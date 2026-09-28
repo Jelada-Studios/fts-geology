@@ -1,6 +1,11 @@
 {
   "replace": false,
   "values": [
-    "fts_geology:volcanic_black_sand"
+    "fts_geology:volcanic_black_sand",
+    "fts_geology:volcanic_ash",
+    "fts_geology:microbial_mat_orange",
+    "fts_geology:microbial_mat_yellow",
+    "fts_geology:microbial_mat_brown",
+    "fts_geology:microbial_mat_green"
   ]
 }
