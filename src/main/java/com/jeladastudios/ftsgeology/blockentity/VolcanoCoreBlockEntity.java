@@ -369,7 +369,9 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
         // summit once the ground around it has loaded, and the chamber's lava then takes its place.
         if (be.fieldPending) {
             if (server.getGameTime() % 20L == 0L) {
-                com.jeladastudios.ftsgeology.volcano.VolcanoBuilder.finishFieldVolcano(server, pos);
+                // Finishing reads the site's plan off the generator, which must come out exactly as it did at generation.
+                com.jeladastudios.ftsgeology.hydrology.RiverNetwork.mayWait(
+                        () -> com.jeladastudios.ftsgeology.volcano.VolcanoBuilder.finishFieldVolcano(server, pos));
             }
             return;
         }

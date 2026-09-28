@@ -197,6 +197,11 @@ public final class RetrogenHandler {
     public static void onServerTick(net.minecraftforge.event.TickEvent.ServerTickEvent event) {
         if (event.phase != net.minecraftforge.event.TickEvent.Phase.END) return;
         if (event.getServer() == null) return;
+        // Retrogen places features by the river network, so it waits for a square rather than read it as empty.
+        com.jeladastudios.ftsgeology.hydrology.RiverNetwork.mayWait(() -> retrogenTick(event));
+    }
+
+    private static void retrogenTick(net.minecraftforge.event.TickEvent.ServerTickEvent event) {
 
         // One budget for the whole mod; these shares are small so the earthquake handler still gets
         // its turn. See TickBudget.

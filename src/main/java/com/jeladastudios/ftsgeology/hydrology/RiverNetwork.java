@@ -202,10 +202,73 @@ public final class RiverNetwork {
         long[] k = LAST_KEY.get();
         At hit = LAST.get();
         if (k[0] == key && hit != null) return hit;
+        boolean[] short_ = SHORT.get();
+        boolean was = short_[0];
+        short_[0] = false;
         At made = look(x, z);
-        k[0] = key;
-        LAST.set(made);
+        // An answer the server thread could not wait for is not kept: asked again, the square may be ready.
+        if (!short_[0]) {
+            k[0] = key;
+            LAST.set(made);
+        }
+        short_[0] |= was;
         return made;
+    }
+
+    // === The server thread never waits for a square =========================
+
+    /**
+     * Set where the server thread may wait for a square to be worked out: the mod's own retrogen, and its commands.
+     * Anywhere else on the server thread -- another mod asking the generator for a height to place a structure, or
+     * to look for one, every tick -- a square not yet worked out reads as empty and is worked out in the background
+     * for the next time. One mod's structure locator asking over and over held the server for seconds at a time.
+     */
+    private static final ThreadLocal<Boolean> MAY_WAIT = ThreadLocal.withInitial(() -> Boolean.FALSE);
+    /** Whether the answer being worked out on this thread read a square as empty for want of waiting. */
+    private static final ThreadLocal<boolean[]> SHORT = ThreadLocal.withInitial(() -> new boolean[1]);
+    /** The tick during which a command of the mod's may wait. */
+    private static volatile int waitTick = Integer.MIN_VALUE;
+    /** Squares being worked out in the background for the server thread, and the most at a time. */
+    private static final java.util.concurrent.atomic.AtomicInteger AHEAD = new java.util.concurrent.atomic.AtomicInteger();
+    private static final int MOST_AHEAD = 4;
+    private static final java.util.concurrent.atomic.LongAdder NOT_WAITED = new java.util.concurrent.atomic.LongAdder();
+
+    /** Runs {@code work} on this thread allowed to wait for squares. */
+    public static void mayWait(Runnable work) {
+        boolean was = MAY_WAIT.get();
+        MAY_WAIT.set(Boolean.TRUE);
+        try {
+            work.run();
+        } finally {
+            MAY_WAIT.set(was);
+        }
+    }
+
+    /** Lets the server thread wait for squares for the rest of this tick: a command of the mod's is running. */
+    public static void mayWaitThisTick(net.minecraft.server.MinecraftServer server) {
+        waitTick = server.getTickCount();
+    }
+
+    private static boolean mustNotWait() {
+        net.minecraft.server.MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+        if (server == null || !server.isSameThread() || MAY_WAIT.get()) return false;
+        return server.getTickCount() != waitTick;
+    }
+
+    /** Works a square out in the background, if not too many are being already. */
+    private static void ahead(int bx, int bz, long key) {
+        if (BUILDING.containsKey(key)) return;
+        if (AHEAD.incrementAndGet() > MOST_AHEAD) {
+            AHEAD.decrementAndGet();
+            return;
+        }
+        CompletableFuture.runAsync(() -> {
+            try {
+                block(bx, bz);
+            } finally {
+                AHEAD.decrementAndGet();
+            }
+        }, net.minecraft.Util.backgroundExecutor());
     }
 
     private static At look(int x, int z) {
@@ -495,6 +558,12 @@ public final class RiverNetwork {
         Square hit = INDEX.get(key);
         if (hit != null) return hit;
         if (BUILT_ONLY.get()) return EMPTY;
+        if (mustNotWait()) {
+            SHORT.get()[0] = true;
+            NOT_WAITED.increment();
+            ahead(bx, bz, key);
+            return EMPTY;
+        }
         CompletableFuture<Square> mine = new CompletableFuture<>();
         CompletableFuture<Square> other = BUILDING.putIfAbsent(key, mine);
         if (other != null) return other.join();

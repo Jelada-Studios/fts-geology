@@ -42,6 +42,16 @@ public final class TectonicCommands {
     /** Side of the chat map, in cells. Odd so the player sits exactly in the middle. */
     static final int MAP_SIZE = 25;
 
+    /** The mod's own commands read the river network exactly, and may wait for it; see RiverNetwork.mayWait. */
+    @SubscribeEvent
+    public static void onCommand(net.minecraftforge.event.CommandEvent event) {
+        String cmd = event.getParseResults().getReader().getString();
+        if (cmd.startsWith("geology") || cmd.startsWith("/geology")) {
+            com.jeladastudios.ftsgeology.hydrology.RiverNetwork.mayWaitThisTick(
+                    event.getParseResults().getContext().getSource().getServer());
+        }
+    }
+
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         event.getDispatcher().register(
