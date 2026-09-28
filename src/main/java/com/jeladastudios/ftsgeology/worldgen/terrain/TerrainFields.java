@@ -266,7 +266,7 @@ public final class TerrainFields {
         // A belt's floodplain belongs to the belt, whichever boundary is nearer: read off the nearer boundary alone,
         // it stopped on the line where a quiet coast took over as nearest, and the plain's few blocks of lift ended
         // there in a dead-straight shore.
-        double apron = apronAt(e, p);
+        double apron = apronAt(e, p, seed);
         return switch (field) {
             case RELIEF -> v + APRON_LIFT * apron + 0.25 * HotspotMap.plumeStrength(seed, x, z, p);
             case EROSION -> v + 0.25 * apron;
@@ -302,11 +302,32 @@ public final class TerrainFields {
 
     /** How deep into a belt's floodplain a column lies, from whichever of its two boundaries says it is deeper. */
     public static double apronAt(long seed, GeologyParams p, int x, int z) {
-        return apronAt(edgesAt(seed, p, x, z), p);
+        return apronAt(edgesAt(seed, p, x, z), p, seed);
     }
 
-    private static double apronAt(TectonicMap.Edges e, GeologyParams p) {
-        return Math.max(apron(e.first(), p), Math.max(apron(e.second(), p), apron(e.third(), p)));
+    private static double apronAt(TectonicMap.Edges e, GeologyParams p, long seed) {
+        double belt = Math.max(apron(e.first(), p), Math.max(apron(e.second(), p), apron(e.third(), p)));
+        return Math.max(belt, basin(e.first(), p, seed));
+    }
+
+    /** A pull-apart basin's half-width, in fault widths, and the length of the stretches of fault they come and go over. */
+    private static final double BASIN_HALF = 0.45, BASIN_LENGTH = 1300.0;
+    /** How far a basin's floor lies below the country round it, in relief units, and how flat it is. */
+    private static final double BASIN_DROP = 0.13, BASIN_FLAT = 0.35;
+
+    /**
+     * How deep into a fault basin a column lies, 0 to 1. Where a strike-slip fault steps over, the ground between the
+     * two strands pulls apart and drops, and the rivers fill it with their silt: the Bursa plain on the North Anatolian
+     * Fault, the Dead Sea and the Hula valley on the Levant transform. On stretches of a continental transform, chosen
+     * along its length, a low flat plain lies either side of the line -- the floodplain the alluvial plain is made of.
+     */
+    public static double basin(PlateSample s, GeologyParams p, long seed) {
+        if (s.plateKind().isOceanic() || s.neighbourKind().isOceanic() || s.boundaryType() != FaultType.TRANSFORM) return 0.0;
+        double w = across(s, p);
+        if (w >= BASIN_HALF) return 0.0;
+        double stretch = noise(seed, (int) Math.round(s.along()), 0, BASIN_LENGTH * p.horizontal(), 0xBA51L);
+        double on = smooth(Mth.clamp((stretch - 0.1) / 0.3, 0.0, 1.0));
+        return on <= 0.0 ? 0.0 : on * peak(w, 0.0, BASIN_HALF);
     }
 
 
@@ -324,10 +345,10 @@ public final class TerrainFields {
             // Answered before the blend, from where it stands rather than from a boundary; never asked here.
             case LANDMARK -> 0.0;
             case CONTINENTS -> continents(s, p);
-            case EROSION -> erosion(s, p, seed, x, z);
+            case EROSION -> erosion(s, p, seed, x, z) + BASIN_FLAT * basin(s, p, seed);
             // No sharp peaks on a valley floor: the ridge noise that makes them is turned down there.
             case RIDGES -> 0.5 + (worn(s, seed) ? WORN_RIDGES : 0.9) * belt(s, p);
-            case RELIEF -> relief(s, p, seed, x, z);
+            case RELIEF -> relief(s, p, seed, x, z) - BASIN_DROP * basin(s, p, seed);
             // A mountain belt's grip, for the offset to scale vanilla's mountain spline down by inside the belt, and
             // how deep in one of the belt's valleys the column lies, for the offset to cut that spline further. A
             // rift keeps vanilla's full spline: halving it there lifted the rift floors out of their lakes.
