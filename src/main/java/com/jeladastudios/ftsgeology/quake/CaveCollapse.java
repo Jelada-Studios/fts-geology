@@ -359,6 +359,14 @@ public final class CaveCollapse {
 
     /** Fells the tree standing at {@code from}: its trunk up, then the crown round it, as a quake's weathering does. */
     private static void fellTree(ServerLevel level, int x, int from, int z) {
+        // A Dynamic Trees tree comes down whole, by its own mod's felling: taken up its trunk column only, its side
+        // branches were left in the air over the sinkhole.
+        BlockPos base = new BlockPos(x, from, z);
+        if (com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isBranch(level.getBlockState(base))
+                && com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.fell(level, base,
+                        net.minecraft.core.Direction.Plane.HORIZONTAL.getRandomDirection(level.random))) {
+            return;
+        }
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         int roof = Math.min(from + 48, level.getMaxBuildHeight() - 1);
         int top = from;

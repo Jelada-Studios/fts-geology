@@ -122,25 +122,27 @@ public final class Collapse {
         for (int y = top; y > ground.getY(); y--) {
             m.set(ground.getX(), y, ground.getZ());
             BlockState s = level.getBlockState(m);
-            if (s.isAir() || !built(s, m, placed, pieces)) continue;
+            if (s.isAir() || !built(level, s, m, placed, pieces)) continue;
             down(level, m.immutable(), s, d.pushX(), d.pushZ());
         }
     }
 
     /** Whether a block is part of a building: placed by a player, a structure's other than its ground, or worked. */
-    static boolean built(BlockState s, BlockPos p, LongSet placed, List<BoundingBox> pieces) {
+    public static boolean built(net.minecraft.world.level.BlockGetter level, BlockState s, BlockPos p, LongSet placed,
+                         List<BoundingBox> pieces) {
         if (s.isAir() || !s.getFluidState().isEmpty() && s.getBlock() == Blocks.WATER) return false;
         if (QuakePlanner.machinery(s)) return false;
         if (placed.contains(p.asLong())) return true;
+        // In a structure's bounds, all but its ground and the trees standing there: a village's log posts are its own.
         if (!pieces.isEmpty() && ShakingDamage.inside(pieces, p.getX(), p.getY(), p.getZ()) && !ShakingDamage.ground(s)
-                && !TerrainProbe.isTreePart(s)) {
+                && (!TerrainProbe.isTreePart(s) || ShakingDamage.builtLog(level, s, p.getX(), p.getY(), p.getZ()))) {
             return true;
         }
         return EruptionHandler.isPlayerPlaced(s) && !TerrainProbe.isVegetation(s);
     }
 
     /** One block comes down: falling, or broken where it stands. */
-    static void down(ServerLevel level, BlockPos p, BlockState s, double pushX, double pushZ) {
+    public static void down(ServerLevel level, BlockPos p, BlockState s, double pushX, double pushZ) {
         if (s.isAir() || QuakePlanner.machinery(s)) return;
         boolean full = s.isCollisionShapeFullBlock(level, p);
         if (s.hasBlockEntity() || !full || shownThisTick >= SHOWN_PER_TICK || shownThisEvent >= SHOWN) {

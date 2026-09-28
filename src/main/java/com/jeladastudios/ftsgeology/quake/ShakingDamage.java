@@ -479,24 +479,59 @@ public final class ShakingDamage {
     }
 
     /** The boxes of the pieces of structures in a chunk that reach up to where buildings are shaken. */
-    static List<BoundingBox> structureBoxes(ServerLevel level, LevelChunk chunk, int floor) {
+    public static List<BoundingBox> structureBoxes(ServerLevel level, LevelChunk chunk, int floor) {
         List<BoundingBox> out = new ArrayList<>();
-        if (chunk.getAllReferences().isEmpty()) return out;
+        var refs = chunk.getAllReferences();
+        if (refs.isEmpty()) return out;
         try {
             ChunkPos cp = chunk.getPos();
-            for (StructureStart start : level.structureManager().startsForStructure(cp, st -> true)) {
-                if (!start.isValid()) continue;
-                for (StructurePiece piece : start.getPieces()) {
-                    BoundingBox b = piece.getBoundingBox();
-                    if (b.maxY() < floor || b.maxX() < cp.getMinBlockX() || b.minX() > cp.getMaxBlockX()
-                            || b.maxZ() < cp.getMinBlockZ() || b.minZ() > cp.getMaxBlockZ()) continue;
-                    out.add(b);
+            for (var e : refs.entrySet()) {
+                for (long home : e.getValue()) {
+                    // Read from the chunk the structure starts in only when it is loaded: asking the structure manager
+                    // loaded it, or generated it, on the server thread, and a volcano's flow at the edge of the loaded
+                    // ground stalled the server for seconds doing so.
+                    LevelChunk at = level.getChunkSource().getChunkNow(ChunkPos.getX(home), ChunkPos.getZ(home));
+                    if (at == null) continue;
+                    StructureStart start = at.getStartForStructure(e.getKey());
+                    if (start == null || !start.isValid()) continue;
+                    for (StructurePiece piece : start.getPieces()) {
+                        BoundingBox b = piece.getBoundingBox();
+                        if (b.maxY() < floor || b.maxX() < cp.getMinBlockX() || b.minX() > cp.getMaxBlockX()
+                                || b.maxZ() < cp.getMinBlockZ() || b.minZ() > cp.getMaxBlockZ()) continue;
+                        out.add(b);
+                    }
                 }
             }
         } catch (RuntimeException e) {
             // A structure source that cannot answer leaves its buildings standing.
         }
         return out;
+    }
+
+    /**
+     * Whether a log inside a structure's bounds is part of the building -- a post, a beam -- and not a tree standing in
+     * its bounds: a tree has leaves within a couple of blocks of its wood, a village's post has none. Reads only the
+     * chunk the log is in, so it never loads the next one.
+     */
+    static boolean builtLog(net.minecraft.world.level.BlockGetter level, BlockState s, int x, int y, int z) {
+        if (!s.is(BlockTags.LOGS) || com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(s)) return false;
+        // No tree grows stripped wood: a cabin's beams, whatever leaves its builders hung beside them.
+        if (stripped(s)) return true;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                if ((x + dx) >> 4 != x >> 4 || (z + dz) >> 4 != z >> 4) continue;
+                for (int dy = -1; dy <= 3; dy++) {
+                    if (level.getBlockState(m.set(x + dx, y + dy, z + dz)).is(BlockTags.LEAVES)) return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /** Stripped logs and wood: worked timber, never a tree's. */
+    static boolean stripped(BlockState s) {
+        return net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath().startsWith("stripped_");
     }
 
     static boolean inside(List<BoundingBox> boxes, int x, int y, int z) {

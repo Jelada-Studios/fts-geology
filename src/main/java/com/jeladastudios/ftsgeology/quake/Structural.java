@@ -61,7 +61,7 @@ public final class Structural {
     }
 
     /** How many blocks over it a block can carry, unshaken. */
-    static double strength(BlockState s) {
+    public static double strength(BlockState s) {
         if (s.getBlock() instanceof FallingBlock) return 0;                      // sand, gravel, concrete powder
         if (strong(s)) return 800;
         if (s.getSoundType() == SoundType.GLASS || s.is(BlockTags.ICE)) return 6;
@@ -159,12 +159,12 @@ public final class Structural {
         for (int y = top; y > ground; y--) {
             BlockState s = chunk.getBlockState(m.set(x, y, z));
             above[y - ground] = count;
-            if (!s.isAir() && Collapse.built(s, m, placed, pieces)) count++;
+            if (!s.isAir() && Collapse.built(level, s, m, placed, pieces)) count++;
         }
         // Load: the lowest block that cannot carry what is over it brings itself and all of that down.
         for (int y = ground + 1; y <= top; y++) {
             BlockState s = chunk.getBlockState(m.set(x, y, z));
-            if (s.isAir() || !Collapse.built(s, m, placed, pieces)) continue;
+            if (s.isAir() || !Collapse.built(level, s, m, placed, pieces)) continue;
             int load = above[y - ground];
             if (load == 0) break;
             if (load > strength(s) * left) {
@@ -178,7 +178,7 @@ public final class Structural {
         double[] stands = new double[top - ground];
         for (int y = ground + 1; y <= top; y++) {
             BlockState s = chunk.getBlockState(m.set(x, y, z));
-            if (s.isAir() || !Collapse.built(s, m, placed, pieces)) continue;
+            if (s.isAir() || !Collapse.built(level, s, m, placed, pieces)) continue;
             if (lowest == Integer.MIN_VALUE) lowest = y;
             stands[n++] = standsTo(s);
         }
@@ -195,7 +195,7 @@ public final class Structural {
         // Overhangs: a block over air needs a supported block of the same floor within its span.
         for (int y = ground + 2; y <= top; y++) {
             BlockState s = chunk.getBlockState(m.set(x, y, z));
-            if (s.isAir() || !Collapse.built(s, m, placed, pieces)) continue;
+            if (s.isAir() || !Collapse.built(level, s, m, placed, pieces)) continue;
             if (!chunk.getBlockState(m.set(x, y - 1, z)).isAir()) continue;
             int reach = (int) Math.floor(span(s) * left);
             if (!supported(level, x, y, z, reach, placed, pieces)) {
@@ -263,7 +263,7 @@ public final class Structural {
             m.set(x, yy, z);
             if (!failing.add(m.asLong())) continue;
             BlockState s = level.getBlockState(m);
-            if (s.isAir() || !Collapse.built(s, m, placed, pieces)) continue;
+            if (s.isAir() || !Collapse.built(level, s, m, placed, pieces)) continue;
             // The top goes first, a moment apart, so a falling column reads as one coming down.
             Collapse.fail(level, m.immutable(), at + (top - yy) / 3, px, pz);
         }

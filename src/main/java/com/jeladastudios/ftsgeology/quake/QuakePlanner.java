@@ -573,9 +573,13 @@ public final class QuakePlanner {
             BlockState s = chunk.getBlockState(m.set(x, y, z));
             if (s.isAir()) continue;
             boolean mine = !placed.isEmpty() && placed.contains(m.asLong());
-            // Trees and plants first, and cheaply: most of a forest's column is its crown.
-            if (!mine && (TerrainProbe.isTreePart(s) || TerrainProbe.isVegetation(s))) continue;
+            // Trees and plants first, and cheaply: most of a forest's column is its crown. A log post in a structure's
+            // bounds is the building's, not a tree.
             boolean inStructure = !pieces.isEmpty() && ShakingDamage.inside(pieces, x, y, z);
+            if (!mine && (TerrainProbe.isVegetation(s) || TerrainProbe.isTreePart(s) && !ShakingDamage.stripped(s)
+                    && !(inStructure && ShakingDamage.builtLog(chunk, s, x, y, z)))) {
+                continue;
+            }
             if (!inStructure && !mine && s.getBlock() instanceof net.minecraft.world.level.block.SlabBlock
                     && com.jeladastudios.ftsgeology.worldgen.RiftSteps.isStep(s, chunk.getBlockState(new BlockPos(x, y - 1, z)))) {
                 return new int[]{y, builtTop, player, 1};
@@ -613,7 +617,8 @@ public final class QuakePlanner {
         for (int y = g + 1; y <= top; y++) {
             BlockState s = chunk.getBlockState(m.set(x, y, z));
             if (!s.isAir()) {
-                if (s.hasBlockEntity() || !(TerrainProbe.isTreePart(s) || TerrainProbe.isVegetation(s))) return null;
+                if (s.hasBlockEntity() || !(TerrainProbe.isTreePart(s) || TerrainProbe.isVegetation(s))
+                        || ShakingDamage.stripped(s)) return null;
                 last = y - g - 1;
             }
             up[y - g - 1] = s;

@@ -116,11 +116,34 @@ public final class DynamicTreesFelling {
 
     /**
      * Whether a block is any part of a Dynamic Trees tree: branch, leaves, rooted soil, the shell round a thick trunk,
-     * a root along the ground. Only some of them carry vanilla's tree tags.
+     * a root along the ground. Only some of them carry vanilla's tree tags. Told by Dynamic Trees' own block classes,
+     * so the trees its add-ons bring (Terralith's, for one) count too; a block of its namespace that is none of these,
+     * a sapling or a fruit, counts as well.
      */
     public static boolean isTreeBlock(BlockState state) {
-        return API != null && "dynamictrees".equals(
-                net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).getNamespace());
+        if (API == null) return false;
+        net.minecraft.world.level.block.Block block = state.getBlock();
+        for (Class<?> c : TREE_CLASSES) {
+            if (c.isInstance(block)) return true;
+        }
+        return "dynamictrees".equals(net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).getNamespace());
+    }
+
+    /** Dynamic Trees' block classes a tree is made of; empty without it. */
+    private static final Class<?>[] TREE_CLASSES = treeClasses();
+
+    private static Class<?>[] treeClasses() {
+        if (!ModList.get().isLoaded("dynamictrees")) return new Class<?>[0];
+        List<Class<?>> out = new java.util.ArrayList<>();
+        for (String n : new String[]{"block.branch.BranchBlock", "block.branch.TrunkShellBlock", "block.branch.SurfaceRootBlock",
+                "block.leaves.DynamicLeavesBlock", "block.rooty.RootyBlock"}) {
+            try {
+                out.add(Class.forName("com.ferreusveritas.dynamictrees." + n));
+            } catch (ClassNotFoundException | LinkageError e) {
+                // A class a later Dynamic Trees renamed: its blocks are still told by their namespace.
+            }
+        }
+        return out.toArray(new Class<?>[0]);
     }
 
     /** Whether a block is the rooted soil a Dynamic Trees tree stands in. A tag read, cheap enough for every column. */
