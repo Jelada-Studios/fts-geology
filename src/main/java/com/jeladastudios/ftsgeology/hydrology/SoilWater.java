@@ -138,8 +138,8 @@ public final class SoilWater {
                           double deepSat, double rootAvailable, double table, int depth, double hoursSinceLook,
                           int grassDryness) {}
 
-    /** Cells by dimension and chunk. */
-    private static final Map<String, Cells> CELLS = new ConcurrentHashMap<>();
+    /** Cells by overworld chunk. */
+    private static final Map<Long, Cells> CELLS = new ConcurrentHashMap<>();
     /** Loaded overworld chunks, looked at in turn. */
     private static final LongLinkedOpenHashSet QUEUE = new LongLinkedOpenHashSet();
     private static long looks, steps, nanos;
@@ -148,8 +148,8 @@ public final class SoilWater {
         return GeyserConfig.SOIL_WATER.get() && Level.OVERWORLD.equals(level.dimension()) && !TfcCompat.active();
     }
 
-    private static String key(Level level, int cx, int cz) {
-        return level.dimension().location() + "|" + ChunkPos.asLong(cx, cz);
+    private static long key(Level level, int cx, int cz) {
+        return ChunkPos.asLong(cx, cz);
     }
 
     // === Chunks coming and going ===========================================
@@ -210,9 +210,13 @@ public final class SoilWater {
     public static void onChunkSave(ChunkDataEvent.Save event) {
         if (!(event.getLevel() instanceof ServerLevel level) || !enabled(level)) return;
         ChunkPos p = event.getChunk().getPos();
-        String k = key(level, p.x, p.z);
+        long k = key(level, p.x, p.z);
         Cells c = CELLS.get(k);
-        if (c == null || c.last < 0) return;
+        if (c == null) return;
+        if (c.last < 0) {
+            if (c.leaving) CELLS.remove(k);
+            return;
+        }
         int[] w = new int[80];
         for (int i = 0; i < 16; i++) {
             w[i] = Math.round(c.top[i] * 10);
@@ -268,8 +272,10 @@ public final class SoilWater {
         long deadline = started + com.jeladastudios.ftsgeology.util.TickBudget.slice(0.05);
         long now = level.getGameTime();
         int tries, looked = 0;
+        // A chunk is looked at every EVERY ticks, so a tick needs to go through only a share of them: twice what that
+        // takes, so a chunk is never long overdue.
         synchronized (QUEUE) {
-            tries = QUEUE.size();
+            tries = Math.min(QUEUE.size(), 1 + 2 * QUEUE.size() / EVERY);
         }
         // One chunk a tick whatever the budget says: with the budget spent by others, as it is while a world first
         // loads, nothing else would ever be looked at.
@@ -281,7 +287,7 @@ public final class SoilWater {
                 QUEUE.add(k);
             }
             int cx = ChunkPos.getX(k), cz = ChunkPos.getZ(k);
-            String key = key(level, cx, cz);
+            long key = key(level, cx, cz);
             Cells c = CELLS.get(key);
             if (c != null && now - c.last < EVERY) continue;
             LevelChunk chunk = level.getChunkSource().getChunkNow(cx, cz);
