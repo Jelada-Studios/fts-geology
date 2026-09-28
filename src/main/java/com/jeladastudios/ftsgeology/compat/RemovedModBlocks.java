@@ -234,6 +234,7 @@ public final class RemovedModBlocks {
     /** Country rock: what a hole in the ground is filled with. */
     static boolean isRock(BlockState s) {
         return s.is(BlockTags.BASE_STONE_OVERWORLD) || s.is(Tags.Blocks.STONE) || TfcCompat.isRock(s)
+                || s.is(BlockTags.BASE_STONE_NETHER) || s.is(Blocks.END_STONE)
                 || s.is(Blocks.CALCITE) || s.is(Blocks.BASALT) || s.is(Blocks.SMOOTH_BASALT) || s.is(Blocks.BLACKSTONE)
                 || s.is(Blocks.SANDSTONE) || s.is(Blocks.RED_SANDSTONE) || s.is(BlockTags.TERRACOTTA);
     }
