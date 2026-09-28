@@ -153,6 +153,9 @@ public final class RiverRepair {
                 continue;
             }
             Plan plan = PLANS.get(key);
+            // Round a player, a chunk with none of the rivers' water in it or beside it has nothing to keep: the network
+            // is not asked about it. A drained stretch still fills, from its ends inwards.
+            if (plan == null && !moved && !riverNear(level, chunk)) continue;
             if (plan == null) {
                 ask(key, cx, cz, level.getSeaLevel());
                 if (moved) queue.add(key);                            // back when the network has answered
@@ -162,6 +165,27 @@ public final class RiverRepair {
             lay(level, chunk, plan, moved);
             CHUNKS.increment();
         }
+    }
+
+    /** Whether a chunk, or a loaded one beside it, holds any of the rivers' water. */
+    private static boolean riverNear(ServerLevel level, LevelChunk chunk) {
+        if (holdsRiver(chunk)) return true;
+        ChunkPos p = chunk.getPos();
+        for (int[] d : SIDES) {
+            LevelChunk c = level.getChunkSource().getChunkNow(p.x + d[0], p.z + d[1]);
+            if (c != null && holdsRiver(c)) return true;
+        }
+        return false;
+    }
+
+    /** Whether any of a chunk's sections has river water in its palette: a look at a few entries a section. */
+    private static boolean holdsRiver(LevelChunk chunk) {
+        net.minecraft.world.level.block.Block river = ModBlocks.RIVER_WATER.get();
+        for (net.minecraft.world.level.chunk.LevelChunkSection s : chunk.getSections()) {
+            if (s.hasOnlyAir()) continue;
+            if (s.getStates().maybeHas(b -> b.getBlock() == river)) return true;
+        }
+        return false;
     }
 
     /** Asks the network about a chunk on a worker thread; the answer is remembered. */
