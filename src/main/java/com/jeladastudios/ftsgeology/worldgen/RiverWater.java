@@ -147,8 +147,12 @@ public final class RiverWater {
                 }
                 if (g >= w) {
                     // A lake fills its hollow and no more: ground standing well over its water is its shore. A block or
-                    // two over is the noise on the raw ground the hollow was worked out on, and is taken down.
-                    if (a.lake() && g - w > Math.round(LAKE_LEVEL * RiverNetwork.horizontal())) continue;
+                    // two over is the noise on the raw ground the hollow was worked out on, and is taken down. The tall
+                    // world's noise stands higher, but only where a stream comes in is more taken, so it meets the lake:
+                    // taken all round, the edge of the hollow was cut to a shelf under the water and the ground just
+                    // past it stood over it, a wall of five to seven blocks round the lake.
+                    if (a.lake() && g - w > LAKE_LEVEL
+                            && (g - w > Math.round(LAKE_LEVEL * RiverNetwork.horizontal()) || !nearStream(x, z))) continue;
                     if (a.lake()) SHORED.increment();
                     int bedY = level(level, at, x, z, g, w, a);
                     if (bedY == Integer.MIN_VALUE) {
@@ -459,6 +463,21 @@ public final class RiverWater {
             if (!changed) break;
         }
         return placed;
+    }
+
+    /** How far from a lake's shore a stream's channel is looked for. */
+    private static final int STREAM_NEAR = 4;
+
+    /** Whether a stream's channel runs within {@link #STREAM_NEAR} of a column, outside the lake. */
+    private static boolean nearStream(int x, int z) {
+        for (int dx = -STREAM_NEAR; dx <= STREAM_NEAR; dx += STREAM_NEAR) {
+            for (int dz = -STREAM_NEAR; dz <= STREAM_NEAR; dz += STREAM_NEAR) {
+                if (dx == 0 && dz == 0) continue;
+                RiverNetwork.At b = RiverNetwork.at(x + dx, z + dz);
+                if (!b.lake() && b.distance() != Double.MAX_VALUE && !b.sunk()) return true;
+            }
+        }
+        return false;
     }
 
     /**

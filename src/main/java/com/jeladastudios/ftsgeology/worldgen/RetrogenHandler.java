@@ -73,6 +73,7 @@ public final class RetrogenHandler {
         DEEP_CURRENT.clear();
         PAINT_CURRENT.clear();
         QUEUE.clear();
+        WAITING.clear();
     }
 
     // === NBT stamp read/write ==============================================
@@ -147,6 +148,15 @@ public final class RetrogenHandler {
     static final java.util.concurrent.ConcurrentLinkedQueue<QueuedChunk> QUEUE =
             new java.util.concurrent.ConcurrentLinkedQueue<>();
 
+    /**
+     * Chunks whose springs and geysers wait for the ground round them to load, looked over every
+     * {@link #WAIT_TICKS} rather than every tick. At the edge of the loaded ground a ring of chunks waits for as long as
+     * the player stays, and cycling it through the queue every tick cost the server thread more than the rest of
+     * retrogen together. Server thread only.
+     */
+    static final List<QueuedChunk> WAITING = new ArrayList<>();
+    private static final int WAIT_TICKS = 40;
+
     /** How many queued chunks are inspected before picking the one to work on. */
     static final int CANDIDATES = 32;
 
@@ -216,6 +226,8 @@ public final class RetrogenHandler {
         int budget = GeyserConfig.RETROGEN_CHUNKS_PER_TICK.get();
         if (com.jeladastudios.ftsgeology.volcano.VolcanoJob.busy()) budget = Math.max(1, budget / 2);
 
+        if (!WAITING.isEmpty() && event.getServer().getTickCount() % WAIT_TICKS == 0) release(event.getServer());
+
         if (!QUEUE.isEmpty()) {
             // A wall-clock brake as well as a chunk count, so the count above is a permission rather
             // than a promise: whichever runs out first stops the tick.
@@ -272,7 +284,7 @@ public final class RetrogenHandler {
                         if (!areaLoaded(level, cp.x - SURFACE_REACH, cp.z - SURFACE_REACH,
                                 cp.x + SURFACE_REACH, cp.z + SURFACE_REACH)) {
                             DEEP_CURRENT.add(key);
-                            deferred.add(new QueuedChunk(q.dimension(), cp, false));
+                            WAITING.add(new QueuedChunk(q.dimension(), cp, false));
                             finished = false;
                             continue;
                         }
@@ -298,13 +310,13 @@ public final class RetrogenHandler {
         if (++reportTimer >= 200) {
             reportTimer = 0;
             int generated = GENERATED.getAndSet(0);
-            if (doneSinceReport > 0 || generated > 0 || !QUEUE.isEmpty()) {
+            if (doneSinceReport > 0 || generated > 0 || !QUEUE.isEmpty() || !WAITING.isEmpty()) {
                 // The longest step is the number that matters with a mod hooking every block change:
                 // it has to stay inside retrogen's slice now that a chunk can stop part way through.
                 com.jeladastudios.ftsgeology.util.Diagnostics.info("retrogen: {} chunks in the last 10s, {} blocks placed, {} still queued, "
                                 + "longest step {} ms; {} chunks got their deep geology at generation ({} blocks, {} of them ore), "
                                 + "{} their ground paint; {} groundwater noise columns so far",
-                        doneSinceReport, blocksSinceReport, QUEUE.size(), ms(longestStepNanos), generated,
+                        doneSinceReport, blocksSinceReport, QUEUE.size() + WAITING.size(), ms(longestStepNanos), generated,
                         GENERATED_BLOCKS.getAndSet(0) + GENERATED_ORE.get(), GENERATED_ORE.getAndSet(0),
                         PAINTED.getAndSet(0),
                         com.jeladastudios.ftsgeology.hydrology.WaterTable.noiseColumns());
@@ -322,6 +334,24 @@ public final class RetrogenHandler {
             doneSinceReport = 0;
             blocksSinceReport = 0;
             longestStepNanos = 0;
+        }
+    }
+
+    /**
+     * Puts back in the queue the waiting chunks whose ground has loaded round them, and forgets the ones no longer
+     * loaded: they queue themselves again when they come back.
+     */
+    private static void release(net.minecraft.server.MinecraftServer server) {
+        for (java.util.Iterator<QueuedChunk> it = WAITING.iterator(); it.hasNext(); ) {
+            QueuedChunk q = it.next();
+            ServerLevel level = server.getLevel(q.dimension());
+            ChunkPos cp = q.pos();
+            if (level == null || level.getChunkSource().getChunkNow(cp.x, cp.z) == null) {
+                it.remove();
+            } else if (areaLoaded(level, cp.x - SURFACE_REACH, cp.z - SURFACE_REACH, cp.x + SURFACE_REACH, cp.z + SURFACE_REACH)) {
+                QUEUE.add(q);
+                it.remove();
+            }
         }
     }
 
