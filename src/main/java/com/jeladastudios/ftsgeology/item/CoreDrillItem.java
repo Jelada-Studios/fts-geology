@@ -41,13 +41,51 @@ public class CoreDrillItem extends Item {
         super(props);
     }
 
+    /** How long the drill is held against the ground to bring up a core, in ticks. */
+    private static final int DRILLING = 40;
+
+    @Override
+    public net.minecraft.world.item.UseAnim getUseAnimation(ItemStack stack) {
+        return net.minecraft.world.item.UseAnim.BRUSH;
+    }
+
+    @Override
+    public int getUseDuration(ItemStack stack) {
+        return DRILLING;
+    }
+
+    /** Set on the ground, the drill starts turning; it is held there until the core comes up. */
     @Override
     public InteractionResult useOn(UseOnContext ctx) {
-        if (ctx.getLevel().isClientSide) return InteractionResult.SUCCESS;
-        if (!(ctx.getLevel() instanceof ServerLevel level) || !(ctx.getPlayer() instanceof ServerPlayer player)) {
-            return InteractionResult.PASS;
+        if (ctx.getPlayer() == null) return InteractionResult.PASS;
+        ctx.getPlayer().startUsingItem(ctx.getHand());
+        return InteractionResult.CONSUME;
+    }
+
+    /** The bit grinding into the rock: dust of what it cuts, and its sound. */
+    @Override
+    public void onUseTick(net.minecraft.world.level.Level level, net.minecraft.world.entity.LivingEntity user, ItemStack stack,
+                          int remaining) {
+        if (!(level instanceof ServerLevel server) || !(user instanceof net.minecraft.world.entity.player.Player player)) return;
+        if (remaining % 4 != 0) return;
+        net.minecraft.world.phys.HitResult hit = getPlayerPOVHitResult(level, player, net.minecraft.world.level.ClipContext.Fluid.NONE);
+        if (!(hit instanceof net.minecraft.world.phys.BlockHitResult b) || hit.getType() != net.minecraft.world.phys.HitResult.Type.BLOCK) {
+            player.stopUsingItem();
+            return;
         }
-        BlockPos top = ctx.getClickedPos();
+        BlockPos at = b.getBlockPos();
+        server.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, level.getBlockState(at)),
+                at.getX() + 0.5, at.getY() + 1.0, at.getZ() + 0.5, 6, 0.15, 0.1, 0.15, 0.08);
+        level.playSound(null, at, SoundEvents.GRINDSTONE_USE, SoundSource.PLAYERS, 0.5f, 0.6f + 0.02f * (DRILLING - remaining));
+    }
+
+    /** Held long enough: the core comes up from under the block the drill stands on. */
+    @Override
+    public ItemStack finishUsingItem(ItemStack stack, net.minecraft.world.level.Level world, net.minecraft.world.entity.LivingEntity user) {
+        if (!(world instanceof ServerLevel level) || !(user instanceof ServerPlayer player)) return stack;
+        net.minecraft.world.phys.HitResult hit = getPlayerPOVHitResult(world, player, net.minecraft.world.level.ClipContext.Fluid.NONE);
+        if (!(hit instanceof net.minecraft.world.phys.BlockHitResult b) || hit.getType() != net.minecraft.world.phys.HitResult.Type.BLOCK) return stack;
+        BlockPos top = b.getBlockPos();
         ItemStack core = drill(level, top);
         CoreSampleItem.describe(core, level, player::sendSystemMessage);
         if (!player.getInventory().add(core)) player.drop(core, false);
@@ -56,10 +94,10 @@ public class CoreDrillItem extends Item {
         level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, level.getBlockState(top)),
                 top.getX() + 0.5, top.getY() + 1.0, top.getZ() + 0.5, 20, 0.2, 0.3, 0.2, 0.1);
         player.getCooldowns().addCooldown(this, COOLDOWN);
-        ctx.getItemInHand().hurtAndBreak(1, player, p -> p.broadcastBreakEvent(ctx.getHand()));
+        stack.hurtAndBreak(1, player, p -> p.broadcastBreakEvent(p.getUsedItemHand()));
         GeologyTrigger.award(player, "core");
         if (CoreSampleItem.hasDeposit(core)) GeologyTrigger.award(player, "core_deposit");
-        return InteractionResult.CONSUME;
+        return stack;
     }
 
     /** Bores down from {@code top} and returns the core. */

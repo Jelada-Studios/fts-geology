@@ -5,7 +5,6 @@ import com.jeladastudios.ftsgeology.advancement.GeologyTrigger;
 import com.jeladastudios.ftsgeology.instrument.RockTypes;
 import com.jeladastudios.ftsgeology.tectonics.FaultType;
 import com.jeladastudios.ftsgeology.tectonics.PlateSample;
-import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -45,10 +44,12 @@ public class GeologyMapItem extends Item {
 
     /** The mark a survey map carries. */
     public static final String TAG = "fts_geology_survey";
-    /** Two blocks to a pixel: a map covers 256 blocks a side. */
-    private static final byte SCALE = 1;
+    /** Four blocks to a pixel: a map covers 512 blocks a side, enough to see a fault run across it. */
+    private static final byte SCALE = 2;
     /** How far round its holder a map fills in, in blocks, and how many pixels at a time. */
-    private static final int REACH = 48, PER_UPDATE = 64;
+    private static final int REACH = 96, PER_UPDATE = 96;
+    /** How far apart along a boundary its motion arrows are drawn, in pixels. */
+    private static final int ARROW_EVERY = 22;
 
     public GeologyMapItem(Properties props) {
         super(props);
@@ -60,6 +61,7 @@ public class GeologyMapItem extends Item {
         if (level.isClientSide) return InteractionResultHolder.success(blank);
         ItemStack map = MapItem.create(level, player.getBlockX(), player.getBlockZ(), SCALE, true, false);
         MapItem.lockMap(level, map);
+        if (level instanceof ServerLevel server) mark(server, map);
         map.getOrCreateTag().putBoolean(TAG, true);
         map.setHoverName(Component.translatable("item.fts_geology.geology_map.filled").withStyle(style -> style.withItalic(false)));
         if (player instanceof ServerPlayer sp) GeologyTrigger.award(sp, "map_survey");
@@ -102,7 +104,34 @@ public class GeologyMapItem extends Item {
         }
     }
 
-    /** Paints the unpainted pixels nearest the holder, a few at a time. */
+    /**
+     * The large volcanoes and the named mountains on the map's ground, marked: a red marker for a volcano, a target
+     * for a mountain. Marked when the map is made, as an explorer map marks its structure.
+     */
+    private static void mark(ServerLevel level, ItemStack map) {
+        MapItemSavedData data = MapItem.getSavedData(map, level);
+        if (data == null) return;
+        int half = 64 << data.scale;
+        int x0 = data.centerX - half, z0 = data.centerZ - half, x1 = data.centerX + half, z1 = data.centerZ + half;
+        int n = 0;
+        for (var site : com.jeladastudios.ftsgeology.volcano.VolcanoField.sitesInBox(level, x0, z0, x1, z1)) {
+            if (!site.chosen() || n++ >= 6) continue;
+            MapItemSavedData.addTargetDecoration(map, new BlockPos(site.x(), 0, site.z()), "volcano" + n,
+                    net.minecraft.world.level.saveddata.maps.MapDecoration.Type.RED_MARKER);
+        }
+        if (com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level)
+                && com.jeladastudios.ftsgeology.worldgen.terrain.DemLibrary.landmarksReady()) {
+            for (var s : com.jeladastudios.ftsgeology.worldgen.terrain.LandmarkSites.all(
+                    com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(),
+                    com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params())) {
+                if (s.x() < x0 || s.x() > x1 || s.z() < z0 || s.z() > z1) continue;
+                MapItemSavedData.addTargetDecoration(map, new BlockPos(s.x(), 0, s.z()), "summit" + s.which(),
+                        net.minecraft.world.level.saveddata.maps.MapDecoration.Type.TARGET_POINT);
+            }
+        }
+    }
+
+    /** Paints the unpainted pixels nearest the holder, a few at a time, and the arrows of the boundaries it crosses. */
     private static void survey(ServerLevel level, ServerPlayer player, ItemStack stack) {
         MapItemSavedData data = MapItem.getSavedData(stack, level);
         if (data == null || !data.dimension.equals(level.dimension())) return;
@@ -116,15 +145,28 @@ public class GeologyMapItem extends Item {
             if (data.colors[px + pz * 128] != 0) continue;
             int wx = data.centerX + (px - 64) * scale, wz = data.centerZ + (pz - 64) * scale;
             if (!level.hasChunkAt(new BlockPos(wx, level.getSeaLevel(), wz))) continue;
-            data.updateColor(px, pz, colour(level, wx, wz, scale));
+            PlateSample s = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sampleCached(level, wx, wz);
+            data.updateColor(px, pz, colour(level, wx, wz, scale, s, px, pz));
+            if (onLine(s, scale) && Math.floorMod((int) Math.round(s.along() / scale), ARROW_EVERY) == 0) {
+                arrows(data, px, pz, s);
+            }
             if (++painted >= PER_UPDATE) break;
         }
     }
 
-    /** The colour of the ground at one point: a boundary across it, water over it, or the rock under its soil. */
+    /** Whether a point lies on the boundary line itself, drawn two pixels wide. */
+    private static boolean onLine(PlateSample s, int scale) {
+        return s.faultType() != FaultType.INTERIOR && s.faultDistance() <= scale;
+    }
+
+    /** The colour of the ground at one point: its boundary line, water, or the rock under the soil, hatched in a fault zone. */
     public static byte colour(ServerLevel level, int x, int z, int scale) {
-        PlateSample s = TectonicMap.sampleCached(level, x, z);
-        if (s.faultType() != FaultType.INTERIOR && s.faultDistance() <= Math.max(1.5, scale * 0.75)) {
+        return colour(level, x, z, scale, com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sampleCached(level, x, z),
+                x / scale, z / scale);
+    }
+
+    static byte colour(ServerLevel level, int x, int z, int scale, PlateSample s, int px, int pz) {
+        if (onLine(s, scale)) {
             MapColor line = switch (s.faultType()) {
                 case CONVERGENT_COLLISION -> MapColor.COLOR_ORANGE;
                 case CONVERGENT_SUBDUCTION -> MapColor.FIRE;
@@ -136,21 +178,59 @@ public class GeologyMapItem extends Item {
         int top = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos(x, top, z);
         if (!level.getFluidState(m).isEmpty()) return MapColor.WATER.getPackedId(MapColor.Brightness.NORMAL);
-        int north = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z - scale) - 1;
-        MapColor.Brightness shade = top > north + 1 ? MapColor.Brightness.HIGH
-                : top < north - 1 ? MapColor.Brightness.LOW : MapColor.Brightness.NORMAL;
+        // The fault zone is hatched: a darker diagonal every few pixels.
+        boolean hatch = s.faultType() != FaultType.INTERIOR && Math.floorMod(px + pz, 5) == 0;
+        MapColor.Brightness shade = hatch ? MapColor.Brightness.LOWEST : MapColor.Brightness.NORMAL;
+        return rock(level, x, z, top).getPackedId(shade);
+    }
+
+    /**
+     * What a geological map shows at a point: the rock under the soil. On the mod's own world types that comes from
+     * the rock model the ground was built from -- a clean map of the rocks, not of stray blocks; loose alluvium on a
+     * floodplain is shown as such. Elsewhere the first rock under the soil is read off the ground.
+     */
+    private static MapColor rock(ServerLevel level, int x, int z, int top) {
+        var biome = level.getBiome(new BlockPos(x, top, z));
+        if (biome.is(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.BIOME,
+                new net.minecraft.resources.ResourceLocation(GeysersMod.MODID, "alluvial_plain")))) return MapColor.SAND;
+        if (com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level)) {
+            long seed = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed();
+            var params = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params();
+            var col = com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.column(seed, params, x, z);
+            var r = com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.rockAt(seed, col, x, top - 3, z, top);
+            MapColor c = colourOf(r);
+            if (c != null) return c;
+            return switch (col.setting()) {
+                case PLATFORM, FORELAND -> MapColor.COLOR_YELLOW;
+                case FOLD_BELT -> MapColor.COLOR_PURPLE;
+                case ARC, HOTSPOT -> MapColor.COLOR_RED;
+                case PRISM -> MapColor.COLOR_BROWN;
+                case RIFT -> MapColor.COLOR_ORANGE;
+                case SHEAR_ZONE -> MapColor.COLOR_GRAY;
+                case OCEAN_FLOOR -> MapColor.COLOR_BLUE;
+            };
+        }
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) g = top;
-        RockTypes.Rock rock = RockTypes.Rock.SOIL;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         for (int y = g; y > g - 10 && y > level.getMinBuildHeight(); y--) {
-            BlockState b = level.getBlockState(m.setY(y));
-            RockTypes.Rock r = RockTypes.classify(b);
-            if (r != RockTypes.Rock.SOIL && r != RockTypes.Rock.OTHER) {
-                rock = r;
-                break;
-            }
+            RockTypes.Rock r = RockTypes.classify(level.getBlockState(m.set(x, y, z)));
+            if (r != RockTypes.Rock.SOIL && r != RockTypes.Rock.OTHER) return colourOf(r);
         }
-        return colourOf(rock).getPackedId(shade);
+        return MapColor.DIRT;
+    }
+
+    private static MapColor colourOf(com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.Rock r) {
+        return switch (r) {
+            case SANDSTONE, RED_BEDS -> MapColor.COLOR_YELLOW;
+            case SHALE, CHERT -> MapColor.COLOR_LIGHT_GRAY;
+            case CALCITE, MARBLE -> MapColor.COLOR_LIGHT_BLUE;
+            case GRANITE, DIORITE -> MapColor.COLOR_PINK;
+            case ANDESITE, TUFF, RHYOLITE, BASALT, SMOOTH_BASALT, BLACKSTONE -> MapColor.COLOR_RED;
+            case GABBRO, PERIDOTITE, SERPENTINITE -> MapColor.COLOR_GREEN;
+            case GNEISS, SCHIST, SLATE, QUARTZITE -> MapColor.COLOR_PURPLE;
+            case STONE, KEEP -> null;
+        };
     }
 
     private static MapColor colourOf(RockTypes.Rock rock) {
@@ -165,5 +245,61 @@ public class GeologyMapItem extends Item {
             case SOIL -> MapColor.DIRT;
             case OTHER -> MapColor.STONE;
         };
+    }
+
+    /**
+     * The boundary's motion at one point of its line, in arrows either side: toward the line where the plates
+     * converge, away from it where they part, and along it, one each way, where they slide past.
+     */
+    private static void arrows(MapItemSavedData data, int px, int pz, PlateSample s) {
+        double nx = s.faultNormalX(), nz = s.faultNormalZ();
+        double len = Math.hypot(nx, nz);
+        if (len < 1e-6) return;
+        nx /= len;
+        nz /= len;
+        double sx = -nz, sz = nx;          // along the strike
+        byte ink = MapColor.COLOR_BLACK.getPackedId(MapColor.Brightness.NORMAL);
+        for (int side = -1; side <= 1; side += 2) {
+            // The arrow's tail, a few pixels out on this side.
+            double ox = px + nx * side * 6, oz = pz + nz * side * 6;
+            double dx, dz;
+            switch (s.faultType()) {
+                case CONVERGENT_COLLISION, CONVERGENT_SUBDUCTION -> {
+                    dx = -nx * side;
+                    dz = -nz * side;
+                }
+                case DIVERGENT -> {
+                    dx = nx * side;
+                    dz = nz * side;
+                    ox = px + nx * side * 2;
+                    oz = pz + nz * side * 2;
+                }
+                default -> {
+                    dx = sx * side;
+                    dz = sz * side;
+                    ox = px + nx * side * 3 - dx * 2;
+                    oz = pz + nz * side * 3 - dz * 2;
+                }
+            }
+            arrow(data, ox, oz, dx, dz, ink);
+        }
+    }
+
+    /** A four-pixel arrow from (ox, oz) along (dx, dz), with a two-pixel head. */
+    private static void arrow(MapItemSavedData data, double ox, double oz, double dx, double dz, byte ink) {
+        for (int i = 0; i <= 3; i++) dot(data, ox + dx * i, oz + dz * i, ink);
+        double tx = ox + dx * 3, tz = oz + dz * 3;
+        double c = Math.cos(Math.toRadians(135)), s = Math.sin(Math.toRadians(135));
+        for (int sign = -1; sign <= 1; sign += 2) {
+            double bx = dx * c - dz * s * sign, bz = dx * s * sign + dz * c;
+            dot(data, tx + bx, tz + bz, ink);
+            dot(data, tx + bx * 2, tz + bz * 2, ink);
+        }
+    }
+
+    private static void dot(MapItemSavedData data, double x, double z, byte ink) {
+        int px = (int) Math.round(x), pz = (int) Math.round(z);
+        if (px < 0 || pz < 0 || px >= 128 || pz >= 128) return;
+        data.updateColor(px, pz, ink);
     }
 }

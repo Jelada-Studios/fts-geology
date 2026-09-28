@@ -29,6 +29,15 @@ public class CoreSampleItem extends Item {
         super(props);
     }
 
+    /** Looked at again: the core read out in the chat, as when it came up. */
+    @Override
+    public net.minecraft.world.InteractionResultHolder<ItemStack> use(Level level, net.minecraft.world.entity.player.Player player,
+                                                                   net.minecraft.world.InteractionHand hand) {
+        ItemStack stack = player.getItemInHand(hand);
+        if (!level.isClientSide && stack.getTagElement("Core") != null) describe(stack, level, player::sendSystemMessage);
+        return net.minecraft.world.InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
+    }
+
     @Override
     public Component getName(ItemStack stack) {
         CompoundTag core = stack.getTagElement("Core");

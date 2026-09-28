@@ -103,7 +103,16 @@ public class GeothermalProbeItem extends Item {
             double t = Math.min(1.0, heat / GeothermalTurbineBlockEntity.HEAT_FULL);
             int fe = (int) Math.round((min + (max - min) * t) * region);
             out.add(Component.translatable("probe.fts_geology.well", well, fe).withStyle(ChatFormatting.AQUA));
-            if (player != null) GeologyTrigger.award(player, "probe_heat");
+            if (player != null) {
+                GeologyTrigger.award(player, "probe_heat");
+                // Steam rising where the well would go, taller the hotter the reservoir.
+                for (int i = 0; i < 12; i++) {
+                    level.sendParticles(net.minecraft.core.particles.ParticleTypes.CAMPFIRE_COSY_SMOKE, x + 0.5,
+                            ground + 1.0 + i * 0.35, z + 0.5, 1, 0.05, 0.1, 0.05, 0.01 + heat * 0.002);
+                }
+                level.playSound(null, new BlockPos(x, ground + 1, z), net.minecraft.sounds.SoundEvents.FIRE_EXTINGUISH,
+                        net.minecraft.sounds.SoundSource.PLAYERS, 0.6f, 0.8f);
+            }
         } else {
             out.add(Component.translatable("probe.fts_geology.no_well", most).withStyle(ChatFormatting.GRAY));
         }

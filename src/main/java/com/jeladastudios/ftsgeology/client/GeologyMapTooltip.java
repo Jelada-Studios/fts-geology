@@ -23,5 +23,6 @@ public final class GeologyMapTooltip {
         event.getToolTip().add(Component.translatable("item.fts_geology.geology_map.key_rocks").withStyle(ChatFormatting.GRAY));
         event.getToolTip().add(Component.translatable("item.fts_geology.geology_map.key_more").withStyle(ChatFormatting.GRAY));
         event.getToolTip().add(Component.translatable("item.fts_geology.geology_map.key_faults").withStyle(ChatFormatting.GRAY));
+        event.getToolTip().add(Component.translatable("item.fts_geology.geology_map.key_marks").withStyle(ChatFormatting.GRAY));
     }
 }

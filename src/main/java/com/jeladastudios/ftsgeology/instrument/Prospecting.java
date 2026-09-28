@@ -85,8 +85,13 @@ public final class Prospecting {
      * reach. Only loaded ground is gone through. Whether a richer ore was found is returned in {@code found[0]}.
      */
     public static List<Component> read(ServerLevel level, BlockPos at, BlockState struck, boolean[] found) {
+        return read(level, at, struck, found, new BlockPos[1]);
+    }
+
+    /** As above; the nearest block of the ore pointed to is handed back in {@code target[0]}. */
+    public static List<Component> read(ServerLevel level, BlockPos at, BlockState struck, boolean[] found, BlockPos[] target) {
         List<Component> out = new ArrayList<>();
-        FaultType setting = TectonicMap.sample(level, at.getX(), at.getZ()).faultType();
+        FaultType setting = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sample(level, at.getX(), at.getZ()).faultType();
         out.add(Component.translatable("prospect.fts_geology.header",
                 Component.translatable(system(struck, setting))).withStyle(ChatFormatting.GOLD));
 
@@ -133,6 +138,7 @@ public final class Prospecting {
             return out;
         }
         found[0] = true;
+        target[0] = bestAt;
         int dx = bestAt.getX() - at.getX(), dy = bestAt.getY() - at.getY(), dz = bestAt.getZ() - at.getZ();
         int across = (int) Math.round(Math.hypot(dx, dz));
         Component where = across <= 1

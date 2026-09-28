@@ -73,10 +73,14 @@ public class GeologistsHammerItem extends Item {
                 && ctx.getPlayer() instanceof net.minecraft.server.level.ServerPlayer player) {
             if (com.jeladastudios.ftsgeology.instrument.Prospecting.readable(struck)) {
                 boolean[] found = new boolean[1];
-                for (Component line : com.jeladastudios.ftsgeology.instrument.Prospecting.read(server, pos, struck, found)) {
+                BlockPos[] target = new BlockPos[1];
+                for (Component line : com.jeladastudios.ftsgeology.instrument.Prospecting.read(server, pos, struck, found, target)) {
                     player.sendSystemMessage(line);
                 }
-                if (found[0]) com.jeladastudios.ftsgeology.advancement.GeologyTrigger.award(player, "prospect");
+                if (found[0]) {
+                    com.jeladastudios.ftsgeology.advancement.GeologyTrigger.award(player, "prospect");
+                    trail(server, pos, target[0]);
+                }
                 player.getCooldowns().addCooldown(this, 20);
             }
             com.jeladastudios.ftsgeology.advancement.GeologyTrigger.award(player, "hammer_rock");
@@ -86,6 +90,22 @@ public class GeologistsHammerItem extends Item {
         ctx.getItemInHand().hurtAndBreak(1, ctx.getPlayer(),
                 p -> p.broadcastBreakEvent(ctx.getHand()));
         return InteractionResult.CONSUME;
+    }
+
+    /**
+     * A prospector's sense of where the ore lies: a short trail of glints from the struck face off toward it, which way
+     * and not how far.
+     */
+    private static void trail(net.minecraft.server.level.ServerLevel level, BlockPos from, BlockPos to) {
+        double dx = to.getX() - from.getX(), dy = to.getY() - from.getY(), dz = to.getZ() - from.getZ();
+        double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len < 1e-6) return;
+        for (int i = 1; i <= 6; i++) {
+            double t = i * 0.5 / len;
+            level.sendParticles(net.minecraft.core.particles.ParticleTypes.END_ROD, from.getX() + 0.5 + dx * t,
+                    from.getY() + 0.5 + dy * t, from.getZ() + 0.5 + dz * t, 1, 0.02, 0.02, 0.02, 0.0);
+        }
+        level.playSound(null, from, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 0.7f, 1.6f);
     }
 
     /**
