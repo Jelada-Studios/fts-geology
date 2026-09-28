@@ -997,7 +997,8 @@ public final class GeyserConfig {
                         "rock, ore, a crystal or soil, or where rock closes round it on every side. What reads as",
                         "a build - bricks, planks, glass, lamps, doors - is left to go, as before. Chunks already",
                         "loaded and saved without the mod have lost those blocks for good; /geology fillvoids",
-                        "closes the small holes they left.")
+                        "closes the small holes they left. It cannot tell them from a small sealed room or a",
+                        "one-block tunnel end a player dug: run it where the mod's blocks were, not over your own.")
                 .define("removedModBlocksToRock", true);
         REMOVED_MOD_BLOCK_RULES = b
                 .comment("Your own choice for a removed mod's blocks, before the rules above: \"modid:block=replacement\"",
