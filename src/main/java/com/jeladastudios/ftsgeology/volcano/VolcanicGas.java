@@ -41,8 +41,11 @@ import java.util.Map;
  * Mammoth Mountain, where it has killed the trees and the odd skier who fell into a snow hollow. Whatever breathes it
  * is sickened and weakened, and whatever keeps its head down in it suffocates; flames go out in it.
  *
- * <p>A volcano reports its gas once a second while it is restless or erupting; its pockets are found then and kept for
- * five minutes, and the gas lingers a couple of minutes after it stops. Nothing is saved.</p>
+ * <p>A live volcano breathes it all the time: between eruptions it lies in the crater and round the vents on the
+ * flanks, where the plants in it die off over the days, as the trees have round Mammoth Mountain; while the volcano
+ * is restless or erupting it pours out and fills the hollows on its flanks too. A volcano reports its gas once a
+ * second; its pockets are found then and kept for five minutes, and the gas lingers a couple of minutes after it
+ * stops. Nothing is saved.</p>
  */
 @Mod.EventBusSubscriber(modid = GeysersMod.MODID)
 public final class VolcanicGas {
@@ -71,12 +74,15 @@ public final class VolcanicGas {
         final ResourceKey<Level> dimension;
         final List<Pocket> pockets;
         final long found;
+        /** Only the crater and the vents: the gas a volcano breathes between eruptions. */
+        final boolean quiet;
         long until;
 
-        Field(ResourceKey<Level> dimension, List<Pocket> pockets, long found) {
+        Field(ResourceKey<Level> dimension, List<Pocket> pockets, long found, boolean quiet) {
             this.dimension = dimension;
             this.pockets = pockets;
             this.found = found;
+            this.quiet = quiet;
         }
     }
 
@@ -85,11 +91,20 @@ public final class VolcanicGas {
 
     /** Once a second from a restless or erupting volcano: its gas keeps coming, and lies where it can. */
     public static void seep(ServerLevel level, BlockPos summit, int craterR, int magnitude, long[] vents) {
+        seep(level, summit, craterR, magnitude, vents, false);
+    }
+
+    /** Once a second from a live volcano between eruptions: gas in its crater and round its vents. */
+    public static void breatheQuietly(ServerLevel level, BlockPos summit, int craterR, int magnitude, long[] vents) {
+        seep(level, summit, craterR, magnitude, vents, true);
+    }
+
+    private static void seep(ServerLevel level, BlockPos summit, int craterR, int magnitude, long[] vents, boolean quiet) {
         if (!GeyserConfig.VOLCANIC_GAS.get()) return;
         long now = level.getGameTime();
         Field f = FIELDS.get(summit.asLong());
-        if (f == null || now - f.found > KEEP) {
-            f = new Field(level.dimension(), find(level, summit, craterR, magnitude, vents), now);
+        if (f == null || now - f.found > KEEP || f.quiet && !quiet) {
+            f = new Field(level.dimension(), find(level, summit, craterR, magnitude, vents, quiet), now, quiet);
             FIELDS.put(summit.asLong(), f);
             com.jeladastudios.ftsgeology.util.Diagnostics.info("Volcano at {} is venting gas: {} pockets{}", summit, f.pockets.size(),
                     f.pockets.stream().limit(4).map(p -> String.format(java.util.Locale.ROOT, "; %d %d %d-%d r%d", p.x(), p.z(), p.floor(), p.top(), p.r()))
@@ -102,7 +117,8 @@ public final class VolcanicGas {
      * Where the gas lies: the crater, filled to its lowest notch, and the hollows on the flanks and round the vents, each
      * filled to the lowest point of its rim, no more than {@link #DEEPEST} deep.
      */
-    private static List<Pocket> find(ServerLevel level, BlockPos summit, int craterR, int magnitude, long[] vents) {
+    private static List<Pocket> find(ServerLevel level, BlockPos summit, int craterR, int magnitude, long[] vents,
+                                     boolean quiet) {
         List<Pocket> out = new ArrayList<>();
         // The crater, over its lava.
         int rim = Integer.MAX_VALUE;
@@ -118,8 +134,8 @@ public final class VolcanicGas {
             out.add(new Pocket(summit.getX(), summit.getZ(), summit.getY(), Math.min(rim, summit.getY() + 6), craterR + 1));
         }
         List<Pocket> hollows = new ArrayList<>();
-        int reach = Math.min(64, craterR + 16 + magnitude);
-        for (int dx = -reach; dx <= reach; dx += STEP) {
+        int reach = quiet ? 0 : Math.min(64, craterR + 16 + magnitude);
+        for (int dx = -reach; dx <= reach && reach > 0; dx += STEP) {
             for (int dz = -reach; dz <= reach; dz += STEP) {
                 if (dx * dx + dz * dz > reach * reach) continue;
                 hollow(level, summit.getX() + dx, summit.getZ() + dz, hollows);
@@ -191,7 +207,10 @@ public final class VolcanicGas {
             for (Pocket p : f.pockets) {
                 if (!PyroclasticFlow.ticking(level, p.x(), p.z())) continue;
                 breathe(level, p);
-                if (douse) douse(level, p);
+                if (douse) {
+                    douse(level, p);
+                    wither(level, p);
+                }
             }
         }
     }
@@ -248,8 +267,42 @@ public final class VolcanicGas {
         }
     }
 
+    /** How often, one in so many looks, a plant in the gas dies, or the grass under it. */
+    private static final int WITHER = 12;
+
+    /**
+     * The plants in a pocket die off: grass, flowers and saplings go, leaves drop, and the grass under them turns to
+     * bare soil -- the dead ground a gas pocket shows by, since the gas itself is never seen.
+     */
+    private static void wither(ServerLevel level, Pocket p) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int dx = -p.r(); dx <= p.r(); dx++) {
+            for (int dz = -p.r(); dz <= p.r(); dz++) {
+                if (level.random.nextInt(WITHER) != 0) continue;
+                for (int y = p.top(); y >= p.floor() - 1; y--) {
+                    m.set(p.x() + dx, y, p.z() + dz);
+                    BlockState s = level.getBlockState(m);
+                    if (s.isAir()) continue;
+                    if (TerrainProbe.isVegetation(s) && !s.is(Blocks.SNOW) || s.is(net.minecraft.tags.BlockTags.LEAVES)) {
+                        level.setBlock(m, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+                        withered++;
+                        break;
+                    }
+                    if (s.is(Blocks.GRASS_BLOCK) || s.is(Blocks.PODZOL) || s.is(Blocks.MYCELIUM)) {
+                        level.setBlock(m, Blocks.COARSE_DIRT.defaultBlockState(), Block.UPDATE_ALL);
+                        withered++;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    private static int withered;
+
     public static String summary() {
-        return String.format(java.util.Locale.ROOT, "gas: %d breaths of it, %d flames out", sickened, flames);
+        return String.format(java.util.Locale.ROOT, "gas: %d breaths of it, %d flames out, %d plants withered",
+                sickened, flames, withered);
     }
 
     @SubscribeEvent

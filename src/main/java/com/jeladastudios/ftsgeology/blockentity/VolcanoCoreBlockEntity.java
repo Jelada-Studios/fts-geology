@@ -453,6 +453,10 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                     }
                     com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.tick(server, summit, be.magnitude, unrest, true);
                     com.jeladastudios.ftsgeology.volcano.VolcanicGas.seep(server, summit, be.craterR, be.magnitude, be.surfaceVents);
+                } else if (!be.sealed) {
+                    // An open, live volcano breathes gas between eruptions too, into its crater and round its vents.
+                    com.jeladastudios.ftsgeology.volcano.VolcanicGas.breatheQuietly(server, summit, be.craterR, be.magnitude,
+                            be.surfaceVents);
                 }
                 be.idleSmoke(server, summit, (float) (0.4 + 0.6 * unrest), true); // lazy smoke, thickening as it wakes
                 if ((be.timer -= 20) <= 0) {

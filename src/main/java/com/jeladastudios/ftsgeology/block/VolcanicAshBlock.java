@@ -32,7 +32,8 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * eruption thickens the deposit instead of re-stamping it, and a player can shovel a path through
  * it. The fall could not do any of those while it was rewriting the ground.</p>
  *
- * <p>This is vanilla's snow layer with the melting taken out - ash does not thaw, it gets buried.
+ * <p>This is vanilla's snow layer with the melting taken out - ash does not thaw; it wears away
+ * slowly in the open (see {@link #randomTick}) and stays where it is sheltered or buried.
  * Nothing here is a new mechanic, which is the point: it behaves the way players already expect a
  * thin covering to behave.</p>
  */
@@ -136,5 +137,44 @@ public class VolcanicAshBlock extends Block {
     public boolean isPathfindable(BlockState state, BlockGetter level, BlockPos pos,
                                   PathComputationType type) {
         return type == PathComputationType.LAND && state.getValue(LAYERS) < 5;
+    }
+
+    /**
+     * Ash wears away. Tephra lying in the open is washed off by the rain and blown about by the wind within months of
+     * an eruption; what is left is worked into the soil, and the grass comes up through it. Here it goes a layer at a
+     * time where the sky is open over it -- about a layer a game day, twice as fast in the rain, a little faster on an
+     * edge the wind gets at -- so a dusting is gone in a day or two and a deep bed lasts a week or more. Ash under a
+     * roof or under more ash stays.
+     */
+    @Override
+    public boolean isRandomlyTicking(BlockState state) {
+        return true;
+    }
+
+    /** A random tick comes to each block about every 68 seconds, some 18 times a game day. */
+    private static final double PER_TICK = 1.0 / 18.0;
+
+    @Override
+    public void randomTick(BlockState state, net.minecraft.server.level.ServerLevel level, BlockPos pos,
+                           net.minecraft.util.RandomSource random) {
+        double rate;
+        try {
+            rate = com.jeladastudios.ftsgeology.config.GeyserConfig.ASH_WEATHERING.get();
+        } catch (IllegalStateException e) {
+            return;
+        }
+        if (rate <= 0 || !level.canSeeSky(pos.above())) return;
+        double chance = PER_TICK * rate;
+        if (level.isRainingAt(pos.above())) chance *= 2.0;
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            if (level.getBlockState(pos.relative(d)).isAir()) {
+                chance *= 1.5;
+                break;
+            }
+        }
+        if (random.nextDouble() >= chance) return;
+        int layers = state.getValue(LAYERS);
+        level.setBlock(pos, layers > 1 ? state.setValue(LAYERS, layers - 1) : Blocks.AIR.defaultBlockState(),
+                Block.UPDATE_ALL);
     }
 }

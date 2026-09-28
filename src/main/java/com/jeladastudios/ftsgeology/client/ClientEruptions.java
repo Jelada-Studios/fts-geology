@@ -92,11 +92,13 @@ public final class ClientEruptions {
             ACTIVE.clear();   // nothing carries over into the next world
             FLOWS.clear();
             fog = 0;
+            com.jeladastudios.ftsgeology.compat.dh.DhAshFog.update(0.0);
             return;
         }
         if (mc.isPaused()) return;
         if (ACTIVE.isEmpty() && FLOWS.isEmpty()) {
             fog = Math.max(0.0, fog - 0.015);
+            com.jeladastudios.ftsgeology.compat.dh.DhAshFog.update(fog);
             return;
         }
         long now = level.getGameTime();
@@ -112,6 +114,8 @@ public final class ClientEruptions {
         for (FlowView v : FLOWS.values()) emitFlow(level, v, eye, setting, level.random);
         double target = ashInAir(eye);
         fog += (target - fog) * (target > fog ? 0.03 : 0.015);
+        // Distant Horizons turns the game fog off unless told otherwise.
+        com.jeladastudios.ftsgeology.compat.dh.DhAshFog.update(fog);
     }
 
     /**
