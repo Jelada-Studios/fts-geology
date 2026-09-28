@@ -204,8 +204,22 @@ public final class TectonicCommands {
                                                                 IntegerArgumentType.getInteger(ctx, "dx"),
                                                                 IntegerArgumentType.getInteger(ctx, "dz"),
                                                                 IntegerArgumentType.getInteger(ctx, "length")))))))
+                        // The small holes a removed mod's blocks left in the ground, closed with the rock round them.
+                        .then(Commands.literal("fillvoids")
+                                .executes(ctx -> fillVoids(ctx, 32))
+                                .then(Commands.argument("radius", IntegerArgumentType.integer(4, 96))
+                                        .executes(ctx -> fillVoids(ctx, IntegerArgumentType.getInteger(ctx, "radius")))))
                         .then(Commands.literal("debug")
                                 .then(Commands.literal("cost").executes(TectonicCommands::cost))));
+    }
+
+    /** /geology fillvoids [radius]: closes the small holes a removed mod's blocks left in the ground round here. */
+    static int fillVoids(CommandContext<CommandSourceStack> ctx, int radius) {
+        com.jeladastudios.ftsgeology.compat.RemovedModBlocks.Filled f = com.jeladastudios.ftsgeology.compat.RemovedModBlocks
+                .fillVoids(ctx.getSource().getLevel(), BlockPos.containing(ctx.getSource().getPosition()), radius);
+        ctx.getSource().sendSuccess(() -> Component.translatable("command.fts_geology.fillvoids", f.pockets(), f.niches(),
+                f.blocks(), radius).withStyle(ChatFormatting.YELLOW), true);
+        return f.blocks();
     }
 
     /** /geology debug cost: what world generation has cost the mod since the last time it was asked; then starts again. */

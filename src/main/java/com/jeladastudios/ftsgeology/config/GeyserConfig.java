@@ -184,6 +184,8 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue UPDATE_NOTICE;
     public static final ForgeConfigSpec.BooleanValue OLDER_WORLD_NOTICE;
     public static final ForgeConfigSpec.BooleanValue DH_TERRAIN;
+    public static final ForgeConfigSpec.BooleanValue REMOVED_MOD_BLOCKS;     // a removed mod's rock stays rock
+    public static final ForgeConfigSpec.ConfigValue<java.util.List<? extends String>> REMOVED_MOD_BLOCK_RULES;
     public static final ForgeConfigSpec.BooleanValue VERBOSE_LOG;            // default OFF
 
     // --- Hydrology (groundwater) ---------------------------------------------
@@ -985,6 +987,23 @@ public final class GeyserConfig {
                         "without trees' shapes, villages or caves, which appear once the ground is really generated.",
                         "Off, Distant Horizons generates the far chunks its own way.")
                 .define("distantHorizonsTerrain", true);
+        REMOVED_MOD_BLOCKS = b
+                .comment("When a mod is taken out of a world, the blocks it laid in the ground turn to air as their",
+                        "chunks load, and the hole is saved: ore and fossil pockets, crystals and rock left empty in",
+                        "cave walls. On, such a block becomes the rock round it instead (deepslate for a deepslate",
+                        "one, the local rock in TerraFirmaCraft) as its chunk loads, where its name reads like",
+                        "rock, ore, a crystal or soil, or where rock closes round it on every side. What reads as",
+                        "a build - bricks, planks, glass, lamps, doors - is left to go, as before. Chunks already",
+                        "loaded and saved without the mod have lost those blocks for good; /geology fillvoids",
+                        "closes the small holes they left.")
+                .define("removedModBlocksToRock", true);
+        REMOVED_MOD_BLOCK_RULES = b
+                .comment("Your own choice for a removed mod's blocks, before the rules above: \"modid:block=replacement\"",
+                        "for one block or \"modid:*=replacement\" for all of a mod's, the replacement a block id or",
+                        "\"air\" (to let it go) or \"rock\" (the rock round it). For example",
+                        "[\"jurassicreborn:*=rock\", \"somemod:glowing_egg=air\"].")
+                .defineListAllowEmpty(java.util.List.of("removedModBlockRules"), java.util.List::of,
+                        o -> o instanceof String s && s.indexOf(':') > 0 && s.indexOf('=') > s.indexOf(':'));
         b.pop();
 
         b.push("diagnostics");

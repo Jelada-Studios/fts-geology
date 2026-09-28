@@ -365,6 +365,7 @@
   "command.fts_geology.aftershocks_line": "  aftershock M%s at %s %s, %s blocks away, in %s s",
   "command.fts_geology.aftershocks_main": "  MAIN SHOCK M%s at %s %s, %s blocks away, in %s s (a foreshock came before it)",
   "command.fts_geology.aftershocks_cleared": "Forgot %s scheduled shocks",
+  "command.fts_geology.fillvoids": "Closed %s pockets and %s niches in the rock, %s blocks, within %s blocks",
   "item.fts_geology.core_drill": "Core Drill",
   "item.fts_geology.core_drill.tip": "Use on the ground: bores %s blocks down and brings up a core",
   "item.fts_geology.core_sample": "Core Sample",

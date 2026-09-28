@@ -355,6 +355,7 @@
   "command.fts_geology.aftershocks_line": "  artçı M%s, %s %s, %s blok uzakta, %s s sonra",
   "command.fts_geology.aftershocks_main": "  ANA ŞOK M%s, %s %s, %s blok uzakta, %s s sonra (öncesinde öncü deprem oldu)",
   "command.fts_geology.aftershocks_cleared": "Bekleyen %s sarsıntı silindi",
+  "command.fts_geology.fillvoids": "Kayada %s kapalı boşluk ve %s oyuk dolduruldu, %s blok, %s blok içinde",
   "item.fts_geology.core_drill": "Karot Sondası",
   "item.fts_geology.core_drill.tip": "Zemine kullan: %s blok aşağı deler ve bir karot çıkarır",
   "item.fts_geology.core_sample": "Karot Numunesi",
