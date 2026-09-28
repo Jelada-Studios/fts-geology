@@ -191,6 +191,8 @@ public final class GeyserConfig {
     // --- Hydrology (groundwater) ---------------------------------------------
     public static final ForgeConfigSpec.BooleanValue RIVERS;                 // default ON, experimental
     public static final ForgeConfigSpec.BooleanValue RIVERS_REFILL;          // lost river water comes back
+    public static final ForgeConfigSpec.BooleanValue SOIL_WATER;             // the ground's water, kept per chunk
+    public static final ForgeConfigSpec.BooleanValue SOIL_WATER_GROUND;      // grass colour, rain-fed farmland
     public static final ForgeConfigSpec.BooleanValue KARST;                  // rivers sink, caves, sinkholes
     public static final ForgeConfigSpec.BooleanValue WATER_TABLE_ENABLED;
     public static final ForgeConfigSpec.DoubleValue WATER_TABLE_SUBDUAL;      // relief it copies, 0..1
@@ -1066,6 +1068,22 @@ public final class GeyserConfig {
                         "drained away by another mod flows back in from the water beside it, a little at a time.",
                         "A stretch walled off from the rest of the river stays dry.")
                 .define("riversRefill", true);
+        SOIL_WATER = b
+                .comment("Keep account of the water in the ground across the overworld: how wet the soil is at the top,",
+                        "in the root zone and deep down, water standing on it, and how far the groundwater stands over",
+                        "or under its usual level. Rain soaks in as the soil takes it, sun and plants dry it out, the",
+                        "deep soil feeds the groundwater. A game day is a week of the ground's time: a shower wets the",
+                        "top for half a day, a dry spell dries the root zone in three or four. Kept in the chunks' own",
+                        "saves, a small share of the tick. On its own it changes no block; /geology water, the core",
+                        "sample and the geothermal probe read it. Not in TerraFirmaCraft, which keeps its own.")
+                .define("soilWater", true);
+        SOIL_WATER_GROUND = b
+                .comment("Let the water in the ground show (needs soilWater). Grass, ferns and the grass block turn",
+                        "towards straw as the root zone dries -- from about the third dry day, straw by the seventh --",
+                        "and green again after rain; farmland over soil wet enough stays moist without water beside",
+                        "it, as rain-fed fields do. Only colours and farmland moisture change: no block is replaced.",
+                        "Off by default while it is new.")
+                .define("soilWaterChangesGround", false);
         KARST = b
                 .comment("Karst, in the mod's own world types: where marble or calcite lies close under a plateau's",
                         "flat beds, a platform's or a foreland's, in the regions that have it, the ground takes its",

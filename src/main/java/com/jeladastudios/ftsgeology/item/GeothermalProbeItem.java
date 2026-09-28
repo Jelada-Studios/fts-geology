@@ -79,6 +79,14 @@ public class GeothermalProbeItem extends Item {
                 player.getZ()) != null) {
             out.add(Component.translatable("probe.fts_geology.gas").withStyle(ChatFormatting.DARK_RED));
         }
+        // The water in the ground here: how wet the roots are, and how far down the groundwater stands.
+        com.jeladastudios.ftsgeology.hydrology.SoilWater.Reading soil =
+                com.jeladastudios.ftsgeology.hydrology.SoilWater.at(level, x, z);
+        if (soil != null && soil.soil().ground() && soil.depth() >= 0) {
+            out.add(Component.translatable("probe.fts_geology.soil", InspectCommands.pct(soil.rootAvailable()),
+                    InspectCommands.bar(soil.rootAvailable()), InspectCommands.dec(Math.max(0, soil.depth() - soil.table()), 1),
+                    soil.depth()).withStyle(ChatFormatting.AQUA));
+        }
         out.add(Component.translatable("command.fts_geology.suitability.volcano", InspectCommands.dec(fit.volcano(), 2),
                 InspectCommands.bar(fit.volcano())));
         out.add(Component.translatable("command.fts_geology.suitability.geyser", InspectCommands.dec(fit.geyser(), 2),

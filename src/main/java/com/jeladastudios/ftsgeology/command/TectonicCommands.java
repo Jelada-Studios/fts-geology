@@ -60,6 +60,7 @@ public final class TectonicCommands {
                         .then(Commands.literal("plate").executes(InspectCommands::plate))
                         .then(Commands.literal("suitability").executes(InspectCommands::suitability))
                         .then(Commands.literal("column").executes(InspectCommands::column))
+                        .then(Commands.literal("water").executes(InspectCommands::water))
                         .then(Commands.literal("deepgen")
                                 .executes(ctx -> deepgen(ctx, 0))
                                 .then(Commands.argument("chunkRadius", IntegerArgumentType.integer(0, 8))

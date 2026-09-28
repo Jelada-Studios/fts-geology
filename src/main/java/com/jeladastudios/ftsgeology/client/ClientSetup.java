@@ -52,6 +52,8 @@ public final class ClientSetup {
         event.register((state, level, pos, tint) -> level != null && pos != null
                         ? net.minecraft.client.renderer.BiomeColors.getAverageWaterColor(level, pos) : 0x3F76E4,
                 com.jeladastudios.ftsgeology.registry.ModBlocks.RIVER_WATER.get());
+        // Grass paler where the ground under it has dried out; the biome's own green where the server says nothing.
+        event.register(ClientSoilTint::grass, ClientSoilTint.GRASSES);
     }
 
     /** The geothermal turbine's rotor turns: a renderer for it, and its model baked though no block names it. */

@@ -31,7 +31,7 @@ public final class ModNetwork {
 
     private ModNetwork() {}
 
-    private static final String VERSION = "3";
+    private static final String VERSION = "4";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(GeysersMod.MODID, "main"),
@@ -55,6 +55,11 @@ public final class ModNetwork {
                 .encoder(FlowPacket::encode)
                 .decoder(FlowPacket::decode)
                 .consumerMainThread(FlowPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SoilTintPacket.class, id++)
+                .encoder(SoilTintPacket::encode)
+                .decoder(SoilTintPacket::decode)
+                .consumerMainThread(SoilTintPacket::handle)
                 .add();
     }
 

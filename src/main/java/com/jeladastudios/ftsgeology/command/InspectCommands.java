@@ -187,6 +187,45 @@ public final class InspectCommands {
         return "[" + "#".repeat(filled) + "-".repeat(10 - filled) + "]";
     }
 
+    // === /geology water =====================================================
+
+    /** The water in the ground here: the soil's layers, water standing on it, and the groundwater. */
+    static int water(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        com.jeladastudios.ftsgeology.hydrology.SoilWater.Reading r =
+                com.jeladastudios.ftsgeology.hydrology.SoilWater.at(level, at.getX(), at.getZ());
+        if (r == null) {
+            source.sendSuccess(() -> Component.translatable("command.fts_geology.water.none").withStyle(ChatFormatting.GRAY), false);
+            return 0;
+        }
+        Component soil = Component.translatable("command.fts_geology.water.soil." + r.soil().name().toLowerCase(Locale.ROOT));
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.water.header", at.getX(), at.getZ(), soil)
+                .withStyle(ChatFormatting.GOLD), false);
+        if (r.soil() == com.jeladastudios.ftsgeology.hydrology.SoilWater.Soil.WATER) {
+            source.sendSuccess(() -> Component.translatable("command.fts_geology.water.open").withStyle(ChatFormatting.AQUA), false);
+            return 1;
+        }
+        if (!r.soil().ground()) return 1;
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.water.layers",
+                pct(r.topSat()), dec(r.top(), 1), pct(r.rootSat()), dec(r.root(), 0),
+                pct(r.deepSat()), dec(r.deep(), 0)).withStyle(ChatFormatting.AQUA), false);
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.water.usable",
+                pct(r.rootAvailable()), bar(r.rootAvailable())).withStyle(ChatFormatting.AQUA), false);
+        String table = r.depth() < 0 ? "?" : dec(Math.max(0, r.depth() - r.table()), 1);
+        String usual = r.depth() < 0 ? "?" : String.valueOf(r.depth());
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.water.ground", dec(r.pond(), 1), table, usual,
+                (r.table() >= 0 ? "+" : "") + dec(r.table(), 2)).withStyle(ChatFormatting.AQUA), false);
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.water.looked", dec(r.hoursSinceLook(), 1),
+                r.grassDryness()).withStyle(ChatFormatting.DARK_GRAY), false);
+        return 1;
+    }
+
+    public static String pct(double v) {
+        return String.valueOf((int) Math.round(100 * v));
+    }
+
     // === /geology map (item) ================================================
 
     /**

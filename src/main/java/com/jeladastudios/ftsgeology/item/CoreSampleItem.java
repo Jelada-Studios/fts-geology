@@ -123,6 +123,11 @@ public class CoreSampleItem extends Item {
                         .withStyle(ChatFormatting.YELLOW));
             }
         }
+        int[] soil = core.getIntArray("Soil");
+        if (soil.length == 3) {
+            out.accept(Component.translatable("item.fts_geology.core_sample.soil", soil[0], soil[1], soil[2])
+                    .withStyle(ChatFormatting.AQUA));
+        }
         int water = top - core.getInt("Water");
         out.accept((water <= 0
                 ? Component.translatable("item.fts_geology.core_sample.water_at_surface")

@@ -144,6 +144,13 @@ public class CoreDrillItem extends Item {
         tag.put("Beds", beds);
         tag.put("Deposits", deposits);
         tag.putInt("Water", com.jeladastudios.ftsgeology.hydrology.WaterTable.tableY(level, top.getX(), top.getZ()));
+        // How wet the soil was when it was drilled, layer by layer, in hundredths.
+        com.jeladastudios.ftsgeology.hydrology.SoilWater.Reading soil =
+                com.jeladastudios.ftsgeology.hydrology.SoilWater.at(level, top.getX(), top.getZ());
+        if (soil != null && soil.soil().ground()) {
+            tag.putIntArray("Soil", new int[]{(int) Math.round(100 * soil.topSat()), (int) Math.round(100 * soil.rootSat()),
+                    (int) Math.round(100 * soil.deepSat())});
+        }
         return core;
     }
 
