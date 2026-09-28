@@ -36,7 +36,7 @@ public final class InspectCommands {
         }
         ServerLevel level = source.getLevel();
         BlockPos at = BlockPos.containing(source.getPosition());
-        PlateSample s = TectonicMap.sample(level, at.getX(), at.getZ());
+        PlateSample s = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sample(level, at.getX(), at.getZ());
 
         source.sendSuccess(() -> Component.translatable("command.fts_geology.tectonics_s_s", at.getX(), at.getZ())
                 .withStyle(ChatFormatting.GOLD), false);
@@ -124,7 +124,7 @@ public final class InspectCommands {
                     line.append(Component.literal("*").withStyle(ChatFormatting.LIGHT_PURPLE));
                     continue;
                 }
-                PlateSample s = TectonicMap.sampleCached(level, wx, wz);
+                PlateSample s = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sampleCached(level, wx, wz);
                 line.append(Component.literal(String.valueOf(glyph(s))).withStyle(colorOf(s.faultType())));
             }
             rows.add(line);
@@ -270,7 +270,7 @@ public final class InspectCommands {
         CommandSourceStack source = ctx.getSource();
         ServerLevel level = source.getLevel();
         BlockPos at = BlockPos.containing(source.getPosition());
-        PlateSample s = TectonicMap.sample(level, at.getX(), at.getZ());
+        PlateSample s = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sample(level, at.getX(), at.getZ());
 
         int top = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, at.getX(), at.getZ());
         if (top == Integer.MIN_VALUE) top = level.getHeight(
@@ -399,7 +399,7 @@ public final class InspectCommands {
         ServerLevel level = source.getLevel();
         BlockPos at = BlockPos.containing(source.getPosition());
         net.minecraft.world.level.ChunkPos centre = new net.minecraft.world.level.ChunkPos(at);
-        PlateSample s = TectonicMap.sample(level, at.getX(), at.getZ());
+        PlateSample s = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sample(level, at.getX(), at.getZ());
 
         int done = 0, blocks = 0;
         String note = null;

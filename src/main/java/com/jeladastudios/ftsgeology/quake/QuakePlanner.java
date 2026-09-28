@@ -46,14 +46,22 @@ public final class QuakePlanner {
     private QuakePlanner() {}
 
     /** One block change queued by a quake. */
-    public record Edit(BlockPos pos, BlockState state) {}
+    /**
+     * One block the quake writes. {@code carried} marks what stood on the ground moving with it, which is not the
+     * ground being dug away: the settling afterwards reads only real digging as ground gone from under something.
+     */
+    public record Edit(BlockPos pos, BlockState state, boolean carried) {
+        public Edit(BlockPos pos, BlockState state) {
+            this(pos, state, false);
+        }
+    }
 
     /** A point on the rupture, carrying the local fault direction and how much it slipped. */
     public record TracePoint(int x, int z, double strikeX, double strikeZ, double slip) {}
 
     /** A fully planned earthquake, ready to be applied on the server thread. */
     public record Plan(BlockPos epicentre, FaultType type, double magnitude,
-                       double depthMetres, int ruptureLength, List<Edit> edits) {}
+                       double depthMetres, int ruptureLength, List<Edit> edits, long[] wrecked) {}
 
     /** How far apart the fault is re-sampled while tracing; between these the strike is lerped. */
     private static final int TRACE_STEP = 8;
@@ -161,7 +169,7 @@ public final class QuakePlanner {
             // Step forward, then re-read the fault so the next segment follows its curve.
             x += sx * TRACE_STEP * sign;
             z += sz * TRACE_STEP * sign;
-            PlateSample s = TectonicMap.sample(level, (int) Math.round(x), (int) Math.round(z));
+            PlateSample s = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sample(level, (int) Math.round(x), (int) Math.round(z));
             // A natural rupture ends where the boundary changes kind. A forced one (the command)
             // keeps going so a style can be shown anywhere.
             if (!forced && (s.faultType() != type || s.stress() <= 0.02)) break;
@@ -243,10 +251,12 @@ public final class QuakePlanner {
                 double d2 = (x - px) * (x - px) + (z - pz) * (z - pz);
                 if (d2 > (double) band * band) continue;
 
-                // Coordinate: the perpendicular offset. Measured against the segment's own line, so
-                // it is the real distance across the fault wherever the column happens to sit.
-                double across = dx * nx + dz * nz;
-                if (Math.abs(across) > band) continue;
+                // Coordinate: the distance to the segment, on the side of the fault the column is on. Alongside the
+                // segment that is the offset from its line; off its ends, the distance to the nearer end, not the
+                // offset from a line the column is nowhere near.
+                double offset = dx * nx + dz * nz;
+                if (Math.abs(offset) > band) continue;
+                double across = Math.copySign(Math.sqrt(d2), offset);
 
                 double f = Mth.clamp(along / TRACE_STEP, 0.0, 1.0);
                 double slip = tp.slip();
@@ -271,7 +281,8 @@ public final class QuakePlanner {
          * One column. The stack is sized per column rather than globally: only the strip that will
          * actually be dug deep - a trench floor, a rift fissure - needs twenty blocks of history.
          */
-        private record Column(int groundY, boolean submerged, boolean generated, BlockState[] stack) {}
+        private record Column(int groundY, boolean submerged, boolean generated, boolean built, boolean playerBuilt,
+                              BlockState[] stack, BlockState[] above) {}
 
         // fastutil (already shipped with Minecraft) so the millions of lookups a large rupture
         // makes do not each allocate a boxed Long.
@@ -315,15 +326,48 @@ public final class QuakePlanner {
             return c != null && c.generated();
         }
 
+        /** True when something built -- a player's, or a structure's -- stands on this column's ground. */
+        public boolean builtAt(int x, int z) {
+            Column c = columns.get(key(x, z));
+            return c != null && c.built();
+        }
+
+        /** True when what stands on this column is a player's: placed by one, or worked material outside a structure. */
+        public boolean playerBuiltAt(int x, int z) {
+            Column c = columns.get(key(x, z));
+            return c != null && c.playerBuilt();
+        }
+
+        /** What stands on this column's ground and moves with it, from the block over it up; null if it cannot. */
+        public BlockState[] aboveAt(int x, int z) {
+            Column c = columns.get(key(x, z));
+            return c == null ? null : c.above();
+        }
+
         /** How deep this column was captured; a deformation may not carve past it. */
         public int depthAt(int x, int z) {
             Column c = columns.get(key(x, z));
             return c == null ? 0 : c.stack().length;
         }
 
-        /** Large volcanoes over the corridor, found while the snapshot is taken. */
+        /** Large volcanoes over the corridor, looked up by the planner before it starts. */
         private final java.util.List<com.jeladastudios.ftsgeology.volcano.VolcanoField.Site> volcanoes =
                 new java.util.ArrayList<>();
+        /** Where to look for them: the level and the corridor's bounds, or null once looked. */
+        private ServerLevel volcanoLevel;
+        private int[] volcanoBox;
+
+        /**
+         * Finds the large volcanoes over the corridor. Working a volcano cell out costs a tenth of a second or more, and
+         * a long rupture crosses a dozen; the planner does it off the server thread.
+         */
+        void findVolcanoes() {
+            if (volcanoBox == null) return;
+            volcanoes.addAll(com.jeladastudios.ftsgeology.volcano.VolcanoField.sitesInBox(volcanoLevel,
+                    volcanoBox[0], volcanoBox[1], volcanoBox[2], volcanoBox[3]));
+            volcanoBox = null;
+            volcanoLevel = null;
+        }
 
         /**
          * How much of the quake a column takes: all of it in open country, a quarter rising to all of it across
@@ -359,42 +403,140 @@ public final class QuakePlanner {
      */
     public static Snapshot snapshot(ServerLevel level, List<TracePoint> trace, FaultType type,
                                     double magnitude, ChunkPos clip) {
-        Snapshot snap = new Snapshot();
-        int band = deformationHalfWidth(type, magnitude);
-        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        SnapshotJob job = new SnapshotJob(level, trace, type, magnitude, clip, null, null);
+        job.step(Long.MAX_VALUE / 4);
+        return job.snapshot();
+    }
 
-        for (int i = 0; i < trace.size(); i++) {
-            if (snap.size() >= MAX_SNAPSHOT_COLUMNS) break;
+    /**
+     * A snapshot read a slice at a time. A great rupture's corridor is a hundred thousand columns and more, and read in
+     * one go it held the server for seconds; the warning before the ground moves is time enough to read it in steps.
+     * Only the chunks loaded when the quake struck are read -- the rest were parked for when they load -- and one of
+     * those that has left memory since is handed to {@code gone} to be parked in its turn.
+     */
+    public static final class SnapshotJob {
+        private final ServerLevel level;
+        private final List<TracePoint> trace;
+        private final FaultType type;
+        private final double magnitude;
+        private final ChunkPos clip;
+        private final it.unimi.dsi.fastutil.longs.LongSet only;
+        private final java.util.function.LongConsumer gone;
+        private final Snapshot snap = new Snapshot();
+        private final int band;
+        private final boolean structures = GeyserConfig.QUAKES_BREAK_STRUCTURES.get();
+        private final BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        // Per chunk, read once: what players placed there, and the pieces of the structures standing in it.
+        private final it.unimi.dsi.fastutil.longs.Long2ObjectMap<it.unimi.dsi.fastutil.longs.LongSet> placed =
+                new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+        private final it.unimi.dsi.fastutil.longs.Long2ObjectMap<List<net.minecraft.world.level.levelgen.structure.BoundingBox>> boxes =
+                new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+        private final it.unimi.dsi.fastutil.longs.LongSet missing = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+        private int next, steps;
+        private boolean done;
+        /** Where the time goes: in all, the chunk lookups, the ground, the columns under it, what stands on it. */
+        private long nanos, chunkNanos, groundNanos, stackNanos, carryNanos, volcanoNanos;
+
+        public SnapshotJob(ServerLevel level, List<TracePoint> trace, FaultType type, double magnitude, ChunkPos clip,
+                           it.unimi.dsi.fastutil.longs.LongSet only, java.util.function.LongConsumer gone) {
+            this.level = level;
+            this.trace = trace;
+            this.type = type;
+            this.magnitude = magnitude;
+            this.clip = clip;
+            this.only = only;
+            this.gone = gone;
+            this.band = deformationHalfWidth(type, magnitude);
+        }
+
+        public Snapshot snapshot() {
+            return snap;
+        }
+
+        public boolean done() {
+            return done;
+        }
+
+        /** Reads trace points for about {@code budgetNanos}, one at the least; true once the whole corridor is in. */
+        public boolean step(long budgetNanos) {
+            if (done) return true;
+            long start = System.nanoTime(), deadline = start + budgetNanos;
+            steps++;
+            do {
+                if (next >= trace.size() || snap.size() >= MAX_SNAPSHOT_COLUMNS) {
+                    finish();
+                    break;
+                }
+                take(next++);
+            } while (System.nanoTime() < deadline);
+            nanos += System.nanoTime() - start;
+            return done;
+        }
+
+        /** One line on how long the reading took and where the time went. */
+        public String timing() {
+            return String.format(java.util.Locale.ROOT,
+                    "%d columns in %d ms over %d ticks (chunks %d, ground %d, columns %d, cover %d, bounds %d ms)",
+                    snap.size(), nanos / 1_000_000, steps, chunkNanos / 1_000_000, groundNanos / 1_000_000,
+                    stackNanos / 1_000_000, carryNanos / 1_000_000, volcanoNanos / 1_000_000);
+        }
+
+        private void take(int i) {
             TracePoint tp = trace.get(i);
-            TracePoint next = i + 1 < trace.size() ? trace.get(i + 1) : null;
-            forEachCorridorColumn(tp, next, band, false, clip, (cx, cz, across, lsx, lsz, slip) -> {
+            TracePoint after = i + 1 < trace.size() ? trace.get(i + 1) : null;
+            forEachCorridorColumn(tp, after, band, false, clip, (cx, cz, across, lsx, lsz, slip) -> {
                 if (snap.has(cx, cz)) return;
-                if (!level.hasChunkAt(new BlockPos(cx, 0, cz))) return;
-
-                int g = TerrainProbe.groundY(level, cx, cz);
-                if (g == Integer.MIN_VALUE) return;
+                long t0 = System.nanoTime();
+                long ck = ChunkPos.asLong(cx >> 4, cz >> 4);
+                if (only != null && !only.contains(ck)) return;
+                // Only chunks already in memory, and read straight from them: a height or a block read through the
+                // level waited for a neighbour chunk to load whenever a replayed chunk's margin reached into one.
+                net.minecraft.world.level.chunk.LevelChunk chunk = level.getChunkSource().getChunkNow(cx >> 4, cz >> 4);
+                if (chunk == null) {
+                    if (only != null && gone != null && missing.add(ck)) gone.accept(ck);
+                    return;
+                }
+                it.unimi.dsi.fastutil.longs.LongSet mine = placed.computeIfAbsent(ck,
+                        k -> PlayerBuilt.inChunk(level, cx >> 4, cz >> 4));
+                List<net.minecraft.world.level.levelgen.structure.BoundingBox> pieces = structures
+                        ? boxes.computeIfAbsent(ck, k -> ShakingDamage.structureBoxes(level, chunk, level.getMinBuildHeight()))
+                        : List.of();
+                long t1 = System.nanoTime();
+                int[] ground = naturalGround(chunk, cx, cz, mine, pieces, m);
+                long t2 = System.nanoTime();
+                chunkNanos += t1 - t0;
+                groundNanos += t2 - t1;
+                if (ground == null) return;
+                int g = ground[0];
                 // Recorded before anything is dug: a rift that opens under the sea builds new crust on
                 // its floor, and afterwards there is no way to tell it was ever under water.
-                boolean wet = !level.getBlockState(m.set(cx, g + 1, cz)).getFluidState().isEmpty();
+                boolean wet = !chunk.getBlockState(m.set(cx, g + 1, cz)).getFluidState().isEmpty();
                 int need = captureDepth(type, magnitude, across);
                 BlockState[] stack = new BlockState[need];
                 for (int d = 0; d < need; d++) {
                     int y = g - d;
-                    m.set(cx, y, cz);
                     stack[d] = y < level.getMinBuildHeight()
                             ? Blocks.BEDROCK.defaultBlockState()
-                            : level.getBlockState(m);
+                            : chunk.getBlockState(m.set(cx, y, cz));
                 }
-                // Asked only where it can matter: a column of plain rock is never in a village, and
-                // the structure lookup is far more expensive than the block reads above it.
-                boolean generated = GeyserConfig.QUAKES_BREAK_STRUCTURES.get()
-                        && EruptionHandler.isPlayerPlaced(stack[0])
-                        && insideGeneratedStructure(level, cx, g, cz);
-                snap.columns.put(Snapshot.key(cx, cz), new Snapshot.Column(g, wet, generated, stack));
+                // A rift's step is ground the world made, and moves with the rest whatever the builds setting says.
+                boolean generated = ground[3] != 0 || !pieces.isEmpty() && ShakingDamage.inside(pieces, cx, g + 1, cz);
+                boolean built = ground[1] != Integer.MIN_VALUE;
+                long t3 = System.nanoTime();
+                BlockState[] above = built || wet ? null : carried(chunk, cx, g, cz, m);
+                long t4 = System.nanoTime();
+                stackNanos += t3 - t2;
+                carryNanos += t4 - t3;
+                snap.columns.put(Snapshot.key(cx, cz), new Snapshot.Column(g, wet, generated,
+                        built, ground[2] != 0, stack, above));
             });
         }
-        // Large volcanoes over the captured ground, so the plan can spare their bodies.
-        if (snap.size() > 0) {
+
+        /** The captured ground's bounds, where the planner looks for large volcanoes so it can spare their bodies. */
+        private void finish() {
+            done = true;
+            if (snap.size() == 0) return;
+            long t0 = System.nanoTime();
             int minX = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
             for (long k : snap.columns.keySet()) {
                 int x = (int) k, z = (int) (k >>> 32);
@@ -403,10 +545,80 @@ public final class QuakePlanner {
                 minZ = Math.min(minZ, z);
                 maxZ = Math.max(maxZ, z);
             }
-            snap.volcanoes.addAll(com.jeladastudios.ftsgeology.volcano.VolcanoField.sitesInBox(
-                    level, minX, minZ, maxX, maxZ));
+            snap.volcanoLevel = level;
+            snap.volcanoBox = new int[]{minX, minZ, maxX, maxZ};
+            volcanoNanos = System.nanoTime() - t0;
         }
-        return snap;
+    }
+
+    /** How far down from the top of a column the ground under a building or a forest is looked for. */
+    private static final int GROUND_WALK = 128;
+
+    /**
+     * The terrain of a column, under whatever stands on it: {ground Y, top of what is built on it, or
+     * {@link Integer#MIN_VALUE}, 1 if a player built it, 1 if the ground is a rift's step}. Trees in a village's bounds
+     * are trees, not the village. Plants, trees and water are passed over, and so is anything built -- what a player
+     * placed, a structure's pieces other than its ground, and worked blocks -- so a quake moves the land, not a roof.
+     * The ground used to be the first solid block from the top: a village's roof, or the lantern on a post, and an
+     * uplift stacked copies of it, beds and torches in towers.
+     */
+    static int[] naturalGround(net.minecraft.world.level.chunk.LevelChunk chunk, int x, int z,
+                               it.unimi.dsi.fastutil.longs.LongSet placed,
+                               List<net.minecraft.world.level.levelgen.structure.BoundingBox> pieces,
+                               BlockPos.MutableBlockPos m) {
+        int top = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x & 15, z & 15);
+        int floor = chunk.getMinBuildHeight();
+        int builtTop = Integer.MIN_VALUE, player = 0;
+        for (int y = top, steps = 0; y > floor && steps < GROUND_WALK; y--, steps++) {
+            BlockState s = chunk.getBlockState(m.set(x, y, z));
+            if (s.isAir()) continue;
+            boolean mine = !placed.isEmpty() && placed.contains(m.asLong());
+            // Trees and plants first, and cheaply: most of a forest's column is its crown.
+            if (!mine && (TerrainProbe.isTreePart(s) || TerrainProbe.isVegetation(s))) continue;
+            boolean inStructure = !pieces.isEmpty() && ShakingDamage.inside(pieces, x, y, z);
+            if (!inStructure && !mine && s.getBlock() instanceof net.minecraft.world.level.block.SlabBlock
+                    && com.jeladastudios.ftsgeology.worldgen.RiftSteps.isStep(s, chunk.getBlockState(new BlockPos(x, y - 1, z)))) {
+                return new int[]{y, builtTop, player, 1};
+            }
+            boolean byPlayer = mine || (!inStructure && EruptionHandler.isPlayerPlaced(s));
+            if (byPlayer || (inStructure && !ShakingDamage.ground(s))) {
+                if (builtTop == Integer.MIN_VALUE) builtTop = y;
+                if (byPlayer) player = 1;
+                continue;
+            }
+            if (!s.getFluidState().isEmpty()) continue;
+            return new int[]{y, builtTop, player, 0};
+        }
+        return null;
+    }
+
+    /** How tall a stand of trees and plants a moving column carries along. */
+    private static final int CARRY_REACH = 40;
+    private static final BlockState[] NOTHING = new BlockState[0];
+
+    /**
+     * What stands on a column's ground and moves with it when the ground moves: plants, trees, snow, from the block
+     * over the ground up to the last of them, the air between included. Ground that rises lifts its trees with it and
+     * ground that drops lowers them, where they used to be buried by the rising ground or left hanging over the
+     * dropped floor. Null when anything else stands there -- a block that holds contents, water, rock overhead -- and
+     * that column moves the old way.
+     */
+    static BlockState[] carried(net.minecraft.world.level.chunk.LevelChunk chunk, int x, int g, int z,
+                                BlockPos.MutableBlockPos m) {
+        int top = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x & 15, z & 15);
+        if (top <= g) return NOTHING;
+        if (top - g > CARRY_REACH) return null;
+        BlockState[] up = new BlockState[top - g];
+        int last = -1;
+        for (int y = g + 1; y <= top; y++) {
+            BlockState s = chunk.getBlockState(m.set(x, y, z));
+            if (!s.isAir()) {
+                if (s.hasBlockEntity() || !(TerrainProbe.isTreePart(s) || TerrainProbe.isVegetation(s))) return null;
+                last = y - g - 1;
+            }
+            up[y - g - 1] = s;
+        }
+        return last < 0 ? NOTHING : java.util.Arrays.copyOf(up, last + 1);
     }
 
     /** How many blocks of history a column needs: the full stack only where this style digs deep. */
@@ -450,10 +662,10 @@ public final class QuakePlanner {
                             boolean mayBreakBuilds, ChunkPos clip) {
         int cap = GeyserConfig.QUAKE_MAX_EDITS.get();
         int band = deformationHalfWidth(type, magnitude);
+        snap.findVolcanoes();
 
         // Phase one: decide what every column does. The order edits go out in is decided below.
         List<ColumnPlan> columns = new ArrayList<>();
-        LongOpenHashSet claimed = new LongOpenHashSet();
 
         // Where along the trace the epicentre sits; the walk radiates from here.
         int mid = 0;
@@ -466,28 +678,45 @@ public final class QuakePlanner {
         }
 
         int length = 0;
-        // Two passes: first the columns alongside each segment, so each gets its own slip, then the
-        // joint discs on bends.
-        for (int pass = 0; pass < 2; pass++) {
-            boolean bodyOnly = pass == 0;
-            for (int step = 0; step < trace.size(); step++) {
-                // mid, mid-1, mid+1, mid-2, mid+2, ... so both halves are laid out together.
-                int offset = (step + 1) / 2;
-                int i = (step % 2 == 0) ? mid - offset : mid + offset;
-                if (i < 0 || i >= trace.size()) continue;
+        // Each column is measured from the nearest stretch of the trace, by its real distance to it. Measured from
+        // whichever stretch reached it first, a column where the trace wanders took its distance across the fault from
+        // a line fifty blocks off: uplift in patches, and strips of ground left standing down the middle of a range.
+        it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<double[]> nearest = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+        for (int step = 0; step < trace.size(); step++) {
+            // mid, mid-1, mid+1, mid-2, mid+2, ... so both halves are laid out together.
+            int offset = (step + 1) / 2;
+            int i = (step % 2 == 0) ? mid - offset : mid + offset;
+            if (i < 0 || i >= trace.size()) continue;
 
-                TracePoint tp = trace.get(i);
-                TracePoint next = i + 1 < trace.size() ? trace.get(i + 1) : null;
-                if (bodyOnly) length += TRACE_STEP;
+            TracePoint tp = trace.get(i);
+            TracePoint next = i + 1 < trace.size() ? trace.get(i + 1) : null;
+            length += TRACE_STEP;
+            int order = step;
 
-                forEachCorridorColumn(tp, next, band, bodyOnly, clip, (x, z, across, lsx, lsz, slip) -> {
-                    if (!claimed.add(Snapshot.key(x, z))) return;
-                    if (!snap.has(x, z)) return;
-                    ColumnPlan cp = columnPlan(snap, type, x, z, across, lsx, lsz, slip,
-                            magnitude, rng, mayBreakBuilds);
-                    if (cp != null) columns.add(cp);
-                });
-            }
+            forEachCorridorColumn(tp, next, band, false, clip, (x, z, across, lsx, lsz, slip) -> {
+                if (!snap.has(x, z)) return;
+                long key = Snapshot.key(x, z);
+                double[] had = nearest.get(key);
+                if (had != null && had[0] <= Math.abs(across)) return;
+                nearest.put(key, new double[]{Math.abs(across), across, lsx, lsz, slip, order, x, z});
+            });
+        }
+        // Planned in the order the stretches were laid out, outward from the epicentre.
+        List<double[]> measured = new ArrayList<>(nearest.values());
+        measured.sort(java.util.Comparator.comparingDouble((double[] m) -> m[5]));
+        for (double[] m : measured) {
+            ColumnPlan cp = columnPlan(snap, type, (int) m[6], (int) m[7], m[1], m[2], m[3], m[4],
+                    magnitude, rng, mayBreakBuilds);
+            if (cp != null) columns.add(cp);
+        }
+
+        // Every tree moves with the ground its trunk stands on.
+        alignTrees(snap, columns);
+
+        // What stood on ground that moved goes down with it: those columns are wrecked once the ground has moved.
+        it.unimi.dsi.fastutil.longs.LongArrayList wrecked = new it.unimi.dsi.fastutil.longs.LongArrayList();
+        for (ColumnPlan c : columns) {
+            if (snap.builtAt(c.x(), c.z())) wrecked.add(BlockPos.asLong(c.x(), c.top(), c.z()));
         }
 
         // Phase two: turn those into edits, one BLOCK OF MOVEMENT at a time across the whole fault.
@@ -505,13 +734,174 @@ public final class QuakePlanner {
                 for (int layer = 1; layer <= c.steps(); layer++) emitLayer(c, layer, ordered);
             }
         }
-        return new Plan(epicentre, type, magnitude, depthMetres, length, List.copyOf(ordered));
+        return new Plan(epicentre, type, magnitude, depthMetres, length, List.copyOf(ordered), wrecked.toLongArray());
     }
 
-    /** What one column of ground is going to do, held until the edits are emitted. */
-    private record ColumnPlan(int x, int z, int top, int delta, BlockState cap, BlockState fill) {
+    /**
+     * What one column of ground is going to do, held until the edits are emitted. A column whose cover moves with it
+     * ({@code above} not null) carries its surface and the {@code low} blocks of low cover over it with its own ground,
+     * {@code delta}, and the tree over it with the ground its tree's trunk stands on, {@code treeDelta}.
+     */
+    private record ColumnPlan(int x, int z, int top, int delta, BlockState cap, BlockState fill, BlockState[] above,
+                              int low, int treeDelta) {
+        ColumnPlan(int x, int z, int top, int delta, BlockState cap, BlockState fill, BlockState[] above) {
+            this(x, z, top, delta, cap, fill, above, lowCover(above), delta);
+        }
+
         /** How many one-block steps of movement this column goes through. */
-        int steps() { return Math.max(1, Math.abs(delta)); }
+        int steps() {
+            return Math.max(1, above == null ? Math.abs(delta) : Math.max(Math.abs(delta), Math.abs(treeDelta)));
+        }
+
+        ColumnPlan withTree(int treeDelta) {
+            return new ColumnPlan(x, z, top, delta, cap, fill, above, low, treeDelta);
+        }
+    }
+
+    /** How much of what stands on a column is low cover and not tree: everything under the first block of a tree. */
+    private static int lowCover(BlockState[] above) {
+        if (above == null) return 0;
+        for (int i = 0; i < above.length; i++) {
+            if (TerrainProbe.isTreePart(above[i])) return i;
+        }
+        return above.length;
+    }
+
+    /**
+     * What a column whose cover moves with it holds at {@code y} after {@code layer} layers, or null where it is left
+     * as it was. Rising ground is filled in under the new surface, and the old surface stays buried; dropping ground
+     * loses the rock under its surface, and the surface comes down whole -- a tree's rooted soil with it. On the
+     * surface stands its low cover, and over that the tree, moved with the ground its trunk stands on. Where the two
+     * meet, the ground wins, then the tree.
+     */
+    private static BlockState carriedAt(ColumnPlan c, int layer, int y) {
+        int g = Integer.signum(c.delta()) * Math.min(layer, Math.abs(c.delta()));
+        int t = Integer.signum(c.treeDelta()) * Math.min(layer, Math.abs(c.treeDelta()));
+        int top = c.top(), base = top + g, low = c.low();
+        BlockState[] above = c.above();
+        if (c.delta() > 0) {
+            if (y <= top) return null;
+            if (y < base) return c.fill();
+            if (y == base) return g == c.delta() ? c.cap() : c.fill();
+        } else {
+            if (y < base) return null;
+            if (y == base) return c.cap();
+        }
+        if (y <= base + low) {
+            BlockState s = above[y - base - 1];
+            if (!s.isAir()) return s;
+        }
+        int i = y - (top + 1 + low + t);
+        if (i >= 0 && i < above.length - low && !above[low + i].isAir()) return above[low + i];
+        return Blocks.AIR.defaultBlockState();
+    }
+
+    /** One layer of a column whose cover moves with it: only the blocks that change, so a trunk costs a few. */
+    private static void emitCarried(ColumnPlan c, int layer, List<Edit> out) {
+        int reach = Math.max(Math.abs(c.delta()), Math.abs(c.treeDelta()));
+        if (layer > reach) return;
+        int from = c.top() - Math.abs(c.delta()) - 1, to = c.top() + c.above().length + reach + 2;
+        for (int y = from; y <= to; y++) {
+            BlockState now = carriedAt(c, layer, y);
+            if (now == null) continue;
+            if (now != carriedAt(c, layer - 1, y)) out.add(new Edit(new BlockPos(c.x(), y, c.z()), now, true));
+        }
+    }
+
+    /** How far from its trunk a tree's crown is looked for. */
+    private static final int CROWN_REACH = 6;
+
+    /**
+     * Makes every tree move as one, with the ground its trunk stands on, whatever the ground under its crown does: a
+     * crown spread over columns that moved apart came out in pieces, and Dynamic Trees' trees fell apart with it.
+     * Trunks side by side are one tree. A column of crown over ground that does not move at all gets a plan of its own.
+     */
+    private static void alignTrees(Snapshot snap, List<ColumnPlan> columns) {
+        it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap index = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
+        index.defaultReturnValue(-1);
+        for (int i = 0; i < columns.size(); i++) index.put(Snapshot.key(columns.get(i).x(), columns.get(i).z()), i);
+        LongOpenHashSet trunks = new LongOpenHashSet();
+        for (var e : snap.columns.long2ObjectEntrySet()) {
+            BlockState[] a = e.getValue().above();
+            if (a != null && a.length > 0 && a[0].is(net.minecraft.tags.BlockTags.LOGS)) trunks.add(e.getLongKey());
+        }
+        if (trunks.isEmpty()) return;
+        // Each tree's move: the mean of its trunk columns'.
+        it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap treeDelta = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
+        LongOpenHashSet seen = new LongOpenHashSet();
+        for (long t0 : trunks) {
+            if (!seen.add(t0)) continue;
+            it.unimi.dsi.fastutil.longs.LongArrayList tree = new it.unimi.dsi.fastutil.longs.LongArrayList();
+            tree.add(t0);
+            for (int gi = 0; gi < tree.size(); gi++) {
+                long k = tree.getLong(gi);
+                int x = (int) k, z = (int) (k >>> 32);
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        long n = Snapshot.key(x + dx, z + dz);
+                        if (trunks.contains(n) && seen.add(n)) tree.add(n);
+                    }
+                }
+            }
+            int sum = 0;
+            for (long k : tree) {
+                int i = index.get(k);
+                sum += i < 0 ? 0 : columns.get(i).delta();
+            }
+            int d = Math.round((float) sum / tree.size());
+            for (long k : tree) treeDelta.put(k, d);
+        }
+        // Each column with tree over it takes the move of the nearest trunk.
+        it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap nearest = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
+        nearest.defaultReturnValue(Integer.MAX_VALUE);
+        it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap moves = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
+        it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap owner = new it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap();
+        for (long t0 : trunks) {
+            int tx = (int) t0, tz = (int) (t0 >>> 32), d = treeDelta.get(t0);
+            for (int dx = -CROWN_REACH; dx <= CROWN_REACH; dx++) {
+                for (int dz = -CROWN_REACH; dz <= CROWN_REACH; dz++) {
+                    int d2 = dx * dx + dz * dz;
+                    if (d2 > CROWN_REACH * CROWN_REACH) continue;
+                    long k = Snapshot.key(tx + dx, tz + dz);
+                    if (k != t0 && trunks.contains(k)) continue;
+                    Snapshot.Column col = snap.columns.get(k);
+                    if (col == null || col.above() == null || lowCover(col.above()) >= col.above().length) continue;
+                    if (d2 >= nearest.get(k)) continue;
+                    nearest.put(k, d2);
+                    moves.put(k, d);
+                    owner.put(k, t0);
+                }
+            }
+        }
+        // Crown over ground that stays gets a plan of its own, laid out next to its trunk's.
+        it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<List<ColumnPlan>> extra = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+        List<ColumnPlan> orphans = new ArrayList<>();
+        for (var e : moves.long2IntEntrySet()) {
+            long k = e.getLongKey();
+            int td = e.getIntValue(), i = index.get(k);
+            if (i >= 0) {
+                ColumnPlan p = columns.get(i);
+                if (p.above() != null && p.treeDelta() != td) columns.set(i, p.withTree(td));
+            } else if (td != 0) {
+                Snapshot.Column col = snap.columns.get(k);
+                if (col.stack().length == 0) continue;
+                ColumnPlan p = new ColumnPlan((int) k, (int) (k >>> 32), col.groundY(), 0, col.stack()[0], null, col.above(),
+                        lowCover(col.above()), td);
+                long t0 = owner.get(k);
+                if (index.get(t0) >= 0) extra.computeIfAbsent(t0, x -> new ArrayList<>()).add(p);
+                else orphans.add(p);
+            }
+        }
+        if (extra.isEmpty() && orphans.isEmpty()) return;
+        List<ColumnPlan> merged = new ArrayList<>(columns.size() + orphans.size() + extra.size() * 8);
+        for (ColumnPlan p : columns) {
+            merged.add(p);
+            List<ColumnPlan> more = extra.get(Snapshot.key(p.x(), p.z()));
+            if (more != null) merged.addAll(more);
+        }
+        merged.addAll(orphans);
+        columns.clear();
+        columns.addAll(merged);
     }
 
     /** How many places along the fault are visibly moving at the same time. */
@@ -543,6 +933,11 @@ public final class QuakePlanner {
 
     /** One block of movement for one column. */
     private static void emitLayer(ColumnPlan c, int layer, List<Edit> out) {
+        // What stands on the ground moves with it.
+        if (c.above() != null) {
+            emitCarried(c, layer, out);
+            return;
+        }
         if (c.delta() > 0) {
             if (layer > c.delta()) return;
             out.add(new Edit(new BlockPos(c.x(), c.top() + layer, c.z()),
@@ -550,8 +945,7 @@ public final class QuakePlanner {
         } else if (c.delta() < 0) {
             int cut = -c.delta();
             if (layer > cut) return;
-            out.add(new Edit(new BlockPos(c.x(), c.top() - (layer - 1), c.z()),
-                    Blocks.AIR.defaultBlockState()));
+            out.add(new Edit(new BlockPos(c.x(), c.top() - (layer - 1), c.z()), Blocks.AIR.defaultBlockState()));
             if (layer == 1) {
                 // The plant cover standing over the column comes off with the first slice, so
                 // nothing is ever left hanging over a subsiding floor.
@@ -571,6 +965,8 @@ public final class QuakePlanner {
     private static ColumnPlan columnPlan(Snapshot snap, FaultType type, int x, int z, double across,
                                          double sx, double sz, double slip, double magnitude,
                                          RandomGenerator rng, boolean mayBreakBuilds) {
+        // A player's build moves, and goes down, only where quakes may break builds.
+        if (!mayBreakBuilds && snap.playerBuiltAt(x, z)) return null;
         if (type == FaultType.TRANSFORM) {
             return strikeSlipPlan(snap, x, z, across, sx, sz, slip, magnitude, rng, mayBreakBuilds);
         }
@@ -587,7 +983,7 @@ public final class QuakePlanner {
         if (delta > 0) {
             BlockState surface = snap.stateAt(x, z, 0);
             if (!liftable(surface, mayBreakBuilds, snap.generatedAt(x, z))) return null;
-            return new ColumnPlan(x, z, top, delta, surface, deeper(snap, x, z, rng));
+            return new ColumnPlan(x, z, top, delta, surface, deeper(snap, x, z, rng), snap.aboveAt(x, z));
         }
         int cut = carvableDepth(snap, x, z, -delta, mayBreakBuilds);
         if (cut < 1) return null;
@@ -598,7 +994,11 @@ public final class QuakePlanner {
                 && Math.abs(across) <= FRESH_CRUST_HALF) {
             floor = freshCrust(rng);
         }
-        return new ColumnPlan(x, z, top, -cut, floor, null);
+        // A rift's fissure swallows what stood on it, which is felled after; the rest of the floor lowers it.
+        boolean fissure = type == FaultType.DIVERGENT && Math.abs(across) <= 1.2;
+        BlockState[] above = fissure ? null : snap.aboveAt(x, z);
+        return new ColumnPlan(x, z, top, -cut, floor != null ? floor : above != null ? snap.stateAt(x, z, 0) : null, null,
+                above);
     }
 
     /** How many blocks down this column may actually be dug before something stops it. */
@@ -826,7 +1226,8 @@ public final class QuakePlanner {
             int trough = Mth.clamp((int) Math.round(slip * magnitude * 0.25), 1, 3);
             if (rng.nextDouble() < 0.06) trough += 2;
             int cut = carvableDepth(snap, x, z, trough, mayBreakBuilds);
-            return cut < 1 ? null : new ColumnPlan(x, z, top, -cut, null, null);
+            BlockState[] above = snap.aboveAt(x, z);
+            return cut < 1 ? null : new ColumnPlan(x, z, top, -cut, above != null ? snap.stateAt(x, z, 0) : null, null, above);
         }
         // Only the near side moves; grinding both would cancel the offset out.
         if (across < 0) return null;
@@ -850,13 +1251,13 @@ public final class QuakePlanner {
         // Clamped and tapered, so a cliff crossing the fault offsets rather than collapses.
         int delta = (int) Math.round(Mth.clamp(from - top, -6, 6) * falloff);
 
-        if (delta > 0) return new ColumnPlan(x, z, top, delta, carried, deeper(snap, fx, fz, rng));
+        if (delta > 0) return new ColumnPlan(x, z, top, delta, carried, deeper(snap, fx, fz, rng), snap.aboveAt(x, z));
         if (delta < 0) {
             int cut = carvableDepth(snap, x, z, -delta, mayBreakBuilds);
-            return cut < 1 ? null : new ColumnPlan(x, z, top, -cut, carried, null);
+            return cut < 1 ? null : new ColumnPlan(x, z, top, -cut, carried, null, snap.aboveAt(x, z));
         }
         // Same height: the offset still shows, because the ground cover itself has moved.
-        return new ColumnPlan(x, z, top, 0, carried, null);
+        return new ColumnPlan(x, z, top, 0, carried, null, null);
     }
 
     /**

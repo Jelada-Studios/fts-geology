@@ -266,6 +266,8 @@ public final class ShakingDamage {
         if (!builds()) return;
         LongSet placed = PlayerBuilt.inChunk(level, cp.x, cp.z);
         List<BoundingBox> built = structureBoxes(level, chunk, floor);
+        // Whether the buildings here stand up to it at all: load, overhangs, slender towers.
+        Structural.chunk(level, chunk, intensity, placed, built, now + job.delay, job.spread);
         boolean[] placedIn = new boolean[chunk.getSectionsCount()];
         for (long p : placed) {
             int i = chunk.getSectionIndex(BlockPos.getY(p));

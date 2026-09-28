@@ -12,6 +12,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;
+import net.minecraft.util.Mth;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -62,6 +63,8 @@ public final class Liquefaction {
     private static final int WET = 3;
     /** How far a built column is followed up, and the most columns one quake settles. */
     private static final int STACK = 48, MOST = 3000;
+    /** The most a column settles, in blocks. */
+    private static final int SINK = 4;
     /** How long a sand boil runs, in ticks. */
     private static final int BOIL = 240;
 
@@ -126,6 +129,7 @@ public final class Liquefaction {
         }
         report = true;
         long deadline = System.nanoTime() + nanos;
+        scanDeadline = deadline;
         long now = server.getTickCount();
         while (!DUE.isEmpty() && System.nanoTime() < deadline) {
             Due due = DUE.peek();
@@ -167,6 +171,9 @@ public final class Liquefaction {
             if (level != null) chunk(level, job, cp);
         }
     }
+
+    /** Until when this tick's look over the ground may work out the water table where it is not known yet. */
+    private static long scanDeadline = Long.MAX_VALUE;
 
     /** Works out one chunk: its shaking, its wet loose ground, and what comes of it and when. */
     private static void chunk(ServerLevel level, Job job, ChunkPos cp) {
@@ -212,12 +219,19 @@ public final class Liquefaction {
         // together, and one standing half on sounder ground is torn across.
         boolean goes = level.random.nextDouble() < Math.min(0.9, 0.35 * (strength + 1.0));
         if (goes) {
+            // How far it goes down: a block at the onset, up to four in the strongest shaking, and more on one side of
+            // the ground than the other, so what stands on it leans as it sinks.
+            double tiltX = level.random.nextDouble() * 2 - 1, tiltZ = level.random.nextDouble() * 2 - 1;
+            long settleAt = when.getAsLong();
             for (var e : bases.long2IntEntrySet()) {
                 int x = BlockPos.getX(e.getLongKey()), z = BlockPos.getZ(e.getLongKey());
                 int base = e.getIntValue();
                 if (!susceptible(level, chunk, m, x, base - 1, z)) continue;
                 if (job.settled()[0]++ >= MOST) break;
-                DUE.add(new Due(level.dimension(), Kind.SETTLE, new BlockPos(x, base, z), 0, when.getAsLong()));
+                double lean = 1.0 + (((x & 15) - 7.5) / 7.5 * tiltX + ((z & 15) - 7.5) / 7.5 * tiltZ) / 4.0;
+                int sink = Mth.clamp((int) Math.round((0.6 + strength * 1.2) * lean), 1, SINK);
+                DUE.add(new Due(level.dimension(), Kind.SETTLE, new BlockPos(x, base, z), sink,
+                        settleAt + level.random.nextInt(20)));
             }
         }
         // Sand boils in the open ground, a few to a chunk, more the harder it shakes.
@@ -301,7 +315,9 @@ public final class Liquefaction {
                         new net.minecraft.resources.ResourceLocation(GeysersMod.MODID, "alluvial_plain")));
         if (wetland) return true;
         if (!sandy) return false;
-        return top - com.jeladastudios.ftsgeology.hydrology.WaterTable.tableY(level, x, z) <= WET;
+        // Out of time for working the table out here, the ground counts as dry this once.
+        int table = com.jeladastudios.ftsgeology.hydrology.WaterTable.tableYBefore(level, x, z, scanDeadline);
+        return table != Integer.MIN_VALUE && top - table <= WET;
     }
 
     /** A sand boil opens: the ground round the vent sanded over, water welling up in the middle, for a while. */
@@ -344,11 +360,17 @@ public final class Liquefaction {
      * A built column settles one block into the ground under it: the block of ground goes, and everything built on it
      * comes down one, in order. A column holding anything with contents stays, and is torn from its neighbours.
      */
-    private static void settle(ServerLevel level, BlockPos basePos, int unused) {
+    private static void settle(ServerLevel level, BlockPos basePos, int sink) {
+        for (int i = 0, base = basePos.getY(); i < Math.max(1, sink); i++, base--) {
+            if (!settleOnce(level, new BlockPos(basePos.getX(), base, basePos.getZ()))) return;
+        }
+    }
+
+    private static boolean settleOnce(ServerLevel level, BlockPos basePos) {
         int x = basePos.getX(), z = basePos.getZ(), base = basePos.getY();
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         BlockState ground = level.getBlockState(m.set(x, base - 1, z));
-        if (!loose(ground)) return;
+        if (!loose(ground)) return false;
         LongSet placed = PlayerBuilt.inChunk(level, x >> 4, z >> 4);
         // The column's building: from its base up to its last block, the air of its rooms included; six blocks of
         // air over it is the sky. Natural ground in it -- a hillside it is built against, a tree over its roof -- is not
@@ -361,8 +383,8 @@ public final class Liquefaction {
                 continue;
             }
             air = 0;
-            if (s.hasBlockEntity() || !s.getFluidState().isEmpty()) return;
-            if (ShakingDamage.ground(s) && !placed.contains(BlockPos.asLong(x, y, z))) return;
+            if (s.hasBlockEntity() || !s.getFluidState().isEmpty()) return false;
+            if (ShakingDamage.ground(s) && !placed.contains(BlockPos.asLong(x, y, z))) return false;
             top = y;
         }
         int height = top - base + 1;
@@ -370,13 +392,14 @@ public final class Liquefaction {
         for (int i = 0; i < height; i++) stack[i] = level.getBlockState(m.set(x, base + i, z));
         for (int i = 0; i < height; i++) {
             BlockPos to = new BlockPos(x, base - 1 + i, z);
-            level.setBlock(to, stack[i], Earthquake.FLAGS);
+            QuakeWrites.set(level, to, stack[i]);
             if (placed.contains(BlockPos.asLong(x, base + i, z))) PlayerBuilt.move(level, BlockPos.asLong(x, base + i, z), to);
         }
-        level.setBlock(new BlockPos(x, top, z), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
+        QuakeWrites.set(level, new BlockPos(x, top, z), Blocks.AIR.defaultBlockState());
         level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, ground), x + 0.5, base, z + 0.5,
                 6, 0.4, 0.1, 0.4, 0.05);
         SETTLED.increment();
+        return true;
     }
 
     /** Whoever stands on the liquefied ground of a chunk sinks in and is held for a few seconds. */

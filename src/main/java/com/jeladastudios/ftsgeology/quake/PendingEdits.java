@@ -49,18 +49,25 @@ public final class PendingEdits {
      * Registers a rupture against every chunk its corridor crosses that is not loaded right now.
      * Loaded chunks are handled immediately by {@link Earthquake} and are not queued.
      */
-    public static void register(ServerLevel level, BlockPos epicentre, FaultType type,
+    public static Map<Long, List<QuakePlanner.TracePoint>> register(ServerLevel level, BlockPos epicentre, FaultType type,
                                 double magnitude, double depthMetres, long seed,
                                 boolean mayBreakBuilds, List<QuakePlanner.TracePoint> trace) {
-        int limit = GeyserConfig.QUAKE_PENDING_LIMIT.get();
-        if (limit <= 0) return;
-
         Map<Long, List<QuakePlanner.TracePoint>> byChunk = segmentsByChunk(type, magnitude, trace);
+        // The corridor's chunks in memory now: the snapshot reads these, and parks any that leave before it gets there.
+        Map<Long, List<QuakePlanner.TracePoint>> loaded = new HashMap<>();
+        for (Map.Entry<Long, List<QuakePlanner.TracePoint>> e : byChunk.entrySet()) {
+            if (level.getChunkSource().getChunkNow(ChunkPos.getX(e.getKey()), ChunkPos.getZ(e.getKey())) != null) {
+                loaded.put(e.getKey(), e.getValue());
+            }
+        }
+        int limit = GeyserConfig.QUAKE_PENDING_LIMIT.get();
+        if (limit <= 0) return loaded;
+
         int registered = 0;
         for (Map.Entry<Long, List<QuakePlanner.TracePoint>> e : byChunk.entrySet()) {
             int cx = ChunkPos.getX(e.getKey());
             int cz = ChunkPos.getZ(e.getKey());
-            if (level.getChunkSource().getChunkNow(cx, cz) != null) continue;   // handled already
+            if (loaded.containsKey(e.getKey())) continue;   // handled already
             if (WAITING.size() >= limit) break;
             WAITING.computeIfAbsent(key(level.dimension(), cx, cz), k -> new ArrayList<>())
                     .add(new PendingRupture(type, magnitude, depthMetres, seed, mayBreakBuilds,
@@ -69,6 +76,7 @@ public final class PendingEdits {
         }
         com.jeladastudios.ftsgeology.util.Diagnostics.info(
                 "quake register: {} chunks parked ({} corridor chunks total)", registered, byChunk.size());
+        return loaded;
     }
 
     /**
@@ -163,9 +171,13 @@ public final class PendingEdits {
                         r.magnitude(), cp);
                 QuakePlanner.Plan plan = QuakePlanner.plan(snap, r.trace(), r.epicentre(), r.type(),
                         r.magnitude(), r.depthMetres(), new Random(r.seed()), r.mayBreakBuilds(), cp);
+                // What stood on this chunk's moved ground comes down too.
+                long[] wreck = java.util.Arrays.stream(plan.wrecked())
+                        .filter(k -> (BlockPos.getX(k) >> 4) == cp.x && (BlockPos.getZ(k) >> 4) == cp.z).toArray();
+                Collapse.wreckColumns(level, wreck, 100);
                 for (QuakePlanner.Edit e : plan.edits()) {
                     if ((e.pos().getX() >> 4) != cp.x || (e.pos().getZ() >> 4) != cp.z) continue;
-                    level.setBlock(e.pos(), com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, e.pos(), e.state()), Earthquake.FLAGS);
+                    QuakeWrites.set(level, e.pos(), com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, e.pos(), e.state()));
                     applied.add(e);
                 }
             } catch (Exception ex) {

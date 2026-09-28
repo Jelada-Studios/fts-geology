@@ -45,7 +45,9 @@ public final class Weathering {
      * How many passes the corridor gets. The first and the last reseat what was growing on the
      * ground; the one between takes the raw edges off the rock.
      */
-    private static final int PASSES = 3;
+    private static final int PASSES = 4;
+    /** The pass that brings down what hangs a second time, after the rock has relaxed, and the finishing one. */
+    private static final int SECOND_FALL = 2, FINISH = 3;
 
     /** How far above the new ground to look for the underside of a hanging stack; covers the deepest cut. */
     private static final int GAP_SEARCH = 40;
@@ -140,7 +142,8 @@ public final class Weathering {
         base.defaultReturnValue(Integer.MIN_VALUE);
         for (QuakePlanner.Edit e : edits) {
             long k = key(e.pos().getX(), e.pos().getZ());
-            int airTop = e.state().isAir() ? e.pos().getY() : Integer.MIN_VALUE;
+            // What stood on the ground and moved with it was not dug away: its air is not a floor hint.
+            int airTop = e.state().isAir() && !e.carried() ? e.pos().getY() : Integer.MIN_VALUE;
             if (airTop > base.get(k)) base.put(k, airTop);
             else if (!base.containsKey(k)) base.put(k, Integer.MIN_VALUE);
         }
@@ -201,6 +204,9 @@ public final class Weathering {
     /** Settles a slice of the corridor, bounded by a column count and a wall-clock deadline. */
     public static void drain(MinecraftServer server, long budgetNanos) {
         if (QUEUE.isEmpty() || server == null) return;
+        // The ground settles once it has stopped moving. A landslide's settling run while the rupture was still
+        // lifting a forest took a tree half moved for one left hanging and felled it.
+        if (Earthquake.moving()) return;
         long deadline = System.nanoTime() + budgetNanos;
 
         Job job = QUEUE.peek();
@@ -239,18 +245,22 @@ public final class Weathering {
                 continue;
             }
             // The first and the last pass bring down what hangs; the one between relaxes the rock.
-            boolean fallPass = (job.pass == 0 || job.pass == PASSES - 1)
+            boolean fallPass = (job.pass == 0 || job.pass == SECOND_FALL)
                     && GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get();
             boolean moved;
-            if (fallPass) {
+            if (job.pass == FINISH) {
+                moved = finish(level, cx, cz);
+            } else if (fallPass) {
                 moved = reseat(level, cx, cz, job.excavated.get(k), job);
-                // Last pass, after reseat: spires, hanging water.
-                if (job.pass == PASSES - 1) {
+                // After the rock has relaxed and reseat has run again: spires, hanging water.
+                if (job.pass == SECOND_FALL) {
                     moved |= topple(level, cx, cz);
                     moved |= dropUnsupportedWater(level, cx, cz);
                 }
+            } else if (job.pass == 1) {
+                moved = relax(level, cx, cz, k, job);
             } else {
-                moved = relax(level, cx, cz);
+                moved = false;
             }
             if (moved) job.moved++;
         }
@@ -275,9 +285,9 @@ public final class Weathering {
      * @return true if this column changed
      */
     private static boolean reseat(ServerLevel level, int x, int z, int excavatedTop, Job job) {
-        int g = excavatedTop == Integer.MIN_VALUE
-                ? TerrainProbe.groundY(level, x, z)
-                : solidAtOrBelow(level, x, excavatedTop, z);
+        // Nothing dug away here, so nothing was left hanging: the air under a crown or a bridge is its own.
+        if (excavatedTop == Integer.MIN_VALUE) return false;
+        int g = solidAtOrBelow(level, x, excavatedTop, z);
         if (g == Integer.MIN_VALUE) return false;
         if (!level.hasChunkAt(new BlockPos(x, g, z))) return false;
 
@@ -290,6 +300,9 @@ public final class Weathering {
         int base = g + 1;
         while (base < gapLimit && level.getBlockState(m.set(x, base, z)).isAir()) base++;
         int drop = base - (g + 1);
+        // Only what rested on the dug cells hangs. A stack with air of its own under it, over the highest of them,
+        // stood over air before the quake: a crown, a branch, a roof.
+        if (base > excavatedTop + 1) return false;
         // A tree left over water, on a bank the quake took into the river, is felled like one over air.
         int over = base;
         while (over < gapLimit && !level.getBlockState(m.set(x, over, z)).getFluidState().isEmpty()) over++;
@@ -316,11 +329,21 @@ public final class Weathering {
         }
         int height = top - base;
         if (height <= 0) return false;
+        // A crown or a branch reaching out over this column from a tree that still stands on its ground stood over
+        // air before the quake as well: it is held, not hanging. Only a tree standing on nothing, and leaves nothing
+        // holds, come down.
+        BlockState foot = level.getBlockState(m.set(x, base, z));
+        if (isPlant(foot) && !TerrainProbe.isVegetation(foot)) {
+            if (trunk != Integer.MIN_VALUE ? grounded(level, x, trunk, z)
+                    : foot.is(BlockTags.LEAVES) && TerrainProbe.crownHeld(level, new BlockPos(x, base, z), foot)) {
+                return false;
+            }
+        }
         if (allPlant && trunk == Integer.MIN_VALUE) {
             // Grass, a fern or leaves left in the air: gone, as a shape update would have had them. A crown
             // whose tree was felled went with it; what is still here belongs to nothing.
             for (int y = base; y < top; y++) {
-                level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
+                QuakeWrites.set(level, new BlockPos(x, y, z), Blocks.AIR.defaultBlockState());
             }
             return true;
         }
@@ -334,7 +357,7 @@ public final class Weathering {
             for (int i = 0; i < height && leavesOnly; i++) leavesOnly = isPlant(level.getBlockState(m.set(x, base + i, z)));
             if (leavesOnly) {
                 for (int i = 0; i < height; i++) {
-                    level.setBlock(new BlockPos(x, base + i, z), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
+                    QuakeWrites.set(level, new BlockPos(x, base + i, z), Blocks.AIR.defaultBlockState());
                 }
                 return true;
             }
@@ -344,10 +367,10 @@ public final class Weathering {
         BlockState[] stack = new BlockState[height];
         for (int i = 0; i < height; i++) stack[i] = level.getBlockState(m.set(x, base + i, z));
         for (int i = 0; i < height; i++) {
-            level.setBlock(new BlockPos(x, base + i, z), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
+            QuakeWrites.set(level, new BlockPos(x, base + i, z), Blocks.AIR.defaultBlockState());
         }
         for (int i = 0; i < height; i++) {
-            level.setBlock(new BlockPos(x, g + 1 + i, z), stack[i], Earthquake.FLAGS);
+            QuakeWrites.set(level, new BlockPos(x, g + 1 + i, z), stack[i]);
         }
         // A puff of dust where a stack lands, for a drop worth seeing and only sometimes.
         if (drop >= 2 && level.random.nextInt(24) == 0) {
@@ -403,8 +426,8 @@ public final class Weathering {
             if (s.isAir()) continue;
             BlockPos rest = lowestNeighbourTop(level, x, y, z);
             if (rest == null) break;                // nowhere lower to go; the rest stays
-            level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
-            level.setBlock(rest, s, Earthquake.FLAGS);
+            QuakeWrites.set(level, new BlockPos(x, y, z), Blocks.AIR.defaultBlockState());
+            QuakeWrites.set(level, rest, s);
             moved = true;
         }
         return moved;
@@ -442,10 +465,18 @@ public final class Weathering {
      */
     private static boolean fell(ServerLevel level, int x, int from, int z, Job job, boolean withNeighbours) {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        // A Dynamic Trees tree comes down whole, falling over as a felled one does, by its own mod's way of felling.
+        BlockPos base = new BlockPos(x, from, z);
+        if (com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isBranch(level.getBlockState(base))
+                && com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.fell(level, base,
+                        net.minecraft.core.Direction.Plane.HORIZONTAL.getRandomDirection(level.random))) {
+            job.felledBase.put(key(x, z), from);
+            return true;
+        }
         int roof = Math.min(from + STACK_LIMIT, level.getMaxBuildHeight() - 1);
         int top = from;
         while (top <= roof && isPlant(level.getBlockState(m.set(x, top, z)))) {
-            level.setBlock(new BlockPos(x, top, z), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
+            QuakeWrites.set(level, new BlockPos(x, top, z), Blocks.AIR.defaultBlockState());
             top++;
         }
         job.felledBase.put(key(x, z), from);
@@ -489,7 +520,7 @@ public final class Weathering {
                 if (!level.hasChunkAt(m.set(cx, floor, cz))) continue;
                 for (int y = floor; y <= roof; y++) {
                     if (!TerrainProbe.isCrown(level.getBlockState(m.set(cx, y, cz)))) continue;
-                    level.setBlock(new BlockPos(cx, y, cz), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
+                    QuakeWrites.set(level, new BlockPos(cx, y, cz), Blocks.AIR.defaultBlockState());
                 }
             }
         }
@@ -523,7 +554,7 @@ public final class Weathering {
                 top++;
             }
             for (int c = base; c < top; c++) {
-                level.setBlock(new BlockPos(x, c, z), Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
+                QuakeWrites.set(level, new BlockPos(x, c, z), Blocks.AIR.defaultBlockState());
             }
             changed = true;
             y = top;
@@ -551,6 +582,39 @@ public final class Weathering {
         return Integer.MIN_VALUE;
     }
 
+    /** How much of a tree is walked looking for where it stands; one bigger than this is taken to stand. */
+    private static final int TREE_WALK = 256;
+
+    /**
+     * Whether the tree this wood belongs to stands on anything: a block of it, reached through its trunk and branches,
+     * with ground under it.
+     */
+    private static boolean grounded(ServerLevel level, int x, int y, int z) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
+        LongOpenHashSet seen = new LongOpenHashSet();
+        BlockPos start = new BlockPos(x, y, z);
+        queue.add(start);
+        seen.add(start.asLong());
+        while (!queue.isEmpty()) {
+            if (seen.size() > TREE_WALK) return true;
+            BlockPos p = queue.poll();
+            BlockState under = level.getBlockState(m.set(p.getX(), p.getY() - 1, p.getZ()));
+            if (!under.isAir() && under.getFluidState().isEmpty() && !isPlant(under)) return true;
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        m.set(p.getX() + dx, p.getY() + dy, p.getZ() + dz);
+                        if (!level.isLoaded(m) || seen.contains(m.asLong()) || !isTrunk(level.getBlockState(m))) continue;
+                        seen.add(m.asLong());
+                        queue.add(m.immutable());
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     /** What holds a tree or a huge mushroom up. */
     private static boolean isTrunk(BlockState s) {
         return s.is(BlockTags.LOGS) || s.is(Blocks.MUSHROOM_STEM);
@@ -568,7 +632,7 @@ public final class Weathering {
     }
 
     /** Applies the two rock rules to one column. Returns true if anything moved. */
-    private static boolean relax(ServerLevel level, int x, int z) {
+    private static boolean relax(ServerLevel level, int x, int z, long k, Job job) {
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return false;
         if (!level.hasChunkAt(new BlockPos(x, g, z))) return false;
@@ -576,6 +640,9 @@ public final class Weathering {
         BlockPos crest = new BlockPos(x, g, z);
         BlockState top = level.getBlockState(crest);
         if (top.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(top)) return false;
+        // Ground something stands on holds: a tree's roots, or a wall's footing. Shedding it left the tree hanging.
+        BlockState on = level.getBlockState(crest.above());
+        if (!on.isAir() && !TerrainProbe.isVegetation(on)) return false;
         if (!top.getFluidState().isEmpty()) return false;
 
         int highest = Integer.MIN_VALUE;
@@ -597,7 +664,8 @@ public final class Weathering {
 
         if (g - highest >= SPIKE) {
             // Nothing holds it up on any side.
-            level.setBlock(crest, Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
+            QuakeWrites.set(level, crest, Blocks.AIR.defaultBlockState());
+            dug(job, k, g);
             return true;
         }
         if (g - lowest >= SCARP && foot != null) {
@@ -605,11 +673,81 @@ public final class Weathering {
             BlockState at = level.getBlockState(foot);
             if (!at.isAir() && !TerrainProbe.isVegetation(at)) return false;
             if (EruptionHandler.isPlayerPlaced(at)) return false;
-            level.setBlock(crest, Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
-            level.setBlock(foot, top, Earthquake.FLAGS);
+            QuakeWrites.set(level, crest, Blocks.AIR.defaultBlockState());
+            QuakeWrites.set(level, foot, top);
+            dug(job, k, g);
             return true;
         }
         return false;
+    }
+
+    /** The ground at {@code y} went from this column: what stood on it is brought down by the next falling pass. */
+    private static void dug(Job job, long k, int y) {
+        if (y > job.excavated.get(k)) job.excavated.put(k, y);
+    }
+
+    /** How far a column may stand over or under all four of its neighbours once the ground has been finished. */
+    private static final int FINISHED_STEP = 2;
+
+    /**
+     * The last look at the ground a quake left: a column standing on its own over all four neighbours is cut down to
+     * one over the highest of them, a pit sunk under all four is filled from the lowest, and soil laid bare where the
+     * ground round it is grown over grows over too. A real scarp or fissure is a line, and has neighbours along it at
+     * its own height, so this leaves it be; what it takes is the odd pillar and hole the moving left.
+     */
+    private static boolean finish(ServerLevel level, int x, int z) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE || !level.hasChunkAt(m.set(x, g, z))) return false;
+        int highest = Integer.MIN_VALUE, lowest = Integer.MAX_VALUE;
+        BlockState lowTop = null;
+        int grown = 0;
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            int nx = x + d.getStepX(), nz = z + d.getStepZ();
+            if (!level.hasChunkAt(m.set(nx, g, nz))) return false;
+            int n = TerrainProbe.groundY(level, nx, nz);
+            if (n == Integer.MIN_VALUE) return false;
+            highest = Math.max(highest, n);
+            if (n < lowest) {
+                lowest = n;
+                lowTop = level.getBlockState(m.set(nx, n, nz));
+            }
+            if (level.getBlockState(m.set(nx, n, nz)).is(Blocks.GRASS_BLOCK)) grown++;
+        }
+        boolean moved = false;
+        // A pillar: trimmed down, a block at a time from its top, as long as what comes off is ground. One a tree
+        // stands on is a knoll and stays; grass on one goes with the top.
+        BlockState on = level.getBlockState(m.set(x, g + 1, z));
+        if (g - highest > FINISHED_STEP - 1 && (isTrunk(on) || !on.isAir() && !TerrainProbe.isVegetation(on))) return false;
+        if (g - highest > FINISHED_STEP - 1 && TerrainProbe.isVegetation(on)) {
+            for (int y = g + 1; y <= g + 2 && TerrainProbe.isVegetation(level.getBlockState(m.set(x, y, z))); y++) {
+                QuakeWrites.set(level, m.immutable(), Blocks.AIR.defaultBlockState());
+            }
+        }
+        while (g - highest > FINISHED_STEP - 1) {
+            BlockState s = level.getBlockState(m.set(x, g, z));
+            if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s) || !s.getFluidState().isEmpty()) break;
+            QuakeWrites.set(level, m.immutable(), Blocks.AIR.defaultBlockState());
+            g--;
+            moved = true;
+        }
+        // A pit: filled from what its lowest neighbour is made of.
+        while (lowest - g > FINISHED_STEP - 1 && lowTop != null && !EruptionHandler.isPlayerPlaced(lowTop)
+                && lowTop.getFluidState().isEmpty() && !TerrainProbe.isVegetation(lowTop)) {
+            BlockState over = level.getBlockState(m.set(x, g + 1, z));
+            if (!over.isAir() && !TerrainProbe.isVegetation(over)) break;
+            QuakeWrites.set(level, m.immutable(), lowTop);
+            g++;
+            moved = true;
+        }
+        // Bare soil among grown-over ground grows over.
+        BlockState top = level.getBlockState(m.set(x, g, z));
+        if (grown >= 2 && (top.is(Blocks.DIRT) || top.is(Blocks.COARSE_DIRT))
+                && level.getBlockState(m.set(x, g + 1, z)).isAir()) {
+            QuakeWrites.set(level, new BlockPos(x, g, z), Blocks.GRASS_BLOCK.defaultBlockState());
+            moved = true;
+        }
+        return moved;
     }
 
     private static long key(int x, int z) {

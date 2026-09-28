@@ -468,10 +468,11 @@
 	#deformation: rifts open fissures, convergent faults thrust one side over the
 	#other, strike-slip faults offset the ground sideways.
 	quakesEnabled = true
-	#Allow quakes to damage player-placed blocks. OFF by default, matching the
-	#rest of the mod: only natural terrain is ever deformed, so a base on a fault
-	#line is safe. Turn on for full realism at your own risk.
-	quakesBreakBuilds = false
+	#Let the rupture itself take what players built: a build standing on ground the fault moves is
+	#buried where the ground rises and comes down where it drops or slides. Off, a build on the fault
+	#line is left standing and the ground under it does not move. The shaking further out is separate
+	#(shakingLoosensBuilds).
+	quakesBreakBuilds = true
 	#Let earthquakes move villages and other world-generated structures.
 	#A village is planks and cobblestone, so the rule that protects what a
 	#player built protected villages too - which is why one could stand
@@ -591,7 +592,7 @@
 	#Together with quakeBlocksPerTick this sets how long a quake takes to play out:
 	#150000 edits at 300 per tick is about twenty-five seconds of ground tearing.
 	#Range: 1000 ~ 4000000
-	quakeMaxEdits = 400000
+	quakeMaxEdits = 1000000
 	#Block edits the deep boundary geology may make per chunk.
 	#This runs constantly while exploring a fault zone, so it is deliberately
 	#sparse: the slab and the metamorphic banding stay obvious when you dig, but
@@ -634,9 +635,10 @@
 	#soil, scree, sand and snow slide down as one mass, trees and all, heap up at the foot and leave
 	#a scar. Never on a slope a player or a village built on, never beside water.
 	quakeLandslides = true
-	#After a quake of magnitude 5.5 or more the fault goes on slipping for days: aftershocks
-	#along it, many at first and fewer later (Omori's law), the largest about 1.2 below the main
-	#shock. Those of 5.5 and up near a player break the ground too; the rest are felt and recorded.
+	#After a quake of magnitude 5.5 or more the fault goes on slipping for days: the few aftershocks
+	#worth feeling, three to five for most quakes, sooner rather than later (Omori's law), the largest
+	#about 1.2 below the main shock. Those of 5.5 and up near a player break the ground too; the rest
+	#are felt and recorded.
 	#Also lets a great earthquake be announced by a foreshock minutes before it.
 	quakeAftershocks = true
 	#How many aftershocks: 1 is the natural number for the main shock's size, 0.5 half as many.
@@ -644,7 +646,7 @@
 	aftershockRate = 1.0
 	#The most aftershocks one quake has.
 	#Range: 1 ~ 500
-	aftershockMax = 30
+	aftershockMax = 8
 	#Over how many in-game days a sequence dies away.
 	#Range: 0.1 ~ 100.0
 	aftershockDays = 3.0

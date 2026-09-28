@@ -132,6 +132,19 @@ public final class WaterTable {
         return sampleCached(level, blockX, blockZ).tableY();
     }
 
+    /**
+     * As {@link #tableY}, for the server thread with a deadline: a column whose sample is not worked out yet is worked
+     * out only while there is time left, and otherwise answered with {@link Integer#MIN_VALUE}. A sample reads the
+     * generator's heights round it; in ground nobody had asked about, a quake's look over one chunk's slopes asked for
+     * enough of them to hold the server for two seconds.
+     */
+    public static int tableYBefore(ServerLevel level, int blockX, int blockZ, long deadline) {
+        Sample hit = CACHE.get(ColumnCache.key(blockX & ~(GRID - 1), blockZ & ~(GRID - 1)));
+        if (hit != null) return hit.tableY();
+        if (System.nanoTime() > deadline) return Integer.MIN_VALUE;
+        return sampleCached(level, blockX, blockZ).tableY();
+    }
+
     /** True where groundwater reaches the surface and would discharge. */
     public static boolean isSpringLine(ServerLevel level, int blockX, int blockZ) {
         return sampleCached(level, blockX, blockZ).isSpringLine(level.getSeaLevel());

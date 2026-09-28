@@ -90,6 +90,21 @@ public final class Earthquake {
     }
 
     private static final List<Running> ACTIVE = new ArrayList<>();
+
+    /** Quakes whose ground is still being read, a slice a tick, before they are planned. */
+    private static final List<Preparing> PREPARING = new ArrayList<>();
+
+    private record Preparing(ResourceKey<Level> dimension, QuakePlanner.SnapshotJob job, List<QuakePlanner.TracePoint> trace,
+                             BlockPos epicentre, FaultType type, double magnitude, double depthMetres, long seed,
+                             boolean mayBreak, long startAt) {}
+
+    /** How long the ground of a new quake is read for in a tick. A quake is rare, and its warning gives the time. */
+    private static final long PREPARE_NANOS = 15_000_000L;
+
+    /** Whether a rupture is still moving the ground somewhere, or about to; the settling waits for it. */
+    public static boolean moving() {
+        return !ACTIVE.isEmpty() || !PREPARING.isEmpty();
+    }
     private static int ambientTimer = 0;
 
     // === Public API =========================================================
@@ -99,7 +114,7 @@ public final class Earthquake {
      * Returns false when the column is not on a fault - plate interiors do not rupture.
      */
     public static boolean triggerHere(ServerLevel level, BlockPos at, double magnitudeOverride) {
-        PlateSample s = TectonicMap.sample(level, at.getX(), at.getZ());
+        PlateSample s = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sample(level, at.getX(), at.getZ());
         if (s.faultType() == FaultType.INTERIOR) return false;
         double magnitude = magnitudeOverride > 0 ? magnitudeOverride
                 : rollMagnitude(s.faultType(), s.stress(), level.random);
@@ -132,7 +147,7 @@ public final class Earthquake {
 
         // Put the hypocentre on the fault first, so quakes fired from different spots follow one line.
         BlockPos epi = epicentre;
-        PlateSample here = TectonicMap.sample(level, epicentre.getX(), epicentre.getZ());
+        PlateSample here = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sample(level, epicentre.getX(), epicentre.getZ());
         if (here.onFault() && here.faultDistance() > 1.0) {
             epi = new BlockPos(
                     epicentre.getX() + (int) Math.round(here.faultNormalX() * here.faultDistance()),
@@ -161,19 +176,20 @@ public final class Earthquake {
                 QuakePlanner.deformationHalfWidth(type, magnitude), (t1 - t0) / 1_000_000);
         if (trace.isEmpty()) return;
 
-        QuakePlanner.Snapshot snap = QuakePlanner.snapshot(level, trace, type, magnitude);
-        long t2 = System.nanoTime();
-        com.jeladastudios.ftsgeology.util.Diagnostics.info("quake snapshot: {} columns in {} ms",
-                snap.size(), (t2 - t1) / 1_000_000);
-
         double depthM = quakeDepthMetres(type, level.random);
         boolean mayBreak = GeyserConfig.QUAKES_BREAK_BUILDS.get();
         long seed = level.random.nextLong();
         ResourceKey<Level> dim = level.dimension();
 
-        PendingEdits.register(level, epicentreOnFault, type, magnitude, depthM, seed, mayBreak, trace);
-        long t3 = System.nanoTime();
-        com.jeladastudios.ftsgeology.util.Diagnostics.info("quake register done in {} ms", (t3 - t2) / 1_000_000);
+        // The corridor's unloaded chunks are parked now; the loaded ones are read over the next ticks.
+        java.util.Map<Long, List<QuakePlanner.TracePoint>> loaded =
+                PendingEdits.register(level, epicentreOnFault, type, magnitude, depthM, seed, mayBreak, trace);
+        long t2 = System.nanoTime();
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("quake register done in {} ms", (t2 - t1) / 1_000_000);
+        QuakePlanner.SnapshotJob job = new QuakePlanner.SnapshotJob(level, trace, type, magnitude, null,
+                new it.unimi.dsi.fastutil.longs.LongOpenHashSet(loaded.keySet()),
+                ck -> PendingEdits.park(level, net.minecraft.world.level.ChunkPos.getX(ck), net.minecraft.world.level.ChunkPos.getZ(ck), epicentreOnFault, type, magnitude,
+                        depthM, seed, mayBreak, loaded.get(ck)));
 
         // Filed for the instruments; a station in an unloaded chunk reads back what it missed.
         com.jeladastudios.ftsgeology.instrument.SeismicNetwork
@@ -188,6 +204,32 @@ public final class Earthquake {
         // And the fault goes on slipping for days.
         if (!aftershock) Aftershocks.afterMain(level, trace, type, magnitude);
 
+        PREPARING.add(new Preparing(dim, job, trace, epicentreOnFault, type, magnitude, depthM, seed, mayBreak, startAt));
+    }
+
+    /** Reads the ground of the quakes being prepared, a slice a tick, and has each planned once it is all in. */
+    private static void prepare(net.minecraft.server.MinecraftServer server) {
+        if (PREPARING.isEmpty()) return;
+        long budget = PREPARE_NANOS / PREPARING.size();
+        PREPARING.removeIf(p -> {
+            ServerLevel level = server.getLevel(p.dimension());
+            if (level == null) return true;
+            if (!p.job().step(budget)) return false;
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("quake snapshot: {}", p.job().timing());
+            plan(level, p);
+            return true;
+        });
+    }
+
+    private static void plan(ServerLevel level, Preparing p) {
+        QuakePlanner.Snapshot snap = p.job().snapshot();
+        List<QuakePlanner.TracePoint> trace = p.trace();
+        BlockPos epicentreOnFault = p.epicentre();
+        FaultType type = p.type();
+        double magnitude = p.magnitude(), depthM = p.depthMetres();
+        long seed = p.seed(), startAt = p.startAt();
+        boolean mayBreak = p.mayBreak();
+        ResourceKey<Level> dim = p.dimension();
         // Worker thread: the expensive half. Touches nothing but the immutable snapshot.
         CompletableFuture
                 .supplyAsync(() -> {
@@ -232,14 +274,16 @@ public final class Earthquake {
 
     /** Stops every running quake and forgets everything parked. */
     public static int cancelAll() {
-        int n = ACTIVE.size();
+        int n = ACTIVE.size() + PREPARING.size();
         ACTIVE.clear();
+        PREPARING.clear();
         PendingEdits.clear();
         Weathering.clear();
         QuakeQuiet.clear();     // nothing left to settle, so nothing left to wait for
         ShakingDamage.clear();
         Liquefaction.clear();
         Landslides.clear();
+        Collapse.clear();
         return n;
     }
 
@@ -274,6 +318,10 @@ public final class Earthquake {
         ShakingDamage.drain(event.getServer(),
                 com.jeladastudios.ftsgeology.util.TickBudget.slice(0.2));
 
+        // Buildings on moved ground, and the parts of others the shaking broke, coming down.
+        Collapse.drain(event.getServer(),
+                com.jeladastudios.ftsgeology.util.TickBudget.slice(0.2));
+
         // Wet sand going quick under the shaking: boils, and what stands on it settling.
         Liquefaction.drain(event.getServer(),
                 com.jeladastudios.ftsgeology.util.TickBudget.slice(0.15));
@@ -281,6 +329,9 @@ public final class Earthquake {
         // Steep slopes shedding their cover.
         Landslides.drain(event.getServer(),
                 com.jeladastudios.ftsgeology.util.TickBudget.slice(0.15));
+
+        // New quakes' ground, read a slice at a time before they are planned.
+        prepare(event.getServer());
 
         // Release quiet zones whose own debris has landed; after the drains, so it can happen this tick.
         for (ServerLevel l : event.getServer().getAllLevels()) {
@@ -318,7 +369,7 @@ public final class Earthquake {
                 QuakePlanner.Edit e = run.pending.poll();
                 examined++;
                 if (level.hasChunkAt(e.pos())) {
-                    level.setBlock(e.pos(), com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, e.pos(), e.state()), FLAGS);
+                    QuakeWrites.set(level, e.pos(), com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, e.pos(), e.state()));
                     placed++;
                 } else {
                     // The chunk went away since the snapshot: parked, not dropped, so the rupture is
@@ -342,12 +393,15 @@ public final class Earthquake {
             boolean done = run.pending.isEmpty() && run.shakeTicks <= 0;
             if (done) {
                 com.jeladastudios.ftsgeology.util.Diagnostics.info("quake finished: {} blocks over {} ticks", run.applied, run.ticks);
-                com.jeladastudios.ftsgeology.util.Diagnostics.info("{}; {}; {}; {}", ShakingDamage.summary(),
-                        FeltShaking.summary(), Liquefaction.summary(), Landslides.summary());
+                com.jeladastudios.ftsgeology.util.Diagnostics.info("{}; {}; {}; {}; {}; {}", ShakingDamage.summary(),
+                        FeltShaking.summary(), Liquefaction.summary(), Landslides.summary(), Collapse.summary(),
+                        Structural.summary());
                 // The shaking stops, but the ground it left is raw. Let it relax.
                 Weathering.enqueue(level, run.plan.edits());
                 // And the caves under it: an arch that stood for ten thousand years can fail in a minute.
                 CaveCollapse.enqueue(level, run.plan);
+                // What stood on ground that moved comes down with it.
+                Collapse.wreckColumns(level, run.plan.wrecked(), 200);
                 // The corridor stays shut until that settling is done.
                 QuakeQuiet.settling(level, run.plan.epicentre());
                 // New springs are seeded now, but do not start climbing until the zone releases.
@@ -382,7 +436,7 @@ public final class Earthquake {
             int oz = level.random.nextInt(reach * 2 + 1) - reach;
             int x = p.blockPosition().getX() + ox;
             int z = p.blockPosition().getZ() + oz;
-            PlateSample s = TectonicMap.sample(level, x, z);
+            PlateSample s = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sample(level, x, z);
             if (s.faultType() == FaultType.INTERIOR) continue;
             // Recurrence, not a coin flip: the chance comes from a target interval in days, shorter
             // on a highly stressed fault.

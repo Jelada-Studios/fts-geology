@@ -27,13 +27,12 @@ public final class DynamicTreesFelling {
 
     private static final Api API = Api.find();
 
-    private record Api(Class<?> branch, Method isRooty, Method destroy, Field species, Field wood, Method drops,
+    private record Api(Class<?> branch, Method destroy, Field species, Field wood, Method drops,
                        Method drop, Object harvest) {
         static Api find() {
             if (!ModList.get().isLoaded("dynamictrees")) return null;
             try {
                 Class<?> branch = Class.forName("com.ferreusveritas.dynamictrees.block.branch.BranchBlock");
-                Class<?> helper = Class.forName("com.ferreusveritas.dynamictrees.api.TreeHelper");
                 Class<?> data = Class.forName("com.ferreusveritas.dynamictrees.util.BranchDestructionData");
                 Class<?> species = Class.forName("com.ferreusveritas.dynamictrees.tree.species.Species");
                 Class<?> volume = Class.forName("com.ferreusveritas.dynamictrees.systems.nodemapper.NetVolumeNode$Volume");
@@ -42,7 +41,7 @@ public final class DynamicTreesFelling {
                 Object harvest = null;
                 for (Object c : type.getEnumConstants()) if (((Enum<?>) c).name().equals("HARVEST")) harvest = c;
                 if (harvest == null) throw new NoSuchFieldException("DestroyType.HARVEST");
-                return new Api(branch, helper.getMethod("isRooty", BlockState.class),
+                return new Api(branch,
                         branch.getMethod("destroyBranchFromNode", Level.class, BlockPos.class, Direction.class, boolean.class, LivingEntity.class),
                         data.getField("species"), data.getField("woodVolume"),
                         species.getMethod("getBranchesDrops", Level.class, volume),
@@ -63,14 +62,70 @@ public final class DynamicTreesFelling {
         return API != null && API.branch().isInstance(state.getBlock());
     }
 
-    /** Whether a block is the rooted soil a Dynamic Trees tree stands in. */
-    public static boolean isRooty(BlockState state) {
-        if (API == null) return false;
-        try {
-            return (Boolean) API.isRooty().invoke(null, state);
-        } catch (ReflectiveOperationException | ClassCastException e) {
-            return false;
+    /** Dynamic Trees' switch for what a branch taken away does to its tree, and the setting that leaves the tree be. */
+    private static final Field DESTROY_MODE;
+    private static final Object LEAVE_BE;
+
+    static {
+        Field mode = null;
+        Object ignore = null;
+        if (API != null) {
+            try {
+                mode = API.branch().getField("destroyMode");
+                @SuppressWarnings({"unchecked", "rawtypes"})
+                Object value = Enum.valueOf((Class) mode.getType(), "IGNORE");
+                ignore = value;
+            } catch (ReflectiveOperationException | IllegalArgumentException | ClassCastException e) {
+                mode = null;
+                ignore = null;
+            }
         }
+        DESTROY_MODE = mode;
+        LEAVE_BE = ignore;
+    }
+
+    /**
+     * Writes over a Dynamic Trees branch without its tree coming down. A branch replaced by anything but another branch
+     * is taken for one broken, and Dynamic Trees tears the whole tree down with it; a quake moving a tree block by block
+     * replaces its trunk's foot first, and the tree was gone before it had risen a block. Dynamic Trees' own deliberate
+     * breaks switch the same setting round their write.
+     */
+    public static <T> T quietly(java.util.function.Supplier<T> write) {
+        if (DESTROY_MODE == null) return write.get();
+        Object was;
+        try {
+            was = DESTROY_MODE.get(null);
+            DESTROY_MODE.set(null, LEAVE_BE);
+        } catch (IllegalAccessException e) {
+            return write.get();
+        }
+        try {
+            return write.get();
+        } finally {
+            try {
+                DESTROY_MODE.set(null, was);
+            } catch (IllegalAccessException ignored) {
+                // Set a moment ago, so it can be set back.
+            }
+        }
+    }
+
+    /** Dynamic Trees' own tag for its rooted soils; empty, and never matched, without Dynamic Trees. */
+    private static final net.minecraft.tags.TagKey<net.minecraft.world.level.block.Block> ROOTY =
+            net.minecraft.tags.BlockTags.create(new net.minecraft.resources.ResourceLocation("dynamictrees", "rooty_soil"));
+
+    /**
+     * Whether a block is any part of a Dynamic Trees tree: branch, leaves, rooted soil, the shell round a thick trunk,
+     * a root along the ground. Only some of them carry vanilla's tree tags.
+     */
+    public static boolean isTreeBlock(BlockState state) {
+        return API != null && "dynamictrees".equals(
+                net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).getNamespace());
+    }
+
+    /** Whether a block is the rooted soil a Dynamic Trees tree stands in. A tag read, cheap enough for every column. */
+    public static boolean isRooty(BlockState state) {
+        return state.is(ROOTY);
     }
 
     /**
@@ -81,6 +136,8 @@ public final class DynamicTreesFelling {
         if (API == null) return false;
         BlockState state = level.getBlockState(base);
         if (!API.branch().isInstance(state.getBlock())) return false;
+        // A tree near the edge of what is loaded is left standing: working it out would load the chunks next door.
+        if (!com.jeladastudios.ftsgeology.quake.QuakeWrites.around(level, base)) return false;
         try {
             Object data = API.destroy().invoke(state.getBlock(), level, base, from, false, null);
             if (data == null) return false;

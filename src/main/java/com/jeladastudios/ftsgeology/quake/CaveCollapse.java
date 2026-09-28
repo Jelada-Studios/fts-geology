@@ -351,7 +351,7 @@ public final class CaveCollapse {
         if (tree) fellTree(level, x, c.ground() + 1, z);
         if (n >= c.roof()) TerrainProbe.clearVegetation(level, x, c.ground(), z, 2);
         for (int i = 0; i < n; i++) {
-            level.setBlock(m.set(x, c.top() + 1 + i, z), TfcCompat.translate(level, m.set(x, c.top() + 1 + i, z), Blocks.AIR.defaultBlockState()), FLAGS);
+            QuakeWrites.set(level, m.set(x, c.top() + 1 + i, z), TfcCompat.translate(level, m.set(x, c.top() + 1 + i, z), Blocks.AIR.defaultBlockState()));
             pool.add(rubble(slab[i], level.random));
         }
         return n;
@@ -363,7 +363,7 @@ public final class CaveCollapse {
         int roof = Math.min(from + 48, level.getMaxBuildHeight() - 1);
         int top = from;
         while (top <= roof && TerrainProbe.isTreePart(level.getBlockState(m.set(x, top, z)))) {
-            level.setBlock(new BlockPos(x, top, z), TfcCompat.translate(level, new BlockPos(x, top, z), Blocks.AIR.defaultBlockState()), FLAGS);
+            QuakeWrites.set(level, new BlockPos(x, top, z), TfcCompat.translate(level, new BlockPos(x, top, z), Blocks.AIR.defaultBlockState()));
             top++;
         }
         Weathering.takeCrown(level, x, from - 1, top + 8, z, Weathering.CROWN_REACH);
@@ -402,7 +402,7 @@ public final class CaveCollapse {
                     if (!level.getBlockState(m.set(cx, y - 1, cz)).isAir() && !level.getBlockState(m.set(cx, y - 1, cz)).getFluidState().isEmpty()) continue;
                     for (int i = 0; i < h && next < total; i++) {
                         if (!level.getBlockState(m.set(cx, y + i, cz)).isAir()) break;
-                        level.setBlock(m.set(cx, y + i, cz), TfcCompat.translate(level, m.set(cx, y + i, cz), pool.get(next++)), FLAGS);
+                        QuakeWrites.set(level, m.set(cx, y + i, cz), TfcCompat.translate(level, m.set(cx, y + i, cz), pool.get(next++)));
                     }
                 }
             }

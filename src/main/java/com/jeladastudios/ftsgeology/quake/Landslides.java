@@ -116,6 +116,7 @@ public final class Landslides {
         }
         report = true;
         long deadline = System.nanoTime() + nanos;
+        scanDeadline = deadline;
         while (!DUE.isEmpty() && System.nanoTime() < deadline) {
             Slide s = DUE.peek();
             ServerLevel level = server.getLevel(s.dimension());
@@ -138,6 +139,9 @@ public final class Landslides {
             if (level != null) chunk(level, job, cp);
         }
     }
+
+    /** Until when this tick's look over the slopes may work out the water table where it is not known yet. */
+    private static long scanDeadline = Long.MAX_VALUE;
 
     /** Looks over a chunk's slopes for the ones the shaking brings down, and when. */
     private static void chunk(ServerLevel level, Job job, ChunkPos cp) {
@@ -176,8 +180,8 @@ public final class Landslides {
                 if (cover(level, x, top, z) == 0 || built(placed, built, x, top, z) || nearWater(level, x, top, z)) continue;
                 // Steeper and harder shaken, likelier; a wet slope likelier still.
                 double chance = 0.04 * (strength + 0.5) * Math.min(3.0, drop / (double) STEEP);
-                int wet = top - com.jeladastudios.ftsgeology.hydrology.WaterTable.tableY(level, x, z);
-                if (wet <= 4) chance *= 1.5;
+                int table = com.jeladastudios.ftsgeology.hydrology.WaterTable.tableYBefore(level, x, z, scanDeadline);
+                if (table != Integer.MIN_VALUE && top - table <= 4) chance *= 1.5;
                 if (level.random.nextDouble() >= Math.min(0.5, chance)) continue;
                 if (job.counts()[0]++ >= MOST) return;
                 here++;
@@ -262,7 +266,7 @@ public final class Landslides {
                     BlockPos p = new BlockPos(x, y, z);
                     BlockState plant = level.getBlockState(p);
                     if (TerrainProbe.isVegetation(plant) || plant.is(Blocks.SNOW)) {
-                        level.setBlock(p, Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
+                        QuakeWrites.set(level, p, Blocks.AIR.defaultBlockState());
                     }
                 }
                 for (int i = 0; i < k; i++) {
@@ -278,7 +282,7 @@ public final class Landslides {
                         f.setHurtsEntities(1.0f, 10);
                         f.hurtMarked = true;
                     } else {
-                        level.setBlock(p, Blocks.AIR.defaultBlockState(), Earthquake.FLAGS);
+                        QuakeWrites.set(level, p, Blocks.AIR.defaultBlockState());
                         deposit(level, x, z, down, block);
                     }
                     emptied.add(new QuakePlanner.Edit(p, Blocks.AIR.defaultBlockState()));

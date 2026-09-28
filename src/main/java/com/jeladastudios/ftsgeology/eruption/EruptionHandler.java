@@ -520,6 +520,11 @@ public final class EruptionHandler {
         // Ground cover is landscape, not a build.
         if (com.jeladastudios.ftsgeology.worldgen.TerrainProbe.isVegetation(s)) return true;
         if (TfcCompat.isGround(s)) return true;
+        // Dynamic Trees' rooted soil is the ground its tree stands in. Read as a build, every tree's column stood
+        // still in a rift's subsidence and rose not at all in an uplift: a forest on pillars of its own soil.
+        if (com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isRooty(s)) return true;
+        // So is the rest of such a tree: a thick trunk's shell and the roots along the ground carry no tree tag.
+        if (com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(s)) return true;
         // Trees are landscape too, or quakes leave forests hanging; a log cabin counts as terrain as a result.
         if (s.is(BlockTags.LOGS) || s.is(BlockTags.LEAVES) || s.is(BlockTags.WART_BLOCKS)
                 || s.is(Blocks.MANGROVE_ROOTS) || s.is(Blocks.MUSHROOM_STEM)
@@ -569,7 +574,13 @@ public final class EruptionHandler {
                 || s.is(Tags.Blocks.COBBLESTONE)      // the boulders of an old-growth taiga
                 || s.is(Tags.Blocks.GRAVEL)
                 || s.is(Tags.Blocks.SAND)
-                || s.is(Tags.Blocks.ORES)) {
+                || s.is(Tags.Blocks.SANDSTONE)
+                || s.is(Tags.Blocks.NETHERRACK)
+                || s.is(Tags.Blocks.ORES)
+                || s.is(BlockTags.NYLIUM)
+                || s.is(BlockTags.MOSS_REPLACEABLE)   // moss, and the soils and stones mods add to it
+                || s.is(BlockTags.LUSH_GROUND_REPLACEABLE)
+                || s.is(BlockTags.AZALEA_ROOT_REPLACEABLE)) {
             return true;
         }
         // Common vanilla naturals that aren't reliably inside the tag families above.

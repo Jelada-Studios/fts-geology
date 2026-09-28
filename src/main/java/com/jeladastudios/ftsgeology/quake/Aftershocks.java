@@ -40,8 +40,11 @@ public final class Aftershocks {
     private static final double BATH = 1.2;
     /** Omori's p, and c in ticks: the rate falls a little faster than one over the time, from half a minute in. */
     private static final double P = 1.1, C = 600.0;
-    /** The smallest aftershock scheduled: smaller ones are too weak to feel far, and too many. */
-    private static final double SMALLEST = 3.5;
+    /**
+     * The smallest aftershock scheduled, and how far under the main shock the ones worth following start: a real
+     * sequence has thousands, of which the three to five that are felt and remembered lie within two magnitudes of it.
+     */
+    private static final double SMALLEST = 4.0, NOTABLE = 1.8;
     /** Share of a great ambient earthquake that is announced minutes before by a foreshock. */
     private static final double GREAT = 7.0;
 
@@ -108,7 +111,7 @@ public final class Aftershocks {
      */
     public static void afterMain(ServerLevel level, List<QuakePlanner.TracePoint> trace, FaultType type, double magnitude) {
         if (!GeyserConfig.QUAKE_AFTERSHOCKS.get() || magnitude < MAIN_MIN || trace.isEmpty()) return;
-        double smallest = Math.max(SMALLEST, magnitude - 3.0);
+        double smallest = Math.max(SMALLEST, magnitude - NOTABLE);
         double largest = magnitude - 0.5;
         int n = (int) Math.round(Math.pow(10.0, magnitude - BATH - smallest) * GeyserConfig.AFTERSHOCK_RATE.get());
         n = Mth.clamp(n, 1, GeyserConfig.AFTERSHOCK_MAX.get());

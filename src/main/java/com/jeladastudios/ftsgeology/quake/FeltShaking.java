@@ -116,8 +116,11 @@ public final class FeltShaking {
 
     private static final class Felt {
         boolean jolted, told;
-        long rumbled = Long.MIN_VALUE;
+        /** When the rumble was last started here; never, at first. */
+        long rumbled = NEVER;
     }
+
+    private static final long NEVER = -1_000_000L;
 
     private static final class Quake {
         final ResourceKey<Level> dimension;
@@ -200,15 +203,25 @@ public final class FeltShaking {
         if (!f.jolted) {
             f.jolted = true;
             jolts++;
+            // The P wave: a sharp jolt and a boom, and, far enough out to be worth it, the warning it is.
+            p.playNotifySound(net.minecraft.sounds.SoundEvents.GENERIC_EXPLODE, net.minecraft.sounds.SoundSource.BLOCKS,
+                    (float) Mth.clamp((intensity - 2.0) / 6.0, 0.2, 0.8), 0.45f);
+            int warn = (int) ((sAt - now) / 20);
+            if (warn >= 1 && intensity >= 4.0) {
+                p.displayClientMessage(Component.translatable("message.fts_geology.p_wave", warn)
+                        .withStyle(ChatFormatting.GOLD), true);
+            }
             com.jeladastudios.ftsgeology.util.Diagnostics.info(
                     "felt: {} {} blocks from the rupture, intensity {}, P at +{} ticks, S at +{}, shaking {} ticks",
                     p.getName().getString(), Math.round(d[0]), String.format(java.util.Locale.ROOT, "%.2f", intensity),
                     pAt - q.startAt, sAt - q.startAt, lasts);
         }
-        if (now - f.rumbled >= RUMBLE_CLIP) {
+        // The rumble starts with the P wave, starts again, louder, as the S wave arrives, and runs until the end.
+        boolean sArrives = now == sAt;
+        if (now - f.rumbled >= RUMBLE_CLIP || sArrives) {
             f.rumbled = now;
             // Heard where the player is, not at the epicentre: the ground under them is what roars.
-            float volume = (float) Mth.clamp((intensity - 2.0) / 5.0, 0.25, 1.0);
+            float volume = (float) Mth.clamp((intensity - 2.0) / (sArrives ? 3.0 : 5.0), 0.35, 1.0);
             float pitch = (float) Mth.clamp(0.75 + 0.05 * (intensity - 3.0), 0.7, 1.0);
             p.playNotifySound(com.jeladastudios.ftsgeology.registry.ModSounds.QUAKE_RUMBLE.get(),
                     net.minecraft.sounds.SoundSource.BLOCKS, volume, pitch);
@@ -221,8 +234,8 @@ public final class FeltShaking {
                 shake = (float) (strong * (into < 0.6 ? 1.0 : 1.0 - (into - 0.6) / 0.4));
                 speed = 1.0f;
             } else {
-                shake = strong * 0.3f;
-                speed = 2.6f;
+                shake = Math.max(0.25f, strong * 0.45f);
+                speed = 3.0f;
             }
             if (shake > 0.02f) com.jeladastudios.ftsgeology.network.ModNetwork.sendShake(p, shake, 20, speed);
         }

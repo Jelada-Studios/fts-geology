@@ -60,6 +60,18 @@ public final class RiftSteps {
         return m;
     }
 
+    /**
+     * Whether a block is one of these steps: a bottom slab of the very rock it lies on. The quakes take it for ground,
+     * not for a build; read as a build, every step in a rift stood still while the floor round it dropped.
+     */
+    public static boolean isStep(BlockState s, BlockState below) {
+        if (!(s.getBlock() instanceof net.minecraft.world.level.block.SlabBlock)
+                || s.getValue(net.minecraft.world.level.block.SlabBlock.TYPE) != net.minecraft.world.level.block.state.properties.SlabType.BOTTOM) {
+            return false;
+        }
+        return slabs().get(below.getBlock()) == s.getBlock();
+    }
+
     public static void generate(WorldGenLevel level, ChunkPos cp) {
         if (TfcCompat.active() || !GeologyWorld.isOwn(level.getLevel())) return;
         int x0 = cp.getMinBlockX(), z0 = cp.getMinBlockZ();

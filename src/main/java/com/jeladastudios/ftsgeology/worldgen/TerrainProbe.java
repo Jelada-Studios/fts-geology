@@ -56,7 +56,9 @@ public final class TerrainProbe {
     public static boolean isTreePart(BlockState s) {
         return s.is(BlockTags.LEAVES) || s.is(BlockTags.LOGS) || s.is(Blocks.MANGROVE_ROOTS)
                 || s.is(Blocks.RED_MUSHROOM_BLOCK) || s.is(Blocks.BROWN_MUSHROOM_BLOCK)
-                || s.is(Blocks.MUSHROOM_STEM) || s.is(Blocks.BEE_NEST);
+                || s.is(Blocks.MUSHROOM_STEM) || s.is(Blocks.BEE_NEST)
+                || com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(s)
+                && !com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isRooty(s);
     }
 
     /** How far a leaf may be from a log before vanilla would rot it, and a huge mushroom's cap from its stem. */

@@ -698,10 +698,11 @@ public final class GeyserConfig {
                         "other, strike-slip faults offset the ground sideways.")
                 .define("quakesEnabled", true);
         QUAKES_BREAK_BUILDS = b
-                .comment("Allow quakes to damage player-placed blocks. OFF by default, matching the",
-                        "rest of the mod: only natural terrain is ever deformed, so a base on a fault",
-                        "line is safe. Turn on for full realism at your own risk.")
-                .define("quakesBreakBuilds", false);
+                .comment("Let the rupture itself take what players built: a build standing on ground the fault moves is",
+                        "buried where the ground rises and comes down where it drops or slides. Off, a build on the fault",
+                        "line is left standing and the ground under it does not move. The shaking further out is separate",
+                        "(shakingLoosensBuilds).")
+                .define("quakesBreakBuilds", true);
         QUAKES_BREAK_STRUCTURES = b
                 .comment("Let earthquakes move villages and other world-generated structures.",
                         "A village is planks and cobblestone, so the rule that protects what a",
@@ -800,9 +801,10 @@ public final class GeyserConfig {
                         "a scar. Never on a slope a player or a village built on, never beside water.")
                 .define("quakeLandslides", true);
         QUAKE_AFTERSHOCKS = b
-                .comment("After a quake of magnitude 5.5 or more the fault goes on slipping for days: aftershocks",
-                        "along it, many at first and fewer later (Omori's law), the largest about 1.2 below the main",
-                        "shock. Those of 5.5 and up near a player break the ground too; the rest are felt and recorded.",
+                .comment("After a quake of magnitude 5.5 or more the fault goes on slipping for days: the few aftershocks",
+                        "worth feeling, three to five for most quakes, sooner rather than later (Omori's law), the largest",
+                        "about 1.2 below the main shock. Those of 5.5 and up near a player break the ground too; the rest",
+                        "are felt and recorded.",
                         "Also lets a great earthquake be announced by a foreshock minutes before it.")
                 .define("quakeAftershocks", true);
         AFTERSHOCK_RATE = b
@@ -810,7 +812,7 @@ public final class GeyserConfig {
                 .defineInRange("aftershockRate", 1.0, 0.0, 10.0);
         AFTERSHOCK_MAX = b
                 .comment("The most aftershocks one quake has.")
-                .defineInRange("aftershockMax", 30, 1, 500);
+                .defineInRange("aftershockMax", 8, 1, 500);
         AFTERSHOCK_DAYS = b
                 .comment("Over how many in-game days a sequence dies away.")
                 .defineInRange("aftershockDays", 3.0, 0.1, 100.0);
@@ -869,7 +871,7 @@ public final class GeyserConfig {
                         "shortens the rupture at its far ends rather than leaving holes in it.",
                         "Together with quakeBlocksPerTick this sets how long a quake takes to play out:",
                         "150000 edits at 300 per tick is about twenty-five seconds of ground tearing.")
-                .defineInRange("quakeMaxEdits", 400000, 1000, 4000000);
+                .defineInRange("quakeMaxEdits", 1000000, 1000, 4000000);
         DEEP_STRUCTURE_BUDGET = b
                 .comment("Block edits the deep boundary geology may make per chunk.",
                         "This runs constantly while exploring a fault zone, so it is deliberately",

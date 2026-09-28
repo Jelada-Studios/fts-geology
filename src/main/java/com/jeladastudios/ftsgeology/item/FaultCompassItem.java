@@ -48,7 +48,7 @@ public class FaultCompassItem extends Item {
 
         int x = player.blockPosition().getX();
         int z = player.blockPosition().getZ();
-        PlateSample s = TectonicMap.sample(server, x, z);
+        PlateSample s = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sample(server, x, z);
 
         player.sendSystemMessage(Component.translatable("message.fts_geology.compass.plate",
                 TectonicMap.plateCode(s.plateId()),
