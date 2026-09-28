@@ -60,8 +60,8 @@ public final class Earthquake {
         final long seed;
         final boolean mayBreak;
         final List<QuakePlanner.TracePoint> trace;
-        /** The corridor by chunk, worked out the first time a chunk is found unloaded. */
-        java.util.Map<Long, List<QuakePlanner.TracePoint>> byChunk;
+        /** Chunks that went away while their ground was moving: the rest of their edits wait for them. */
+        final it.unimi.dsi.fastutil.longs.LongOpenHashSet parked = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
         /** When the ground may start moving: the warning window lets seismographs sound first. */
         long startAt;
         int shakeTicks;
@@ -176,7 +176,7 @@ public final class Earthquake {
                 QuakePlanner.deformationHalfWidth(type, magnitude), (t1 - t0) / 1_000_000);
         if (trace.isEmpty()) return;
 
-        double depthM = quakeDepthMetres(type, level.random);
+        double depthM = quakeDepthMetres(type, magnitude, level.random);
         boolean mayBreak = GeyserConfig.QUAKES_BREAK_BUILDS.get();
         long seed = level.random.nextLong();
         ResourceKey<Level> dim = level.dimension();
@@ -260,7 +260,7 @@ public final class Earthquake {
     public static void tremor(ServerLevel level, BlockPos at, FaultType type, double magnitude,
                               double strikeX, double strikeZ, boolean aftershock) {
         if (!GeyserConfig.QUAKES_ENABLED.get() || type == FaultType.INTERIOR) return;
-        double depthM = quakeDepthMetres(type, level.random);
+        double depthM = quakeDepthMetres(type, magnitude, level.random);
         com.jeladastudios.ftsgeology.instrument.SeismicNetwork.record(level, at, type, magnitude, depthM);
         List<QuakePlanner.TracePoint> trace = List.of(new QuakePlanner.TracePoint(at.getX(), at.getZ(), strikeX, strikeZ, 0.0));
         announce(level, trace, at, type, magnitude, depthM, aftershock);
@@ -368,19 +368,16 @@ public final class Earthquake {
                     && System.nanoTime() < deadline) {
                 QuakePlanner.Edit e = run.pending.poll();
                 examined++;
-                if (level.hasChunkAt(e.pos())) {
+                long ck = net.minecraft.world.level.ChunkPos.asLong(e.pos().getX() >> 4, e.pos().getZ() >> 4);
+                if (!run.parked.contains(ck) && level.hasChunkAt(e.pos())) {
                     QuakeWrites.set(level, e.pos(), com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, e.pos(), e.state()));
                     placed++;
                 } else {
-                    // The chunk went away since the snapshot: parked, not dropped, so the rupture is
-                    // replayed there when it comes back.
-                    if (run.byChunk == null) {
-                        run.byChunk = PendingEdits.segmentsByChunk(run.type, run.plan.magnitude(), run.trace);
-                    }
-                    int cx = e.pos().getX() >> 4, cz = e.pos().getZ() >> 4;
-                    PendingEdits.park(level, cx, cz, run.epicentre, run.type, run.plan.magnitude(),
-                            run.depthMetres, run.seed, run.mayBreak,
-                            run.byChunk.get(net.minecraft.world.level.ChunkPos.asLong(cx, cz)));
+                    // The chunk went away since the snapshot: the rest of its edits wait for it, in order, and are
+                    // written when it comes back. The whole rupture used to be planned there again from the ground
+                    // half moved, and it moved twice: a column lifted twice over, the snow on it left in the air.
+                    run.parked.add(ck);
+                    PendingEdits.parkEdit(level, e);
                 }
             }
             run.applied += placed;
@@ -392,7 +389,10 @@ public final class Earthquake {
             run.shakeTicks--;
             boolean done = run.pending.isEmpty() && run.shakeTicks <= 0;
             if (done) {
-                com.jeladastudios.ftsgeology.util.Diagnostics.info("quake finished: {} blocks over {} ticks", run.applied, run.ticks);
+                com.jeladastudios.ftsgeology.util.Diagnostics.info("quake finished: {} blocks over {} ticks, {} chunks left waiting",
+                        run.applied, run.ticks, run.parked.size());
+                // A chunk that went and came back while the rest was moving has its edits written now.
+                PendingEdits.release(level, run.parked);
                 com.jeladastudios.ftsgeology.util.Diagnostics.info("{}; {}; {}; {}; {}; {}", ShakingDamage.summary(),
                         FeltShaking.summary(), Liquefaction.summary(), Landslides.summary(), Collapse.summary(),
                         Structural.summary());
@@ -481,9 +481,23 @@ public final class Earthquake {
     }
 
 
-    public static double quakeDepthMetres(FaultType type, RandomSource rng) {
-        double base = type.typicalQuakeDepth() * 1000.0;   // the enum reports kilometres
-        return base * (0.5 + rng.nextDouble());
+    /**
+     * How deep a quake breaks, in metres. Crustal faults break between a few kilometres and the bottom of the brittle
+     * crust, twenty or so. A subduction zone's great quakes are on its megathrust, ten to forty-five kilometres down;
+     * of its smaller ones some are in the slab under it, from sixty kilometres to a few hundred, and so is the odd one
+     * under a collision belt, as under the Hindu Kush.
+     */
+    public static double quakeDepthMetres(FaultType type, double magnitude, RandomSource rng) {
+        double km = switch (type) {
+            case TRANSFORM -> 5 + 13 * rng.nextDouble();
+            case DIVERGENT -> 3 + 9 * rng.nextDouble();
+            case CONVERGENT_COLLISION -> magnitude < 7.5 && rng.nextDouble() < 0.1
+                    ? 70 + 130 * rng.nextDouble() : 8 + 17 * rng.nextDouble();
+            case CONVERGENT_SUBDUCTION -> magnitude < 7.5 && rng.nextDouble() < 0.3
+                    ? 60 + 400 * Math.pow(rng.nextDouble(), 1.6) : 10 + 35 * rng.nextDouble();
+            case INTERIOR -> 5 + 15 * rng.nextDouble();
+        };
+        return km * 1000.0;
     }
 
     /**

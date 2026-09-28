@@ -17,12 +17,18 @@ public enum FaultType {
     /** Not near a boundary at all: stable plate interior. */
     INTERIOR;
 
-    /** Rough depth character of quakes on this kind of boundary; 0 when it is not seismic. */
+    /**
+     * The usual depth of this boundary's quakes in kilometres; 0 when it is not seismic. Most break in the brittle
+     * upper crust: a strike-slip fault at ten kilometres, a rift shallower still, a collision's thrust at fifteen, a
+     * subduction zone's megathrust at thirty -- where its great quakes are -- though the slab under it quakes as deep
+     * as seven hundred.
+     */
     public int typicalQuakeDepth() {
         return switch (this) {
-            case CONVERGENT_SUBDUCTION -> 300;
-            case CONVERGENT_COLLISION -> 120;
-            case TRANSFORM, DIVERGENT -> 40;
+            case CONVERGENT_SUBDUCTION -> 30;
+            case CONVERGENT_COLLISION -> 15;
+            case TRANSFORM -> 10;
+            case DIVERGENT -> 8;
             case INTERIOR -> 0;
         };
     }

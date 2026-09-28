@@ -16,6 +16,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
@@ -510,6 +511,54 @@ public final class EruptionHandler {
     }
 
     /**
+     * Whether a block is something people make and build with -- stairs, slabs, walls, doors, glass, planks, wool,
+     * bricks and dressed stone, metal blocks -- told by what it is, not by where it stands. The test for what a quake
+     * may shake down or bring down with a building: a block nobody here recognises, a modded rock the world laid down,
+     * is ground and stays. {@link #isPlayerPlaced} answers the other way, for what an eruption must not wall over.
+     */
+    public static boolean isWorked(BlockState s) {
+        if (s.isAir() || !s.getFluidState().isEmpty()) return false;
+        Block b = s.getBlock();
+        if (b instanceof net.minecraft.world.level.block.StairBlock || b instanceof net.minecraft.world.level.block.SlabBlock
+                || b instanceof net.minecraft.world.level.block.WallBlock || b instanceof net.minecraft.world.level.block.FenceBlock
+                || b instanceof net.minecraft.world.level.block.FenceGateBlock || b instanceof net.minecraft.world.level.block.DoorBlock
+                || b instanceof net.minecraft.world.level.block.TrapDoorBlock || b instanceof net.minecraft.world.level.block.IronBarsBlock
+                || b instanceof net.minecraft.world.level.block.BedBlock || b instanceof net.minecraft.world.level.block.CarpetBlock
+                || b instanceof net.minecraft.world.level.block.LadderBlock) {
+            return true;
+        }
+        if (s.is(BlockTags.PLANKS) || s.is(BlockTags.WOOL) || s.is(Tags.Blocks.GLASS) || s.is(Tags.Blocks.GLASS_PANES)
+                || s.is(Tags.Blocks.STORAGE_BLOCKS) || s.is(Blocks.HAY_BLOCK) || s.is(Blocks.BOOKSHELF)
+                || s.is(Blocks.MUD_BRICKS) || s.is(Blocks.PACKED_MUD) || s.is(Tags.Blocks.CHESTS)) {
+            return true;
+        }
+        String path = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(b).getPath();
+        // Smooth basalt is the lining of a geode and a volcano's own rock.
+        if (path.equals("smooth_basalt")) return false;
+        for (String mark : WORKED_MARKS) if (path.contains(mark)) return true;
+        return false;
+    }
+
+    /** Words in a block's name that say it was made: bricks and tiles, dressed, cut and polished stone, concrete. */
+    private static final String[] WORKED_MARKS = {"brick", "tile", "polished", "smooth_", "cut_", "chiseled", "planks",
+            "concrete", "glazed", "stripped_", "lamp", "lantern", "pillar", "carved_", "_glass", "shingle", "plaster"};
+
+    /**
+     * Rock other mods lay down in the ground that no tag here names: rock salt, rough gem stone, raw ore. By name,
+     * and never a worked form of it -- rock salt bricks and polished rock salt are builds.
+     */
+    private static boolean naturalByName(BlockState s) {
+        net.minecraft.resources.ResourceLocation id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock());
+        String path = id.getPath();
+        for (String mark : WORKED_MARKS) if (path.contains(mark)) return false;
+        if (path.contains("slab") || path.contains("stairs") || path.contains("wall")) return false;
+        return path.endsWith("_ore") || path.startsWith("raw_") || path.startsWith("rough_") || path.startsWith("rock_salt")
+                || path.endsWith("_cluster") || path.endsWith("_bud") || path.startsWith("budding_")
+                || id.getNamespace().equals("spelunkery") && (path.equals("salt") || path.equals("saltpeter")
+                        || path.equals("cinnabar_block") || path.equals("sulfur") || path.equals("nephrite"));
+    }
+
+    /**
      * The broad recognizer for naturally-generated world material (vanilla + modded). Leans on
      * tag families so modded stones/soils that opt in are covered, plus explicit vanilla blocks
      * that aren't reliably tagged. Any fluid (source or flowing) counts as natural.
@@ -583,6 +632,7 @@ public final class EruptionHandler {
                 || s.is(BlockTags.AZALEA_ROOT_REPLACEABLE)) {
             return true;
         }
+        if (naturalByName(s)) return true;
         // Common vanilla naturals that aren't reliably inside the tag families above.
         return s.is(Blocks.GRAVEL) || s.is(Blocks.CLAY) || s.is(Blocks.MUD)
                 || s.is(Blocks.MOSS_BLOCK) || s.is(Blocks.DIRT_PATH) || s.is(Blocks.ROOTED_DIRT)

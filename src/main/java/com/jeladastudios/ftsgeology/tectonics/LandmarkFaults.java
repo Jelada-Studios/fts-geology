@@ -80,26 +80,42 @@ public final class LandmarkFaults {
     static PlateSample adjust(ServerLevel level, int x, int z, PlateSample s) {
         Line[] ls = lines(level);
         if (ls == null) return s;
-        // Only the nearest mountain's fault: the three stand closer in a world than on Earth, and Everest's thrust ran
-        // on past K2.
+        // One mountain's fault: the one whose fault zone the column stands in, and of those, or of all where it stands in
+        // none, the one whose summit is nearest. The three stand closer in a world than on Earth: taken by summit alone,
+        // Everest's thrust ran on past K2, and the Matterhorn's own fault read as a plate interior where Everest's
+        // summit was the nearer.
         Line l = null;
         double best = Double.MAX_VALUE;
+        boolean zoned = false;
         for (Line c : ls) {
+            double rx = x - c.px(), rz = z - c.pz();
+            boolean in = Math.abs(rx * c.ux() + rz * c.uz()) <= c.length() && Math.abs(rx * c.nx() + rz * c.nz()) <= ZONE;
+            if (zoned && !in) continue;
             double m = (x - c.summitX()) * (x - c.summitX()) + (z - c.summitZ()) * (z - c.summitZ());
-            if (m < best) {
+            if (in && !zoned || m < best) {
                 best = m;
                 l = c;
+                zoned |= in;
             }
         }
         double rx = x - l.px(), rz = z - l.pz();
         double along = rx * l.ux() + rz * l.uz();
         double side = rx * l.nx() + rz * l.nz();          // positive on the mountain's side
         double d = Math.abs(side);
-        if (Math.abs(along) > l.length() || d > l.reach()) return s;
+        boolean named = Math.abs(along) <= l.length() && d <= l.reach();
+        boolean inZone = named && d <= ZONE;
+        // On a mountain's own ground, out of its fault's zone, the column stands in the belt the mountain was raised
+        // in: the Alps, the Himalaya and the Karakoram are all two continents run together. A boundary of the plates
+        // that happens to pass under the crop is not read there, where a transform through the Matterhorn's summit
+        // said the mountain stood on a strike-slip fault.
+        if (!inZone) {
+            LandmarkSites.Site site = LandmarkSites.near(TerrainContext.seed(), TerrainContext.params(), x, z);
+            if (site != null) return belt(s, site, x, z);
+        }
+        if (!named) return s;
         // Whichever boundary is nearer is the one a column reads.
         if (s.faultDistance() < d) return s;
         Fault f = l.fault();
-        boolean inZone = d <= ZONE;
         // Towards the line from the column.
         double sign = side >= 0 ? -1.0 : 1.0;
         double nx = sign * l.nx(), nz = sign * l.nz();
@@ -113,6 +129,28 @@ public final class LandmarkFaults {
         return new PlateSample(over ? hi : lo, PlateKind.CONTINENTAL, s.plateVelX(), s.plateVelZ(), over ? lo : hi,
                 PlateKind.CONTINENTAL, inZone ? f.type() : FaultType.INTERIOR, d, convergence, shear, nx, nz,
                 stress, along);
+    }
+
+    /** How strained a named mountain's belt reads away from its fault: the Alps close a few millimetres a year. */
+    private static final double BELT_STRESS = 0.25;
+
+    /**
+     * A column on a named mountain's ground, away from the mountain's own fault: in a collision belt whose line runs
+     * along the range, through the middle of the crop. The suture of the Alps runs at the Matterhorn's very foot.
+     */
+    private static PlateSample belt(PlateSample s, LandmarkSites.Site site, int x, int z) {
+        double c = Math.cos(site.bearing()), sn = Math.sin(site.bearing());
+        double dx = x - site.x(), dz = z - site.z();
+        double along = dx * c + dz * sn, across = -dx * sn + dz * c;
+        // Towards the range's line from the column.
+        double sign = across >= 0 ? -1.0 : 1.0;
+        double nx = sign * -sn, nz = sign * c;
+        long a = s.plateId(), b = s.neighbourId() != s.plateId() ? s.neighbourId() : s.plateId() ^ 0x5DEECE66DL;
+        long hi = Long.compareUnsigned(a, b) >= 0 ? a : b, lo = hi == a ? b : a;
+        boolean over = across >= 0;
+        return new PlateSample(over ? hi : lo, PlateKind.CONTINENTAL, s.plateVelX(), s.plateVelZ(), over ? lo : hi,
+                PlateKind.CONTINENTAL, FaultType.CONVERGENT_COLLISION, Math.abs(across), 1.0, 0.2, nx, nz,
+                BELT_STRESS, along);
     }
 
     /** The three faults laid out for this world, worked out once from its seed. Null where no mountain is raised. */

@@ -138,7 +138,7 @@ public final class Collapse {
                 && (!TerrainProbe.isTreePart(s) || ShakingDamage.builtLog(level, s, p.getX(), p.getY(), p.getZ()))) {
             return true;
         }
-        return EruptionHandler.isPlayerPlaced(s) && !TerrainProbe.isVegetation(s);
+        return EruptionHandler.isWorked(s) && !TerrainProbe.isVegetation(s);
     }
 
     /** One block comes down: falling, or broken where it stands. */

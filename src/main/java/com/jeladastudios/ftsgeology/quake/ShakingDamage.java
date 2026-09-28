@@ -434,7 +434,7 @@ public final class ShakingDamage {
 
     /** Made of something the ground is not: a build, whatever it stands in. */
     private static boolean worked(BlockState s) {
-        return !s.isAir() && weakness(s) > 0 && EruptionHandler.isPlayerPlaced(s);
+        return !s.isAir() && weakness(s) > 0 && EruptionHandler.isWorked(s);
     }
 
     /**

@@ -584,7 +584,7 @@ public final class QuakePlanner {
                     && com.jeladastudios.ftsgeology.worldgen.RiftSteps.isStep(s, chunk.getBlockState(new BlockPos(x, y - 1, z)))) {
                 return new int[]{y, builtTop, player, 1};
             }
-            boolean byPlayer = mine || (!inStructure && EruptionHandler.isPlayerPlaced(s));
+            boolean byPlayer = mine || (!inStructure && EruptionHandler.isWorked(s));
             if (byPlayer || (inStructure && !ShakingDamage.ground(s))) {
                 if (builtTop == Integer.MIN_VALUE) builtTop = y;
                 if (byPlayer) player = 1;

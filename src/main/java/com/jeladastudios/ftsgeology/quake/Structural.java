@@ -44,8 +44,13 @@ public final class Structural {
 
     private Structural() {}
 
-    /** The least intensity at which anything is read at all. */
+    /** The least intensity at which a building is read for load, overhangs and slender towers. */
     static final double ONSET = 5.0;
+    /**
+     * Loose sand and gravel hold together only by lying still: walls of them are read from this weaker shaking, a
+     * magnitude 5 close to its fault, and nothing else is.
+     */
+    static final double LOOSE_ONSET = 4.2;
     /** How high over its ground a building is read. */
     private static final int HEIGHT = 96, SKY = 6;
     /** Across how far a support for an overhang is looked for. */
@@ -93,7 +98,7 @@ public final class Structural {
      * it is the harder block: it is loose stones in mortar.
      */
     static double standsTo(BlockState s) {
-        if (s.getBlock() instanceof FallingBlock) return 5.0;
+        if (s.getBlock() instanceof FallingBlock) return 4.4;
         if (strong(s) || s.getBlock().defaultDestroyTime() < 0) return 99.0;
         if (s.getSoundType() == SoundType.GLASS || s.is(BlockTags.ICE) || s.is(BlockTags.WOOL) || s.is(BlockTags.LEAVES)
                 || s.is(Blocks.HAY_BLOCK) || s.is(BlockTags.DIRT)) return 6.0;
@@ -114,7 +119,7 @@ public final class Structural {
      */
     static void chunk(ServerLevel level, LevelChunk chunk, double intensity, LongSet placed, List<BoundingBox> pieces,
                       long from, int spread) {
-        if (intensity < ONSET || !GeyserConfig.SHAKING_LOOSENS_BUILDS.get()) return;
+        if (intensity < LOOSE_ONSET || !GeyserConfig.SHAKING_LOOSENS_BUILDS.get()) return;
         ChunkPos cp = chunk.getPos();
         double left = left(intensity);
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
@@ -161,8 +166,9 @@ public final class Structural {
             above[y - ground] = count;
             if (!s.isAir() && Collapse.built(level, s, m, placed, pieces)) count++;
         }
+        boolean looseOnly = intensity < ONSET;
         // Load: the lowest block that cannot carry what is over it brings itself and all of that down.
-        for (int y = ground + 1; y <= top; y++) {
+        for (int y = ground + 1; y <= top && !looseOnly; y++) {
             BlockState s = chunk.getBlockState(m.set(x, y, z));
             if (s.isAir() || !Collapse.built(level, s, m, placed, pieces)) continue;
             int load = above[y - ground];
@@ -184,6 +190,7 @@ public final class Structural {
         }
         if (n > 0) {
             java.util.Arrays.sort(stands, 0, n);
+            if (looseOnly && stands[n / 2] >= ONSET) return;
             double at = stands[n / 2] - TALL * Math.max(0, top - ground - 6);
             double chance = Math.max(0.0, Math.min(1.0, 0.5 + (intensity - at) / 0.8));
             if (chance > 0 && level.random.nextDouble() < chance) {
@@ -192,6 +199,7 @@ public final class Structural {
                 return;
             }
         }
+        if (looseOnly) return;
         // Overhangs: a block over air needs a supported block of the same floor within its span.
         for (int y = ground + 2; y <= top; y++) {
             BlockState s = chunk.getBlockState(m.set(x, y, z));

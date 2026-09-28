@@ -22,7 +22,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 /**
  * Keeps a rupture alive across chunks nobody has loaded yet. The rupture itself (type, size, path) is
  * stored rather than its edits, since planning has to read terrain; it is replanned when a chunk it
- * crosses loads. The load event only flags the chunk; planning and writes run from the tick loop.
+ * crosses loads. A chunk that goes away while its ground is moving keeps the rest of its edits instead.
+ * The load event only flags the chunk; planning and writes run from the tick loop.
  */
 public final class PendingEdits {
 
@@ -35,6 +36,13 @@ public final class PendingEdits {
 
     /** dimension + chunk -> ruptures that still have to be applied there. */
     private static final Map<String, List<PendingRupture>> WAITING = new ConcurrentHashMap<>();
+
+    /**
+     * dimension + chunk -> the edits of a running rupture still to be written there, in order: the chunk went away
+     * while its ground was moving. Its edits were worked out from the ground as it was, and nothing changes in a chunk
+     * nobody has loaded, so they are written as they are when it comes back.
+     */
+    private static final Map<String, List<QuakePlanner.Edit>> EDITS = new ConcurrentHashMap<>();
 
     /** Chunks that have loaded and are waiting for the tick loop to replay their deformation. */
     private record ReadyChunk(ResourceKey<Level> dimension, ChunkPos pos) {}
@@ -109,8 +117,8 @@ public final class PendingEdits {
     }
 
     /**
-     * Parks one chunk of a rupture that was being applied when the chunk went away, so its edits are
-     * replayed when it comes back instead of being lost. Once per chunk and rupture.
+     * Parks one chunk of a rupture whose ground went away while it was being read, before anything was written
+     * there, so the rupture is planned there when it comes back instead of being lost. Once per chunk and rupture.
      */
     public static void park(ServerLevel level, int cx, int cz, BlockPos epicentre, FaultType type,
                             double magnitude, double depthMetres, long seed, boolean mayBreakBuilds,
@@ -125,12 +133,27 @@ public final class PendingEdits {
         here.add(new PendingRupture(type, magnitude, depthMetres, seed, mayBreakBuilds, epicentre, segment));
     }
 
+    /** Keeps one edit of a running rupture for its chunk, which went away before it was written. */
+    public static void parkEdit(ServerLevel level, QuakePlanner.Edit e) {
+        EDITS.computeIfAbsent(key(level.dimension(), e.pos().getX() >> 4, e.pos().getZ() >> 4),
+                k -> java.util.Collections.synchronizedList(new ArrayList<>())).add(e);
+    }
+
+    /** A rupture has written all it could: its waiting chunks that are loaded again have the rest written now. */
+    public static void release(ServerLevel level, it.unimi.dsi.fastutil.longs.LongSet chunks) {
+        for (long ck : chunks) {
+            int cx = ChunkPos.getX(ck), cz = ChunkPos.getZ(ck);
+            if (level.getChunkSource().getChunkNow(cx, cz) != null) READY.add(new ReadyChunk(level.dimension(), new ChunkPos(cx, cz)));
+        }
+    }
+
     /**
      * Notes that a chunk carrying parked deformation has loaded. Deliberately does NOT touch the
      * world - see the class note on why writing blocks from the chunk-load event is unsafe.
      */
     public static void onChunkLoaded(ServerLevel level, ChunkPos cp) {
-        if (!WAITING.containsKey(key(level.dimension(), cp.x, cp.z))) return;
+        String key = key(level.dimension(), cp.x, cp.z);
+        if (!WAITING.containsKey(key) && !EDITS.containsKey(key)) return;
         READY.add(new ReadyChunk(level.dimension(), cp));
     }
 
@@ -159,12 +182,21 @@ public final class PendingEdits {
      * theirs when they load in turn.
      */
     private static void applyFor(ServerLevel level, ChunkPos cp) {
-        List<PendingRupture> ruptures = WAITING.remove(key(level.dimension(), cp.x, cp.z));
-        if (ruptures == null || ruptures.isEmpty()) return;
-
         // Everything written here is weathered afterwards, exactly as a live rupture's corridor is:
         // a replayed chunk left as written keeps its trees and vines standing over the cut.
         List<QuakePlanner.Edit> applied = new ArrayList<>();
+        // What a running rupture had still to write here when the chunk went away, first and as it was.
+        List<QuakePlanner.Edit> left = EDITS.remove(key(level.dimension(), cp.x, cp.z));
+        if (left != null) {
+            synchronized (left) {
+                for (QuakePlanner.Edit e : left) {
+                    QuakeWrites.set(level, e.pos(), com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.translate(level, e.pos(), e.state()));
+                    applied.add(e);
+                }
+            }
+        }
+        List<PendingRupture> ruptures = WAITING.remove(key(level.dimension(), cp.x, cp.z));
+        if (ruptures == null) ruptures = List.of();
         for (PendingRupture r : ruptures) {
             try {
                 QuakePlanner.Snapshot snap = QuakePlanner.snapshot(level, r.trace(), r.type(),
@@ -191,6 +223,7 @@ public final class PendingEdits {
     /** Drops everything; called when a server stops, and by the cancel command. */
     public static void clear() {
         WAITING.clear();
+        EDITS.clear();
         READY.clear();
     }
 }
