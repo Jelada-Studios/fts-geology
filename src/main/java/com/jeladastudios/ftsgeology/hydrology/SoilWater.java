@@ -63,8 +63,9 @@ public final class SoilWater {
     static final int EVERY = 200;
     static final double STEP_HOURS = 6.0;
     static final int MOST_STEPS = 400;
-    /** Steps of average weather a cell never looked at is settled with: a month of the ground's time. */
-    static final int SPIN_UP = 120;
+    /** Steps of average weather a cell never looked at is settled with, and their length: a month of the ground's time. */
+    static final int SPIN_UP = 40;
+    static final double SPIN_UP_HOURS = 18.0;
     /** Rain, in millimetres an hour of the ground's time, and the share of the time it rains on average. */
     static final double RAIN = 1.2, STORM = 3.0, RAINY_SHARE = 0.2;
     /** How long water standing on the ground takes to run off, and the groundwater to settle back, in hours. */
@@ -433,7 +434,7 @@ public final class SoilWater {
         c.root[i] = (float) (soil.root * kept);
         c.deep[i] = (float) (soil.deep * soil.fieldCapacity * (0.7 + 0.3 * wet));
         c.pond[i] = 0;
-        for (int k = 0; k < SPIN_UP; k++) step(c, i, soil, STEP_HOURS, rains ? RAIN * RAINY_SHARE : 0, pet);
+        for (int k = 0; k < SPIN_UP; k++) step(c, i, soil, SPIN_UP_HOURS, rains ? RAIN * RAINY_SHARE : 0, pet);
     }
 
     /**
