@@ -92,6 +92,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue PYROCLASTIC_FLOWS;         // per eruption of an explosive volcano
     public static final ForgeConfigSpec.DoubleValue PYROCLASTIC_FLOW_REACH;
     public static final ForgeConfigSpec.BooleanValue VOLCANIC_GAS;          // CO2 in hollows while restless
+    public static final ForgeConfigSpec.DoubleValue ASH_WEATHERING;         // how fast ash washes off, 0 never
     public static final ForgeConfigSpec.BooleanValue ASH_LOAD_COLLAPSES_ROOFS;
     public static final ForgeConfigSpec.BooleanValue SOIL_FROM_BEDROCK;     // default ON
 
@@ -187,6 +188,7 @@ public final class GeyserConfig {
 
     // --- Hydrology (groundwater) ---------------------------------------------
     public static final ForgeConfigSpec.BooleanValue RIVERS;                 // default ON, experimental
+    public static final ForgeConfigSpec.BooleanValue RIVERS_REFILL;          // lost river water comes back
     public static final ForgeConfigSpec.BooleanValue KARST;                  // rivers sink, caves, sinkholes
     public static final ForgeConfigSpec.BooleanValue WATER_TABLE_ENABLED;
     public static final ForgeConfigSpec.DoubleValue WATER_TABLE_SUBDUAL;      // relief it copies, 0..1
@@ -425,16 +427,23 @@ public final class GeyserConfig {
                         "trees' leaves, shatters glass, sets wooden buildings alight and leaves a bed of ash along",
                         "the valley, deepest where it stops. Shields and fissures, with their runny lava, send none.",
                         "0 turns them off.")
-                .defineInRange("pyroclasticFlows", 2, 0, 8);
+                .defineInRange("pyroclasticFlows", 1, 0, 8);
         PYROCLASTIC_FLOW_REACH = b
                 .comment("How far pyroclastic flows run: 1 takes a large volcano's some two hundred blocks out from",
                         "its crater down a valley; less on open slopes, where they spread and stop sooner.")
                 .defineInRange("pyroclasticFlowReach", 1.0, 0.25, 3.0);
         VOLCANIC_GAS = b
-                .comment("Carbon dioxide seeping out of a restless or erupting volcano collects, unseen, in its",
-                        "crater and in hollows on its flanks. Breathing it makes you sick and weak, and it",
-                        "suffocates whatever keeps its head down in it; torches, candles and campfires go out in it.")
+                .comment("Carbon dioxide seeping out of a volcano collects, unseen, in its crater and round its vents,",
+                        "and while it is restless or erupting in hollows on its flanks too. Breathing it makes you sick",
+                        "and weak, and it suffocates whatever keeps its head down in it; torches, candles and campfires",
+                        "go out in it, and the plants in it die.")
                 .define("volcanicGas", true);
+        ASH_WEATHERING = b
+                .comment("How fast fallen ash wears away where the sky is open over it: the rain washes it off and the",
+                        "wind takes it, a layer about every game day, twice as fast in the rain, and the ground and its",
+                        "grass come back out from under it. A deep bed goes a layer at a time, so it lasts. 1 is the",
+                        "default, 2 twice as fast, 0 keeps it for good.")
+                .defineInRange("ashWeathering", 1.0, 0.0, 10.0);
         ASH_LOAD_COLLAPSES_ROOFS = b
                 .comment("Ash piling up on a roof can bring it down, as it did round Pinatubo in 1991: glass and",
                         "wool give way under a couple of layers, wood under a few more, stone under most of a",
@@ -1031,6 +1040,13 @@ public final class GeyserConfig {
                         "a seam. Set it before a world is made, not after.",
                         "Off, the world keeps vanilla's own rivers and nothing else.")
                 .define("rivers", true);
+        RIVERS_REFILL = b
+                .comment("The water of the mod's rivers and lakes comes back where it is lost. After a quake, a",
+                        "landslide or a cave falling in, the rivers and lakes of the ground that moved are laid again",
+                        "at their level, as far as their banks hold them. Near players, water taken out of a river or",
+                        "drained away by another mod flows back in from the water beside it, a little at a time.",
+                        "A stretch walled off from the rest of the river stays dry.")
+                .define("riversRefill", true);
         KARST = b
                 .comment("Karst, in the mod's own world types: where marble or calcite lies close under a plateau's",
                         "flat beds, a platform's or a foreland's, in the regions that have it, the ground takes its",

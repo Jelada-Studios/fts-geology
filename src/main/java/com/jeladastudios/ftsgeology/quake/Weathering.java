@@ -45,8 +45,11 @@ public final class Weathering {
      * How many passes the corridor gets. The first and the last reseat what was growing on the
      * ground; the one between takes the raw edges off the rock.
      */
-    private static final int PASSES = 4;
-    /** The pass that brings down what hangs a second time, after the rock has relaxed, and the finishing one. */
+    private static final int PASSES = 5;
+    /**
+     * The pass that brings down what hangs a second time, after the rock has relaxed, and the finishing ones: twice,
+     * since taking a column down changes what its neighbours stand over.
+     */
     private static final int SECOND_FALL = 2, FINISH = 3;
 
     /** How far above the new ground to look for the underside of a hanging stack; covers the deepest cut. */
@@ -224,6 +227,8 @@ public final class Weathering {
                             job.moved, job.columns.length, job.felledBase.size(), job.nanos / 1_000_000,
                             job.worstNanos / 1_000_000);
                     QUEUE.poll();
+                    // The ground has settled: the rivers and lakes on it are laid again.
+                    com.jeladastudios.ftsgeology.hydrology.RiverRepair.afterQuake(level, job.columns);
                     return;
                 }
             }
@@ -248,7 +253,7 @@ public final class Weathering {
             boolean fallPass = (job.pass == 0 || job.pass == SECOND_FALL)
                     && GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get();
             boolean moved;
-            if (job.pass == FINISH) {
+            if (job.pass >= FINISH) {
                 moved = finish(level, cx, cz);
             } else if (fallPass) {
                 moved = reseat(level, cx, cz, job.excavated.get(k), job);
@@ -686,14 +691,19 @@ public final class Weathering {
         if (y > job.excavated.get(k)) job.excavated.put(k, y);
     }
 
-    /** How far a column may stand over or under all four of its neighbours once the ground has been finished. */
-    private static final int FINISHED_STEP = 2;
+    /**
+     * How far a column may stand over or under all four of its neighbours once the ground has been finished: not at
+     * all. Real ground has no column standing alone a block proud of all round it, and the moving ground left a grain
+     * of them -- rough, pitted slopes where the ground had been smooth.
+     */
+    private static final int FINISHED_STEP = 1;
 
     /**
      * The last look at the ground a quake left: a column standing on its own over all four neighbours is cut down to
-     * one over the highest of them, a pit sunk under all four is filled from the lowest, and soil laid bare where the
-     * ground round it is grown over grows over too. A real scarp or fissure is a line, and has neighbours along it at
-     * its own height, so this leaves it be; what it takes is the odd pillar and hole the moving left.
+     * the highest of them, a pit sunk under all four is filled from the lowest, and soil laid bare where the ground
+     * round it is grown over grows over too, as does ground bare of the snow lying all round it. A real scarp or
+     * fissure is a line, and has neighbours along it at its own height, so this leaves it be; what it takes is the
+     * odd pillar and hole the moving left.
      */
     private static boolean finish(ServerLevel level, int x, int z) {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
@@ -701,7 +711,7 @@ public final class Weathering {
         if (g == Integer.MIN_VALUE || !level.hasChunkAt(m.set(x, g, z))) return false;
         int highest = Integer.MIN_VALUE, lowest = Integer.MAX_VALUE;
         BlockState lowTop = null;
-        int grown = 0;
+        int grown = 0, snowy = 0;
         for (Direction d : Direction.Plane.HORIZONTAL) {
             int nx = x + d.getStepX(), nz = z + d.getStepZ();
             if (!level.hasChunkAt(m.set(nx, g, nz))) return false;
@@ -713,8 +723,25 @@ public final class Weathering {
                 lowTop = level.getBlockState(m.set(nx, n, nz));
             }
             if (level.getBlockState(m.set(nx, n, nz)).is(Blocks.GRASS_BLOCK)) grown++;
+            BlockState over = level.getBlockState(m.set(nx, n + 1, nz));
+            if (over.is(Blocks.SNOW) || level.getBlockState(m.set(nx, n, nz)).is(Blocks.SNOW_BLOCK)) snowy++;
         }
         boolean moved = false;
+        // Cover left over a gap or on more of itself -- a snow layer a block over its ground, two layers one on the
+        // other -- comes down onto the ground. A mountain the quake had been over was left shelved with them.
+        BlockState a1 = level.getBlockState(m.set(x, g + 1, z));
+        for (int y = g + 2; y <= g + 4; y++) {
+            BlockState s = level.getBlockState(m.set(x, y, z));
+            if (s.isAir()) continue;
+            boolean cover = s.getFluidState().isEmpty() && TerrainProbe.isVegetation(s) && !isTrunk(s);
+            if (cover && (a1.isAir() || a1.is(Blocks.SNOW) && s.is(Blocks.SNOW))) {
+                QuakeWrites.set(level, m.immutable(), Blocks.AIR.defaultBlockState());
+                BlockPos onGround = new BlockPos(x, g + 1, z);
+                if (a1.isAir() && s.canSurvive(level, onGround)) QuakeWrites.set(level, onGround, s);
+                moved = true;
+            }
+            break;
+        }
         // A pillar: trimmed down, a block at a time from its top, as long as what comes off is ground. One a tree
         // stands on is a knoll and stays; grass on one goes with the top.
         BlockState on = level.getBlockState(m.set(x, g + 1, z));
@@ -745,6 +772,14 @@ public final class Weathering {
         if (grown >= 2 && (top.is(Blocks.DIRT) || top.is(Blocks.COARSE_DIRT))
                 && level.getBlockState(m.set(x, g + 1, z)).isAir()) {
             QuakeWrites.set(level, new BlockPos(x, g, z), Blocks.GRASS_BLOCK.defaultBlockState());
+            moved = true;
+        }
+        // Snow lies on it again where it lies all round, and the column had it before, or the sky still snows on it.
+        BlockPos over = new BlockPos(x, g + 1, z);
+        if ((snowy >= 2 || on.is(Blocks.SNOW) && moved) && level.getBlockState(over).isAir()
+                && Blocks.SNOW.defaultBlockState().canSurvive(level, over)
+                && level.getBiome(over).value().coldEnoughToSnow(over)) {
+            QuakeWrites.set(level, over, Blocks.SNOW.defaultBlockState());
             moved = true;
         }
         return moved;
