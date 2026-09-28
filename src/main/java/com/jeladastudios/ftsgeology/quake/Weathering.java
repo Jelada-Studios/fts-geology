@@ -86,6 +86,9 @@ public final class Weathering {
         int cursor;
         int pass;
         int moved;
+        /** Dynamic Trees wood known to belong to a tree that stands, and the loose pieces of it taken down. */
+        final LongOpenHashSet woodHeld = new LongOpenHashSet();
+        int loose;
 
         /** Bounding box, so {@link #pendingNear} does not walk every column each tick. Generous, never early. */
         final int minX, maxX, minZ, maxZ;
@@ -223,8 +226,8 @@ public final class Weathering {
             if (job.cursor >= job.columns.length) {
                 job.cursor = 0;
                 if (++job.pass >= PASSES) {
-                    com.jeladastudios.ftsgeology.util.Diagnostics.info("weathering finished: {} blocks moved over {} columns, {} trees felled, {} ms, longest tick {} ms",
-                            job.moved, job.columns.length, job.felledBase.size(), job.nanos / 1_000_000,
+                    com.jeladastudios.ftsgeology.util.Diagnostics.info("weathering finished: {} blocks moved over {} columns, {} trees felled, {} loose branches taken down, {} ms, longest tick {} ms",
+                            job.moved, job.columns.length, job.felledBase.size(), job.loose, job.nanos / 1_000_000,
                             job.worstNanos / 1_000_000);
                     QUEUE.poll();
                     // The ground has settled: the rivers and lakes on it are laid again.
@@ -255,6 +258,7 @@ public final class Weathering {
             boolean moved;
             if (job.pass >= FINISH) {
                 moved = finish(level, cx, cz);
+                if (job.pass == PASSES - 1) moved |= looseWood(level, cx, cz, job);
             } else if (fallPass) {
                 moved = reseat(level, cx, cz, job.excavated.get(k), job);
                 // After the rock has relaxed and reseat has run again: spires, hanging water.
@@ -618,6 +622,94 @@ public final class Weathering {
             }
         }
         return false;
+    }
+
+    /** The most wood a loose piece of a Dynamic Trees tree has; a bigger body is taken to be a tree. */
+    private static final int LOOSE_MOST = 12;
+
+    /**
+     * Takes down the loose pieces of Dynamic Trees wood over a column: a side branch or two a big quake broke off a
+     * tree it moved, left in the air when the tree came down or went up without it. A piece is loose when none of its
+     * wood reaches the tree's rooted soil or stands on ground, and it is small; anything bigger is left, a tree.
+     */
+    private static boolean looseWood(ServerLevel level, int x, int z, Job job) {
+        if (!com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.present()) return false;
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE) return false;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        boolean took = false;
+        int roof = Math.min(g + GAP_SEARCH, level.getMaxBuildHeight() - 1);
+        for (int y = g + 1; y <= roof; y++) {
+            m.set(x, y, z);
+            if (job.woodHeld.contains(m.asLong()) || !isLooseWood(level.getBlockState(m))) continue;
+            java.util.List<BlockPos> piece = woodPiece(level, m.immutable(), job.woodHeld);
+            if (piece == null) continue;
+            for (BlockPos p : piece) QuakeWrites.set(level, p, Blocks.AIR.defaultBlockState());
+            job.loose++;
+            took = true;
+        }
+        return took;
+    }
+
+    /** Dynamic Trees wood: branch, trunk shell or surface root; its leaves and rooted soil are not. */
+    private static boolean isLooseWood(BlockState s) {
+        return com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(s) && !s.is(BlockTags.LEAVES)
+                && !com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isRooty(s);
+    }
+
+    /**
+     * The wood joined to a place, if it is a loose piece; null where it reaches roots or ground, or wood already known
+     * to hold, or is too big to be anything but a tree. What was walked of a piece that holds is remembered as held: a
+     * later walk that meets it holds too, where treating it as already seen and going round it took a block of a
+     * standing trunk, whose neighbours had all been walked, for a piece on its own.
+     */
+    private static java.util.List<BlockPos> woodPiece(ServerLevel level, BlockPos start, LongOpenHashSet held) {
+        java.util.List<BlockPos> piece = new java.util.ArrayList<>();
+        LongOpenHashSet seen = new LongOpenHashSet();
+        java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
+        queue.add(start);
+        seen.add(start.asLong());
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        boolean holds = false;
+        while (!queue.isEmpty() && !holds) {
+            BlockPos p = queue.poll();
+            piece.add(p);
+            if (piece.size() > LOOSE_MOST) {
+                holds = true;
+                break;
+            }
+            BlockState under = level.getBlockState(m.set(p.getX(), p.getY() - 1, p.getZ()));
+            if (com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isRooty(under)
+                    || !under.isAir() && under.getFluidState().isEmpty() && !isPlant(under)
+                    && !com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(under)) {
+                holds = true;
+                break;
+            }
+            for (int dx = -1; dx <= 1 && !holds; dx++) {
+                for (int dy = -1; dy <= 1 && !holds; dy++) {
+                    for (int dz = -1; dz <= 1 && !holds; dz++) {
+                        m.set(p.getX() + dx, p.getY() + dy, p.getZ() + dz);
+                        long k = m.asLong();
+                        if (seen.contains(k)) continue;
+                        if (held.contains(k) || !com.jeladastudios.ftsgeology.util.Loaded.at(level, m)) {
+                            holds = true;
+                            continue;
+                        }
+                        BlockState s = level.getBlockState(m);
+                        if (com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isRooty(s)) {
+                            holds = true;
+                            continue;
+                        }
+                        if (!isLooseWood(s)) continue;
+                        seen.add(k);
+                        queue.add(m.immutable());
+                    }
+                }
+            }
+        }
+        if (!holds) return piece;
+        held.addAll(seen);
+        return null;
     }
 
     /** What holds a tree or a huge mushroom up. */
