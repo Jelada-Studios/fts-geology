@@ -1,52 +1,594 @@
 {
   "parent": "minecraft:block/block",
   "textures": {
-    "particle": "minecraft:block/cut_copper",
-    "base": "minecraft:block/smooth_stone",
-    "body": "minecraft:block/cut_copper",
-    "head": "minecraft:block/piston_top",
-    "iron": "minecraft:block/iron_block"
+    "particle": "minecraft:block/anvil",
+    "pad": "minecraft:block/smooth_stone",
+    "cast": "minecraft:block/anvil",
+    "steel": "minecraft:block/iron_block",
+    "motor": "minecraft:block/oxidized_copper",
+    "wheel": "minecraft:block/red_concrete",
+    "conduit": "minecraft:block/copper_block",
+    "bore": "minecraft:block/black_concrete"
   },
   "elements": [
     {
-      "from": [0, 0, 0], "to": [16, 3, 16],
+      "name": "concrete pad",
+      "from": [1, 0, 1],
+      "to": [15, 2, 15],
       "faces": {
-        "down":  { "texture": "#base", "cullface": "down" },
-        "up":    { "texture": "#base" },
-        "north": { "uv": [0, 13, 16, 16], "texture": "#base", "cullface": "north" },
-        "south": { "uv": [0, 13, 16, 16], "texture": "#base", "cullface": "south" },
-        "west":  { "uv": [0, 13, 16, 16], "texture": "#base", "cullface": "west" },
-        "east":  { "uv": [0, 13, 16, 16], "texture": "#base", "cullface": "east" }
+        "down": {
+          "texture": "#pad",
+          "cullface": "down"
+        },
+        "up": {
+          "texture": "#pad"
+        },
+        "north": {
+          "texture": "#pad"
+        },
+        "south": {
+          "texture": "#pad"
+        },
+        "west": {
+          "texture": "#pad"
+        },
+        "east": {
+          "texture": "#pad"
+        }
       }
     },
     {
-      "from": [2, 3, 2], "to": [14, 12, 14],
+      "name": "base flange of the discharge head, bolted over the casing",
+      "from": [3, 2, 3],
+      "to": [13, 3, 13],
       "faces": {
-        "north": { "uv": [2, 4, 14, 13], "texture": "#body" },
-        "south": { "uv": [2, 4, 14, 13], "texture": "#body" },
-        "west":  { "uv": [2, 4, 14, 13], "texture": "#body" },
-        "east":  { "uv": [2, 4, 14, 13], "texture": "#body" }
+        "up": {
+          "texture": "#cast"
+        },
+        "north": {
+          "texture": "#cast"
+        },
+        "south": {
+          "texture": "#cast"
+        },
+        "west": {
+          "texture": "#cast"
+        },
+        "east": {
+          "texture": "#cast"
+        }
       }
     },
     {
-      "from": [1, 12, 1], "to": [15, 16, 15],
+      "name": "cast-iron discharge head",
+      "from": [4, 3, 4],
+      "to": [12, 9, 12],
       "faces": {
-        "down":  { "texture": "#iron" },
-        "up":    { "texture": "#head", "cullface": "up" },
-        "north": { "uv": [1, 0, 15, 4], "texture": "#iron" },
-        "south": { "uv": [1, 0, 15, 4], "texture": "#iron" },
-        "west":  { "uv": [1, 0, 15, 4], "texture": "#iron" },
-        "east":  { "uv": [1, 0, 15, 4], "texture": "#iron" }
+        "north": {
+          "texture": "#cast"
+        },
+        "south": {
+          "texture": "#cast"
+        },
+        "west": {
+          "texture": "#cast"
+        },
+        "east": {
+          "texture": "#cast"
+        }
       }
     },
     {
-      "from": [6, 7, 0], "to": [10, 10, 2],
+      "name": "motor stand ring",
+      "from": [3.5, 9, 3.5],
+      "to": [12.5, 10, 12.5],
       "faces": {
-        "north": { "uv": [6, 6, 10, 9], "texture": "#iron" },
-        "up":    { "uv": [6, 0, 10, 2], "texture": "#iron" },
-        "down":  { "uv": [6, 0, 10, 2], "texture": "#iron" },
-        "west":  { "uv": [0, 6, 2, 9], "texture": "#iron" },
-        "east":  { "uv": [0, 6, 2, 9], "texture": "#iron" }
+        "down": {
+          "texture": "#steel"
+        },
+        "up": {
+          "texture": "#steel"
+        },
+        "north": {
+          "texture": "#steel"
+        },
+        "south": {
+          "texture": "#steel"
+        },
+        "west": {
+          "texture": "#steel"
+        },
+        "east": {
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "vertical motor, core",
+      "from": [4.5, 10, 4.5],
+      "to": [11.5, 14, 11.5],
+      "faces": {
+        "north": {
+          "texture": "#motor"
+        },
+        "south": {
+          "texture": "#motor"
+        },
+        "west": {
+          "texture": "#motor"
+        },
+        "east": {
+          "texture": "#motor"
+        }
+      }
+    },
+    {
+      "name": "motor, rounded out east-west",
+      "from": [4, 10, 5.5],
+      "to": [12, 14, 10.5],
+      "faces": {
+        "west": {
+          "texture": "#motor"
+        },
+        "east": {
+          "texture": "#motor"
+        },
+        "north": {
+          "texture": "#motor"
+        },
+        "south": {
+          "texture": "#motor"
+        }
+      }
+    },
+    {
+      "name": "motor, rounded out north-south",
+      "from": [5.5, 10, 4],
+      "to": [10.5, 14, 12],
+      "faces": {
+        "north": {
+          "texture": "#motor"
+        },
+        "south": {
+          "texture": "#motor"
+        },
+        "west": {
+          "texture": "#motor"
+        },
+        "east": {
+          "texture": "#motor"
+        }
+      }
+    },
+    {
+      "name": "cooling rib",
+      "from": [3.75, 11.75, 3.75],
+      "to": [12.25, 12.25, 12.25],
+      "faces": {
+        "down": {
+          "texture": "#steel"
+        },
+        "up": {
+          "texture": "#steel"
+        },
+        "north": {
+          "texture": "#steel"
+        },
+        "south": {
+          "texture": "#steel"
+        },
+        "west": {
+          "texture": "#steel"
+        },
+        "east": {
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "rain cap",
+      "from": [4, 14, 4],
+      "to": [12, 15, 12],
+      "faces": {
+        "down": {
+          "texture": "#motor"
+        },
+        "up": {
+          "texture": "#motor"
+        },
+        "north": {
+          "texture": "#motor"
+        },
+        "south": {
+          "texture": "#motor"
+        },
+        "west": {
+          "texture": "#motor"
+        },
+        "east": {
+          "texture": "#motor"
+        }
+      }
+    },
+    {
+      "name": "vent on the rain cap",
+      "from": [6.5, 15, 6.5],
+      "to": [9.5, 16, 9.5],
+      "faces": {
+        "up": {
+          "texture": "#cast",
+          "cullface": "up"
+        },
+        "north": {
+          "texture": "#cast"
+        },
+        "south": {
+          "texture": "#cast"
+        },
+        "west": {
+          "texture": "#cast"
+        },
+        "east": {
+          "texture": "#cast"
+        }
+      }
+    },
+    {
+      "name": "discharge pipe out of the head",
+      "from": [6, 4, 1],
+      "to": [10, 8, 4],
+      "faces": {
+        "up": {
+          "texture": "#cast"
+        },
+        "down": {
+          "texture": "#cast"
+        },
+        "west": {
+          "texture": "#cast"
+        },
+        "east": {
+          "texture": "#cast"
+        },
+        "north": {
+          "texture": "#bore"
+        }
+      }
+    },
+    {
+      "name": "outlet flange, top",
+      "from": [5.5, 7.5, 0],
+      "to": [10.5, 8.5, 1],
+      "faces": {
+        "down": {
+          "texture": "#steel"
+        },
+        "up": {
+          "texture": "#steel"
+        },
+        "north": {
+          "texture": "#steel",
+          "cullface": "north"
+        },
+        "south": {
+          "texture": "#steel"
+        },
+        "west": {
+          "texture": "#steel"
+        },
+        "east": {
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "outlet flange, bottom",
+      "from": [5.5, 3.5, 0],
+      "to": [10.5, 4.5, 1],
+      "faces": {
+        "down": {
+          "texture": "#steel"
+        },
+        "up": {
+          "texture": "#steel"
+        },
+        "north": {
+          "texture": "#steel",
+          "cullface": "north"
+        },
+        "south": {
+          "texture": "#steel"
+        },
+        "west": {
+          "texture": "#steel"
+        },
+        "east": {
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "outlet flange, west",
+      "from": [5.5, 4.5, 0],
+      "to": [6.5, 7.5, 1],
+      "faces": {
+        "down": {
+          "texture": "#steel"
+        },
+        "up": {
+          "texture": "#steel"
+        },
+        "north": {
+          "texture": "#steel",
+          "cullface": "north"
+        },
+        "south": {
+          "texture": "#steel"
+        },
+        "west": {
+          "texture": "#steel"
+        },
+        "east": {
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "outlet flange, east",
+      "from": [9.5, 4.5, 0],
+      "to": [10.5, 7.5, 1],
+      "faces": {
+        "down": {
+          "texture": "#steel"
+        },
+        "up": {
+          "texture": "#steel"
+        },
+        "north": {
+          "texture": "#steel",
+          "cullface": "north"
+        },
+        "south": {
+          "texture": "#steel"
+        },
+        "west": {
+          "texture": "#steel"
+        },
+        "east": {
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "gate valve bonnet",
+      "from": [6.5, 8, 1.5],
+      "to": [9.5, 10, 3.5],
+      "faces": {
+        "up": {
+          "texture": "#cast"
+        },
+        "north": {
+          "texture": "#cast"
+        },
+        "south": {
+          "texture": "#cast"
+        },
+        "west": {
+          "texture": "#cast"
+        },
+        "east": {
+          "texture": "#cast"
+        }
+      }
+    },
+    {
+      "name": "valve stem",
+      "from": [7.5, 10, 2],
+      "to": [8.5, 11.5, 3],
+      "faces": {
+        "north": {
+          "texture": "#steel"
+        },
+        "south": {
+          "texture": "#steel"
+        },
+        "west": {
+          "texture": "#steel"
+        },
+        "east": {
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "handwheel rim, front",
+      "from": [5.5, 11.5, 0.5],
+      "to": [10.5, 12.25, 1.25],
+      "faces": {
+        "down": {
+          "texture": "#wheel"
+        },
+        "up": {
+          "texture": "#wheel"
+        },
+        "north": {
+          "texture": "#wheel"
+        },
+        "south": {
+          "texture": "#wheel"
+        },
+        "west": {
+          "texture": "#wheel"
+        },
+        "east": {
+          "texture": "#wheel"
+        }
+      }
+    },
+    {
+      "name": "handwheel rim, back",
+      "from": [5.5, 11.5, 3.25],
+      "to": [10.5, 12.25, 4],
+      "faces": {
+        "down": {
+          "texture": "#wheel"
+        },
+        "up": {
+          "texture": "#wheel"
+        },
+        "north": {
+          "texture": "#wheel"
+        },
+        "south": {
+          "texture": "#wheel"
+        },
+        "west": {
+          "texture": "#wheel"
+        },
+        "east": {
+          "texture": "#wheel"
+        }
+      }
+    },
+    {
+      "name": "handwheel rim, west",
+      "from": [5.5, 11.5, 1.25],
+      "to": [6.25, 12.25, 3.25],
+      "faces": {
+        "down": {
+          "texture": "#wheel"
+        },
+        "up": {
+          "texture": "#wheel"
+        },
+        "north": {
+          "texture": "#wheel"
+        },
+        "south": {
+          "texture": "#wheel"
+        },
+        "west": {
+          "texture": "#wheel"
+        },
+        "east": {
+          "texture": "#wheel"
+        }
+      }
+    },
+    {
+      "name": "handwheel rim, east",
+      "from": [9.75, 11.5, 1.25],
+      "to": [10.5, 12.25, 3.25],
+      "faces": {
+        "down": {
+          "texture": "#wheel"
+        },
+        "up": {
+          "texture": "#wheel"
+        },
+        "north": {
+          "texture": "#wheel"
+        },
+        "south": {
+          "texture": "#wheel"
+        },
+        "west": {
+          "texture": "#wheel"
+        },
+        "east": {
+          "texture": "#wheel"
+        }
+      }
+    },
+    {
+      "name": "handwheel spoke",
+      "from": [6.25, 11.6, 2],
+      "to": [9.75, 12.1, 2.5],
+      "faces": {
+        "down": {
+          "texture": "#wheel"
+        },
+        "up": {
+          "texture": "#wheel"
+        },
+        "north": {
+          "texture": "#wheel"
+        },
+        "south": {
+          "texture": "#wheel"
+        },
+        "west": {
+          "texture": "#wheel"
+        },
+        "east": {
+          "texture": "#wheel"
+        }
+      }
+    },
+    {
+      "name": "handwheel hub",
+      "from": [7.5, 11.5, 1.75],
+      "to": [8.5, 12.5, 2.75],
+      "faces": {
+        "down": {
+          "texture": "#steel"
+        },
+        "up": {
+          "texture": "#steel"
+        },
+        "north": {
+          "texture": "#steel"
+        },
+        "south": {
+          "texture": "#steel"
+        },
+        "west": {
+          "texture": "#steel"
+        },
+        "east": {
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "terminal box on the motor, where the power comes in",
+      "from": [12, 10.5, 6.5],
+      "to": [13.5, 13, 9.5],
+      "faces": {
+        "up": {
+          "texture": "#steel"
+        },
+        "down": {
+          "texture": "#steel"
+        },
+        "north": {
+          "texture": "#steel"
+        },
+        "south": {
+          "texture": "#steel"
+        },
+        "east": {
+          "texture": "#steel"
+        }
+      }
+    },
+    {
+      "name": "conduit down to the pad",
+      "from": [12.25, 2, 7.5],
+      "to": [13.25, 10.5, 8.5],
+      "faces": {
+        "north": {
+          "texture": "#conduit"
+        },
+        "south": {
+          "texture": "#conduit"
+        },
+        "west": {
+          "texture": "#conduit"
+        },
+        "east": {
+          "texture": "#conduit"
+        }
       }
     }
   ]

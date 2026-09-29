@@ -1,5 +1,6 @@
 package com.jeladastudios.ftsgeology.blockentity;
 
+import com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.hydrology.Aquifer;
 import com.jeladastudios.ftsgeology.registry.ModBlockEntities;
@@ -31,7 +32,7 @@ import java.util.Locale;
 
 /**
  * A well pump: it lifts groundwater up the {@link com.jeladastudios.ftsgeology.block.WellCasingBlock well casing} under
- * it, on Forge Energy, and hands the water to whatever beside it or on top of it takes water. The water comes in at the
+ * it, on Forge Energy or Electrodynamics' 120 V, and hands the water to whatever beside it or on top of it takes water. The water comes in at the
  * casing's foot, from the rock there ({@link Aquifer}): gravel and sand give all it can lift, limestone and basalt a
  * good deal, granite and slate little, clay a trickle -- and only while water stands over the foot. What it draws is
  * drawn from the ground: the water table round it sinks in a cone for as long as it runs, the faster the tighter the
@@ -97,7 +98,13 @@ public class WellPumpBlockEntity extends BlockEntity {
         }
     };
     private final LazyOptional<IEnergyStorage> power = LazyOptional.of(() -> energy);
+    /** The same store as Electrodynamics' electricity, where it is installed: its wires give nothing else. 120 V only. */
+    private final LazyOptional<Object> volts = ElectrodynamicsPower.receiver(energy::getEnergyStored, () -> STORE,
+            () -> Math.min(TAKE_PER_TICK, STORE - energy.getEnergyStored()), energy::set, this::setChanged, this::tooHigh);
     private final LazyOptional<IFluidHandler> water = LazyOptional.of(() -> outlet);
+    /** The last voltage it refused, and when, for the reading. */
+    private double refusedVolts;
+    private long refusedAt = -1;
 
     /** Lengths of casing under it, and the foot of the last: the rock round it gives the water. */
     private int well;
@@ -155,6 +162,11 @@ public class WellPumpBlockEntity extends BlockEntity {
         over = waterY - foot.getY();
         lift = Math.max(1.0, worldPosition.getY() - waterY);
         allowed = Aquifer.millibucketsPerTick(Aquifer.capacity(rock, over));
+    }
+
+    private void tooHigh(double v) {
+        refusedVolts = v;
+        if (level != null) refusedAt = level.getGameTime();
     }
 
     private int perBucket() {
@@ -217,6 +229,9 @@ public class WellPumpBlockEntity extends BlockEntity {
         }
         out.add(Component.translatable("message.fts_geology.pump.stored", energy.getEnergyStored(), STORE,
                 tank.getFluidAmount(), TANK, perBucket()));
+        if (level != null && refusedAt >= 0 && level.getGameTime() - refusedAt < 40) {
+            out.add(Component.translatable("message.fts_geology.pump.over_voltage", String.format(Locale.ROOT, "%.0f", refusedVolts)));
+        }
         return out;
     }
 
@@ -234,6 +249,7 @@ public class WellPumpBlockEntity extends BlockEntity {
     @Override
     public <T> @NotNull LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
         if (cap == ForgeCapabilities.ENERGY) return power.cast();
+        if (ElectrodynamicsPower.is(cap)) return volts.cast();
         if (cap == ForgeCapabilities.FLUID_HANDLER && side != Direction.DOWN) return water.cast();
         return super.getCapability(cap, side);
     }
@@ -242,6 +258,7 @@ public class WellPumpBlockEntity extends BlockEntity {
     public void invalidateCaps() {
         super.invalidateCaps();
         power.invalidate();
+        volts.invalidate();
         water.invalidate();
     }
 

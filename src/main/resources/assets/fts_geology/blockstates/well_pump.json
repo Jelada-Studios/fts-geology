@@ -1,5 +1,8 @@
 {
   "variants": {
-    "": { "model": "fts_geology:block/well_pump" }
+    "facing=north": { "model": "fts_geology:block/well_pump" },
+    "facing=east":  { "model": "fts_geology:block/well_pump", "y": 90 },
+    "facing=south": { "model": "fts_geology:block/well_pump", "y": 180 },
+    "facing=west":  { "model": "fts_geology:block/well_pump", "y": 270 }
   }
 }
