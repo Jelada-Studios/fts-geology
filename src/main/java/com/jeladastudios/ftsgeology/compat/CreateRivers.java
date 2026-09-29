@@ -71,4 +71,56 @@ public final class CreateRivers {
             return null;
         }
     }
+
+    /**
+     * Whether a pipe's open end, facing {@code at}, is buried in ground the groundwater fills: natural rock or soil,
+     * a block or more under the water table as it stands now. Such an end draws from the aquifer ({@link #drawFromGround}).
+     */
+    public static boolean buriedInWater(net.minecraft.world.level.BlockGetter reader, BlockPos at) {
+        if (!(reader instanceof net.minecraft.server.level.ServerLevel level) || !Level.OVERWORLD.equals(level.dimension())
+                || !com.jeladastudios.ftsgeology.config.GeyserConfig.SOIL_WATER.get()
+                || !com.jeladastudios.ftsgeology.util.Loaded.at(level, at)) {
+            return false;
+        }
+        if (com.jeladastudios.ftsgeology.hydrology.Aquifer.rockOf(level.getBlockState(at)) == null) return false;
+        return com.jeladastudios.ftsgeology.hydrology.Aquifer.waterY(level, at.getX(), at.getZ()) >= at.getY() + 1;
+    }
+
+    /** What each buried end may still draw, in millibuckets, and the tick it was last asked, by where it faces. */
+    private static final java.util.Map<Long, double[]> OWED = new java.util.HashMap<>();
+
+    /**
+     * What an open pipe end buried in saturated ground draws: a bucket of water at a time, as fast as the rock round it
+     * gives water up with the water standing over it, taken from the aquifer as a well's is. Null where it is not so
+     * buried, and the pipe goes on as Create has it.
+     */
+    public static FluidStack drawFromGround(Object pipe, boolean simulate) {
+        if (WORLD == null) return null;
+        try {
+            Level level = (Level) WORLD.invokeExact(pipe);
+            BlockPos at = (BlockPos) OUTPUT.invokeExact(pipe);
+            if (!(level instanceof net.minecraft.server.level.ServerLevel server) || at == null || !buriedInWater(server, at)) return null;
+            var rock = com.jeladastudios.ftsgeology.hydrology.Aquifer.rockAt(server, at);
+            double head = com.jeladastudios.ftsgeology.hydrology.Aquifer.waterY(server, at.getX(), at.getZ()) - at.getY();
+            double perTick = com.jeladastudios.ftsgeology.hydrology.Aquifer.millibucketsPerTick(
+                    com.jeladastudios.ftsgeology.hydrology.Aquifer.capacity(rock, head));
+            long now = server.getGameTime();
+            double[] owed = OWED.computeIfAbsent(at.asLong(), k -> new double[]{0, now});
+            owed[0] = Math.min(owed[0] + perTick * Math.max(0, now - owed[1]), 2000);
+            owed[1] = now;
+            if (owed[0] < 1000) return FluidStack.EMPTY;
+            if (!simulate) {
+                owed[0] -= 1000;
+                com.jeladastudios.ftsgeology.hydrology.Aquifer.draw(server, at, 1.0);
+            }
+            return new FluidStack(Fluids.WATER, 1000);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** The server is going down: what buried ends were owed goes with it. */
+    public static void clear() {
+        OWED.clear();
+    }
 }

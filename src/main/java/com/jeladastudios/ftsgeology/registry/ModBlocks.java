@@ -98,6 +98,14 @@ public final class ModBlocks {
                     .requiresCorrectToolForDrops()
                     .noOcclusion()));
 
+    /** A well pump: groundwater up a well casing, on Forge Energy. */
+    public static final RegistryObject<Block> WELL_PUMP = BLOCKS.register("well_pump",
+            () -> new com.jeladastudios.ftsgeology.block.WellPumpBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)
+                    .mapColor(MapColor.METAL)
+                    .strength(3.0F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .noOcclusion()));
+
     /** Well casing: the steel pipe a turbine's well is lined with, down to the heat. */
     public static final RegistryObject<Block> WELL_CASING = BLOCKS.register("well_casing",
             () -> new com.jeladastudios.ftsgeology.block.WellCasingBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BARS)

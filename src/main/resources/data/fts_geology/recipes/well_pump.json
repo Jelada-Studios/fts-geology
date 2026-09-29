@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "IPI",
+    "CBC",
+    "IRI"
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "P": { "item": "minecraft:piston" },
+    "C": { "item": "minecraft:copper_ingot" },
+    "B": { "item": "minecraft:bucket" },
+    "R": { "item": "minecraft:redstone" }
+  },
+  "result": { "item": "fts_geology:well_pump" }
+}

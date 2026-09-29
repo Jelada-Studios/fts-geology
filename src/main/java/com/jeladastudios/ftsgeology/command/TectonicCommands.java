@@ -60,7 +60,10 @@ public final class TectonicCommands {
                         .then(Commands.literal("plate").executes(InspectCommands::plate))
                         .then(Commands.literal("suitability").executes(InspectCommands::suitability))
                         .then(Commands.literal("column").executes(InspectCommands::column))
-                        .then(Commands.literal("water").executes(InspectCommands::water))
+                        .then(Commands.literal("water").executes(InspectCommands::water)
+                                .then(Commands.literal("weather")
+                                        .then(waterWeather("dry", false))
+                                        .then(waterWeather("wet", true))))
                         .then(Commands.literal("deepgen")
                                 .executes(ctx -> deepgen(ctx, 0))
                                 .then(Commands.argument("chunkRadius", IntegerArgumentType.integer(0, 8))
@@ -212,6 +215,24 @@ public final class TectonicCommands {
                                         .executes(ctx -> fillVoids(ctx, IntegerArgumentType.getInteger(ctx, "radius")))))
                         .then(Commands.literal("debug")
                                 .then(Commands.literal("cost").executes(TectonicCommands::cost))));
+    }
+
+    /** /geology water weather dry|wet &lt;days&gt; [chunkRadius]: what a drought or a wet spell does to the ground round here. */
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> waterWeather(String name, boolean wet) {
+        return Commands.literal(name).then(Commands.argument("days", IntegerArgumentType.integer(1, 60))
+                .executes(ctx -> waterWeather(ctx, wet, 2))
+                .then(Commands.argument("chunkRadius", IntegerArgumentType.integer(0, 8))
+                        .executes(ctx -> waterWeather(ctx, wet, IntegerArgumentType.getInteger(ctx, "chunkRadius")))));
+    }
+
+    static int waterWeather(CommandContext<CommandSourceStack> ctx, boolean wet, int radius) {
+        BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+        int days = IntegerArgumentType.getInteger(ctx, "days");
+        int n = com.jeladastudios.ftsgeology.hydrology.SoilWater.fastForward(ctx.getSource().getLevel(), at.getX(), at.getZ(),
+                radius, days, wet);
+        ctx.getSource().sendSuccess(() -> Component.translatable("command.fts_geology.water.weather." + (wet ? "wet" : "dry"),
+                days, n).withStyle(ChatFormatting.YELLOW), true);
+        return n;
     }
 
     /** /geology fillvoids [radius]: closes the small holes a removed mod's blocks left in the ground round here. */

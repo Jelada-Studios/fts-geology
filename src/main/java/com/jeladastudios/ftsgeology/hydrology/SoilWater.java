@@ -6,6 +6,7 @@ import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.core.QuartPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -74,7 +75,7 @@ public final class SoilWater {
     static final double MM_PER_BLOCK = 200.0;
 
     private static final String TAG = "fts_soil_water";
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
 
     /**
      * What the ground is at a cell, for how it holds and passes water. The layers are the top two centimetres, the
@@ -129,6 +130,21 @@ public final class SoilWater {
         boolean leaving;
         /** How dry the grass looks in each cell, 0 to 15, as last sent to the players watching the chunk. */
         final byte[] tint = new byte[16];
+        /** Hours of the ground's time the root zone has been at its wilting point, and the ground has stood in water. */
+        final float[] dry = new float[16], soak = new float[16];
+        /**
+         * Columns of each cell, bit {@code (z & 3) * 4 + (x & 3)}, whose grass died back here, and that went to mud here:
+         * only these grow back and dry out again.
+         */
+        final short[] bare = new short[16], mud = new short[16];
+        /** What plants could use of the root zone's water at the last look, 0 to 1. Not kept. */
+        final float[] usable = new float[16];
+        /** Blocks the wells round the chunk have lowered its water table by, at the last look. Not kept. */
+        float lowered;
+
+        Cells() {
+            java.util.Arrays.fill(usable, 1f);
+        }
     }
 
     /**
@@ -137,7 +153,7 @@ public final class SoilWater {
      */
     public record Reading(Soil soil, double top, double root, double deep, double pond, double topSat, double rootSat,
                           double deepSat, double rootAvailable, double table, int depth, double hoursSinceLook,
-                          int grassDryness) {}
+                          int grassDryness, double droughtHours) {}
 
     /** Cells by overworld chunk. */
     private static final Map<Long, Cells> CELLS = new ConcurrentHashMap<>();
@@ -159,9 +175,10 @@ public final class SoilWater {
     public static void onChunkData(ChunkDataEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel level) || !enabled(level)) return;
         CompoundTag tag = event.getData().getCompound(TAG);
-        if (tag.getInt("v") != VERSION) return;
+        int v = tag.getInt("v");
+        if (v != 1 && v != VERSION) return;
         int[] w = tag.getIntArray("w");
-        if (w.length != 80) return;
+        if (w.length != (v == 1 ? 80 : 144)) return;
         Cells c = new Cells();
         for (int i = 0; i < 16; i++) {
             c.top[i] = w[i] / 10f;
@@ -169,6 +186,11 @@ public final class SoilWater {
             c.deep[i] = w[32 + i] / 10f;
             c.pond[i] = w[48 + i] / 10f;
             c.table[i] = w[64 + i] / 100f;
+            if (v == 1) continue;
+            c.dry[i] = w[80 + i] / 10f;
+            c.soak[i] = w[96 + i] / 10f;
+            c.bare[i] = (short) w[112 + i];
+            c.mud[i] = (short) w[128 + i];
         }
         c.last = tag.getLong("t");
         c.depth = tag.getInt("d");
@@ -218,13 +240,17 @@ public final class SoilWater {
             if (c.leaving) CELLS.remove(k);
             return;
         }
-        int[] w = new int[80];
+        int[] w = new int[144];
         for (int i = 0; i < 16; i++) {
             w[i] = Math.round(c.top[i] * 10);
             w[16 + i] = Math.round(c.root[i] * 10);
             w[32 + i] = Math.round(c.deep[i] * 10);
             w[48 + i] = Math.round(c.pond[i] * 10);
             w[64 + i] = Math.round(c.table[i] * 100);
+            w[80 + i] = Math.round(c.dry[i] * 10);
+            w[96 + i] = Math.round(c.soak[i] * 10);
+            w[112 + i] = c.bare[i];
+            w[128 + i] = c.mud[i];
         }
         CompoundTag tag = new CompoundTag();
         tag.putInt("v", VERSION);
@@ -316,7 +342,21 @@ public final class SoilWater {
         boolean first = c.last < 0;
         double hours = first ? 0 : (now - c.last) * HOURS_PER_TICK;
         boolean away = hours > EVERY * HOURS_PER_TICK * 3;          // not looked at for a while: unloaded
-        boolean raining = level.isRaining(), storm = level.isThundering(), day = level.isDay();
+        advance(level, chunk, c, first, hours, away, level.isRaining(), level.isThundering(), level.isDay());
+        c.last = now;
+        looks++;
+        // Away, the place had its average weather, rain and all: no drought or flood is carried over it.
+        if (GeyserConfig.SOIL_WATER_GROUND.get()) showGround(level, chunk, c, first || away ? -1 : hours);
+    }
+
+    /**
+     * Takes a chunk's cells {@code hours} on through the weather given, or through the place's average weather when
+     * {@code away}; a chunk's {@code first} look settles them to that average.
+     */
+    private static void advance(ServerLevel level, LevelChunk chunk, Cells c, boolean first, double hours, boolean away,
+                                boolean raining, boolean storm, boolean day) {
+        ChunkPos p = chunk.getPos();
+        c.lowered = (float) Aquifer.drawdown(level, p.getMiddleBlockX() + 0.5, p.getMiddleBlockZ() + 0.5);
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         for (int i = 0; i < 16; i++) {
             int x = p.getMinBlockX() + (i & 3) * 4 + 2, z = p.getMinBlockZ() + (i >> 2) * 4 + 2;
@@ -331,12 +371,15 @@ public final class SoilWater {
                 continue;
             }
             if (!soil.ground()) continue;
-            Holder<Biome> biome = level.getBiome(m.set(x, g + 1, z));
+            // From the chunk itself: the level's blended lookup reads the chunk next door at the cell by the edge, which
+            // need not be loaded.
+            Holder<Biome> biome = chunk.getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(g + 1), QuartPos.fromBlock(z));
             double pet = evaporation(biome.value());
             // Snow counts as the rain it melts into: a tundra's ground is wet, not a desert's.
             boolean rains = biome.value().hasPrecipitation();
             if (first) {
                 spinUp(c, i, soil, pet, rains);
+                c.usable[i] = (float) soil.available(sat(c.root[i], soil.root));
                 continue;
             }
             double left = hours;
@@ -352,10 +395,36 @@ public final class SoilWater {
             }
             // Longer away than the steps reach: what is left of the gap has settled the ground to its average.
             if (left > 1e-6) spinUp(c, i, soil, pet, rains);
+            c.usable[i] = (float) soil.available(sat(c.root[i], soil.root));
         }
-        c.last = now;
-        looks++;
-        if (GeyserConfig.SOIL_WATER_GROUND.get()) showGround(level, chunk, c);
+    }
+
+    /**
+     * Runs the loaded chunks within {@code radius} chunks of a column on through {@code days} game days of dry weather
+     * or of steady rain, a week of the ground's time each, as if watched all the while: what a drought or a wet spell
+     * does, seen without waiting for it. Returns how many chunks it ran.
+     */
+    public static int fastForward(ServerLevel level, int x, int z, int radius, int days, boolean wet) {
+        if (!enabled(level)) return 0;
+        long now = level.getGameTime();
+        int n = 0;
+        for (int cx = (x >> 4) - radius; cx <= (x >> 4) + radius; cx++) {
+            for (int cz = (z >> 4) - radius; cz <= (z >> 4) + radius; cz++) {
+                LevelChunk chunk = level.getChunkSource().getChunkNow(cx, cz);
+                if (chunk == null) continue;
+                Cells c = CELLS.computeIfAbsent(key(level, cx, cz), k -> new Cells());
+                if (c.last < 0) look(level, chunk, c, now, Long.MAX_VALUE);
+                for (int d = 0; d < days; d++) {
+                    // Half the week in daylight and half in the dark, as the sky would give it.
+                    advance(level, chunk, c, false, 84, false, wet, false, true);
+                    advance(level, chunk, c, false, 84, false, wet, false, false);
+                    if (GeyserConfig.SOIL_WATER_GROUND.get()) showGround(level, chunk, c, 168);
+                }
+                c.last = now;
+                n++;
+            }
+        }
+        return n;
     }
 
     // === What it does to the ground (soilWaterChangesGround) ===============
@@ -373,11 +442,29 @@ public final class SoilWater {
     /** Farmland over soil this wet stays moist, as a rain-fed field does. */
     private static final double MOIST_FIELD = 0.6;
 
-    /** The grass's colour to the players watching the chunk, when it has changed; moist fields over wet soil. */
-    private static void showGround(ServerLevel level, LevelChunk chunk, Cells c) {
+    /** What plants can use of the root zone under which the grass is dying back, and how long it takes, in hours. */
+    static final double DIEBACK = 0.05, DIEBACK_HOURS = 6 * 168;
+    /** What plants can use of the root zone over which grass that died back grows again. */
+    static final double REGROW = 0.4;
+    /**
+     * Millimetres of standing water that soak the ground, and the hours it takes to turn it to mud: two game days of
+     * standing water, a wet spell's and not a shower's.
+     */
+    static final double PUDDLE = 2.0, MUD_HOURS = 2 * 168;
+    /** Share of a cell's columns that change in a game day, dying back, growing again, going to mud and drying out. */
+    private static final double DIE_A_DAY = 0.35, GROW_A_DAY = 0.2, MUD_A_DAY = 0.25, DRY_A_DAY = 0.3;
+
+    /**
+     * The grass's colour to the players watching the chunk, when it has changed; moist fields over wet soil; and, with
+     * {@code hours} of the sky's own weather since the last look (negative for none: the chunk was away, or new), the
+     * grass dying back over a long drought and growing again after it, and the ground going to mud under standing water
+     * and drying out again.
+     */
+    private static void showGround(ServerLevel level, LevelChunk chunk, Cells c, double hours) {
         ChunkPos p = chunk.getPos();
         boolean changed = false;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        it.unimi.dsi.fastutil.longs.LongSet placed = null;
         for (int i = 0; i < 16; i++) {
             int x0 = p.getMinBlockX() + (i & 3) * 4, z0 = p.getMinBlockZ() + (i >> 2) * 4;
             int g = ground(level, x0 + 2, z0 + 2);
@@ -387,6 +474,28 @@ public final class SoilWater {
             if (t != c.tint[i]) {
                 c.tint[i] = t;
                 changed = true;
+            }
+            if (hours < 0) {
+                c.dry[i] = 0;
+                c.soak[i] = 0;
+            } else if (soil.ground()) {
+                double usable = c.usable[i];
+                c.dry[i] = (float) (usable < DIEBACK ? c.dry[i] + hours : Math.max(0, c.dry[i] - 2 * hours));
+                c.soak[i] = (float) (c.pond[i] > PUDDLE ? c.soak[i] + hours : Math.max(0, c.soak[i] - hours));
+                // It dies while the drought still holds: once the rain is back no more of it goes, though the count
+                // of dry hours takes a while to run down.
+                boolean dies = c.dry[i] > DIEBACK_HOURS && usable < DIEBACK;
+                boolean grows = c.bare[i] != 0 && c.dry[i] == 0 && usable > REGROW;
+                boolean muds = c.soak[i] > MUD_HOURS && (soil == Soil.LOAM || soil == Soil.CLAY);
+                boolean dries = c.mud[i] != 0 && c.soak[i] == 0 && usable < 0.5;
+                if (dies || grows || muds || dries) {
+                    if (placed == null) placed = com.jeladastudios.ftsgeology.quake.PlayerBuilt.inChunk(level, p.x, p.z);
+                    double day = Math.min(1.0, hours / 168.0);
+                    if (dies) c.bare[i] |= change(level, chunk, x0, z0, placed, DIE_A_DAY * day, Change.DIE, c.bare[i]);
+                    if (grows) c.bare[i] &= (short) ~change(level, chunk, x0, z0, placed, GROW_A_DAY * day, Change.GROW, c.bare[i]);
+                    if (muds) c.mud[i] |= change(level, chunk, x0, z0, placed, MUD_A_DAY * day, Change.MUD, c.mud[i]);
+                    if (dries) c.mud[i] &= (short) ~change(level, chunk, x0, z0, placed, DRY_A_DAY * day, Change.DRY, c.mud[i]);
+                }
             }
             if (!soil.ground() || soil.available(sat(c.root[i], soil.root)) < MOIST_FIELD) continue;
             for (int dx = 0; dx < 4; dx++) {
@@ -426,6 +535,174 @@ public final class SoilWater {
                 new com.jeladastudios.ftsgeology.network.SoilTintPacket(p.x, p.z, c.tint.clone()));
     }
 
+    private enum Change { DIE, GROW, MUD, DRY }
+
+    /**
+     * Changes each column of the four by four cell at {@code x0, z0}, with the chance {@code share}: grass dies back to
+     * its soil, and grows again over the soil it died back from ({@code marked}); the ground in the cell's hollows
+     * goes to mud, and mud made so dries out ({@code marked}). What a player placed is left, and so is grass watered
+     * from within four blocks. Returns the bits of the columns done with: changed, or no longer what was made there.
+     */
+    private static short change(ServerLevel level, LevelChunk chunk, int x0, int z0, it.unimi.dsi.fastutil.longs.LongSet placed,
+                                double share, Change what, short marked) {
+        boolean undo = what == Change.GROW || what == Change.DRY;
+        short done = 0;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int b = 0; b < 16; b++) {
+            boolean mine = (marked & (1 << b)) != 0;
+            // Grass that spread back over ground the drought killed dies again at once while the drought lasts: other
+            // mods spread grass their own way (Immersive Weathering's growths), past the check that stops the game's.
+            boolean again = what == Change.DIE && mine;
+            if (!again && (undo != mine || level.random.nextDouble() >= share)) continue;
+            int x = x0 + (b & 3), z = z0 + (b >> 2);
+            int y = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15);
+            m.set(x, y, z);
+            if (placed.contains(m.asLong())) continue;
+            BlockState s = chunk.getBlockState(m);
+            BlockState to = switch (what) {
+                case DIE -> {
+                    // Grass first, the costly look for water beside it only then: a dying cell's columns are all gone
+                    // over on every look.
+                    BlockState dead = deadOf(s, chunk.getBlockState(m.below()));
+                    yield dead == null || watered(level, x, y, z) ? null : dead;
+                }
+                case GROW -> {
+                    BlockState over = chunk.getBlockState(m.above());
+                    yield over.isAir() || over.canBeReplaced() || over.is(Blocks.DEAD_BUSH) ? grassOf(s) : null;
+                }
+                case MUD -> (s.is(Blocks.GRASS_BLOCK) || s.is(Blocks.DIRT) || s.is(Blocks.COARSE_DIRT)) && hollow(level, x, y, z)
+                        ? Blocks.MUD.defaultBlockState() : null;
+                case DRY -> s.is(Blocks.MUD) ? Blocks.DIRT.defaultBlockState() : null;
+            };
+            if (to == null) {
+                // Made here, but no longer what was made: something else has had it since.
+                if (mine && !(what == Change.GROW ? grassOf(s) != null : s.is(Blocks.MUD))) done |= (short) (1 << b);
+                continue;
+            }
+            if (what == Change.DIE) witherOver(level, chunk, m.above());
+            level.setBlock(m.immutable(), to, net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+            done |= (short) (1 << b);
+        }
+        return done;
+    }
+
+    /**
+     * Whether a column's ground lies in a hollow water gathers in: none of the four beside it lower, two or more higher.
+     * Flat ground has none, and stays as it is however long it stands wet; what goes to mud is the dip in it.
+     */
+    private static boolean hollow(ServerLevel level, int x, int y, int z) {
+        int higher = 0;
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            int nx = x + d.getStepX(), nz = z + d.getStepZ();
+            LevelChunk c = level.getChunkSource().getChunkNow(nx >> 4, nz >> 4);
+            if (c == null) return false;
+            int ny = c.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, nx & 15, nz & 15);
+            if (ny < y) return false;
+            if (ny > y) higher++;
+        }
+        return higher >= 2;
+    }
+
+    /** Water within four blocks of a column's ground, a level over or under it: a bank or a watered lawn. */
+    private static boolean watered(ServerLevel level, int x, int y, int z) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int dx = -4; dx <= 4; dx++) {
+            for (int dz = -4; dz <= 4; dz++) {
+                if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, x + dx, z + dz)) continue;
+                for (int dy = -1; dy <= 1; dy++) {
+                    if (level.getFluidState(m.set(x + dx, y + dy, z + dz)).is(net.minecraft.tags.FluidTags.WATER)) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Grass and the soil it dies back to: over sand or gravel, coarse ground; Immersive Weathering's own grassy soils. */
+    private static BlockState deadOf(BlockState s, BlockState under) {
+        if (s.is(Blocks.GRASS_BLOCK)) {
+            if (under.is(BlockTags.SAND) || under.is(Tags.Blocks.GRAVEL)) {
+                BlockState sandy = weathering("sandy_dirt");
+                return sandy != null ? sandy : Blocks.COARSE_DIRT.defaultBlockState();
+            }
+            return Blocks.DIRT.defaultBlockState();
+        }
+        String name = name(s);
+        for (String[] pair : WEATHERING_GRASS) {
+            if (name.equals("immersive_weathering:" + pair[0])) return weathering(pair[1]);
+        }
+        return null;
+    }
+
+    /** The grass that grows again over soil that died back here; null over anything else. */
+    private static BlockState grassOf(BlockState s) {
+        if (s.is(Blocks.DIRT) || s.is(Blocks.COARSE_DIRT)) return Blocks.GRASS_BLOCK.defaultBlockState();
+        String name = name(s);
+        if (name.equals("immersive_weathering:sandy_dirt")) return Blocks.GRASS_BLOCK.defaultBlockState();
+        for (String[] pair : WEATHERING_GRASS) {
+            if (name.equals("immersive_weathering:" + pair[1])) return weathering(pair[0]);
+        }
+        return null;
+    }
+
+    /** Immersive Weathering's grassy soils and what they are without their grass. Blocks by name only (LGPLv3). */
+    private static final String[][] WEATHERING_GRASS = {
+            {"grassy_sandy_dirt", "sandy_dirt"}, {"grassy_earthen_clay", "earthen_clay"}, {"grassy_silt", "silt"}};
+
+    private static BlockState weathering(String path) {
+        net.minecraft.world.level.block.Block b = net.minecraftforge.registries.ForgeRegistries.BLOCKS.getValue(
+                new net.minecraft.resources.ResourceLocation("immersive_weathering", path));
+        return b == null || b == Blocks.AIR ? null : b.defaultBlockState();
+    }
+
+    private static String name(BlockState s) {
+        return net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock()).toString();
+    }
+
+    /** The grass growing over ground that dies back dies with it; now and then a dead bush is left. */
+    private static void witherOver(ServerLevel level, LevelChunk chunk, BlockPos over) {
+        BlockState s = chunk.getBlockState(over);
+        if (s.is(Blocks.TALL_GRASS) || s.is(Blocks.LARGE_FERN)) {
+            level.setBlock(over.above(), Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+            level.setBlock(over, Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+        } else if (s.is(Blocks.GRASS) || s.is(Blocks.FERN)) {
+            level.setBlock(over, level.random.nextInt(10) == 0 ? Blocks.DEAD_BUSH.defaultBlockState()
+                    : Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+        }
+    }
+
+    private static int cell(int x, int z) {
+        return ((z & 15) >> 2) * 4 + ((x & 15) >> 2);
+    }
+
+    /** Whether this ground is in a drought, with the ground changing on: grass does not spread onto it. */
+    public static boolean parched(net.minecraft.world.level.LevelReader level, BlockPos pos) {
+        if (!(level instanceof ServerLevel sl) || !GeyserConfig.SOIL_WATER_GROUND.get() || !enabled(sl)) return false;
+        Cells c = CELLS.get(key(sl, pos.getX() >> 4, pos.getZ() >> 4));
+        return c != null && c.dry[cell(pos.getX(), pos.getZ())] > 0;
+    }
+
+    /** What plants can use of the root zone under which a dry field's crop stops growing, and slows towards. */
+    static final double CROP_THIRST = 0.3;
+
+    /**
+     * A crop on a dry field grows slower as the root zone dries, and not at all at the wilting point. A watered field,
+     * by water beside it or by rain on it, is moist and grows as ever.
+     */
+    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.LOW)
+    public static void onCropGrow(net.minecraftforge.event.level.BlockEvent.CropGrowEvent.Pre event) {
+        if (!(event.getLevel() instanceof ServerLevel level) || !GeyserConfig.SOIL_WATER_GROUND.get() || !enabled(level)) return;
+        BlockPos pos = event.getPos();
+        BlockState field = level.getBlockState(pos.below());
+        if (!(field.getBlock() instanceof net.minecraft.world.level.block.FarmBlock)
+                || field.getValue(net.minecraft.world.level.block.FarmBlock.MOISTURE) >= 7) {
+            return;
+        }
+        Cells c = CELLS.get(key(level, pos.getX() >> 4, pos.getZ() >> 4));
+        if (c == null || c.last < 0) return;
+        double deny = Mth.clamp((CROP_THIRST - c.usable[cell(pos.getX(), pos.getZ())]) / CROP_THIRST, 0.0, 1.0);
+        if (deny > 0 && level.random.nextDouble() < deny) event.setResult(net.minecraftforge.eventbus.api.Event.Result.DENY);
+    }
+
     /** A cell never looked at: the ground as the place's weather keeps it, a few weeks of it on average. */
     private static void spinUp(Cells c, int i, Soil soil, double pet, boolean rains) {
         double wet = rains ? Mth.clamp(RAIN * RAINY_SHARE / Math.max(pet, 0.01), 0.0, 1.0) : 0.0;
@@ -460,7 +737,7 @@ public final class SoilWater {
         deep -= recharge;
         // Groundwater up at the surface takes no more: what would have gone down stands on the ground instead.
         int depth = Math.max(0, c.depth);
-        if (c.depth >= 0 && table >= depth) {
+        if (c.depth >= 0 && table - c.lowered >= depth) {
             pond += recharge;
             recharge = 0;
         }
@@ -483,7 +760,8 @@ public final class SoilWater {
         // The groundwater settles back to its level over weeks; near the surface it wets the roots from below.
         table *= Math.exp(-h / SETTLE_HOURS);
         if (c.depth >= 0) {
-            double under = depth - table;
+            // A well's cone lowers the water under the roots as much as a dry year does.
+            double under = depth - table + c.lowered;
             if (under < 3) {
                 double rise = Math.min(s.root * s.fieldCapacity - root, 0.3 * h * (1 - Math.max(0, under) / 3.0));
                 if (rise > 0) {
@@ -564,7 +842,7 @@ public final class SoilWater {
         double hours = (level.getGameTime() - c.last) * HOURS_PER_TICK;
         double rootSat = sat(c.root[i], soil.root);
         return new Reading(soil, c.top[i], c.root[i], c.deep[i], c.pond[i], sat(c.top[i], soil.top), rootSat,
-                sat(c.deep[i], soil.deep), soil.available(rootSat), c.table[i], c.depth, hours, c.tint[i]);
+                sat(c.deep[i], soil.deep), soil.available(rootSat), c.table[i], c.depth, hours, c.tint[i], c.dry[i]);
     }
 
     public static String summary() {

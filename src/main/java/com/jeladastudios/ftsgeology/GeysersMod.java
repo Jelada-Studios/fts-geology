@@ -97,6 +97,7 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.instrument.SeismicNetwork.clear();
         com.jeladastudios.ftsgeology.command.SiteTeleport.clear();
         com.jeladastudios.ftsgeology.blockentity.GeothermalTurbineBlockEntity.clearAll();
+        com.jeladastudios.ftsgeology.compat.CreateRivers.clear();
         com.jeladastudios.ftsgeology.blockentity.GeyserCoreBlockEntity.clearAll();
         com.jeladastudios.ftsgeology.worldgen.LavaTubes.clear();
         com.jeladastudios.ftsgeology.worldgen.OreGenesis.clear();
@@ -126,6 +127,7 @@ public class GeysersMod {
             // things in the mod a player is meant to carry.
             event.accept(ModItems.SEISMOGRAPH.get());
             event.accept(ModItems.GEOTHERMAL_TURBINE.get());
+            event.accept(ModItems.WELL_PUMP.get());
             event.accept(ModItems.WELL_CASING.get());
             event.accept(ModItems.GEOLOGISTS_HAMMER.get());
             event.accept(ModItems.FAULT_COMPASS.get());

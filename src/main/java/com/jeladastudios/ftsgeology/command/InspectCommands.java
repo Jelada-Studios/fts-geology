@@ -213,12 +213,17 @@ public final class InspectCommands {
                 pct(r.deepSat()), dec(r.deep(), 0)).withStyle(ChatFormatting.AQUA), false);
         source.sendSuccess(() -> Component.translatable("command.fts_geology.water.usable",
                 pct(r.rootAvailable()), bar(r.rootAvailable())).withStyle(ChatFormatting.AQUA), false);
-        String table = r.depth() < 0 ? "?" : dec(Math.max(0, r.depth() - r.table()), 1);
+        double lowered = com.jeladastudios.ftsgeology.hydrology.Aquifer.drawdown(level, at.getX() + 0.5, at.getZ() + 0.5);
+        String table = r.depth() < 0 ? "?" : dec(Math.max(0, r.depth() - r.table() + lowered), 1);
         String usual = r.depth() < 0 ? "?" : String.valueOf(r.depth());
         source.sendSuccess(() -> Component.translatable("command.fts_geology.water.ground", dec(r.pond(), 1), table, usual,
                 (r.table() >= 0 ? "+" : "") + dec(r.table(), 2)).withStyle(ChatFormatting.AQUA), false);
+        if (lowered >= 0.05) {
+            source.sendSuccess(() -> Component.translatable("command.fts_geology.water.wells", dec(lowered, 2),
+                    com.jeladastudios.ftsgeology.hydrology.Aquifer.count(level)).withStyle(ChatFormatting.AQUA), false);
+        }
         source.sendSuccess(() -> Component.translatable("command.fts_geology.water.looked", dec(r.hoursSinceLook(), 1),
-                r.grassDryness()).withStyle(ChatFormatting.DARK_GRAY), false);
+                r.grassDryness(), dec(r.droughtHours() / 168.0, 1)).withStyle(ChatFormatting.DARK_GRAY), false);
         return 1;
     }
 

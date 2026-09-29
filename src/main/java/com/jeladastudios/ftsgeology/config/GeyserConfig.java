@@ -221,6 +221,8 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue TURBINE_MAX_FE;      // FE/t of a turbine over the hottest ground
     public static final ForgeConfigSpec.IntValue TURBINE_MIN_FE;      // FE/t over the faintest heat it runs on
     public static final ForgeConfigSpec.IntValue TURBINE_WELL_DEPTH;  // lengths of casing a well may run to
+    public static final ForgeConfigSpec.IntValue WELL_PUMP_RATE;      // mB/t a well pump lifts at most
+    public static final ForgeConfigSpec.IntValue WELL_PUMP_ENERGY;    // FE a bucket a block of lift
     public static final ForgeConfigSpec.IntValue CORE_DRILL_DEPTH;    // blocks the hand core drill bores down
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -1046,6 +1048,14 @@ public final class GeyserConfig {
                         "sits thirty to sixty blocks under its pool; a natural geyser's chamber is down near the",
                         "bottom of the world, out of reach unless this is raised.")
                 .defineInRange("turbineWellMaxDepth", 96, 1, 512);
+        WELL_PUMP_RATE = b
+                .comment("Millibuckets a tick a well pump lifts at most. What it lifts is also what the rock at its",
+                        "well's foot lets through -- gravel and sand far more than this, clay a trickle -- and what",
+                        "the water standing over the foot allows: drawn down to the foot, the well runs dry.")
+                .defineInRange("wellPumpRate", 100, 1, 10000);
+        WELL_PUMP_ENERGY = b
+                .comment("Forge Energy a well pump spends on each bucket for each block it lifts the water.")
+                .defineInRange("wellPumpEnergyPerBucketBlock", 40, 0, 100000);
         CORE_DRILL_DEPTH = b
                 .comment("How many blocks down the core drill bores from the block it is set on. Its core logs every",
                         "bed it went through, any deposit named for what laid it, and the water table.")
@@ -1082,8 +1092,13 @@ public final class GeyserConfig {
                 .comment("Let the water in the ground show (needs soilWater). Grass, ferns and the grass block turn",
                         "towards straw as the root zone dries -- from about the third dry day, straw by the seventh --",
                         "and green again after rain; farmland over soil wet enough stays moist without water beside",
-                        "it, as rain-fed fields do. Only colours and farmland moisture change: no block is replaced.",
-                        "Off by default while it is new.")
+                        "it, as rain-fed fields do. A long drought -- the roots at the wilting point for six game days",
+                        "and more -- kills the grass back to bare soil in patches, and no grass spreads onto dry ground",
+                        "meanwhile; it grows back after the rain comes. Grass within four blocks of water stays green,",
+                        "and nothing a player placed is touched. A dry field's crops slow and stop; a watered one grows",
+                        "as ever. Ground that stands in water two days and more, where the groundwater is up at the surface,",
+                        "goes to mud in its hollows and dries out again. /geology water weather dry|wet <days>",
+                        "shows what a drought or a wet spell does, without waiting. Off by default while it is new.")
                 .define("soilWaterChangesGround", false);
         KARST = b
                 .comment("Karst, in the mod's own world types: where marble or calcite lies close under a plateau's",

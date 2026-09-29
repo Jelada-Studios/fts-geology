@@ -252,6 +252,9 @@ public final class ModItems {
     public static final RegistryObject<Item> GEOTHERMAL_TURBINE = ITEMS.register("geothermal_turbine",
             () -> new DescribedBlockItem(ModBlocks.GEOTHERMAL_TURBINE.get(), new Item.Properties(), 3, "electrodynamics"));
 
+    public static final RegistryObject<Item> WELL_PUMP = ITEMS.register("well_pump",
+            () -> new DescribedBlockItem(ModBlocks.WELL_PUMP.get(), new Item.Properties(), 3, "create"));
+
     public static final RegistryObject<Item> WELL_CASING = ITEMS.register("well_casing",
             () -> new DescribedBlockItem(ModBlocks.WELL_CASING.get(), new Item.Properties(), 2));
 
