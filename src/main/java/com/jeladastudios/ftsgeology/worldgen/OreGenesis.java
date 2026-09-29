@@ -26,6 +26,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -75,6 +76,7 @@ public final class OreGenesis {
         kimberlites(d);
         magnetite(d);
         nativeCopper(d);
+        modOres(d);
         return d.placed;
     }
 
@@ -784,6 +786,318 @@ public final class OreGenesis {
     }
 
     /** Natural rock a deposit may replace. Ore already there, the generator's or another deposit's, stays. */
+    // === Other mods' ores =========================================================
+
+    /**
+     * The metals other mods add that the geology lays itself when {@code geologicalModOres} is on (their own ore
+     * features for these are taken out; see {@code OreUnification}), by the names of Forge's ore tags.
+     */
+    public static final java.util.Set<String> MOD_METALS = java.util.Set.of("tin", "tungsten", "lithium", "lead", "zinc",
+            "silver", "fluorite", "nickel", "aluminum", "chromium", "platinum", "osmium", "iridium", "titanium", "monazite",
+            "thorium", "salt", "potassiumchloride", "saltpeter", "nitrate", "uranium");
+
+    /** A pack's ore of a metal for a depth, or null where no mod adds it. */
+    private static Block modOre(String metal, int y) {
+        return com.jeladastudios.ftsgeology.compat.OreUnification.oreOf(metal, y < 0);
+    }
+
+    /** One of weighted metals, by a 0..1 draw. */
+    private static String pick(double u, String[] metals, double[] weights) {
+        double sum = 0;
+        for (double w : weights) sum += w;
+        double at = u * sum;
+        for (int i = 0; i < metals.length; i++) {
+            at -= weights[i];
+            if (at <= 0) return metals[i];
+        }
+        return metals[metals.length - 1];
+    }
+
+    /** A metal's ore set at a block whose rock passes {@code host}, at least {@code cover} blocks under the ground. */
+    private static void setOre(Deposit d, int x, int y, int z, String metal, int cover, java.util.function.Predicate<BlockState> host) {
+        Block ore = modOre(metal, y);
+        if (ore == null || !d.inside(x, z) || y <= d.level.getMinBuildHeight()) return;
+        int g = d.ground(x, z);
+        if (g == Integer.MIN_VALUE || y > g - cover) return;
+        BlockPos p = new BlockPos(x, y, z);
+        BlockState s = d.level.getBlockState(p);
+        if (s.is(ore) || s.hasBlockEntity() || !host.test(s)) return;
+        d.level.setBlock(p, ore.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+        d.placed++;
+    }
+
+    private static boolean granite(BlockState s) {
+        return s.is(Blocks.GRANITE) || s.is(Blocks.DIORITE) || s.is(ModBlocks.RHYOLITE.get()) || s.is(ModBlocks.QUARTZITE.get())
+                || s.is(ModBlocks.GNEISS.get()) || s.is(ModBlocks.SCHIST.get()) || s.is(BlockTags.BASE_STONE_OVERWORLD);
+    }
+
+    private static boolean carbonate(BlockState s) {
+        return s.is(Blocks.CALCITE) || s.is(ModBlocks.MARBLE.get()) || s.is(ModBlocks.TRAVERTINE.get());
+    }
+
+    private static boolean ultramafic(BlockState s) {
+        return s.is(ModBlocks.SERPENTINITE.get()) || s.is(ModBlocks.PERIDOTITE.get()) || s.is(ModBlocks.GABBRO.get());
+    }
+
+    private static boolean sediment(BlockState s) {
+        return s.is(Blocks.SANDSTONE) || s.is(Blocks.RED_SANDSTONE) || s.is(BlockTags.TERRACOTTA) || s.is(Blocks.STONE)
+                || s.is(ModBlocks.SHALE.get()) || s.is(BlockTags.SAND) || s.is(BlockTags.DIRT) || s.is(Blocks.GRAVEL);
+    }
+
+    /** Every deposit of other mods' metals the geology lays; on the own world type, with the setting on. */
+    private static void modOres(Deposit d) {
+        if (!d.own || !com.jeladastudios.ftsgeology.compat.OreUnification.geological()) return;
+        for (int i = 0; i < MOD_DEPOSITS.size(); i++) {
+            int was = d.placed;
+            MOD_DEPOSITS.get(i).accept(d);
+            MOD_PLACED[i].add(d.placed - was);
+        }
+    }
+
+    private static final List<java.util.function.Consumer<Deposit>> MOD_DEPOSITS = List.of(OreGenesis::greisens,
+            OreGenesis::mvtPods, OreGenesis::laterites, OreGenesis::chromitites, OreGenesis::placers, OreGenesis::evaporites,
+            OreGenesis::rollFronts);
+    private static final String[] MOD_DEPOSIT_NAMES = {"greisen", "MVT", "laterite", "chromitite", "placer", "evaporite",
+            "roll front"};
+    private static final java.util.concurrent.atomic.LongAdder[] MOD_PLACED = new java.util.concurrent.atomic.LongAdder[7];
+    static {
+        for (int i = 0; i < MOD_PLACED.length; i++) MOD_PLACED[i] = new java.util.concurrent.atomic.LongAdder();
+    }
+
+    /** Other mods' ore blocks the geology has laid since the server started, by deposit; null if none. */
+    public static String modOresSummary() {
+        StringBuilder out = new StringBuilder("Mod ores laid by the geology:");
+        long all = 0;
+        for (int i = 0; i < MOD_PLACED.length; i++) {
+            long n = MOD_PLACED[i].sumThenReset();
+            all += n;
+            out.append(' ').append(MOD_DEPOSIT_NAMES[i]).append(' ').append(n).append(i + 1 < MOD_PLACED.length ? "," : "");
+        }
+        return all == 0 ? null : out.toString();
+    }
+
+    private static final int GREISEN_CELL = 96, GREISEN_REACH = 14;
+
+    /**
+     * Greisen at the roof of a granite body: the last of the magma's water, rich in tin, tungsten and lithium,
+     * forcing its way up the cooling roof in sheets of veins -- Cornwall's tin, the Erzgebirge's. Where a column has a
+     * granite pluton, a cupola at its top holds a stockwork of close-set parallel veins.
+     */
+    private static void greisens(Deposit d) {
+        String[] metals = {"tin", "tungsten", "lithium"};
+        double[] weights = {0.6, 0.25, 0.15};
+        d.cells(GREISEN_CELL, GREISEN_REACH, 0x6E15L, (cellX, cellZ, h) -> {
+            if (die(h, 0) > 0.55) return;
+            int ax = cellX + (int) (die(h, 1) * GREISEN_CELL), az = cellZ + (int) (die(h, 2) * GREISEN_CELL);
+            Lithology.Column col = d.column(ax, az);
+            if (col == null || !Lithology.hasPluton(col) || col.pluton() != Lithology.Rock.GRANITE) return;
+            int top = d.base(ax, az) - col.plutonTop();
+            int r = 6 + (int) (die(h, 3) * 7);
+            double nx = die(h, 4) - 0.5, nz = die(h, 5) - 0.5, ny = 0.3 * (die(h, 6) - 0.5);
+            double len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+            double ux = nx / len, uy = ny / len, uz = nz / len;
+            for (int x = d.minX(ax - r); x <= d.maxX(ax + r); x++) {
+                for (int z = d.minZ(az - r); z <= d.maxZ(az + r); z++) {
+                    for (int y = top - 8; y <= top + 5; y++) {
+                        double dx = x - ax, dy = (y - top) * 1.6, dz = z - az;
+                        if (dx * dx + dy * dy + dz * dz > r * r) continue;
+                        double along = dx * ux + dy * uy + dz * uz;
+                        if (Math.floorMod((int) Math.floor(along), 3) != 0 || grain(x, y, z, 0x61) > 0.55) continue;
+                        setOre(d, x, y, z, pick(grain(x, y, z, 0x62), metals, weights), 6, OreGenesis::granite);
+                    }
+                }
+            }
+        });
+    }
+
+    private static final int MVT_CELL = 80, MVT_REACH = 12;
+
+    /**
+     * Mississippi Valley-type deposits: basin brines that sank through platform limestone and dropped lead, zinc and
+     * fluorite in the caverns and breccias they dissolved -- the Tri-State district, Pine Point. Pods in the
+     * carbonate beds of platforms and forelands, some tens of blocks down.
+     */
+    private static void mvtPods(Deposit d) {
+        String[] metals = {"zinc", "lead", "fluorite", "silver"};
+        double[] weights = {0.45, 0.35, 0.15, 0.05};
+        d.cells(MVT_CELL, MVT_REACH, 0x3171L, (cellX, cellZ, h) -> {
+            if (die(h, 0) > 0.6) return;
+            int ax = cellX + (int) (die(h, 1) * MVT_CELL), az = cellZ + (int) (die(h, 2) * MVT_CELL);
+            Lithology.Column col = d.column(ax, az);
+            if (col == null || (col.setting() != Lithology.Setting.PLATFORM && col.setting() != Lithology.Setting.FORELAND)) return;
+            // In a carbonate bed: the first marble or limestone some way down, where the brines found it.
+            int g = d.base(ax, az), found = Integer.MIN_VALUE;
+            for (int y = g - 8; y > g - 90; y--) {
+                Lithology.Rock r = Lithology.rockAt(d.rockSeed, col, ax, y, az, g);
+                if (r == Lithology.Rock.MARBLE || r == Lithology.Rock.CALCITE) {
+                    found = y;
+                    break;
+                }
+            }
+            if (found == Integer.MIN_VALUE) return;
+            int cy = found - 2;
+            int rx = 7 + (int) (die(h, 4) * 6), rz = 7 + (int) (die(h, 5) * 6), ry = 3 + (int) (die(h, 6) * 3);
+            for (int x = d.minX(ax - rx); x <= d.maxX(ax + rx); x++) {
+                for (int z = d.minZ(az - rz); z <= d.maxZ(az + rz); z++) {
+                    for (int y = cy - ry; y <= cy + ry; y++) {
+                        double ex = (x - ax) / (double) rx, ey = (y - cy) / (double) ry, ez = (z - az) / (double) rz;
+                        if (ex * ex + ey * ey + ez * ez > 1.0 + 0.3 * noise3D(x, y, z, 5.0, 5.0) || grain(x, y, z, 0x71) > 0.35) continue;
+                        setOre(d, x, y, z, pick(grain(x, y, z, 0x72), metals, weights), 8, OreGenesis::carbonate);
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Laterite: under hot, wet uplands the rock rots to its least soluble part, and what is left a few blocks down is
+     * bauxite, aluminium's ore -- or, over peridotite, the nickel of New Caledonia. A blanket two or three blocks
+     * thick in patches under the soil, where the climate is hot and wet enough.
+     */
+    private static void laterites(Deposit d) {
+        BlockPos mid = new BlockPos(d.x0 + 8, 64, d.z0 + 8);
+        net.minecraft.world.level.biome.Biome b = d.level.getBiome(mid).value();
+        if (b.getBaseTemperature() < 0.9 || b.getModifiedClimateSettings().downfall() < 0.6) return;
+        for (int x = d.x0; x < d.x0 + 16; x++) {
+            for (int z = d.z0; z < d.z0 + 16; z++) {
+                if (noise(x + 5521, z - 5521, 40.0) < 0.5) continue;
+                int g = d.ground(x, z);
+                if (g == Integer.MIN_VALUE || g < d.level.getSeaLevel() + 4) continue;
+                Lithology.Column col = d.column(x, z);
+                Lithology.Rock under = col == null ? Lithology.Rock.STONE : Lithology.rockAt(d.rockSeed, col, x, g - 12, z, g);
+                String metal = under == Lithology.Rock.PERIDOTITE || under == Lithology.Rock.SERPENTINITE ? "nickel" : "aluminum";
+                for (int y = g - 4; y <= g - 2; y++) {
+                    if (grain(x, y, z, 0x81) > 0.5) continue;
+                    setOre(d, x, y, z, metal, 2, s -> sediment(s) || s.is(BlockTags.BASE_STONE_OVERWORLD) || ultramafic(s));
+                }
+            }
+        }
+    }
+
+    private static final int CHROMITE_CELL = 64, CHROMITE_REACH = 8;
+
+    /**
+     * Podiform chromitite: lenses of chromite settled out in the mantle rock of an ocean floor now thrust onto land
+     * (an ophiolite: Oman's, Cyprus's, Turkey's Guleman), with the platinum metals -- platinum, osmium, iridium --
+     * caught in it. Pods in serpentinite and peridotite.
+     */
+    private static void chromitites(Deposit d) {
+        String[] metals = {"chromium", "platinum", "osmium", "iridium"};
+        double[] weights = {0.9, 0.05, 0.03, 0.02};
+        d.cells(CHROMITE_CELL, CHROMITE_REACH, 0x4C12L, (cellX, cellZ, h) -> {
+            int ax = cellX + (int) (die(h, 1) * CHROMITE_CELL), az = cellZ + (int) (die(h, 2) * CHROMITE_CELL);
+            Lithology.Column col = d.column(ax, az);
+            if (col == null) return;
+            int g = d.base(ax, az), cy = g - 15 - (int) (die(h, 3) * 40);
+            Lithology.Rock host = Lithology.rockAt(d.rockSeed, col, ax, cy, az, g);
+            if (host != Lithology.Rock.SERPENTINITE && host != Lithology.Rock.PERIDOTITE) return;
+            boolean alongX = die(h, 4) < 0.5;
+            int rx = alongX ? 6 : 3, rz = alongX ? 3 : 6, ry = 2;
+            for (int x = d.minX(ax - rx); x <= d.maxX(ax + rx); x++) {
+                for (int z = d.minZ(az - rz); z <= d.maxZ(az + rz); z++) {
+                    for (int y = cy - ry; y <= cy + ry; y++) {
+                        double ex = (x - ax) / (double) rx, ey = (y - cy) / (double) ry, ez = (z - az) / (double) rz;
+                        if (ex * ex + ey * ey + ez * ez > 1.0 || grain(x, y, z, 0x91) > 0.5) continue;
+                        setOre(d, x, y, z, pick(grain(x, y, z, 0x92), metals, weights), 6, OreGenesis::ultramafic);
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Placers: waves winnow a beach and leave its heaviest grains behind, dark bands of ilmenite and rutile
+     * (titanium) and of monazite with its thorium -- Kerala's black sands, Western Australia's. In old beach sand now
+     * sandstone, a couple of blocks under the shore.
+     */
+    private static void placers(Deposit d) {
+        int sea = d.level.getSeaLevel();
+        String[] metals = {"titanium", "monazite", "thorium", "tin"};
+        double[] weights = {0.6, 0.25, 0.1, 0.05};
+        for (int x = d.x0; x < d.x0 + 16; x++) {
+            for (int z = d.z0; z < d.z0 + 16; z++) {
+                if (noise(x - 3307, z + 3307, 24.0) < 0.6) continue;
+                int g = d.ground(x, z);
+                if (g == Integer.MIN_VALUE || g < sea - 3 || g > sea + 2) continue;
+                BlockState top = d.level.getBlockState(new BlockPos(x, g, z));
+                if (!top.is(BlockTags.SAND)) continue;
+                for (int y = g - 3; y <= g - 2; y++) {
+                    if (grain(x, y, z, 0xA1) > 0.3) continue;
+                    setOre(d, x, y, z, pick(grain(x, y, z, 0xA2), metals, weights), 2,
+                            s -> s.is(Blocks.SANDSTONE) || s.is(BlockTags.SAND) || s.is(Blocks.STONE));
+                }
+            }
+        }
+    }
+
+    /**
+     * Evaporites: in a basin with no way out under a desert sky, the water goes up and its salt stays -- halite in
+     * thick beds, potash (sylvite) on top of it, the last to crystallise, and saltpetre in the crust near the
+     * surface, as in the Atacama.
+     */
+    private static void evaporites(Deposit d) {
+        BlockPos mid = new BlockPos(d.x0 + 8, 64, d.z0 + 8);
+        net.minecraft.world.level.biome.Biome b = d.level.getBiome(mid).value();
+        if (b.getBaseTemperature() < 1.5 || b.getModifiedClimateSettings().downfall() > 0.15) return;
+        for (int x = d.x0; x < d.x0 + 16; x++) {
+            for (int z = d.z0; z < d.z0 + 16; z++) {
+                if (noise(x + 7703, z + 7703, 64.0) < 0.6) continue;
+                int g = d.ground(x, z);
+                if (g == Integer.MIN_VALUE) continue;
+                for (int y = g - 9; y <= g - 1; y++) {
+                    int depth = g - y;
+                    String metal = depth >= 6 ? "salt" : depth == 5 ? "potassiumchloride" : depth <= 2 ? "saltpeter" : null;
+                    if (metal == null) continue;
+                    double keep = metal.equals("salt") ? 0.6 : metal.equals("potassiumchloride") ? 0.4 : 0.12;
+                    if (grain(x, y, z, 0xB1) > keep) continue;
+                    if (metal.equals("saltpeter") && modOre("saltpeter", y) == null) metal = "nitrate";
+                    setOre(d, x, y, z, metal, 1, OreGenesis::sediment);
+                }
+            }
+        }
+    }
+
+    private static final int ROLL_CELL = 96, ROLL_REACH = 16;
+
+    /**
+     * Roll fronts: oxygenated groundwater carries uranium down a sandstone bed until it meets reducing ground, where the
+     * uranium drops out along a curved front -- the ores of Wyoming and Kazakhstan. A crescent in the sandstone beds
+     * of a platform or foreland.
+     */
+    private static void rollFronts(Deposit d) {
+        d.cells(ROLL_CELL, ROLL_REACH, 0x55A7L, (cellX, cellZ, h) -> {
+            if (die(h, 0) > 0.5) return;
+            int ax = cellX + (int) (die(h, 1) * ROLL_CELL), az = cellZ + (int) (die(h, 2) * ROLL_CELL);
+            Lithology.Column col = d.column(ax, az);
+            if (col == null || (col.setting() != Lithology.Setting.PLATFORM && col.setting() != Lithology.Setting.FORELAND)) return;
+            int g = d.base(ax, az), found = Integer.MIN_VALUE;
+            for (int y = g - 10; y > g - 60; y -= 2) {
+                Lithology.Rock r = Lithology.rockAt(d.rockSeed, col, ax, y, az, g);
+                if (r == Lithology.Rock.SANDSTONE || r == Lithology.Rock.RED_BEDS) {
+                    found = y;
+                    break;
+                }
+            }
+            if (found == Integer.MIN_VALUE) return;
+            int cy = found;
+            double facing = die(h, 3) * Math.PI * 2;
+            int radius = 8 + (int) (die(h, 4) * 7);
+            for (int x = d.minX(ax - radius - 2); x <= d.maxX(ax + radius + 2); x++) {
+                for (int z = d.minZ(az - radius - 2); z <= d.maxZ(az + radius + 2); z++) {
+                    double dx = x - ax, dz = z - az, dist = Math.sqrt(dx * dx + dz * dz);
+                    if (Math.abs(dist - radius) > 1.5) continue;
+                    double a = Math.atan2(dz, dx) - facing;
+                    if (Math.cos(a) < 0.1) continue;                       // the front's half, the side it rolls towards
+                    for (int y = cy - 1; y <= cy + 1; y++) {
+                        if (grain(x, y, z, 0xC1) > 0.4) continue;
+                        setOre(d, x, y, z, "uranium", 8, s -> s.is(Blocks.SANDSTONE) || s.is(Blocks.RED_SANDSTONE)
+                                || s.is(BlockTags.TERRACOTTA) || s.is(Blocks.STONE));
+                    }
+                }
+            }
+        });
+    }
+
     private static boolean isHostRock(BlockState s) {
         return s.is(BlockTags.BASE_STONE_OVERWORLD)
                 || s.is(Blocks.CALCITE) || s.is(Blocks.BLACKSTONE) || s.is(Blocks.BASALT)

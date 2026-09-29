@@ -19,4 +19,8 @@ public final class ModBiomeModifiers {
     /** Another mod's animals in the mod's biomes, when that mod is there. See {@link OptionalSpawns}. */
     public static final RegistryObject<Codec<OptionalSpawns>> OPTIONAL_SPAWNS =
             SERIALIZERS.register("optional_spawns", () -> OptionalSpawns.CODEC);
+
+    /** One ore of a kind: other mods' features placing an ore the kept mod already places there. See {@link com.jeladastudios.ftsgeology.compat.OreUnification}. */
+    public static final RegistryObject<Codec<com.jeladastudios.ftsgeology.compat.OreUnification.Remove>> UNIFY_ORES =
+            SERIALIZERS.register("unify_ores", () -> com.jeladastudios.ftsgeology.compat.OreUnification.Remove.CODEC);
 }

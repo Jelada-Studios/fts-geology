@@ -185,6 +185,10 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue DH_TERRAIN;
     public static final ForgeConfigSpec.BooleanValue REMOVED_MOD_BLOCKS;     // a removed mod's rock stays rock
     public static final ForgeConfigSpec.ConfigValue<java.util.List<? extends String>> REMOVED_MOD_BLOCK_RULES;
+    public static final ForgeConfigSpec.BooleanValue UNIFY_ORES;                 // one ore of a kind in new chunks
+    public static final ForgeConfigSpec.ConfigValue<java.util.List<? extends String>> UNIFY_ORES_ORDER;
+    public static final ForgeConfigSpec.BooleanValue UNIFY_EXISTING_CHUNKS;
+    public static final ForgeConfigSpec.BooleanValue GEOLOGICAL_MOD_ORES;         // mod ores in their deposits
     public static final ForgeConfigSpec.BooleanValue VERBOSE_LOG;            // default OFF
 
     // --- Hydrology (groundwater) ---------------------------------------------
@@ -1002,6 +1006,28 @@ public final class GeyserConfig {
                         "[\"jurassicreborn:*=rock\", \"somemod:glowing_egg=air\"].")
                 .defineListAllowEmpty(java.util.List.of("removedModBlockRules"), java.util.List::of,
                         o -> o instanceof String s && s.indexOf(':') > 0 && s.indexOf('=') > s.indexOf(':'));
+        UNIFY_ORES = b
+                .comment("One ore of a kind: where several mods add the same ore (tin, lead, silver, uranium and so on, by the",
+                        "forge:ores/ tags), new chunks have only one of them, the first mod's in oreUnifyOrder, in its stone and",
+                        "deepslate forms, and the others' ore of it is not placed a second time where that mod places its own,",
+                        "so there is as much of it as one mod would put. What is mined drops that mod's ore. Ingots and the",
+                        "like are not made one: a mod such as Almost Unified does that. Not in TerraFirmaCraft.")
+                .define("unifyOres", true);
+        UNIFY_ORES_ORDER = b
+                .comment("Which mod's ore is kept, first first; mods not named come after, by name.")
+                .defineListAllowEmpty(java.util.List.of("oreUnifyOrder"), () -> java.util.List.of("minecraft", "alltheores", "create",
+                        "immersiveengineering", "electrodynamics", "mekanism", "thermal"), o -> o instanceof String);
+        GEOLOGICAL_MOD_ORES = b
+                .comment("Other mods' ores where the geology would put them, in the mod's own world types: tin, tungsten and",
+                        "lithium in greisen at the roofs of granite bodies; lead, zinc, silver and fluorite in pods in platform",
+                        "limestone; bauxite (aluminium) and lateritic nickel under hot wet uplands; chromite with platinum,",
+                        "osmium and iridium in serpentinite; titanium, monazite and thorium in old beach sands; salt, potash and",
+                        "saltpetre in desert basins; uranium in roll fronts in sandstone. Those mods' own ore of these is not",
+                        "placed then. Off by default: a pack that relies on finding them everywhere will find them rarer.")
+                .define("geologicalModOres", false);
+        UNIFY_EXISTING_CHUNKS = b
+                .comment("Also make the ores one in chunks made before, as each is next loaded. Off: those keep what they had.")
+                .define("unifyOresInExistingChunks", false);
         b.pop();
 
         b.push("diagnostics");

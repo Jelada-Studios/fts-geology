@@ -97,6 +97,9 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.instrument.SeismicNetwork.clear();
         if (com.jeladastudios.ftsgeology.quake.FaultClocks.rolled() > 0) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.quake.FaultClocks.summary());
         com.jeladastudios.ftsgeology.quake.FaultClocks.clear();
+        String modOres = com.jeladastudios.ftsgeology.worldgen.OreGenesis.modOresSummary();
+        if (modOres != null) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", modOres);
+        com.jeladastudios.ftsgeology.compat.OreUnification.clear();
         com.jeladastudios.ftsgeology.command.SiteTeleport.clear();
         com.jeladastudios.ftsgeology.blockentity.GeothermalTurbineBlockEntity.clearAll();
         com.jeladastudios.ftsgeology.compat.CreateRivers.clear();

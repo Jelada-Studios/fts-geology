@@ -29,6 +29,12 @@ public final class GeologyWorld {
 
     private static final Map<String, Boolean> OWN = new ConcurrentHashMap<>();
 
+    /** Whether a generator is the mod's own world type's, before any level is made from it. */
+    public static boolean isOwn(net.minecraft.world.level.chunk.ChunkGenerator generator) {
+        return generator instanceof NoiseBasedChunkGenerator noise
+                && (noise.generatorSettings().is(SETTINGS) || noise.generatorSettings().is(SETTINGS_TALL));
+    }
+
     public static boolean isOwn(ServerLevel level) {
         return OWN.computeIfAbsent(level.dimension().location().toString(), k -> {
             boolean own = level.getChunkSource().getGenerator() instanceof NoiseBasedChunkGenerator noise
