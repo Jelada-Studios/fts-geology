@@ -163,7 +163,6 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue AFTERSHOCK_DAYS;
     public static final ForgeConfigSpec.DoubleValue FORESHOCK_SHARE;
     public static final ForgeConfigSpec.IntValue QUAKE_AMBIENT_INTERVAL;   // ticks between ambient rolls
-    public static final ForgeConfigSpec.IntValue QUAKE_SEARCH_RADIUS;      // how far from a player to look
     public static final ForgeConfigSpec.DoubleValue QUAKE_RECURRENCE_DAYS; // mean interval between ruptures
     public static final ForgeConfigSpec.IntValue QUAKE_MAX_FISSURE_DEPTH;  // divergent rift depth cap
     public static final ForgeConfigSpec.IntValue QUAKE_MAX_RUPTURE;        // cap on rupture length, blocks
@@ -874,26 +873,20 @@ public final class GeyserConfig {
                         "magnitudes smaller, comes before by one to five minutes.")
                 .defineInRange("foreshockShare", 0.3, 0.0, 1.0);
         QUAKE_AMBIENT_INTERVAL = b
-                .comment("Ticks between ambient earthquake rolls. 0 disables ambient quakes entirely",
-                        "(the /geology quake command still works).")
-                .defineInRange("quakeAmbientInterval", 6000, 0, 1728000);
-        QUAKE_SEARCH_RADIUS = b
-                .comment("How far from a player an ambient quake looks for a fault, in blocks.",
-                        "This is the knob that actually decides how often you feel one. Each roll",
-                        "picks a single random point inside this radius, and if that point is plate",
-                        "interior nothing happens at all - so a player who is not near a boundary can",
-                        "go a very long time without a quake however low the recurrence is set.",
-                        "Raise it to find faults further off; lower it to make quakes strictly local.")
-                .defineInRange("quakeSearchRadius", 128, 16, 2048);
+                .comment("Ticks between rolls of the faults' clocks. Every stretch of boundary within quakeFeltRange of a",
+                        "player or seismographRange of a seismograph is run on this far through its cycle at each roll;",
+                        "the rate of quakes does not depend on it, only how finely their times are drawn. 0 disables",
+                        "the world's own quakes entirely (the /geology quake command still works).")
+                .defineInRange("quakeAmbientInterval", 1200, 0, 1728000);
         QUAKE_RECURRENCE_DAYS = b
-                .comment("Average in-game days between ruptures on a fully stressed fault.",
-                        "Real faults rupture on a recurrence interval - decades to centuries - rather",
-                        "than at random every few minutes, and a quake you have to travel to and wait",
-                        "for is worth far more than one that happens constantly. Stress scales this:",
-                        "a locked boundary goes off closer to this figure, a sleepy one much less",
-                        "often. The /geology quake command still fires one instantly whenever you",
-                        "want to demonstrate or test.")
-                .defineInRange("quakeRecurrenceDays", 8.0, 0.05, 1000.0);
+                .comment("Average in-game days between quakes of magnitude 5 and up on each 256 blocks of a fully",
+                        "stressed boundary; a sleepier boundary goes less often, by its stress. Every stretch keeps its",
+                        "own clock (quiet after it breaks, more and more likely to go the longer it holds), and sizes",
+                        "follow Gutenberg-Richter up to the boundary's largest, so small quakes are felt near the fault",
+                        "and great ones far out. At 8: on a boundary one is felt every two or three days and one does",
+                        "damage every month or so; a thousand blocks off one is felt every ten to fifteen days, and",
+                        "a seismograph there records several a day. The /geology quake command fires one at once.")
+                .defineInRange("quakeRecurrenceDays", 8.0, 0.01, 1000.0);
         TICK_BUDGET_MS = b
                 .comment("Milliseconds the WHOLE MOD may spend on the server thread per tick.",
                         "A hard wall-clock brake shared by everything: the quake itself, deformation",

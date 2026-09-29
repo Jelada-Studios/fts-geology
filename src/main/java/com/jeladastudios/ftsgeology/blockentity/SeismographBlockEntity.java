@@ -134,6 +134,8 @@ public class SeismographBlockEntity extends BlockEntity {
         if (be.shake > 0 && now % 4L == 0L) be.scratch(server, pos);
 
         if (now % 20L != 0L) return;   // catching up is a once-a-second job
+        // The faults round a station keep breaking while nobody is near, so there is something for it to draw.
+        if (now % 1200L == 0L) com.jeladastudios.ftsgeology.quake.FaultClocks.station(server, pos);
         for (SeismicNetwork.Event e : SeismicNetwork.since(server.dimension(), be.seen)) {
             be.seen = Math.max(be.seen, e.id());
             be.consider(server, pos, state, e);

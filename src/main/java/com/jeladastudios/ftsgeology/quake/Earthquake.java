@@ -105,7 +105,6 @@ public final class Earthquake {
     public static boolean moving() {
         return !ACTIVE.isEmpty() || !PREPARING.isEmpty();
     }
-    private static int ambientTimer = 0;
 
     // === Public API =========================================================
 
@@ -415,45 +414,11 @@ public final class Earthquake {
     // === Ambient quakes =====================================================
 
     /**
-     * Occasionally ruptures a stressed fault near a player. Only ever fires where somebody is
-     * actually loaded in, and the chance is weighted by tectonic stress, so quiet plate interiors
-     * stay quiet and active boundaries do not.
+     * The world's own quakes: each stretch of boundary breaks on its own clock, felt wherever a player is near
+     * enough and heard by the seismographs further out; see {@link FaultClocks}.
      */
     private static void tickAmbient(TickEvent.ServerTickEvent event) {
-        int interval = GeyserConfig.QUAKE_AMBIENT_INTERVAL.get();
-        if (interval <= 0 || !GeyserConfig.QUAKES_ENABLED.get()) return;
-        if (++ambientTimer < interval) return;
-        ambientTimer = 0;
-
-        for (ServerLevel level : event.getServer().getAllLevels()) {
-            List<ServerPlayer> players = level.players();
-            if (players.isEmpty()) continue;
-            ServerPlayer p = players.get(level.random.nextInt(players.size()));
-
-            // Look for a fault a little way off, so the epicentre is nearby but not underfoot.
-            int reach = GeyserConfig.QUAKE_SEARCH_RADIUS.get();
-            int ox = level.random.nextInt(reach * 2 + 1) - reach;
-            int oz = level.random.nextInt(reach * 2 + 1) - reach;
-            int x = p.blockPosition().getX() + ox;
-            int z = p.blockPosition().getZ() + oz;
-            PlateSample s = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sample(level, x, z);
-            if (s.faultType() == FaultType.INTERIOR) continue;
-            // Recurrence, not a coin flip: the chance comes from a target interval in days, shorter
-            // on a highly stressed fault.
-            double days = GeyserConfig.QUAKE_RECURRENCE_DAYS.get() / Math.max(0.15, s.stress());
-            double rollsPerDay = 24000.0 / Math.max(1, interval);
-            if (level.random.nextDouble() > 1.0 / Math.max(1.0, days * rollsPerDay)) continue;
-
-            int y = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, x, z);
-            if (y == Integer.MIN_VALUE) continue;
-            BlockPos epi = new BlockPos(x, y, z);
-            double m = rollMagnitude(s.faultType(), s.stress(), level.random);
-            // A great earthquake may be announced minutes before by a smaller one on the same spot.
-            if (!Aftershocks.foreshock(level, epi, s.faultType(), m, s.faultStrikeX(), s.faultStrikeZ())) {
-                trigger(level, epi, s.faultType(), m, s.faultStrikeX(), s.faultStrikeZ());
-            }
-            return; // at most one ambient quake per roll
-        }
+        FaultClocks.tick(event.getServer());
     }
 
     // === Magnitude and depth ================================================
@@ -508,25 +473,28 @@ public final class Earthquake {
                                  double magnitude, double depthMetres, boolean aftershock) {
         // The magnitude is formatted here, not in the lang file: Minecraft's translation formatter
         // only understands %s, %d and positional %N$s, and throws on a %.1f.
+        String m = String.format(Locale.ROOT, "%.1f", magnitude);
+        Component kind = Component.translatable("quake.fts_geology.kind." + type.name().toLowerCase(Locale.ROOT));
         Component msg = Component.translatable(aftershock ? "message.fts_geology.aftershock" : "message.fts_geology.earthquake",
-                String.format(Locale.ROOT, "%.1f", magnitude), label(type), DepthScale.format(depthMetres))
-                .withStyle(ChatFormatting.RED);
+                m, kind, DepthScale.format(depthMetres)).withStyle(ChatFormatting.RED);
         double radius = 260 + magnitude * 60;
         double r2 = radius * radius;
         java.util.Set<ServerPlayer> told = new java.util.HashSet<>(FeltShaking.within(level, trace, magnitude));
         for (ServerPlayer p : level.players()) {
             if (p.distanceToSqr(at.getX() + 0.5, p.getY(), at.getZ() + 0.5) <= r2) told.add(p);
         }
-        for (ServerPlayer p : told) p.sendSystemMessage(msg);
+        for (ServerPlayer p : told) {
+            // Far out it says where: a great quake is felt thousands of blocks from where the ground broke.
+            int dx = at.getX() - p.getBlockX(), dz = at.getZ() - p.getBlockZ();
+            int d = (int) Math.round(Math.sqrt((double) dx * dx + (double) dz * dz));
+            p.sendSystemMessage(d < FAR ? msg : Component.translatable(
+                    aftershock ? "message.fts_geology.aftershock_far" : "message.fts_geology.earthquake_far", m, kind, d,
+                    Component.translatable("prospect.fts_geology.dir."
+                            + com.jeladastudios.ftsgeology.instrument.Prospecting.bearingOf(dx, dz)),
+                    DepthScale.format(depthMetres)).withStyle(ChatFormatting.RED));
+        }
     }
 
-    private static String label(FaultType type) {
-        return switch (type) {
-            case CONVERGENT_SUBDUCTION -> "subduction thrust";
-            case CONVERGENT_COLLISION -> "collision thrust";
-            case TRANSFORM -> "strike-slip";
-            case DIVERGENT -> "rift normal fault";
-            case INTERIOR -> "intraplate";
-        };
-    }
+    /** Blocks from where the ground broke past which the alert says how far and which way. */
+    private static final int FAR = 200;
 }
