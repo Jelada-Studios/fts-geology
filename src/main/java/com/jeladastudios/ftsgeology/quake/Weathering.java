@@ -241,7 +241,7 @@ public final class Weathering {
                 if (++job.pass >= PASSES) {
                     QUEUE.poll();
                     if (job.sweep) {
-                        if (job.debris > 0) com.jeladastudios.ftsgeology.util.Diagnostics.info("debris swept: {} loose pieces of buildings taken down over {} columns", job.debris, job.columns.length);
+                        if (job.debris + job.loose + job.felledBase.size() > 0) com.jeladastudios.ftsgeology.util.Diagnostics.info("debris swept: {} loose pieces of buildings, {} loose branches and {} trees standing on nothing taken down over {} columns", job.debris, job.loose, job.felledBase.size(), job.columns.length);
                         return;
                     }
                     com.jeladastudios.ftsgeology.util.Diagnostics.info("weathering finished: {} blocks moved over {} columns, {} trees felled, {} loose branches and {} loose pieces of buildings taken down, {} ms, longest tick {} ms",
@@ -277,7 +277,8 @@ public final class Weathering {
                     && GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get();
             boolean moved;
             if (job.sweep) {
-                moved = GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get() && looseDebris(level, cx, cz, job);
+                moved = looseWood(level, cx, cz, job);
+                if (GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get()) moved |= looseDebris(level, cx, cz, job);
             } else if (job.pass >= FINISH) {
                 moved = finish(level, cx, cz);
                 if (job.pass == PASSES - 1) {
@@ -669,6 +670,20 @@ public final class Weathering {
             if (job.woodHeld.contains(m.asLong()) || !isLooseWood(level.getBlockState(m))) continue;
             java.util.List<BlockPos> piece = woodPiece(level, m.immutable(), job.woodHeld);
             if (piece == null) continue;
+            if (piece.size() > LOOSE_MOST) {
+                // A whole tree whose rooted soil the ground took, standing on nothing: it comes down by Dynamic
+                // Trees' own felling, from its lowest wood. Where that cannot be worked out it is left.
+                BlockPos base = piece.get(0);
+                for (BlockPos p : piece) if (p.getY() < base.getY()) base = p;
+                if (com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.fell(level, base,
+                        Direction.Plane.HORIZONTAL.getRandomDirection(level.random))) {
+                    job.felledBase.put(key(base.getX(), base.getZ()), base.getY());
+                    took = true;
+                } else {
+                    for (BlockPos p : piece) job.woodHeld.add(p.asLong());
+                }
+                continue;
+            }
             for (BlockPos p : piece) QuakeWrites.set(level, p, Blocks.AIR.defaultBlockState());
             job.loose++;
             took = true;
@@ -683,8 +698,9 @@ public final class Weathering {
     }
 
     /**
-     * The wood joined to a place, if it is a loose piece; null where it reaches roots or ground, or wood already known
-     * to hold, or is too big to be anything but a tree. What was walked of a piece that holds is remembered as held: a
+     * The wood joined to a place, if it stands on nothing: a loose piece, or a whole tree whose roots are gone (bigger than
+     * {@link #LOOSE_MOST}); null where it reaches roots or ground, or wood already known to hold, or is bigger than a
+     * tree walk goes. What was walked of a piece that holds is remembered as held: a
      * later walk that meets it holds too, where treating it as already seen and going round it took a block of a
      * standing trunk, whose neighbours had all been walked, for a piece on its own.
      */
@@ -699,7 +715,8 @@ public final class Weathering {
         while (!queue.isEmpty() && !holds) {
             BlockPos p = queue.poll();
             piece.add(p);
-            if (piece.size() > LOOSE_MOST) {
+            // A body bigger than a branch is a tree: walked on, as far as a big tree goes, to find what it stands on.
+            if (piece.size() > TREE_WALK) {
                 holds = true;
                 break;
             }
