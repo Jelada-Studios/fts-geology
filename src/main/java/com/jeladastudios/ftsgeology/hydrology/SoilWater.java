@@ -139,11 +139,14 @@ public final class SoilWater {
         final short[] bare = new short[16], mud = new short[16];
         /** What plants could use of the root zone's water at the last look, 0 to 1. Not kept. */
         final float[] usable = new float[16];
+        /** The soil each cell was last taken for, or -1 before: a change settles the cell again (see advance). */
+        final byte[] kind = new byte[16];
         /** Blocks the wells round the chunk have lowered its water table by, at the last look. Not kept. */
         float lowered;
 
         Cells() {
             java.util.Arrays.fill(usable, 1f);
+            java.util.Arrays.fill(kind, (byte) -1);
         }
     }
 
@@ -178,7 +181,7 @@ public final class SoilWater {
         int v = tag.getInt("v");
         if (v != 1 && v != VERSION) return;
         int[] w = tag.getIntArray("w");
-        if (w.length != (v == 1 ? 80 : 144)) return;
+        if (v == 1 ? w.length != 80 : w.length != 144 && w.length != 160) return;
         Cells c = new Cells();
         for (int i = 0; i < 16; i++) {
             c.top[i] = w[i] / 10f;
@@ -191,6 +194,7 @@ public final class SoilWater {
             c.soak[i] = w[96 + i] / 10f;
             c.bare[i] = (short) w[112 + i];
             c.mud[i] = (short) w[128 + i];
+            if (w.length == 160) c.kind[i] = (byte) w[144 + i];
         }
         c.last = tag.getLong("t");
         c.depth = tag.getInt("d");
@@ -240,7 +244,7 @@ public final class SoilWater {
             if (c.leaving) CELLS.remove(k);
             return;
         }
-        int[] w = new int[144];
+        int[] w = new int[160];
         for (int i = 0; i < 16; i++) {
             w[i] = Math.round(c.top[i] * 10);
             w[16 + i] = Math.round(c.root[i] * 10);
@@ -251,6 +255,7 @@ public final class SoilWater {
             w[96 + i] = Math.round(c.soak[i] * 10);
             w[112 + i] = c.bare[i];
             w[128 + i] = c.mud[i];
+            w[144 + i] = c.kind[i];
         }
         CompoundTag tag = new CompoundTag();
         tag.putInt("v", VERSION);
@@ -362,8 +367,7 @@ public final class SoilWater {
             int x = p.getMinBlockX() + (i & 3) * 4 + 2, z = p.getMinBlockZ() + (i >> 2) * 4 + 2;
             int g = ground(level, x, z);
             if (g == Integer.MIN_VALUE) continue;
-            BlockState top = chunk.getBlockState(m.set(x, g, z));
-            Soil soil = soilOf(top, chunk.getBlockState(m.set(x, g + 1, z)));
+            Soil soil = cellSoil(chunk, x, g, z);
             if (soil == Soil.WATER) {
                 c.top[i] = c.root[i] = c.deep[i] = 0;
                 c.pond[i] = 0;
@@ -377,7 +381,12 @@ public final class SoilWater {
             double pet = evaporation(biome.value());
             // Snow counts as the rain it melts into: a tundra's ground is wet, not a desert's.
             boolean rains = biome.value().hasPrecipitation();
-            if (first) {
+            // Ground that has changed what it is (grass dug to stone, or a cell once taken for rock by a boulder at its
+            // middle) is settled again to what its new soil holds: its old water, in the old soil's measure, read wrong.
+            byte k = (byte) soil.ordinal();
+            boolean changed = c.kind[i] >= 0 && c.kind[i] != k;
+            c.kind[i] = k;
+            if (first || changed) {
                 spinUp(c, i, soil, pet, rains);
                 c.usable[i] = (float) soil.available(sat(c.root[i], soil.root));
                 continue;
@@ -469,7 +478,7 @@ public final class SoilWater {
             int x0 = p.getMinBlockX() + (i & 3) * 4, z0 = p.getMinBlockZ() + (i >> 2) * 4;
             int g = ground(level, x0 + 2, z0 + 2);
             Soil soil = g == Integer.MIN_VALUE ? Soil.NONE
-                    : soilOf(chunk.getBlockState(m.set(x0 + 2, g, z0 + 2)), chunk.getBlockState(m.set(x0 + 2, g + 1, z0 + 2)));
+                    : cellSoil(chunk, x0 + 2, g, z0 + 2);
             byte t = tintOf(soil, c.root[i]);
             if (t != c.tint[i]) {
                 c.tint[i] = t;
@@ -557,8 +566,15 @@ public final class SoilWater {
             int x = x0 + (b & 3), z = z0 + (b >> 2);
             int y = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15);
             m.set(x, y, z);
-            if (placed.contains(m.asLong())) continue;
             BlockState s = chunk.getBlockState(m);
+            // Snow lying on the ground is not the ground: taken for it, a column that died back under a snowfall was
+            // let go as no longer what was made there, and never grew back.
+            if (s.is(Blocks.SNOW)) {
+                m.move(net.minecraft.core.Direction.DOWN);
+                y--;
+                s = chunk.getBlockState(m);
+            }
+            if (placed.contains(m.asLong())) continue;
             BlockState to = switch (what) {
                 case DIE -> {
                     // Grass first, the costly look for water beside it only then: a dying cell's columns are all gone
@@ -580,6 +596,10 @@ public final class SoilWater {
                 continue;
             }
             if (what == Change.DIE) witherOver(level, chunk, m.above());
+            // Grass growing back under snow is the snowy grass the game would draw there.
+            if (to.hasProperty(net.minecraft.world.level.block.SnowyDirtBlock.SNOWY)) {
+                to = to.setValue(net.minecraft.world.level.block.SnowyDirtBlock.SNOWY, chunk.getBlockState(m.above()).is(Blocks.SNOW));
+            }
             level.setBlock(m.immutable(), to, net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
             done |= (short) (1 << b);
         }
@@ -802,6 +822,29 @@ public final class SoilWater {
         return com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, x, z);
     }
 
+    /**
+     * The ground a cell stands on, for how it holds water: its middle column's, unless that is bare rock standing out of
+     * what is mostly soil -- an outcrop -- when it is the soil most of its sixteen columns show. Taken from the middle
+     * column alone, a boulder in a meadow made the whole cell rock: its water gone in hours, its grass dying at the
+     * first dry spell.
+     */
+    static Soil cellSoil(LevelChunk chunk, int x, int g, int z) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        Soil middle = soilOf(chunk.getBlockState(m.set(x, g, z)), chunk.getBlockState(m.set(x, g + 1, z)));
+        if (middle != Soil.ROCK) return middle;
+        int[] n = new int[Soil.values().length];
+        int x0 = x & ~3, z0 = z & ~3;
+        for (int dx = 0; dx < 4; dx++) {
+            for (int dz = 0; dz < 4; dz++) {
+                int y = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, (x0 + dx) & 15, (z0 + dz) & 15);
+                n[soilOf(chunk.getBlockState(m.set(x0 + dx, y, z0 + dz)), chunk.getBlockState(m.set(x0 + dx, y + 1, z0 + dz))).ordinal()]++;
+            }
+        }
+        Soil best = Soil.ROCK;
+        for (Soil s : new Soil[]{Soil.LOAM, Soil.SAND, Soil.CLAY}) if (n[s.ordinal()] > n[best.ordinal()]) best = s;
+        return best;
+    }
+
     /** The ground a cell stands on, by its top block; what lies over it, if it is a fluid, makes it water. */
     static Soil soilOf(BlockState top, BlockState over) {
         if (!top.getFluidState().isEmpty() || !over.getFluidState().isEmpty()) return Soil.WATER;
@@ -836,7 +879,7 @@ public final class SoilWater {
             int cx = (x & ~3) + 2, cz = (z & ~3) + 2;
             int g = ground(level, cx, cz);
             if (g != Integer.MIN_VALUE) {
-                soil = soilOf(chunk.getBlockState(new BlockPos(cx, g, cz)), chunk.getBlockState(new BlockPos(cx, g + 1, cz)));
+                soil = cellSoil(chunk, cx, g, cz);
             }
         }
         double hours = (level.getGameTime() - c.last) * HOURS_PER_TICK;
