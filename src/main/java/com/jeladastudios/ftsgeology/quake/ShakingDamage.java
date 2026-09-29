@@ -240,6 +240,7 @@ public final class ShakingDamage {
         level.levelEvent(2001, pos, Block.getId(state));   // the crack and dust of it coming away
         level.setBlock(pos, state.getFluidState().createLegacyBlock(), Block.UPDATE_ALL);
         FallingBlockEntity.fall(level, pos.relative(side), state);
+        Collapse.touched(level, pos);
         KNOCKED.increment();
     }
 

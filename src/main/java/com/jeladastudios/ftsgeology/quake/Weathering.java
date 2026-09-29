@@ -6,6 +6,7 @@ import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceKey;
@@ -89,11 +90,23 @@ public final class Weathering {
         /** Dynamic Trees wood known to belong to a tree that stands, and the loose pieces of it taken down. */
         final LongOpenHashSet woodHeld = new LongOpenHashSet();
         int loose;
+        /** Blocks known to be joined to ground, and the loose pieces of buildings brought down. */
+        final LongOpenHashSet builtHeld = new LongOpenHashSet();
+        int debris;
+        /** When the last pass may start: the buildings still coming down have landed by then. */
+        long lastPassAt;
+        /** Only a sweep for pieces of buildings left in the air ({@link #sweep}): the ground is not touched. */
+        final boolean sweep;
 
         /** Bounding box, so {@link #pendingNear} does not walk every column each tick. Generous, never early. */
         final int minX, maxX, minZ, maxZ;
 
         Job(ResourceKey<Level> dimension, long[] columns, Long2IntMap excavated) {
+            this(dimension, columns, excavated, false);
+        }
+
+        Job(ResourceKey<Level> dimension, long[] columns, Long2IntMap excavated, boolean sweep) {
+            this.sweep = sweep;
             this.dimension = dimension;
             this.columns = columns;
             this.excavated = excavated;
@@ -226,15 +239,21 @@ public final class Weathering {
             if (job.cursor >= job.columns.length) {
                 job.cursor = 0;
                 if (++job.pass >= PASSES) {
-                    com.jeladastudios.ftsgeology.util.Diagnostics.info("weathering finished: {} blocks moved over {} columns, {} trees felled, {} loose branches taken down, {} ms, longest tick {} ms",
-                            job.moved, job.columns.length, job.felledBase.size(), job.loose, job.nanos / 1_000_000,
-                            job.worstNanos / 1_000_000);
                     QUEUE.poll();
+                    if (job.sweep) {
+                        if (job.debris > 0) com.jeladastudios.ftsgeology.util.Diagnostics.info("debris swept: {} loose pieces of buildings taken down over {} columns", job.debris, job.columns.length);
+                        return;
+                    }
+                    com.jeladastudios.ftsgeology.util.Diagnostics.info("weathering finished: {} blocks moved over {} columns, {} trees felled, {} loose branches and {} loose pieces of buildings taken down, {} ms, longest tick {} ms",
+                            job.moved, job.columns.length, job.felledBase.size(), job.loose, job.debris,
+                            job.nanos / 1_000_000, job.worstNanos / 1_000_000);
                     // The ground has settled: the rivers and lakes on it are laid again.
                     com.jeladastudios.ftsgeology.hydrology.RiverRepair.afterQuake(level, job.columns);
                     return;
                 }
             }
+            // The last pass takes down what was left in the air, so it waits for the buildings still coming down.
+            if (job.pass == PASSES - 1 && job.cursor == 0 && !lastPassReady(level, job)) return;
             long k = job.columns[job.cursor++];
             done++;
             int cx = (int) (k >> 32), cz = (int) k;
@@ -242,6 +261,7 @@ public final class Weathering {
             // Park rather than drop. Never force a load: the settling waits for the next visit,
             // exactly as parked deformation does.
             if (level.getChunkSource().getChunkNow(cx >> 4, cz >> 4) == null) {
+                if (job.sweep) continue;
                 Long2IntOpenHashMap park = PARKED.computeIfAbsent(
                         parkKey(job.dimension, cx >> 4, cz >> 4),
                         key -> {
@@ -256,9 +276,14 @@ public final class Weathering {
             boolean fallPass = (job.pass == 0 || job.pass == SECOND_FALL)
                     && GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get();
             boolean moved;
-            if (job.pass >= FINISH) {
+            if (job.sweep) {
+                moved = GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get() && looseDebris(level, cx, cz, job);
+            } else if (job.pass >= FINISH) {
                 moved = finish(level, cx, cz);
-                if (job.pass == PASSES - 1) moved |= looseWood(level, cx, cz, job);
+                if (job.pass == PASSES - 1) {
+                    moved |= looseWood(level, cx, cz, job);
+                    if (GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get()) moved |= looseDebris(level, cx, cz, job);
+                }
             } else if (fallPass) {
                 moved = reseat(level, cx, cz, job.excavated.get(k), job);
                 // After the rock has relaxed and reseat has run again: spires, hanging water.
@@ -701,6 +726,128 @@ public final class Weathering {
                             continue;
                         }
                         if (!isLooseWood(s)) continue;
+                        seen.add(k);
+                        queue.add(m.immutable());
+                    }
+                }
+            }
+        }
+        if (!holds) return piece;
+        held.addAll(seen);
+        return null;
+    }
+
+    /**
+     * Sweeps columns for pieces of buildings left in the air, and the columns beside them, once what came down there has
+     * landed: after the shaking brought blocks down where no rupture moved the ground, and so no settling runs.
+     */
+    public static void sweep(ServerLevel level, it.unimi.dsi.fastutil.longs.LongSet columns) {
+        if (columns.isEmpty()) return;
+        LongOpenHashSet around = new LongOpenHashSet();
+        for (long k : columns) {
+            int x = (int) (k >> 32), z = (int) k;
+            for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) around.add(key(x + dx, z + dz));
+        }
+        Job job = new Job(level.dimension(), around.toLongArray(), new Long2IntOpenHashMap(), true);
+        job.pass = PASSES - 1;
+        QUEUE.add(job);
+    }
+
+    public static long column(int x, int z) {
+        return key(x, z);
+    }
+
+    /** How long after the last building came down the last pass starts: what fell has landed by then. */
+    private static final int LANDED_TICKS = 60;
+
+    private static boolean lastPassReady(ServerLevel level, Job job) {
+        if (Collapse.busy()) {
+            job.lastPassAt = 0;
+            return false;
+        }
+        long now = level.getGameTime();
+        if (job.lastPassAt == 0) job.lastPassAt = now + LANDED_TICKS;
+        return now >= job.lastPassAt;
+    }
+
+    /** The most blocks a loose piece of a building has; a bigger piece is left standing, the way a shell stands. */
+    private static final int DEBRIS_MOST = 48;
+
+    /**
+     * Brings down the pieces of buildings the quake left in the air over a column: a village house's beam and the
+     * trapdoor on it, whose posts went down with the ground under them. A piece is what touches it, face, edge or corner;
+     * it is loose when none of it reaches the ground, a tree or a machine, and it is small. A piece with a block a
+     * player placed is left: a build may hang on purpose.
+     */
+    private static boolean looseDebris(ServerLevel level, int x, int z, Job job) {
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE) return false;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<it.unimi.dsi.fastutil.longs.LongSet> placed =
+                new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+        boolean took = false;
+        int roof = Math.min(g + STACK_LIMIT, level.getMaxBuildHeight() - 2);
+        for (int y = g + 1; y <= roof; y++) {
+            BlockState s = level.getBlockState(m.set(x, y, z));
+            if (s.isAir() || job.builtHeld.contains(m.asLong())) continue;
+            if (!EruptionHandler.isWorked(s) && !(s.is(BlockTags.LOGS)
+                    && !com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(s))) continue;
+            // A piece hangs from its lowest block: start only where there is nothing under.
+            BlockState under = level.getBlockState(m.set(x, y - 1, z));
+            if (!under.isAir() && !(under.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock)) continue;
+            List<BlockPos> piece = debrisPiece(level, new BlockPos(x, y, z), job.builtHeld, placed);
+            if (piece == null) continue;
+            Collapse.loose(level, piece);
+            job.debris++;
+            took = true;
+        }
+        return took;
+    }
+
+    /** The blocks touching a place, and touching them, if they are a loose piece; null where they hold. */
+    private static List<BlockPos> debrisPiece(ServerLevel level, BlockPos start, LongOpenHashSet held,
+                                              it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<it.unimi.dsi.fastutil.longs.LongSet> placed) {
+        List<BlockPos> piece = new java.util.ArrayList<>();
+        LongOpenHashSet seen = new LongOpenHashSet();
+        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+        queue.add(start);
+        seen.add(start.asLong());
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        boolean holds = false;
+        while (!queue.isEmpty() && !holds) {
+            BlockPos p = queue.poll();
+            BlockState s = level.getBlockState(p);
+            LongSet mine = placed.computeIfAbsent(ChunkPos.asLong(p.getX() >> 4, p.getZ() >> 4),
+                    c -> PlayerBuilt.inChunk(level, ChunkPos.getX(c), ChunkPos.getZ(c)));
+            if (mine.contains(p.asLong()) || QuakePlanner.machinery(s)
+                    || com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(s)) {
+                holds = true;
+                break;
+            }
+            piece.add(p);
+            if (piece.size() > DEBRIS_MOST) {
+                holds = true;
+                break;
+            }
+            // Edges and corners join as faces do: a gable of logs, or a roof of stairs, meets the course under it only
+            // at the edge, and taking its ridge for a piece on its own brought down the roofs of standing houses.
+            for (int dx = -1; dx <= 1 && !holds; dx++) {
+                for (int dy = -1; dy <= 1 && !holds; dy++) {
+                    for (int dz = -1; dz <= 1 && !holds; dz++) {
+                        m.set(p.getX() + dx, p.getY() + dy, p.getZ() + dz);
+                        long k = m.asLong();
+                        if (seen.contains(k)) continue;
+                        if (held.contains(k) || m.getY() <= level.getMinBuildHeight() || m.getY() >= level.getMaxBuildHeight()
+                                || !com.jeladastudios.ftsgeology.util.Loaded.at(level, m)) {
+                            holds = true;
+                            continue;
+                        }
+                        BlockState n = level.getBlockState(m);
+                        if (n.isAir() || n.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock) continue;
+                        if (ShakingDamage.ground(n)) {
+                            holds = true;
+                            continue;
+                        }
                         seen.add(k);
                         queue.add(m.immutable());
                     }

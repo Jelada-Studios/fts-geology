@@ -48,6 +48,9 @@ public final class Collapse {
 
     private static final PriorityQueue<Due> DUE = new PriorityQueue<>(Comparator.comparingLong(Due::at));
     private static int shownThisTick, shownThisEvent;
+
+    /** Columns something came down in since the last quiet, by dimension: swept for what it left hanging once all is down. */
+    private static final java.util.Map<ResourceKey<Level>, it.unimi.dsi.fastutil.longs.LongOpenHashSet> TOUCHED = new java.util.HashMap<>();
     private static long tick = Long.MIN_VALUE;
 
     /**
@@ -77,6 +80,13 @@ public final class Collapse {
         if (DUE.isEmpty()) {
             if (report) {
                 report = false;
+                // What the shaking brought down may have left a beam hanging where no rupture moved the ground to
+                // settle it: those columns are swept once it has all come down.
+                for (var e : TOUCHED.entrySet()) {
+                    ServerLevel level = server.getLevel(e.getKey());
+                    if (level != null) Weathering.sweep(level, e.getValue());
+                }
+                TOUCHED.clear();
                 com.jeladastudios.ftsgeology.util.Diagnostics.info("{}; {}", summary(), Structural.summary());
             }
             return;
@@ -141,9 +151,28 @@ public final class Collapse {
         return EruptionHandler.isWorked(s) && !TerrainProbe.isVegetation(s);
     }
 
+    /** A block came away here some other way (shaken off): the column is swept with the others once all is down. */
+    public static void touched(ServerLevel level, BlockPos p) {
+        TOUCHED.computeIfAbsent(level.dimension(), k -> new it.unimi.dsi.fastutil.longs.LongOpenHashSet())
+                .add(Weathering.column(p.getX(), p.getZ()));
+        report = true;
+    }
+
+    /** A loose piece of a building comes down where it hangs, its top first. */
+    public static void loose(ServerLevel level, List<BlockPos> piece) {
+        piece.sort(Comparator.comparingInt((BlockPos p) -> p.getY()).reversed());
+        for (BlockPos p : piece) down(level, p, level.getBlockState(p), 0, 0);
+    }
+
     /** One block comes down: falling, or broken where it stands. */
     public static void down(ServerLevel level, BlockPos p, BlockState s, double pushX, double pushZ) {
         if (s.isAir() || QuakePlanner.machinery(s)) return;
+        if (level.getServer().getTickCount() != tick) {
+            tick = level.getServer().getTickCount();
+            shownThisTick = 0;
+        }
+        TOUCHED.computeIfAbsent(level.dimension(), k -> new it.unimi.dsi.fastutil.longs.LongOpenHashSet())
+                .add(Weathering.column(p.getX(), p.getZ()));
         boolean full = s.isCollisionShapeFullBlock(level, p);
         if (s.hasBlockEntity() || !full || shownThisTick >= SHOWN_PER_TICK || shownThisEvent >= SHOWN) {
             // Contents spill, ornaments drop, and past what can be shown falling the block breaks where it is.
@@ -176,6 +205,7 @@ public final class Collapse {
 
     public static void clear() {
         DUE.clear();
+        TOUCHED.clear();
     }
 
     @SubscribeEvent
