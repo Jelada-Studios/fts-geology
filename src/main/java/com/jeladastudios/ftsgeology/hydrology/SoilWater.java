@@ -151,6 +151,8 @@ public final class SoilWater {
         final byte[] load = new byte[16];
         /** The ground's height at each cell's middle when its load was taken: ground built up or dug out takes it again. */
         final int[] loadGround = new int[16];
+        /** When water first stood two blocks and more over each cell's load, or 0: the rise has to hold. Not kept. */
+        final long[] riseSince = new long[16];
 
         Cells() {
             java.util.Arrays.fill(usable, 1f);
@@ -728,10 +730,13 @@ public final class SoilWater {
         return ok && !out.isEmpty() ? out : null;
     }
 
+    /** Ticks water has to stand over a cell's load before the roof under it is looked at. */
+    private static final long RISE_HOLDS = 6000;
+
     /**
      * The water standing over each cell's middle, against what stood there when the cell was first seen: water brought
-     * since weighs on any cave under it; and in karst, the wells' cone drawing the water down out of a cave takes away
-     * what held its roof up. Either is handed to {@link com.jeladastudios.ftsgeology.quake.RoofLoad}.
+     * since, and staying, weighs on any cave under it; and in karst, the wells' cone drawing the water down out of a
+     * cave takes away what held its roof up. Either is handed to {@link com.jeladastudios.ftsgeology.quake.RoofLoad}.
      */
     private static void loads(ServerLevel level, LevelChunk chunk, Cells c) {
         if (!GeyserConfig.WATER_LOAD_COLLAPSE.get()) return;
@@ -751,7 +756,14 @@ public final class SoilWater {
                 c.loadGround[i] = g;
                 continue;
             }
-            if (depth >= c.load[i] + 2) com.jeladastudios.ftsgeology.quake.RoofLoad.consider(level, x, z, depth - c.load[i], 0);
+            // A rise that holds, not water passing: a flood going by, another mod's water still finding its level.
+            if (depth >= c.load[i] + 2) {
+                long now = level.getGameTime();
+                if (c.riseSince[i] == 0) c.riseSince[i] = now;
+                else if (now - c.riseSince[i] >= RISE_HOLDS) com.jeladastudios.ftsgeology.quake.RoofLoad.consider(level, x, z, depth - c.load[i], 0);
+            } else {
+                c.riseSince[i] = 0;
+            }
             if (drawn) com.jeladastudios.ftsgeology.quake.RoofLoad.drawnDown(level, x, z, naturalTable, c.lowered);
         }
     }

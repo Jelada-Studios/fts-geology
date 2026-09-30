@@ -1126,7 +1126,8 @@ public final class GeyserConfig {
                 .comment("A cave roof may give way under water brought over it later -- a reservoir, a pond dug and filled --",
                         "or, in karst, once the wells round it have drawn the water down out of its cave: only a roof that",
                         "was nearly failing anyway, thin, wide and in soft or soluble rock. It drips and creaks a minute or",
-                        "two first. The lakes and rivers the world was made with are the load the roofs grew up under.")
+                        "two first. The lakes and rivers the world was made with are the load the roofs grew up under, and",
+                        "water that only passes (a flood, another mod's water finding its level) does not count.")
                 .define("waterLoadCollapsesCaves", true);
         DAMS = b
                 .comment("A river walled across fills up behind the wall, a layer at a time, as fast as the river brings water,",

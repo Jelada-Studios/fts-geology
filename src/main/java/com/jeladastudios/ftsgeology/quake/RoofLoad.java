@@ -33,7 +33,9 @@ import java.util.List;
  * which is how the obruks of the Konya plain open under the fields their wells water.</p>
  *
  * <p>So not everywhere: a lake the world was made with is the load the roof grew up under, and only water brought
- * later, or drawn away later, counts (the water at a place is taken as it first stood; see {@code SoilWater}). And
+ * later, or drawn away later, counts (the water at a place is taken as it first stood; see {@code SoilWater}) -- and
+ * only water that stays: it has to stand a while before the roof is looked at, and still stand when the roof would go,
+ * so a flood passing by or another mod's water finding its level brings nothing down. And
  * only a roof that was nearly failing anyway -- thin, wide, in soft or soluble rock -- goes: a thick roof, or granite,
  * holds a lake. A roof about to go warns first: water drips from it, it creaks and sheds grit, for a minute or two.
  * Then it comes down, and the water over it pours into the cave; where the roof was thin, the ground opens.</p>
@@ -50,14 +52,17 @@ public final class RoofLoad {
 
     /** Columns whose roof is going, to the tick it goes; overworld only, as the ground's water is. */
     private static final Long2LongOpenHashMap DUE = new Long2LongOpenHashMap();
+    /** Columns going under water brought over them, to the water that must still stand there when the roof goes. */
+    private static final it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap HOLD = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
     /** Columns looked at, to when. */
     private static final Long2LongOpenHashMap LOOKED = new Long2LongOpenHashMap();
-    private static long considered, warned, fell;
+    private static long considered, warned, fell, held;
 
     public static void clear() {
         DUE.clear();
         LOOKED.clear();
-        considered = warned = fell = 0;
+        HOLD.clear();
+        considered = warned = fell = held = 0;
     }
 
     private static boolean soluble(BlockState s) {
@@ -93,6 +98,8 @@ public final class RoofLoad {
         if (stress < 1.0) return;
         if (level.random.nextDouble() >= Mth.clamp((stress - 1.0) / 0.4, 0.15, 1.0)) return;
         DUE.put(k, now + WARN + level.random.nextInt(WARN_MORE));
+        // The roof goes only if the water is still there: half the rise gone again, and it holds.
+        if (water > 0) HOLD.put(k, Math.max(1, waterOver(level, x, z) - (int) Math.ceil(water / 2.0)));
         warned++;
         com.jeladastudios.ftsgeology.util.Diagnostics.info("roof load: a cave roof at {} {} (roof {}, span {}, {}) is giving way under {} blocks of water{}",
                 x, z, cave.roof(), span, roofRock.getBlock().getName().getString(), String.format(java.util.Locale.ROOT, "%.1f", water),
@@ -136,7 +143,13 @@ public final class RoofLoad {
         }
         for (long k : go) {
             DUE.remove(k);
-            fall(level, BlockPos.getX(k), BlockPos.getZ(k));
+            int x = BlockPos.getX(k), z = BlockPos.getZ(k), hold = HOLD.remove(k);
+            if (hold > 0 && waterOver(level, x, z) < hold) {
+                held++;
+                com.jeladastudios.ftsgeology.util.Diagnostics.info("roof load: the water over {} {} has gone down again; the roof holds", x, z);
+                continue;
+            }
+            fall(level, x, z);
         }
     }
 
@@ -214,8 +227,18 @@ public final class RoofLoad {
         return considered > 0;
     }
 
+    /** Blocks of water standing on the ground at a column. */
+    private static int waterOver(ServerLevel level, int x, int z) {
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE) return 0;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int d = 0;
+        while (d < 32 && level.getFluidState(m.set(x, g + 1 + d, z)).is(net.minecraft.tags.FluidTags.WATER)) d++;
+        return d;
+    }
+
     public static String summary() {
-        return String.format(java.util.Locale.ROOT, "roof load: %d columns looked at, %d roofs warned, %d came down, %d going",
-                considered, warned, fell, DUE.size());
+        return String.format(java.util.Locale.ROOT, "roof load: %d columns looked at, %d roofs warned, %d came down, %d held once the water went, %d going",
+                considered, warned, fell, held, DUE.size());
     }
 }
