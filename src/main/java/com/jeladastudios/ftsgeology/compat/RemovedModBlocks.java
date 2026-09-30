@@ -309,7 +309,8 @@ public final class RemovedModBlocks {
      * Closes the small holes a removed mod's blocks left in the ground, round a place: pockets of air of up to
      * {@link #POCKET} blocks that natural ground closes in on every side, and one-block niches in cave walls with
      * ground on five sides. They are filled with the rock round them. Only loaded ground under the surface, never
-     * where a player built; a pocket or niche the world made itself goes too, which does no harm.
+     * where a player built, nor a pocket shaped like a dug room or tunnel; a pocket or niche the world made itself goes
+     * too, which does no harm.
      */
     public static Filled fillVoids(net.minecraft.server.level.ServerLevel level, net.minecraft.core.BlockPos centre, int r) {
         int pockets = 0, blocks = 0, niches = 0;
@@ -370,8 +371,32 @@ public final class RemovedModBlocks {
                 }
             }
         }
-        if (sealed) return cells;
+        if (sealed && !dug(cells)) return cells;
         return null;
+    }
+
+    /**
+     * Whether a pocket reads as dug: a room or a tunnel a player cut, walled up since. What a removed mod leaves is the
+     * shape of its ore, its fossil or its crystal, ragged; a dug space stands on a flat floor, at least two blocks high,
+     * and fills the box round it.
+     */
+    private static boolean dug(java.util.List<net.minecraft.core.BlockPos> cells) {
+        int x0 = Integer.MAX_VALUE, y0 = Integer.MAX_VALUE, z0 = Integer.MAX_VALUE, x1 = Integer.MIN_VALUE, y1 = Integer.MIN_VALUE, z1 = Integer.MIN_VALUE;
+        for (net.minecraft.core.BlockPos p : cells) {
+            x0 = Math.min(x0, p.getX()); y0 = Math.min(y0, p.getY()); z0 = Math.min(z0, p.getZ());
+            x1 = Math.max(x1, p.getX()); y1 = Math.max(y1, p.getY()); z1 = Math.max(z1, p.getZ());
+        }
+        if (y1 - y0 < 1) return false;
+        int box = (x1 - x0 + 1) * (y1 - y0 + 1) * (z1 - z0 + 1);
+        if (cells.size() < 0.9 * box) return false;
+        // Every column of it reaches down to the same floor.
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet columns = new it.unimi.dsi.fastutil.longs.LongOpenHashSet(), floor = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+        for (net.minecraft.core.BlockPos p : cells) {
+            long c = net.minecraft.world.level.ChunkPos.asLong(p.getX(), p.getZ());
+            columns.add(c);
+            if (p.getY() == y0) floor.add(c);
+        }
+        return floor.size() == columns.size();
     }
 
     /** Whether an air block has natural ground on five sides and air on the sixth: a niche in a cave wall. */

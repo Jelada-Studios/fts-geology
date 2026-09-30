@@ -517,7 +517,8 @@ public final class EruptionHandler {
      * is ground and stays. {@link #isPlayerPlaced} answers the other way, for what an eruption must not wall over.
      */
     public static boolean isWorked(BlockState s) {
-        if (s.isAir() || !s.getFluidState().isEmpty()) return false;
+        // Water itself is not made; a trapdoor or a slab under water still is.
+        if (s.isAir() || s.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock) return false;
         Block b = s.getBlock();
         if (b instanceof net.minecraft.world.level.block.StairBlock || b instanceof net.minecraft.world.level.block.SlabBlock
                 || b instanceof net.minecraft.world.level.block.WallBlock || b instanceof net.minecraft.world.level.block.FenceBlock

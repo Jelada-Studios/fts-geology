@@ -800,6 +800,17 @@ public final class Weathering {
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return false;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        // A piece that is the top of its column -- a beam, a lone trapdoor -- is what the probe takes for the ground:
+        // the walk goes on down past what was built, and whatever hangs in the air it passed.
+        for (int steps = 0; steps < STACK_LIMIT && g > level.getMinBuildHeight(); steps++) {
+            BlockState s = level.getBlockState(m.set(x, g, z));
+            if (!(s.isAir() || !s.getFluidState().isEmpty() && !EruptionHandler.isWorked(s) || EruptionHandler.isWorked(s)
+                    || s.is(BlockTags.LOGS) && !com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(s)
+                    || TerrainProbe.isVegetation(s))) {
+                break;
+            }
+            g--;
+        }
         it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<it.unimi.dsi.fastutil.longs.LongSet> placed =
                 new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
         boolean took = false;

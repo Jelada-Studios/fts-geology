@@ -53,6 +53,11 @@ final class GeologyLodGenerator implements IDhApiWorldGenerator {
      * all but the biggest river, and the network would be traced over the whole far distance to say so.
      */
     private static final int RIVER_DETAIL = 4;
+    /**
+     * The coarsest detail at which lakes are drawn, from the parts of the network already worked out only: a lake is
+     * wide, and cut off where the rivers stop it left a straight edge across the water.
+     */
+    private static final int LAKE_DETAIL = 8;
     /** How deep the soil under the surface block is, and how steep ground must be to show bare rock. */
     private static final int SOIL = 3;
     private static final double BARE_SLOPE = 1.4;
@@ -155,9 +160,10 @@ final class GeologyLodGenerator implements IDhApiWorldGenerator {
         if (top < sea - 1) {
             water = sea;
         }
-        if (detail <= RIVER_DETAIL && RiverNetwork.ready()) {
-            RiverNetwork.At a = RiverNetwork.at(x, z);
-            if (a.distance() != Double.MAX_VALUE && !a.sunk() && (a.lake() || a.inChannel())) {
+        if (detail <= LAKE_DETAIL && RiverNetwork.ready()) {
+            boolean near = detail <= RIVER_DETAIL;
+            RiverNetwork.At a = near ? RiverNetwork.at(x, z) : RiverNetwork.builtOnly(() -> RiverNetwork.at(x, z));
+            if (a.distance() != Double.MAX_VALUE && !a.sunk() && (a.lake() || near && a.inChannel())) {
                 int w = (int) Math.floor(a.water()) + 1;
                 int bed = clamp((int) Math.floor(Math.min(a.bed(), a.water() - 1.0)));
                 if (w > bed + 1 && w > sea) {

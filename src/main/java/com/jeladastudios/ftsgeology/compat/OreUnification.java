@@ -70,6 +70,7 @@ public final class OreUnification {
         replace = null;
         strip = Map.of();
         geoReplace = null;
+        BY_STATE.clear();
         kept = Map.of();
         metalOf = Map.of();
     }
@@ -238,20 +239,35 @@ public final class OreUnification {
         return m;
     }
 
+    /** Every state of each replaced block to what it becomes, looked up by identity: the chunk pass reads each block once. */
+    private static final Map<Map<Block, BlockState>, it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap<BlockState, BlockState>> BY_STATE =
+            java.util.Collections.synchronizedMap(new java.util.IdentityHashMap<>());
+
+    private static it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap<BlockState, BlockState> byState(Map<Block, BlockState> blocks) {
+        return BY_STATE.computeIfAbsent(blocks, b -> {
+            var m = new it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap<BlockState, BlockState>();
+            for (Map.Entry<Block, BlockState> e : b.entrySet()) {
+                for (BlockState s : e.getKey().getStateDefinition().getPossibleStates()) m.put(s, e.getValue());
+            }
+            return m;
+        });
+    }
+
     @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel level) || !(event.getChunk() instanceof LevelChunk chunk)) return;
         boolean geo = event.isNewChunk() && net.minecraft.world.level.Level.OVERWORLD.equals(level.dimension()) && geological();
         if (!geo && (!on() || (!event.isNewChunk() && !GeyserConfig.UNIFY_EXISTING_CHUNKS.get()))) return;
-        Map<Block, BlockState> r = geo ? geoReplacements() : replacements();
-        if (r.isEmpty()) return;
+        Map<Block, BlockState> blocks = geo ? geoReplacements() : replacements();
+        if (blocks.isEmpty()) return;
+        it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap<BlockState, BlockState> r = byState(blocks);
         boolean changed = false;
         for (LevelChunkSection section : chunk.getSections()) {
-            if (section.hasOnlyAir() || !section.getStates().maybeHas(s -> r.containsKey(s.getBlock()))) continue;
+            if (section.hasOnlyAir() || !section.getStates().maybeHas(r::containsKey)) continue;
             for (int y = 0; y < 16; y++) {
                 for (int z = 0; z < 16; z++) {
                     for (int x = 0; x < 16; x++) {
-                        BlockState to = r.get(section.getBlockState(x, y, z).getBlock());
+                        BlockState to = r.get(section.getBlockState(x, y, z));
                         if (to == null) continue;
                         section.setBlockState(x, y, z, to, false);
                         changed = true;
