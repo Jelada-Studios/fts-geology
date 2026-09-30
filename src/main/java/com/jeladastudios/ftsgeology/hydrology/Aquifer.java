@@ -112,7 +112,8 @@ public final class Aquifer {
                 double u = rr * rr * rock.yield / (t2 * dt);
                 s += c[1] / (4 * Math.PI * rock.transmissivity) * wellFunction(u);
             }
-            return Math.max(0, s);
+            // A recharge (a negative rate) raises the water back; the sum over all wells is kept from going over its level.
+            return s;
         }
     }
 
@@ -206,6 +207,41 @@ public final class Aquifer {
         w.drawn += cubicMetres;
     }
 
+    /**
+     * Water soaking down into the ground at a column, in cubic metres, that reaches the aquifer a well nearby is drawing
+     * on: it goes back in as that well's water taken out does, a well run backwards at the spot (one to a sixteen-block
+     * square, at the depth the well draws from), and the cone fills in by as much. Where no well draws within reach the
+     * ground's own water ({@link SoilWater}) is all there is to it.
+     */
+    public static void recharge(ServerLevel level, int x, int z, double cubicMetres) {
+        if (!GeyserConfig.SOIL_WATER.get() || !Level.OVERWORLD.equals(level.dimension()) || cubicMetres <= 0) return;
+        Wells ws = level.getDataStorage().get(Wells::load, "fts_geology_wells");
+        if (ws == null || ws.byPos.isEmpty()) return;
+        Well near = null;
+        long nearKey = 0;
+        double best = REACH * REACH;
+        for (var e : ws.byPos.long2ObjectEntrySet()) {
+            Well w = e.getValue();
+            if (w.rate <= 0) continue;
+            double dx = w.x - x, dz = w.z - z, r2 = dx * dx + dz * dz;
+            if (r2 < best) {
+                best = r2;
+                near = w;
+                nearKey = e.getLongKey();
+            }
+        }
+        if (near == null) return;
+        long at = BlockPos.asLong((x & ~15) + 8, BlockPos.getY(nearKey), (z & ~15) + 8);
+        Well r = ws.byPos.get(at);
+        if (r == null) {
+            r = new Well((x & ~15) + 8, (z & ~15) + 8, near.rock);
+            ws.byPos.put(at, r);
+            ws.setDirty();
+        }
+        if (r.windowStart == Long.MIN_VALUE) r.windowStart = level.getGameTime();
+        r.drawn -= cubicMetres;
+    }
+
     /** Each window, a well's measured rate goes into its story where it has changed; wells long stopped are let go. */
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
@@ -229,7 +265,7 @@ public final class Aquifer {
             if (now - w.windowStart < WINDOW) continue;
             double rate = w.drawn / ((now - w.windowStart) * SoilWater.HOURS_PER_TICK);
             w.drawn = 0;
-            w.windowStart = rate > 0 ? now : Long.MIN_VALUE;
+            w.windowStart = rate != 0 ? now : Long.MIN_VALUE;
             if (Math.abs(rate - w.rate) > 0.1 * Math.max(rate, w.rate) + 1e-6) {
                 change(w, h, rate - w.rate);
                 w.rate = rate;
@@ -272,7 +308,7 @@ public final class Aquifer {
             if (r2 > REACH * REACH || w.story.isEmpty()) continue;
             s += w.drawdown(Math.sqrt(r2), h);
         }
-        return s;
+        return Math.max(0, s);
     }
 
     /** How fast a well draws now, in cubic metres an hour of the ground's time, as last measured; 0 if not kept. */

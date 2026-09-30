@@ -196,6 +196,9 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue RIVERS_REFILL;          // lost river water comes back
     public static final ForgeConfigSpec.BooleanValue SOIL_WATER;             // the ground's water, kept per chunk
     public static final ForgeConfigSpec.BooleanValue SOIL_WATER_GROUND;      // grass colour, rain-fed farmland
+    public static final ForgeConfigSpec.BooleanValue SEA_WATER_SALTY;        // sea water waters no field
+    public static final ForgeConfigSpec.BooleanValue DAMS;                   // dammed rivers fill; weak dams break
+    public static final ForgeConfigSpec.BooleanValue WATER_LOAD_COLLAPSE;    // cave roofs under new water, drained karst
     public static final ForgeConfigSpec.BooleanValue KARST;                  // rivers sink, caves, sinkholes
     public static final ForgeConfigSpec.BooleanValue WATER_TABLE_ENABLED;
     public static final ForgeConfigSpec.DoubleValue WATER_TABLE_SUBDUAL;      // relief it copies, 0..1
@@ -1119,6 +1122,23 @@ public final class GeyserConfig {
                         "goes to mud in its hollows and dries out again. /geology water weather dry|wet <days>",
                         "shows what a drought or a wet spell does, without waiting. Off by default while it is new.")
                 .define("soilWaterChangesGround", false);
+        WATER_LOAD_COLLAPSE = b
+                .comment("A cave roof may give way under water brought over it later -- a reservoir, a pond dug and filled --",
+                        "or, in karst, once the wells round it have drawn the water down out of its cave: only a roof that",
+                        "was nearly failing anyway, thin, wide and in soft or soluble rock. It drips and creaks a minute or",
+                        "two first. The lakes and rivers the world was made with are the load the roofs grew up under.")
+                .define("waterLoadCollapsesCaves", true);
+        DAMS = b
+                .comment("A river walled across fills up behind the wall, a layer at a time, as fast as the river brings water,",
+                        "up to the top of the wall or the lowest gap in the valley; a wall too thin for the water it holds",
+                        "(stone about as thick as the water is high, concrete a little over half, earth three times, an earth",
+                        "bank not overtopped) leaks, creaks and breaks, and the reservoir runs out through the gap.")
+                .define("dams", true);
+        SEA_WATER_SALTY = b
+                .comment("The sea is salt. Water at sea level in an ocean or on a beach waters no field, and a bucket dipped",
+                        "in it comes up with sea water, which waters none wherever it is poured. River, lake, well and rain",
+                        "water are fresh and water fields as ever.")
+                .define("seaWaterSalty", true);
         KARST = b
                 .comment("Karst, in the mod's own world types: where marble or calcite lies close under a plateau's",
                         "flat beds, a platform's or a foreland's, in the regions that have it, the ground takes its",

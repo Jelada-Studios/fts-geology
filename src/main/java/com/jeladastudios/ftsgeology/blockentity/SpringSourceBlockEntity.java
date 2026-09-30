@@ -168,6 +168,8 @@ public class SpringSourceBlockEntity extends BlockEntity {
 
         if (be.dormant) return;
         if (be.adoptOldSave(server)) return;
+        // Before the pool's health is read: a pool drawn dry is not a fouled one to be flushed back in.
+        if (be.drawnDry(server)) return;
 
         // A pool somebody has thrown a few blocks into is cleaned out and rebuilt at the age it had
         // reached. Only a pool that is mostly buried counts as a blocked outlet.
@@ -231,6 +233,38 @@ public class SpringSourceBlockEntity extends BlockEntity {
                     be.vent(), be.stage, be.maxStage, HotSpringShape.radiusFor(be.stage) * 2 + 1);
             be.setChanged();
         }
+    }
+
+    /** Blocks the wells round a spring may draw its water down before its pool goes dry, and under which it comes back. */
+    private static final double DRY_AT = 2.0, WET_AT = 1.0;
+
+    /** Its pool drawn dry by the wells round it: see {@link #drawnDry}. */
+    private boolean dry;
+
+    /**
+     * A spring rises on the water in the ground under it, and a well drawing that water down in a cone round it takes
+     * the spring's away: past {@link #DRY_AT} blocks of drawdown at the vent its pool goes dry, and it stays so until the
+     * cone has filled back in under {@link #WET_AT}, when the pool comes back as it was. Pamukkale's terraces went dry
+     * so, their water taken off to the hotels. Returns true while the spring is dry: nothing else is done with it.
+     */
+    private boolean drawnDry(ServerLevel level) {
+        if (!surfaced || stage <= 0 || datumY == Integer.MIN_VALUE) return false;
+        double s = com.jeladastudios.ftsgeology.hydrology.Aquifer.drawdown(level, outletX + 0.5, outletZ + 0.5);
+        if (!dry) {
+            if (s < DRY_AT) return false;
+            drainPool(level);
+            dry = true;
+            setChanged();
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring at {},{} drawn dry: the wells round it have its water {} blocks down",
+                    siteX(), siteZ(), String.format(java.util.Locale.ROOT, "%.1f", s));
+            return true;
+        }
+        if (s >= WET_AT) return true;
+        dry = false;
+        applyStage(level, stage);
+        setChanged();
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring at {},{} flows again: the cone has filled back in", siteX(), siteZ());
+        return false;
     }
 
     /** How long the current stage lasts, in ticks. */
@@ -625,6 +659,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
         tag.putLong("StageSince", stageSince);
         tag.putInt("Stalled", stalled);
         tag.putBoolean("Dormant", dormant);
+        tag.putBoolean("DrawnDry", dry);
         tag.putInt("DatumY", datumY);
         tag.putInt("Carbonate", carbonate);
         tag.putInt("Volcanic", volcanic);
@@ -649,6 +684,7 @@ public class SpringSourceBlockEntity extends BlockEntity {
         stageSince = tag.getLong("StageSince");
         stalled = tag.getInt("Stalled");
         dormant = tag.getBoolean("Dormant");
+        dry = tag.getBoolean("DrawnDry");
         datumY = tag.contains("DatumY") ? tag.getInt("DatumY") : Integer.MIN_VALUE;
         carbonate = tag.getInt("Carbonate");
         volcanic = tag.getInt("Volcanic");

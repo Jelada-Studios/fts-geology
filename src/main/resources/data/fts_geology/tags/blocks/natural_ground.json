@@ -1,0 +1,22 @@
+{
+  "replace": false,
+  "values": [
+    {"id": "trmt:eroded_grass_block", "required": false},
+    {"id": "trmt:eroded_dirt", "required": false},
+    {"id": "trmt:eroded_coarse_dirt", "required": false},
+    {"id": "trmt:eroded_sand", "required": false},
+    {"id": "immersive_weathering:sand_layer_block", "required": false},
+    {"id": "immersive_weathering:red_sand_layer_block", "required": false},
+    {"id": "immersive_weathering:vitrified_sand", "required": false},
+    {"id": "immersive_weathering:loam", "required": false},
+    {"id": "immersive_weathering:silt", "required": false},
+    {"id": "immersive_weathering:earthen_clay", "required": false},
+    {"id": "immersive_weathering:sandy_dirt", "required": false},
+    {"id": "immersive_weathering:grassy_silt", "required": false},
+    {"id": "immersive_weathering:grassy_earthen_clay", "required": false},
+    {"id": "immersive_weathering:grassy_sandy_dirt", "required": false},
+    {"id": "immersive_weathering:rooted_grass_block", "required": false},
+    {"id": "immersive_weathering:permafrost", "required": false},
+    {"id": "immersive_weathering:grassy_permafrost", "required": false}
+  ]
+}

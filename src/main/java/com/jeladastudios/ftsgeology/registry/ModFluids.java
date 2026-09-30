@@ -10,7 +10,7 @@ import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 
-/** The one fluid the mod adds: the standing water of a traced river. */
+/** The mod's fluids: the standing water of a traced river, and sea water carried off the sea in a bucket. */
 public final class ModFluids {
 
     private ModFluids() {}
@@ -22,6 +22,22 @@ public final class ModFluids {
             FLUIDS.register("river_water", () -> new RiverWaterFluid.Source(properties()));
     public static final RegistryObject<Fluid> FLOWING_RIVER_WATER =
             FLUIDS.register("flowing_river_water", () -> new RiverWaterFluid.Flowing(properties()));
+
+    /**
+     * Sea water, carried off the sea in a bucket: water in every way (water's own type, for the reasons below), and it
+     * flows and spreads as water does, but it waters no field; see {@link com.jeladastudios.ftsgeology.hydrology.SeaWater}.
+     */
+    public static final RegistryObject<Fluid> SEA_WATER =
+            FLUIDS.register("sea_water", () -> new ForgeFlowingFluid.Source(seaProperties()));
+    public static final RegistryObject<Fluid> FLOWING_SEA_WATER =
+            FLUIDS.register("flowing_sea_water", () -> new ForgeFlowingFluid.Flowing(seaProperties()));
+
+    private static ForgeFlowingFluid.Properties seaProperties() {
+        return new ForgeFlowingFluid.Properties(ForgeMod.WATER_TYPE, SEA_WATER, FLOWING_SEA_WATER)
+                .block(() -> (net.minecraft.world.level.block.LiquidBlock) ModBlocks.SEA_WATER.get())
+                .bucket(() -> ModItems.SEA_WATER_BUCKET.get())
+                .slopeFindDistance(4).levelDecreasePerBlock(1).tickRate(5).explosionResistance(100.0F);
+    }
 
     /**
      * The fluid is <em>water's own</em> {@link ForgeMod#WATER_TYPE}, not a type of its own, and that one argument is

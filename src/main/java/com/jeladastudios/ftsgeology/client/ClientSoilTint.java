@@ -75,6 +75,19 @@ public final class ClientSoilTint {
     static final net.minecraft.world.level.block.Block[] GRASSES = {Blocks.GRASS_BLOCK, Blocks.GRASS, Blocks.TALL_GRASS,
             Blocks.FERN, Blocks.LARGE_FERN, Blocks.POTTED_FERN, Blocks.SUGAR_CANE};
 
+    /**
+     * Other mods' grass over their own soils, where they are installed: Immersive Weathering's grassy soils and rooted
+     * grass, The Roads More Travelled's worn grass. It dries with the ground under it as the game's does.
+     */
+    static net.minecraft.world.level.block.Block[] otherGrasses() {
+        return java.util.stream.Stream.of("immersive_weathering:grassy_silt", "immersive_weathering:grassy_earthen_clay",
+                        "immersive_weathering:grassy_sandy_dirt", "immersive_weathering:rooted_grass_block", "trmt:eroded_grass_block")
+                .map(net.minecraft.resources.ResourceLocation::new)
+                .filter(net.minecraft.core.registries.BuiltInRegistries.BLOCK::containsKey)
+                .map(net.minecraft.core.registries.BuiltInRegistries.BLOCK::get)
+                .toArray(net.minecraft.world.level.block.Block[]::new);
+    }
+
     @SubscribeEvent
     public static void onChunkUnload(ChunkEvent.Unload event) {
         if (event.getLevel() != null && event.getLevel().isClientSide()) DRY.remove(event.getChunk().getPos().toLong());

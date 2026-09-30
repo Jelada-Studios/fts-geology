@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    {"id": "immersive_weathering:sandy_dirt", "required": false},
+    {"id": "immersive_weathering:grassy_sandy_dirt", "required": false},
+    {"id": "immersive_weathering:sandy_farmland", "required": false},
+    {"id": "immersive_weathering:sand_layer_block", "required": false},
+    {"id": "immersive_weathering:red_sand_layer_block", "required": false},
+    {"id": "trmt:eroded_sand", "required": false}
+  ]
+}

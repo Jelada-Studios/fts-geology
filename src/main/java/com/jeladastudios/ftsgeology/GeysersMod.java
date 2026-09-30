@@ -100,6 +100,10 @@ public class GeysersMod {
         String modOres = com.jeladastudios.ftsgeology.worldgen.OreGenesis.modOresSummary();
         if (modOres != null) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", modOres);
         com.jeladastudios.ftsgeology.compat.OreUnification.clear();
+        if (com.jeladastudios.ftsgeology.quake.RoofLoad.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.quake.RoofLoad.summary());
+        com.jeladastudios.ftsgeology.quake.RoofLoad.clear();
+        if (com.jeladastudios.ftsgeology.hydrology.Reservoirs.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.hydrology.Reservoirs.summary());
+        com.jeladastudios.ftsgeology.hydrology.Reservoirs.clear();
         com.jeladastudios.ftsgeology.command.SiteTeleport.clear();
         com.jeladastudios.ftsgeology.blockentity.GeothermalTurbineBlockEntity.clearAll();
         com.jeladastudios.ftsgeology.compat.CreateRivers.clear();
@@ -134,6 +138,7 @@ public class GeysersMod {
             event.accept(ModItems.GEOTHERMAL_TURBINE.get());
             event.accept(ModItems.WELL_PUMP.get());
             event.accept(ModItems.WELL_CASING.get());
+            event.accept(ModItems.SEA_WATER_BUCKET.get());
             event.accept(ModItems.GEOLOGISTS_HAMMER.get());
             event.accept(ModItems.FAULT_COMPASS.get());
             event.accept(ModItems.CORE_DRILL.get());

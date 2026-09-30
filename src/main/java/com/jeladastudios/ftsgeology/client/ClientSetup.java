@@ -38,6 +38,13 @@ public final class ClientSetup {
             net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
                     com.jeladastudios.ftsgeology.registry.ModBlocks.RIVER_WATER.get(),
                     net.minecraft.client.renderer.RenderType.translucent());
+            // And the sea water carried in a bucket, which is drawn as water as well.
+            net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
+                    com.jeladastudios.ftsgeology.registry.ModFluids.SEA_WATER.get(), net.minecraft.client.renderer.RenderType.translucent());
+            net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
+                    com.jeladastudios.ftsgeology.registry.ModFluids.FLOWING_SEA_WATER.get(), net.minecraft.client.renderer.RenderType.translucent());
+            net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
+                    com.jeladastudios.ftsgeology.registry.ModBlocks.SEA_WATER.get(), net.minecraft.client.renderer.RenderType.translucent());
         });
     }
 
@@ -51,9 +58,11 @@ public final class ClientSetup {
     public static void blockColors(net.minecraftforge.client.event.RegisterColorHandlersEvent.Block event) {
         event.register((state, level, pos, tint) -> level != null && pos != null
                         ? net.minecraft.client.renderer.BiomeColors.getAverageWaterColor(level, pos) : 0x3F76E4,
-                com.jeladastudios.ftsgeology.registry.ModBlocks.RIVER_WATER.get());
+                com.jeladastudios.ftsgeology.registry.ModBlocks.RIVER_WATER.get(), com.jeladastudios.ftsgeology.registry.ModBlocks.SEA_WATER.get());
         // Grass paler where the ground under it has dried out; the biome's own green where the server says nothing.
         event.register(ClientSoilTint::grass, ClientSoilTint.GRASSES);
+        net.minecraft.world.level.block.Block[] others = ClientSoilTint.otherGrasses();
+        if (others.length > 0) event.register(ClientSoilTint::grass, others);
     }
 
     /** The geothermal turbine's rotor turns: a renderer for it, and its model baked though no block names it. */

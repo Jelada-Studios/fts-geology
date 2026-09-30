@@ -12,10 +12,12 @@
     "ThinAirHeightMixin",
     "NoiseChunkWrapMixin",
     "HolderHolderWrapMixin",
-    "GrassSpreadMixin"
+    "GrassSpreadMixin",
+    "FarmlandSaltMixin"
   ],
   "client": [
-    "OculusBlockIdsMixin"
+    "OculusBlockIdsMixin",
+    "PuddleRainMixin"
   ],
   "injectors": {
     "defaultRequire": 1

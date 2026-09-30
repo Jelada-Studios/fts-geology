@@ -265,15 +265,30 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         int topBound = core.getY() + GeyserConfig.CHAMBER_TARGET_HEIGHT.get() + magnitude + 3;
         int bottomBound = core.getY() - 2;
 
+        // From the cell over the core, or where that is blocked -- gravel from the roof, fallen in during an
+        // eruption, lying on the core -- from the nearest open cell of the chamber round it.
         BlockPos start = core.above();
+        search:
+        for (int r = 0; r <= 3 && !chamberInterior(level.getBlockState(start)); r++) {
+            for (int dy = 1; dy <= 1 + r; dy++) {
+                for (int dx = -r; dx <= r; dx++) {
+                    for (int dz = -r; dz <= r; dz++) {
+                        BlockPos p = core.offset(dx, dy, dz);
+                        if (chamberInterior(level.getBlockState(p))) {
+                            start = p;
+                            break search;
+                        }
+                    }
+                }
+            }
+        }
         queue.add(start);
         seen.add(start.asLong());
 
         while (!queue.isEmpty() && cells.size() < cellCap) {
             BlockPos p = queue.poll();
             BlockState s = level.getBlockState(p);
-            boolean interior = s.isAir() || s.getFluidState().is(FluidTags.WATER);
-            if (!interior) continue; // walls (rock / chamber markers) bound the volume
+            if (!chamberInterior(s)) continue; // walls (rock / chamber markers) bound the volume
 
             cells.add(p.asLong());
 
@@ -293,6 +308,11 @@ public class GeyserCoreBlockEntity extends BlockEntity {
             out[i] = cells.get(i);
         }
         return out;
+    }
+
+    /** A cell of the chamber's volume: open, or holding its water. */
+    private static boolean chamberInterior(BlockState s) {
+        return s.isAir() || s.getFluidState().is(FluidTags.WATER);
     }
 
     /** Forces a chamber re-scan on the next tick (call when vent geometry changes). */
@@ -406,6 +426,7 @@ public class GeyserCoreBlockEntity extends BlockEntity {
     // === State machine ======================================================
 
     private void runStateMachine(ServerLevel level, BlockPos pos) {
+        if (!emergent && level.getGameTime() % 100 == 0) drawnSilent = drawnDown(level) >= DRAWN_SILENT;
         double boiling = GeyserConfig.BOILING_POINT_C.get();
         double erupt = GeyserConfig.PRESSURE_ERUPTION_THRESHOLD.get();
         double safe = GeyserConfig.PRESSURE_SAFE_THRESHOLD.get();
@@ -454,6 +475,10 @@ public class GeyserCoreBlockEntity extends BlockEntity {
                 }
                 if (capped) {
                     latentSteam = 0.0;          // drawn off through the turbine, never built into an eruption
+                } else if (drawnSilent) {
+                    // The wells have its water: it only steams, as Beowawe's and Steamboat Springs' geysers did once
+                    // the geothermal wells round them were drilled.
+                    latentSteam = 0.0;
                 } else if (pressure >= erupt) {
                     beginEruption(level, pos, mouth);
                 }
@@ -506,8 +531,10 @@ public class GeyserCoreBlockEntity extends BlockEntity {
                 if (level.getGameTime() % GeyserConfig.CHAMBER_REFILL_INTERVAL_TICKS.get() < 20L) {
                     refillChamberWater(level); // basin refills as surface water drains back in
                 }
+                // Thermal shock: cold intake drops us below boiling -> cooldown. A chamber no water can reach -- choked, or
+                // its intake cut off -- settles into it after a while all the same, rather than hanging hot for good.
                 // Thermal shock: cold intake drops us below boiling -> cooldown.
-                if (temperatureC < boiling) {
+                if (temperatureC < boiling || ++rechargeSeconds > RECHARGE_MOST_SECONDS) {
                     enterCooldown(level);
                 }
             }
@@ -541,6 +568,7 @@ public class GeyserCoreBlockEntity extends BlockEntity {
 
     private void endEruption(ServerLevel level, BlockPos pos, BlockPos mouth) {
         phase = Phase.RECHARGING;
+        rechargeSeconds = 0;
         EruptionHandler.removeJetField(level, mouth, spilledWater);
         setChanged();
         invalidateChamberCache(); // geometry settled; refresh cell set for the recharge survey
@@ -597,11 +625,27 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         return currentMouth != null ? currentMouth : resolveMouth(level, pos, false);
     }
 
+    /** Seconds a geyser stays recharging at most, and how long this one has. */
+    private static final int RECHARGE_MOST_SECONDS = 300;
+    private int rechargeSeconds;
+
+    /** Blocks the wells round a natural geyser may draw its water down before it only steams. */
+    private static final double DRAWN_SILENT = 3.0;
+    /** Drawn down past that at the last look, once every five seconds. */
+    private boolean drawnSilent;
+
+    /** Blocks the wells round this geyser have drawn the water it refills from down by. */
+    private double drawnDown(ServerLevel level) {
+        return com.jeladastudios.ftsgeology.hydrology.Aquifer.drawdown(level, worldPosition.getX() + 0.5, worldPosition.getZ() + 0.5);
+    }
+
     private void enterCooldown(ServerLevel level) {
         phase = Phase.COOLING;
         int min = GeyserConfig.COOLDOWN_TICKS_MIN.get();
         int max = GeyserConfig.COOLDOWN_TICKS_MAX.get();
         this.cooldownTimer = min + level.random.nextInt(Math.max(1, max - min));
+        // A natural geyser refills from the water in the ground: drawn down by the wells round it, it takes the longer.
+        if (!emergent) this.cooldownTimer = (int) Math.min(Integer.MAX_VALUE / 2, cooldownTimer * (1.0 + drawnDown(level)));
         this.latentSteam = 0.0;
         this.pressure = 0.0;
     }

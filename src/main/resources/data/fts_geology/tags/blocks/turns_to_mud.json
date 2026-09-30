@@ -1,0 +1,16 @@
+{
+  "replace": false,
+  "values": [
+    "minecraft:grass_block",
+    "minecraft:dirt",
+    "minecraft:coarse_dirt",
+    {"id": "immersive_weathering:loam", "required": false},
+    {"id": "immersive_weathering:silt", "required": false},
+    {"id": "immersive_weathering:grassy_silt", "required": false},
+    {"id": "immersive_weathering:earthen_clay", "required": false},
+    {"id": "immersive_weathering:grassy_earthen_clay", "required": false},
+    {"id": "trmt:eroded_grass_block", "required": false},
+    {"id": "trmt:eroded_dirt", "required": false},
+    {"id": "trmt:eroded_coarse_dirt", "required": false}
+  ]
+}

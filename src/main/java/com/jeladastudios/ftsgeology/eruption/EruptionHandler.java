@@ -613,6 +613,7 @@ public final class EruptionHandler {
         if (s.is(BlockTags.BASE_STONE_OVERWORLD)      // stone, granite, diorite, andesite, tuff, deepslate (+modded)
                 || s.is(BlockTags.BASE_STONE_NETHER)  // netherrack, basalt, blackstone (+modded)
                 || s.is(BlockTags.DIRT)
+                || s.is(com.jeladastudios.ftsgeology.hydrology.SoilBlocks.NATURAL_GROUND) // worn paths, sand layers
                 || s.is(BlockTags.SAND)
                 || s.is(BlockTags.SNOW)
                 || s.is(BlockTags.ICE)

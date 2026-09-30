@@ -143,10 +143,20 @@ public final class SoilWater {
         final byte[] kind = new byte[16];
         /** Blocks the wells round the chunk have lowered its water table by, at the last look. Not kept. */
         float lowered;
+        /** Water standing on the ground, by column: the share of it that has soaked in so far. Not kept. */
+        final it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap soaking = new it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap();
+        /** How wet each cell's top looked, as last sent to the players watching the chunk (see SoilWetPacket). */
+        final byte[] wet = new byte[16];
+        /** Blocks of water standing over each cell's middle as it first stood, or -1 before: the load its ground grew up under. */
+        final byte[] load = new byte[16];
+        /** The ground's height at each cell's middle when its load was taken: ground built up or dug out takes it again. */
+        final int[] loadGround = new int[16];
 
         Cells() {
             java.util.Arrays.fill(usable, 1f);
             java.util.Arrays.fill(kind, (byte) -1);
+            java.util.Arrays.fill(load, (byte) -1);
+            java.util.Arrays.fill(loadGround, Integer.MIN_VALUE);
         }
     }
 
@@ -162,7 +172,7 @@ public final class SoilWater {
     private static final Map<Long, Cells> CELLS = new ConcurrentHashMap<>();
     /** Loaded overworld chunks, looked at in turn. */
     private static final LongLinkedOpenHashSet QUEUE = new LongLinkedOpenHashSet();
-    private static long looks, steps, nanos;
+    private static long looks, steps, nanos, soaking, soaked;
 
     private static boolean enabled(Level level) {
         return GeyserConfig.SOIL_WATER.get() && Level.OVERWORLD.equals(level.dimension()) && !TfcCompat.active();
@@ -198,6 +208,10 @@ public final class SoilWater {
         }
         c.last = tag.getLong("t");
         c.depth = tag.getInt("d");
+        byte[] l = tag.getByteArray("l");
+        if (l.length == 16) System.arraycopy(l, 0, c.load, 0, 16);
+        int[] lg = tag.getIntArray("lg");
+        if (lg.length == 16) System.arraycopy(lg, 0, c.loadGround, 0, 16);
         ChunkPos p = event.getChunk().getPos();
         CELLS.put(key(level, p.x, p.z), c);
     }
@@ -262,6 +276,8 @@ public final class SoilWater {
         tag.putLong("t", c.last);
         tag.putInt("d", c.depth);
         tag.putIntArray("w", w);
+        tag.putByteArray("l", c.load.clone());
+        tag.putIntArray("lg", c.loadGround.clone());
         event.getData().put(TAG, tag);
         if (c.leaving) CELLS.remove(k);
     }
@@ -288,7 +304,7 @@ public final class SoilWater {
         synchronized (QUEUE) {
             QUEUE.clear();
         }
-        looks = steps = nanos = 0;
+        looks = steps = nanos = soaking = soaked = 0;
     }
 
     // === Looking in turn ==================================================
@@ -350,6 +366,8 @@ public final class SoilWater {
         advance(level, chunk, c, first, hours, away, level.isRaining(), level.isThundering(), level.isDay());
         c.last = now;
         looks++;
+        sendWet(chunk, c);
+        loads(level, chunk, c);
         // Away, the place had its average weather, rain and all: no drought or flood is carried over it.
         if (GeyserConfig.SOIL_WATER_GROUND.get()) showGround(level, chunk, c, first || away ? -1 : hours);
     }
@@ -372,6 +390,9 @@ public final class SoilWater {
                 c.top[i] = c.root[i] = c.deep[i] = 0;
                 c.pond[i] = 0;
                 c.table[i] = 0;
+                // Kept as water, so ground that comes out of it later (a pond filled in, a lake drained) is settled
+                // as ground: left as it was, it read bone dry.
+                c.kind[i] = (byte) Soil.WATER.ordinal();
                 continue;
             }
             if (!soil.ground()) continue;
@@ -379,6 +400,13 @@ public final class SoilWater {
             // need not be loaded.
             Holder<Biome> biome = chunk.getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(g + 1), QuartPos.fromBlock(z));
             double pet = evaporation(biome.value());
+            // A mulch keeps the sun off the soil: what it takes out of the ground under one is about half.
+            BlockState surface = chunk.getBlockState(m.set(x, g, z));
+            if (surface.is(SoilBlocks.MULCH)) pet *= 0.5;
+            // Grass draws on the soil under it as grass does anywhere: a soil's own share is for its bare ground, and grass
+            // on sand, taken for bare sand, outlasted every drought.
+            double plants = SoilBlocks.deadOf(surface, chunk.getBlockState(m.set(x, g - 1, z))) != null
+                    ? Math.max(soil.plants, 0.9) : soil.plants;
             // Snow counts as the rain it melts into: a tundra's ground is wet, not a desert's.
             boolean rains = biome.value().hasPrecipitation();
             // Ground that has changed what it is (grass dug to stone, or a cell once taken for rock by a boulder at its
@@ -387,7 +415,7 @@ public final class SoilWater {
             boolean changed = c.kind[i] >= 0 && c.kind[i] != k;
             c.kind[i] = k;
             if (first || changed) {
-                spinUp(c, i, soil, pet, rains);
+                spinUp(c, i, soil, pet, rains, plants);
                 c.usable[i] = (float) soil.available(sat(c.root[i], soil.root));
                 continue;
             }
@@ -398,12 +426,12 @@ public final class SoilWater {
                 // Away, the weather is what the place gets on average; here, what the sky is doing now.
                 double rain = !rains ? 0 : away ? RAIN * RAINY_SHARE : raining ? (storm ? STORM : RAIN) : 0;
                 double petNow = away ? pet : pet * (day ? 1.9 : 0.1) * (raining ? 0.3 : 1.0);
-                step(c, i, soil, h, rain, petNow);
+                step(c, i, soil, h, rain, petNow, plants);
                 left -= h;
                 steps++;
             }
             // Longer away than the steps reach: what is left of the gap has settled the ground to its average.
-            if (left > 1e-6) spinUp(c, i, soil, pet, rains);
+            if (left > 1e-6) spinUp(c, i, soil, pet, rains, plants);
             c.usable[i] = (float) soil.available(sat(c.root[i], soil.root));
         }
     }
@@ -496,7 +524,9 @@ public final class SoilWater {
                 boolean dies = c.dry[i] > DIEBACK_HOURS && usable < DIEBACK;
                 boolean grows = c.bare[i] != 0 && c.dry[i] == 0 && usable > REGROW;
                 boolean muds = c.soak[i] > MUD_HOURS && (soil == Soil.LOAM || soil == Soil.CLAY);
-                boolean dries = c.mud[i] != 0 && c.soak[i] == 0 && usable < 0.5;
+                // Mud dries from the top: once no water stands on it and the sun has dried its surface, whatever the
+                // roots below still get from groundwater near the surface (which kept a pit over it mud for good).
+                boolean dries = c.mud[i] != 0 && c.soak[i] == 0 && (usable < 0.5 || sat(c.top[i], soil.top) < 0.3);
                 if (dies || grows || muds || dries) {
                     if (placed == null) placed = com.jeladastudios.ftsgeology.quake.PlayerBuilt.inChunk(level, p.x, p.z);
                     double day = Math.min(1.0, hours / 168.0);
@@ -512,7 +542,7 @@ public final class SoilWater {
                     int top = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, (x0 + dx) & 15, (z0 + dz) & 15);
                     for (int y = top; y >= top - 1; y--) {
                         BlockState s = chunk.getBlockState(m.set(x0 + dx, y, z0 + dz));
-                        if (!s.is(Blocks.FARMLAND)) continue;
+                        if (!SoilBlocks.farmland(s)) continue;
                         if (s.getValue(net.minecraft.world.level.block.FarmBlock.MOISTURE) < 7) {
                             level.setBlock(m.immutable(), s.setValue(net.minecraft.world.level.block.FarmBlock.MOISTURE, 7), 2);
                         }
@@ -521,6 +551,7 @@ public final class SoilWater {
                 }
             }
         }
+        if (hours > 0) soakIn(level, chunk, c, hours);
         if (changed) {
             com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
                     net.minecraftforge.network.PacketDistributor.TRACKING_CHUNK.with(() -> chunk),
@@ -528,14 +559,246 @@ public final class SoilWater {
         }
     }
 
-    /** A player starts watching a chunk: how dry its grass looks, if it looks dry at all. */
+    /**
+     * Most water, in blocks' worth, a body standing on the ground may hold and still soak away, and most blocks it may
+     * spread over: Flowing Fluids spreads a bucket poured on flat ground into a film of shallow water many blocks wide.
+     */
+    static final double SOAK_MOST = 16;
+    static final int SOAK_SPREAD = 128;
+    /** Share of what soaks in that goes on down to the aquifer: what the roots and the sun do not take back. */
+    static final double RECHARGE_SHARE = 0.5;
+
+    /**
+     * Water standing on the soil soaks into it, as fast as the soil takes water: a bucket poured on sand is gone in a
+     * few minutes, on loam in ten or so, on clay only after most of an hour, as a clay-lined pond holds its water. Only
+     * a small body, a block deep, on ground that is not soaked through: a lake stands on ground the groundwater keeps
+     * full, a river is the mod's own water, the sea is salt. What soaks in wets the cell's soil, and so the fields in
+     * it, and half of it goes on down to the groundwater, filling in the cone of a well drawing nearby. The body goes
+     * all at once when its water has all soaked in, or the game's endless water would only fill it again.
+     */
+    private static void soakIn(ServerLevel level, LevelChunk chunk, Cells c, double hours) {
+        ChunkPos p = chunk.getPos();
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet seen = null, alive = null;
+        double recharged = 0;
+        for (int lx = 0; lx < 16; lx++) {
+            for (int lz = 0; lz < 16; lz++) {
+                // Water on top is where the surface stands over the solid ground; elsewhere nothing to look at.
+                int top = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, lx, lz);      // the top block, a chunk's own measure
+                if (top <= chunk.getHeight(Heightmap.Types.OCEAN_FLOOR, lx, lz)) continue;
+                int x = p.getMinBlockX() + lx, z = p.getMinBlockZ() + lz;
+                if (seen != null && seen.contains(BlockPos.asLong(x, top, z))) continue;
+                net.minecraft.world.level.material.FluidState f = chunk.getFluidState(m.set(x, top, z));
+                if (!f.is(net.minecraft.world.level.material.Fluids.WATER) && !f.is(net.minecraft.world.level.material.Fluids.FLOWING_WATER)) continue;
+                Soil soil = soilOf(chunk.getBlockState(m.set(x, top - 1, z)), Blocks.AIR.defaultBlockState());
+                if (soil != Soil.LOAM && soil != Soil.SAND && soil != Soil.CLAY) continue;
+                int i = ((lz >> 2) << 2) | (lx >> 2);
+                if (soakedThrough(c, i, soil)) continue;
+                if (SeaWater.salty(level, m.set(x, top, z), f)) continue;
+                if (seen == null) {
+                    seen = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+                    alive = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+                }
+                // A pond or a lake at a glance, before following it: the water round it, all taken as seen.
+                if (crowded(level, x, top, z, seen)) continue;
+                java.util.List<BlockPos> body = body(level, x, top, z, seen);
+                if (body == null) continue;
+                soaking++;
+                // The body's water: every level of it where Flowing Fluids keeps water finite, only its sources where
+                // the game's endless water runs off them and back. It soaks in over all the ground it wets, each block
+                // at its own soil's pace, and goes when all of it is in.
+                boolean finite = finite();
+                double volume = 0, rate = 0;
+                long key = Long.MAX_VALUE;
+                for (BlockPos b : body) {
+                    net.minecraft.world.level.material.FluidState bf = level.getFluidState(b);
+                    volume += finite ? bf.getAmount() / 8.0 : bf.isSource() ? 1 : 0;
+                    Soil under = soilOf(level.getBlockState(b.below()), Blocks.AIR.defaultBlockState());
+                    if (under.ground() && under != Soil.ROCK) rate += under.infiltration / 1000.0;
+                    key = Math.min(key, b.asLong());
+                }
+                if (volume <= 0 || rate <= 0) continue;
+                float had = c.soaking.get(key);
+                double now = Math.min(volume, had + rate * hours), share = (now - had) / (rate * hours);
+                alive.add(key);
+                c.soaking.put(key, (float) now);
+                if (now > had) {
+                    for (BlockPos b : body) {
+                        Soil under = soilOf(level.getBlockState(b.below()), Blocks.AIR.defaultBlockState());
+                        if (!under.ground() || under == Soil.ROCK) continue;
+                        wet(c, cell(b.getX(), b.getZ()), under, under.infiltration * hours * share / 16.0,
+                                b.getX() >> 4 == p.x && b.getZ() >> 4 == p.z);
+                    }
+                    recharged += (now - had) * RECHARGE_SHARE;
+                }
+                if (now < volume - 1e-6) continue;
+                soaked++;
+                for (BlockPos b : body) level.setBlock(b, Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+                c.soaking.remove(key);
+                alive.remove(key);
+            }
+        }
+        // What soaked on elsewhere is forgotten once its water is gone.
+        if (alive == null) {
+            c.soaking.clear();
+        } else {
+            final it.unimi.dsi.fastutil.longs.LongOpenHashSet keep = alive;
+            c.soaking.keySet().removeIf((java.util.function.LongPredicate) k -> !keep.contains(k));
+        }
+        if (recharged > 0) Aquifer.recharge(level, p.getMiddleBlockX(), p.getMiddleBlockZ(), recharged);
+    }
+
+    /** Whether water is finite, every level of it real water, as Flowing Fluids makes it; the game's own runs off its sources. */
+    private static boolean finite() {
+        return net.minecraftforge.fml.ModList.get().isLoaded("flowing_fluids");
+    }
+
+    /** A cell whose ground takes no more: the groundwater up at the surface, or every layer full. */
+    private static boolean soakedThrough(Cells c, int i, Soil soil) {
+        if (c.depth >= 0 && c.table[i] - c.lowered >= c.depth) return true;
+        return sat(c.top[i], soil.top) > 0.98 && sat(c.root[i], soil.root) > 0.98 && sat(c.deep[i], soil.deep) > 0.98;
+    }
+
+    /** Millimetres over a cell soaking into its ground: the top first, what it cannot hold down into the roots and on. */
+    private static void wet(Cells c, int i, Soil soil, double mm, boolean here) {
+        if (!here) return;      // a body across a chunk's edge: the cell next door is that chunk's to wet
+        double into = Math.min(mm, soil.top - c.top[i]);
+        c.top[i] += (float) Math.max(0, into);
+        mm -= Math.max(0, into);
+        into = Math.min(mm, soil.root - c.root[i]);
+        c.root[i] += (float) Math.max(0, into);
+        mm -= Math.max(0, into);
+        c.deep[i] = (float) Math.min(soil.deep, c.deep[i] + Math.max(0, mm));
+    }
+
+    /**
+     * Whether there is more water at this level within two blocks than a small body holds, in blocks' worth: then it is
+     * a pond or a lake, and the water looked at here is taken as seen, so a lake is not followed again from each column.
+     */
+    private static boolean crowded(ServerLevel level, int x, int y, int z, it.unimi.dsi.fastutil.longs.LongOpenHashSet seen) {
+        double n = 0;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, x + dx, z + dz)) continue;
+                net.minecraft.world.level.material.FluidState f = level.getFluidState(m.set(x + dx, y, z + dz));
+                n += finite() ? f.getAmount() / 8.0 : f.isSource() ? 1 : 0;
+            }
+        }
+        if (n <= 12) return false;
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) seen.add(BlockPos.asLong(x + dx, y, z + dz));
+        }
+        return true;
+    }
+
+    /**
+     * The water blocks at one level touching this one, if they hold little ({@link #SOAK_MOST}) and are a block deep;
+     * null for a bigger body, a deeper one, or one reaching into a chunk not loaded.
+     */
+    private static java.util.List<BlockPos> body(ServerLevel level, int x, int y, int z, it.unimi.dsi.fastutil.longs.LongOpenHashSet seen) {
+        java.util.List<BlockPos> out = new java.util.ArrayList<>();
+        java.util.ArrayDeque<BlockPos> todo = new java.util.ArrayDeque<>();
+        BlockPos start = new BlockPos(x, y, z);
+        // Its own record of where it has been: the columns taken as seen round a lake would cut a pond into scraps
+        // small enough to soak away one by one.
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet visited = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+        todo.add(start);
+        visited.add(start.asLong());
+        boolean ok = true, finite = finite();
+        double volume = 0;
+        while (!todo.isEmpty()) {
+            BlockPos b = todo.poll();
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, b)) {
+                ok = false;
+                continue;
+            }
+            net.minecraft.world.level.material.FluidState f = level.getFluidState(b);
+            if (!f.is(net.minecraft.world.level.material.Fluids.WATER) && !f.is(net.minecraft.world.level.material.Fluids.FLOWING_WATER)) continue;
+            out.add(b);
+            volume += finite ? f.getAmount() / 8.0 : f.isSource() ? 1 : 0;
+            if (volume > SOAK_MOST || out.size() > SOAK_SPREAD || !level.getFluidState(b.below()).isEmpty() || !level.getFluidState(b.above()).isEmpty()) ok = false;
+            if (!ok) continue;
+            for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                BlockPos n = b.relative(d);
+                if (visited.add(n.asLong())) todo.add(n);
+            }
+        }
+        seen.addAll(visited);
+        return ok && !out.isEmpty() ? out : null;
+    }
+
+    /**
+     * The water standing over each cell's middle, against what stood there when the cell was first seen: water brought
+     * since weighs on any cave under it; and in karst, the wells' cone drawing the water down out of a cave takes away
+     * what held its roof up. Either is handed to {@link com.jeladastudios.ftsgeology.quake.RoofLoad}.
+     */
+    private static void loads(ServerLevel level, LevelChunk chunk, Cells c) {
+        if (!GeyserConfig.WATER_LOAD_COLLAPSE.get()) return;
+        ChunkPos p = chunk.getPos();
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        boolean drawn = c.lowered >= 2 && c.depth >= 0;
+        int naturalTable = drawn ? chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, 8, 8) - c.depth : 0;
+        for (int i = 0; i < 16; i++) {
+            int x = p.getMinBlockX() + (i & 3) * 4 + 2, z = p.getMinBlockZ() + (i >> 2) * 4 + 2;
+            int g = ground(level, x, z);
+            if (g == Integer.MIN_VALUE) continue;
+            int depth = 0;
+            while (depth < 32 && chunk.getFluidState(m.set(x, g + 1 + depth, z)).is(net.minecraft.tags.FluidTags.WATER)) depth++;
+            // First seen, or the ground itself built up or dug out since: the water now is the load it stands under.
+            if (c.load[i] < 0 || Math.abs(g - c.loadGround[i]) > 1) {
+                c.load[i] = (byte) depth;
+                c.loadGround[i] = g;
+                continue;
+            }
+            if (depth >= c.load[i] + 2) com.jeladastudios.ftsgeology.quake.RoofLoad.consider(level, x, z, depth - c.load[i], 0);
+            if (drawn) com.jeladastudios.ftsgeology.quake.RoofLoad.drawnDown(level, x, z, naturalTable, c.lowered);
+        }
+    }
+
+    /** How wet each cell's top is, to the players watching the chunk, when it has changed; see {@link #wetOf}. */
+    private static void sendWet(LevelChunk chunk, Cells c) {
+        boolean changed = false;
+        for (int i = 0; i < 16; i++) {
+            byte b = wetOf(c, i);
+            if (b != c.wet[i]) {
+                c.wet[i] = b;
+                changed = true;
+            }
+        }
+        if (!changed) return;
+        ChunkPos p = chunk.getPos();
+        com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
+                net.minecraftforge.network.PacketDistributor.TRACKING_CHUNK.with(() -> chunk),
+                new com.jeladastudios.ftsgeology.network.SoilWetPacket(p.x, p.z, c.wet.clone()));
+    }
+
+    /**
+     * A cell's top as puddles need it (see {@code SoilWetPacket}): how wet, 0 to 15, in bits 0-3; the soil, 1 sand,
+     * 2 loam, 3 clay, in bits 4-5; water standing on it in bit 6.
+     */
+    static byte wetOf(Cells c, int i) {
+        if (c.kind[i] < 0) return 0;
+        Soil s = Soil.values()[c.kind[i]];
+        int kind = s == Soil.SAND ? 1 : s == Soil.LOAM ? 2 : s == Soil.CLAY ? 3 : 0;
+        int wet = s.top > 0 ? (int) Math.round(sat(c.top[i], s.top) * 15) : 0;
+        return (byte) (wet | kind << 4 | (c.pond[i] > PUDDLE ? 64 : 0));
+    }
+
+    /** A player starts watching a chunk: how wet its ground is, and how dry its grass looks if it looks dry at all. */
     @SubscribeEvent
     public static void onWatch(net.minecraftforge.event.level.ChunkWatchEvent.Watch event) {
         ServerLevel level = event.getLevel();
-        if (!enabled(level) || !GeyserConfig.SOIL_WATER_GROUND.get()) return;
+        if (!enabled(level)) return;
         ChunkPos p = event.getPos();
         Cells c = CELLS.get(key(level, p.x, p.z));
         if (c == null) return;
+        if (c.last >= 0) {
+            com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
+                    net.minecraftforge.network.PacketDistributor.PLAYER.with(event::getPlayer),
+                    new com.jeladastudios.ftsgeology.network.SoilWetPacket(p.x, p.z, c.wet.clone()));
+        }
+        if (!GeyserConfig.SOIL_WATER_GROUND.get()) return;
         boolean any = false;
         for (byte b : c.tint) any |= b != 0;
         if (!any) return;
@@ -579,20 +842,19 @@ public final class SoilWater {
                 case DIE -> {
                     // Grass first, the costly look for water beside it only then: a dying cell's columns are all gone
                     // over on every look.
-                    BlockState dead = deadOf(s, chunk.getBlockState(m.below()));
+                    BlockState dead = SoilBlocks.deadOf(s, chunk.getBlockState(m.below()));
                     yield dead == null || watered(level, x, y, z) ? null : dead;
                 }
                 case GROW -> {
                     BlockState over = chunk.getBlockState(m.above());
-                    yield over.isAir() || over.canBeReplaced() || over.is(Blocks.DEAD_BUSH) ? grassOf(s) : null;
+                    yield over.isAir() || over.canBeReplaced() || over.is(Blocks.DEAD_BUSH) ? SoilBlocks.grassOf(s, chunk.getBlockState(m.below())) : null;
                 }
-                case MUD -> (s.is(Blocks.GRASS_BLOCK) || s.is(Blocks.DIRT) || s.is(Blocks.COARSE_DIRT)) && hollow(level, x, y, z)
-                        ? Blocks.MUD.defaultBlockState() : null;
-                case DRY -> s.is(Blocks.MUD) ? Blocks.DIRT.defaultBlockState() : null;
+                case MUD -> s.is(SoilBlocks.TURNS_TO_MUD) && hollow(level, x, y, z) ? Blocks.MUD.defaultBlockState() : null;
+                case DRY -> s.is(Blocks.MUD) ? SoilBlocks.driedMud() : null;
             };
             if (to == null) {
                 // Made here, but no longer what was made: something else has had it since.
-                if (mine && !(what == Change.GROW ? grassOf(s) != null : s.is(Blocks.MUD))) done |= (short) (1 << b);
+                if (mine && !(what == Change.GROW ? SoilBlocks.grassOf(s, chunk.getBlockState(m.below())) != null : s.is(Blocks.MUD))) done |= (short) (1 << b);
                 continue;
             }
             if (what == Change.DIE) witherOver(level, chunk, m.above());
@@ -637,47 +899,6 @@ public final class SoilWater {
         return false;
     }
 
-    /** Grass and the soil it dies back to: over sand or gravel, coarse ground; Immersive Weathering's own grassy soils. */
-    private static BlockState deadOf(BlockState s, BlockState under) {
-        if (s.is(Blocks.GRASS_BLOCK)) {
-            if (under.is(BlockTags.SAND) || under.is(Tags.Blocks.GRAVEL)) {
-                BlockState sandy = weathering("sandy_dirt");
-                return sandy != null ? sandy : Blocks.COARSE_DIRT.defaultBlockState();
-            }
-            return Blocks.DIRT.defaultBlockState();
-        }
-        String name = name(s);
-        for (String[] pair : WEATHERING_GRASS) {
-            if (name.equals("immersive_weathering:" + pair[0])) return weathering(pair[1]);
-        }
-        return null;
-    }
-
-    /** The grass that grows again over soil that died back here; null over anything else. */
-    private static BlockState grassOf(BlockState s) {
-        if (s.is(Blocks.DIRT) || s.is(Blocks.COARSE_DIRT)) return Blocks.GRASS_BLOCK.defaultBlockState();
-        String name = name(s);
-        if (name.equals("immersive_weathering:sandy_dirt")) return Blocks.GRASS_BLOCK.defaultBlockState();
-        for (String[] pair : WEATHERING_GRASS) {
-            if (name.equals("immersive_weathering:" + pair[1])) return weathering(pair[0]);
-        }
-        return null;
-    }
-
-    /** Immersive Weathering's grassy soils and what they are without their grass. Blocks by name only (LGPLv3). */
-    private static final String[][] WEATHERING_GRASS = {
-            {"grassy_sandy_dirt", "sandy_dirt"}, {"grassy_earthen_clay", "earthen_clay"}, {"grassy_silt", "silt"}};
-
-    private static BlockState weathering(String path) {
-        net.minecraft.world.level.block.Block b = net.minecraftforge.registries.ForgeRegistries.BLOCKS.getValue(
-                new net.minecraft.resources.ResourceLocation("immersive_weathering", path));
-        return b == null || b == Blocks.AIR ? null : b.defaultBlockState();
-    }
-
-    private static String name(BlockState s) {
-        return net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock()).toString();
-    }
-
     /** The grass growing over ground that dies back dies with it; now and then a dead bush is left. */
     private static void witherOver(ServerLevel level, LevelChunk chunk, BlockPos over) {
         BlockState s = chunk.getBlockState(over);
@@ -713,8 +934,7 @@ public final class SoilWater {
         if (!(event.getLevel() instanceof ServerLevel level) || !GeyserConfig.SOIL_WATER_GROUND.get() || !enabled(level)) return;
         BlockPos pos = event.getPos();
         BlockState field = level.getBlockState(pos.below());
-        if (!(field.getBlock() instanceof net.minecraft.world.level.block.FarmBlock)
-                || field.getValue(net.minecraft.world.level.block.FarmBlock.MOISTURE) >= 7) {
+        if (!SoilBlocks.farmland(field) || field.getValue(net.minecraft.world.level.block.FarmBlock.MOISTURE) >= 7) {
             return;
         }
         Cells c = CELLS.get(key(level, pos.getX() >> 4, pos.getZ() >> 4));
@@ -724,21 +944,21 @@ public final class SoilWater {
     }
 
     /** A cell never looked at: the ground as the place's weather keeps it, a few weeks of it on average. */
-    private static void spinUp(Cells c, int i, Soil soil, double pet, boolean rains) {
+    private static void spinUp(Cells c, int i, Soil soil, double pet, boolean rains, double plants) {
         double wet = rains ? Mth.clamp(RAIN * RAINY_SHARE / Math.max(pet, 0.01), 0.0, 1.0) : 0.0;
         double kept = soil.wilting + (soil.fieldCapacity - soil.wilting) * (0.2 + 0.8 * wet);
         c.top[i] = (float) (soil.top * kept * 0.8);
         c.root[i] = (float) (soil.root * kept);
         c.deep[i] = (float) (soil.deep * soil.fieldCapacity * (0.7 + 0.3 * wet));
         c.pond[i] = 0;
-        for (int k = 0; k < SPIN_UP; k++) step(c, i, soil, SPIN_UP_HOURS, rains ? RAIN * RAINY_SHARE : 0, pet);
+        for (int k = 0; k < SPIN_UP; k++) step(c, i, soil, SPIN_UP_HOURS, rains ? RAIN * RAINY_SHARE : 0, pet, plants);
     }
 
     /**
      * One step of the ground's water over {@code h} hours, with {@code rain} and the evaporation the air asks for in
      * millimetres an hour.
      */
-    static void step(Cells c, int i, Soil s, double h, double rain, double pet) {
+    static void step(Cells c, int i, Soil s, double h, double rain, double pet, double plants) {
         double top = c.top[i], root = c.root[i], deep = c.deep[i], pond = c.pond[i], table = c.table[i];
         // Rain on the ground, and what it takes in: all of it up to what the soil passes in the time.
         pond += rain * h;
@@ -773,7 +993,7 @@ public final class SoilWater {
         top -= e;
         want -= e;
         double stress = Mth.clamp(s.available(sat(root, s.root)) / 0.5, 0.0, 1.0);
-        e = Math.min(root, want * s.plants * stress);
+        e = Math.min(root, want * plants * stress);
         root -= e;
         // Standing water runs off towards the rivers.
         pond *= Math.exp(-h / RUNOFF_HOURS);
@@ -848,6 +1068,10 @@ public final class SoilWater {
     /** The ground a cell stands on, by its top block; what lies over it, if it is a fluid, makes it water. */
     static Soil soilOf(BlockState top, BlockState over) {
         if (!top.getFluidState().isEmpty() || !over.getFluidState().isEmpty()) return Soil.WATER;
+        // Other mods' soils first: their earthen clay and sandy dirt are in the game's dirt, and would be taken for loam.
+        if (top.is(SoilBlocks.CLAY_SOIL)) return Soil.CLAY;
+        if (top.is(SoilBlocks.SANDY_SOIL)) return Soil.SAND;
+        if (top.is(SoilBlocks.FARMLAND)) return Soil.LOAM;
         if (top.is(BlockTags.SAND) || top.is(Tags.Blocks.GRAVEL) || top.is(Tags.Blocks.SANDSTONE)) return Soil.SAND;
         if (top.is(Blocks.CLAY) || top.is(Blocks.MUD) || top.is(Blocks.MUDDY_MANGROVE_ROOTS)
                 || top.is(BlockTags.TERRACOTTA)) {
@@ -889,7 +1113,7 @@ public final class SoilWater {
     }
 
     public static String summary() {
-        return String.format(java.util.Locale.ROOT, "soil water: %d chunks kept, %d looks, %d steps, %.1f ms in all, %.3f ms a look",
-                CELLS.size(), looks, steps, nanos / 1e6, looks == 0 ? 0.0 : nanos / 1e6 / looks);
+        return String.format(java.util.Locale.ROOT, "soil water: %d chunks kept, %d looks, %d steps, %.1f ms in all, %.3f ms a look; %d soakings of standing water, %d bodies soaked away",
+                CELLS.size(), looks, steps, nanos / 1e6, looks == 0 ? 0.0 : nanos / 1e6 / looks, soaking, soaked);
     }
 }

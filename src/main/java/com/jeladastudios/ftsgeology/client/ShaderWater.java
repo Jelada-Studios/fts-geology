@@ -31,6 +31,11 @@ public final class ShaderWater {
             out.put(s, id);
             added++;
         }
+        for (BlockState s : ModBlocks.SEA_WATER.get().getStateDefinition().getPossibleStates()) {
+            if (out.containsKey(s)) continue;
+            out.put(s, id);
+            added++;
+        }
         GeysersMod.LOGGER.info("Shader pack: the river's {} block states drawn as water (id {})", added, id);
         return out;
     }

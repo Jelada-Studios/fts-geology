@@ -66,6 +66,12 @@ public final class ModBlocks {
                     () -> (net.minecraft.world.level.material.FlowingFluid) ModFluids.RIVER_WATER.get(),
                     BlockBehaviour.Properties.copy(Blocks.WATER).noLootTable()));
 
+    /** Sea water poured out of a bucket: water, but it waters no field; see {@link ModFluids#SEA_WATER}. */
+    public static final RegistryObject<Block> SEA_WATER = BLOCKS.register("sea_water",
+            () -> new net.minecraft.world.level.block.LiquidBlock(
+                    () -> (net.minecraft.world.level.material.FlowingFluid) ModFluids.SEA_WATER.get(),
+                    BlockBehaviour.Properties.copy(Blocks.WATER).noLootTable()));
+
     public static final RegistryObject<Block> SPRING_SOURCE = BLOCKS.register("spring_source",
             () -> new SpringSourceBlock(BlockBehaviour.Properties.copy(Blocks.DEEPSLATE)
                     .strength(-1.0F, 3600000.0F)

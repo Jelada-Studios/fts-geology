@@ -66,7 +66,7 @@ public final class CaveCollapse {
     private static final int PROBES_PER_TICK = 64;
 
     /** A roof this thin or thinner comes down all the way, and the collapse reaches the surface. */
-    private static final int THIN_ROOF = 5;
+    static final int THIN_ROOF = 5;
 
     /** A void at least this tall is a cave rather than a pocket. */
     private static final int MIN_VOID = 2;
@@ -117,7 +117,7 @@ public final class CaveCollapse {
     private static final Map<String, Parked> PARKED = new HashMap<>();
 
     /** The shape of the cave under one column. {@code roof} counts the solid blocks over it. */
-    private record Cave(int ground, int top, int floor, int roof) {}
+    record Cave(int ground, int top, int floor, int roof) {}
 
     // === Queue ===============================================================
 
@@ -283,7 +283,7 @@ public final class CaveCollapse {
     }
 
     /** The first cave under a column within the configured depth, or null. */
-    private static Cave caveUnder(ServerLevel level, int x, int z) {
+    static Cave caveUnder(ServerLevel level, int x, int z) {
         int ground = TerrainProbe.groundY(level, x, z);
         if (ground == Integer.MIN_VALUE) return null;
         int bottom = Math.max(level.getMinBuildHeight() + 1, ground - GeyserConfig.CAVE_COLLAPSE_DEPTH.get());
@@ -298,7 +298,7 @@ public final class CaveCollapse {
     }
 
     /** The widest run of open ceiling through the column, along either axis. */
-    private static int span(ServerLevel level, int x, int y, int z) {
+    static int span(ServerLevel level, int x, int y, int z) {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         int best = 1;
         for (int axis = 0; axis < 2; axis++) {
@@ -358,7 +358,7 @@ public final class CaveCollapse {
     }
 
     /** Fells the tree standing at {@code from}: its trunk up, then the crown round it, as a quake's weathering does. */
-    private static void fellTree(ServerLevel level, int x, int from, int z) {
+    static void fellTree(ServerLevel level, int x, int from, int z) {
         // A Dynamic Trees tree comes down whole, by its own mod's felling: taken up its trunk column only, its side
         // branches were left in the air over the sinkhole.
         BlockPos base = new BlockPos(x, from, z);
@@ -378,7 +378,7 @@ public final class CaveCollapse {
     }
 
     /** A void this tall is a big cave, whose roof is never brought down. */
-    private static final int DEEP_VOID = 24;
+    static final int DEEP_VOID = 24;
     /** Tallest a rubble heap stands. */
     private static final int HEAP_HEIGHT = 4;
 
@@ -386,7 +386,7 @@ public final class CaveCollapse {
      * Heaps the fallen roof on the cave floor under the middle of the fall: a low cone, tallest in the middle and
      * running out to nothing at its rim, laid only into open air. Rubble packs, so what does not fit is lost.
      */
-    private static void heap(ServerLevel level, int x, int z, int floorY, List<BlockState> pool) {
+    static void heap(ServerLevel level, int x, int z, int floorY, List<BlockState> pool) {
         int total = pool.size();
         int radius = Math.max(1, (int) Math.ceil(Math.sqrt(total / 1.5)));
         double area = Math.PI * radius * radius;
@@ -418,7 +418,7 @@ public final class CaveCollapse {
     }
 
     /** What a block becomes on the way down: bedrock breaks up, soil loses its turf. */
-    private static BlockState rubble(BlockState s, RandomSource rng) {
+    static BlockState rubble(BlockState s, RandomSource rng) {
         if (s.is(BlockTags.BASE_STONE_OVERWORLD)) {
             if (rng.nextInt(4) == 0) return Blocks.GRAVEL.defaultBlockState();
             return s.is(Blocks.DEEPSLATE) ? Blocks.COBBLED_DEEPSLATE.defaultBlockState()

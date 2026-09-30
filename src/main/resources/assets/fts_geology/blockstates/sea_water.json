@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "fts_geology:block/river_water"
+    }
+  }
+}

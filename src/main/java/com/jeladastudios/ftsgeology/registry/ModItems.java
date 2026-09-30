@@ -255,6 +255,18 @@ public final class ModItems {
     public static final RegistryObject<Item> WELL_PUMP = ITEMS.register("well_pump",
             () -> new DescribedBlockItem(ModBlocks.WELL_PUMP.get(), new Item.Properties(), 3, "electrodynamics", "create"));
 
+    /** A bucket of sea water: it pours out as water that waters no field. */
+    public static final RegistryObject<Item> SEA_WATER_BUCKET = ITEMS.register("sea_water_bucket",
+            () -> new net.minecraft.world.item.BucketItem(ModFluids.SEA_WATER, new Item.Properties()
+                    .craftRemainder(net.minecraft.world.item.Items.BUCKET).stacksTo(1)) {
+                @Override
+                public void appendHoverText(net.minecraft.world.item.ItemStack stack, @org.jetbrains.annotations.Nullable net.minecraft.world.level.Level level,
+                                            java.util.List<net.minecraft.network.chat.Component> tooltip, net.minecraft.world.item.TooltipFlag flag) {
+                    tooltip.add(net.minecraft.network.chat.Component.translatable("item.fts_geology.sea_water_bucket.tooltip")
+                            .withStyle(net.minecraft.ChatFormatting.GRAY));
+                }
+            });
+
     public static final RegistryObject<Item> WELL_CASING = ITEMS.register("well_casing",
             () -> new DescribedBlockItem(ModBlocks.WELL_CASING.get(), new Item.Properties(), 2));
 
