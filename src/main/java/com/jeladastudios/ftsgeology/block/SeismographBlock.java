@@ -94,6 +94,15 @@ public class SeismographBlock extends BaseEntityBlock {
         if (!(level.getBlockEntity(pos) instanceof SeismographBlockEntity be)) {
             return InteractionResult.PASS;
         }
+        // Paper in hand: the station's record printed, a book to keep and read.
+        net.minecraft.world.item.ItemStack held = player.getItemInHand(hand);
+        if (held.is(net.minecraft.world.item.Items.PAPER)) {
+            if (!player.getAbilities().instabuild) held.shrink(1);
+            net.minecraft.world.item.ItemStack book = be.printout(level.getGameTime());
+            if (!player.getInventory().add(book)) player.drop(book, false);
+            level.playSound(null, pos, net.minecraft.sounds.SoundEvents.BOOK_PAGE_TURN, net.minecraft.sounds.SoundSource.BLOCKS, 1.0f, 1.0f);
+            return InteractionResult.CONSUME;
+        }
         List<Component> lines = be.report(level.getGameTime());
         for (Component c : lines) player.sendSystemMessage(c);
         return InteractionResult.CONSUME;

@@ -63,6 +63,8 @@ public class SeismographBlockEntity extends BlockEntity {
     }
 
     private final List<Reading> readings = new ArrayList<>();
+    /** The station's long record, day by day, and its watch on a restless volcano near it; printed on paper. */
+    private final com.jeladastudios.ftsgeology.instrument.Seismogram.Record record = new com.jeladastudios.ftsgeology.instrument.Seismogram.Record();
 
     /**
      * One small quake of a volcano's swarm as this drum drew it. Kept apart from the readings: a swarm is dozens of
@@ -92,6 +94,11 @@ public class SeismographBlockEntity extends BlockEntity {
 
     public SeismographBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.SEISMOGRAPH.get(), pos, state);
+    }
+
+    /** The station's record printed on paper: a book of its quakes, day by day, and its watch on a volcano. */
+    public net.minecraft.world.item.ItemStack printout(long now) {
+        return com.jeladastudios.ftsgeology.instrument.Seismogram.print(record, worldPosition, now);
     }
 
     public int signal() {
@@ -134,6 +141,20 @@ public class SeismographBlockEntity extends BlockEntity {
         if (be.shake > 0 && now % 4L == 0L) be.scratch(server, pos);
 
         if (now % 20L != 0L) return;   // catching up is a once-a-second job
+        be.record.started(now);
+        // Once a game hour, a look at the restless volcano near it, if there is one: how far its ground has swelled here.
+        if (now % 1000L == 0L) {
+            var restless = com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.nearest(level, pos.getX(), pos.getZ());
+            if (restless != null) {
+                be.record.watch(now, (int) Math.round(Math.hypot(pos.getX() - restless.summit().getX(), pos.getZ() - restless.summit().getZ())
+                                * DepthScale.metresPerBlockHorizontal()),
+                        com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.swellCm(restless, pos.getX(), pos.getZ()),
+                        com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.near(level, pos));
+            } else {
+                be.record.hourQuiet();
+            }
+            be.setChanged();
+        }
         // The faults round a station keep breaking while nobody is near, so there is something for it to draw.
         if (now % 1200L == 0L) com.jeladastudios.ftsgeology.quake.FaultClocks.station(server, pos);
         for (SeismicNetwork.Event e : SeismicNetwork.since(server.dimension(), be.seen)) {
@@ -159,6 +180,7 @@ public class SeismographBlockEntity extends BlockEntity {
         }
 
         readings.add(0, new Reading(e.id(), SeismicWave.spSeconds(d), amp, e.gameTime()));
+        record.quake(e.gameTime(), readings.get(0).magnitude(), readings.get(0).distanceMetres());
         com.jeladastudios.ftsgeology.advancement.GeologyTrigger.awardNear(level, pos.getX(), pos.getZ(), 32, "seismogram");
         while (readings.size() > LOG_SIZE) readings.remove(readings.size() - 1);
 
@@ -190,6 +212,7 @@ public class SeismographBlockEntity extends BlockEntity {
                         double metres) {
         long now = level.getGameTime();
         swarm.add(new Tremor(e.gameTime(), e.magnitude(), metres));
+        record.tremor(e.gameTime(), e.magnitude());
         swarm.removeIf(t -> now - t.gameTime() > SWARM_KEPT);
         while (swarm.size() > SWARM_SIZE) swarm.remove(0);
         if (warnUntil == 0) {
@@ -319,6 +342,7 @@ public class SeismographBlockEntity extends BlockEntity {
             tag.put("Swarm", tremors);
         }
         tag.putLong("SwarmAlarm", swarmAlarm);
+        record.save(tag);
     }
 
     @Override
@@ -344,5 +368,6 @@ public class SeismographBlockEntity extends BlockEntity {
             swarm.add(new Tremor(c.getLong("At"), c.getDouble("M"), c.getDouble("D")));
         }
         swarmAlarm = tag.contains("SwarmAlarm") ? tag.getLong("SwarmAlarm") : Long.MIN_VALUE;
+        record.load(tag);
     }
 }
