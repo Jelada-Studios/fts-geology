@@ -104,6 +104,16 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.quake.RoofLoad.clear();
         if (com.jeladastudios.ftsgeology.hydrology.Reservoirs.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.hydrology.Reservoirs.summary());
         com.jeladastudios.ftsgeology.hydrology.Reservoirs.clear();
+        if (com.jeladastudios.ftsgeology.hydrology.Floods.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.hydrology.Floods.summary());
+        com.jeladastudios.ftsgeology.hydrology.Floods.clear();
+        if (com.jeladastudios.ftsgeology.weather.Storms.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.weather.Storms.summary());
+        com.jeladastudios.ftsgeology.weather.Storms.clear();
+        if (com.jeladastudios.ftsgeology.hydrology.Puddles.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.hydrology.Puddles.summary());
+        com.jeladastudios.ftsgeology.hydrology.Puddles.clear();
+        if (com.jeladastudios.ftsgeology.hydrology.RiverSpill.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.hydrology.RiverSpill.summary());
+        com.jeladastudios.ftsgeology.hydrology.RiverSpill.clear();
+        if (com.jeladastudios.ftsgeology.hydrology.RiverFloods.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.hydrology.RiverFloods.summary());
+        com.jeladastudios.ftsgeology.hydrology.RiverFloods.clear();
         com.jeladastudios.ftsgeology.command.SiteTeleport.clear();
         com.jeladastudios.ftsgeology.blockentity.GeothermalTurbineBlockEntity.clearAll();
         com.jeladastudios.ftsgeology.compat.CreateRivers.clear();

@@ -211,6 +211,7 @@
   "message.fts_geology.dam.strain": "Baraj zorlanıyor: arkasında %s blok su var, kalınlığı %s blok ama %s olmalı. Sızdırıyor ve çatırdıyor.",
   "message.fts_geology.dam.broke": "Baraj yıkıldı! Hazne boşalıyor.",
   "block.fts_geology.sea_water": "Deniz Suyu",
+  "block.fts_geology.puddle": "Su Birikintisi",
   "item.fts_geology.sea_water_bucket": "Deniz Suyu Kovası",
   "item.fts_geology.sea_water_bucket.tooltip": "Tuzlu su: nereye dökülse dökülsün tarlayı sulamaz.",
   "message.fts_geology.update_available": "FT's Geology %s çıktı; bu sürüm %s.",

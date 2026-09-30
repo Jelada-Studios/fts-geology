@@ -58,7 +58,8 @@ public final class ClientSetup {
     public static void blockColors(net.minecraftforge.client.event.RegisterColorHandlersEvent.Block event) {
         event.register((state, level, pos, tint) -> level != null && pos != null
                         ? net.minecraft.client.renderer.BiomeColors.getAverageWaterColor(level, pos) : 0x3F76E4,
-                com.jeladastudios.ftsgeology.registry.ModBlocks.RIVER_WATER.get(), com.jeladastudios.ftsgeology.registry.ModBlocks.SEA_WATER.get());
+                com.jeladastudios.ftsgeology.registry.ModBlocks.RIVER_WATER.get(), com.jeladastudios.ftsgeology.registry.ModBlocks.SEA_WATER.get(),
+                com.jeladastudios.ftsgeology.registry.ModBlocks.PUDDLE.get());
         // Grass paler where the ground under it has dried out; the biome's own green where the server says nothing.
         event.register(ClientSoilTint::grass, ClientSoilTint.GRASSES);
         net.minecraft.world.level.block.Block[] others = ClientSoilTint.otherGrasses();

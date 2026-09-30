@@ -21,6 +21,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -69,6 +70,8 @@ public final class Reservoirs {
     private static final int LAYER_MOST = 8000;
     /** Ticks between looks at each reservoir. */
     private static final int EVERY = 40;
+    /** How far below the dam the river is felt to weaken while the reservoir fills, and a breach's flood reaches. */
+    private static final int DOWN_REACH = 48, FLOOD_REACH = 96;
 
     enum State { FILLING, FULL, DRAINING }
 
@@ -88,6 +91,17 @@ public final class Reservoirs {
         double inflow;
         State state = State.FILLING;
         long lastWarn;
+        /** The wall's blocks at the river's surface when it was read, and that height: its crest is read again from them. */
+        long[] wall = new long[0];
+        int wallY;
+        /** The top water of the river below the dam, near it: taken while the reservoir fills, as the river brings none past it. */
+        long[] downstream = new long[0];
+        /** Of those, the ones taken now, to be laid again. */
+        LongArrayList lowered = new LongArrayList();
+        /** Where the spillway's water pours over the crest, or {@link Long#MIN_VALUE}. */
+        long spill = Long.MIN_VALUE;
+        /** The water each layer laid, from the bottom: what runs out again when it drains. */
+        final List<LongArrayList> laid = new ArrayList<>();
 
         CompoundTag save() {
             CompoundTag t = new CompoundTag();
@@ -102,6 +116,14 @@ public final class Reservoirs {
             t.putDouble("Owed", owed);
             t.putDouble("Inflow", inflow);
             t.putString("State", state.name());
+            t.putLongArray("Wall", wall);
+            t.putInt("WallY", wallY);
+            t.putLongArray("Downstream", downstream);
+            t.putLongArray("Lowered", lowered.toLongArray());
+            t.putLong("Spill", spill);
+            ListTag layers = new ListTag();
+            for (LongArrayList l : laid) layers.add(new net.minecraft.nbt.LongArrayTag(l.toLongArray()));
+            t.put("Laid", layers);
             return t;
         }
 
@@ -117,6 +139,12 @@ public final class Reservoirs {
             r.fz = t.getInt("Fz");
             r.owed = t.getDouble("Owed");
             r.inflow = t.getDouble("Inflow");
+            r.wall = t.getLongArray("Wall");
+            r.wallY = t.getInt("WallY");
+            r.downstream = t.getLongArray("Downstream");
+            r.lowered = new LongArrayList(t.getLongArray("Lowered"));
+            r.spill = t.contains("Spill") ? t.getLong("Spill") : Long.MIN_VALUE;
+            for (Tag l : t.getList("Laid", Tag.TAG_LONG_ARRAY)) r.laid.add(new LongArrayList(((net.minecraft.nbt.LongArrayTag) l).getAsLongArray()));
             try {
                 r.state = State.valueOf(t.getString("State"));
             } catch (IllegalArgumentException e) {
@@ -154,6 +182,8 @@ public final class Reservoirs {
 
     public static void clear() {
         PENDING.clear();
+        held = new LongOpenHashSet();
+        heldRead = false;
         formed = filled = broke = 0;
     }
 
@@ -197,6 +227,10 @@ public final class Reservoirs {
         }
         if (now % EVERY != 0) return;
         Store s = level.getDataStorage().get(Store::load, "fts_geology_reservoirs");
+        if (!heldRead) {
+            heldRead = true;
+            rebuildHeld(level);
+        }
         if (s == null || s.all.isEmpty()) return;
         s.all.removeIf(r -> {
             if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, r.dam) || !com.jeladastudios.ftsgeology.util.Loaded.at(level, r.seed)) return false;
@@ -340,9 +374,21 @@ public final class Reservoirs {
         r.fx = (int) Math.signum(Math.round(way.x));
         r.fz = (int) Math.signum(Math.round(way.z));
         if (r.fx == 0 && r.fz == 0) r.fx = 1;
-        r.crest = crest(level, wall, surface);
+        r.crest = crestOf(level, wall.toLongArray(), surface, r.fx, r.fz);
         if (r.crest <= r.base) return;             // no higher than the water: nothing to hold
         r.inflow = 2.0 + 1.5 * Math.max(1, width);
+        r.wall = wall.toLongArray();
+        r.wallY = surface;
+        // The river's top water below the dam, as far as the reservoir's filling is felt.
+        LongArrayList tops = new LongArrayList();
+        for (long k : down) {
+            int x = BlockPos.getX(k), z = BlockPos.getZ(k);
+            if (Math.max(Math.abs(x - start.getX()), Math.abs(z - start.getZ())) > DOWN_REACH || tops.size() >= 2048) continue;
+            BlockPos top = BlockPos.of(k);
+            while (top.getY() < low + 32 && riverWater(level.getFluidState(top.above()))) top = top.above();
+            tops.add(top.asLong());
+        }
+        r.downstream = tops.toLongArray();
         store(level).all.add(r);
         store(level).setDirty();
         formed++;
@@ -376,15 +422,31 @@ public final class Reservoirs {
         return out;
     }
 
-    /** The lowest top of the wall across the river: the water can stand no higher. */
-    private static int crest(ServerLevel level, LongOpenHashSet wall, int surface) {
-        int crest = Integer.MAX_VALUE;
+    /** Where a wall column stands across the river, and how far down it, for walls running either way. */
+    private static int across(long k, int fx, int fz) {
+        return fx != 0 ? BlockPos.getZ(k) : BlockPos.getX(k);
+    }
+
+    private static int downstream(long k, int fx, int fz) {
+        return fx != 0 ? BlockPos.getX(k) * fx : BlockPos.getZ(k) * fz;
+    }
+
+    /**
+     * The crest the water can stand to: along each line through the wall the way the river runs it has to get over the
+     * highest part, so a cut into the middle of a thick wall lets nothing out; the crest is the lowest of those. Past
+     * ground not loaded, {@link Integer#MIN_VALUE}.
+     */
+    private static int crestOf(ServerLevel level, long[] wall, int surface, int fx, int fz) {
+        it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap highest = new it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap();
+        highest.defaultReturnValue(Integer.MIN_VALUE);
         for (long k : wall) {
             int x = BlockPos.getX(k), z = BlockPos.getZ(k);
-            int y = surface;
-            while (y < surface + 32 && solid(level.getBlockState(new BlockPos(x, y + 1, z)))) y++;
-            crest = Math.min(crest, y);
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(x, surface, z))) return Integer.MIN_VALUE;
+            int line = across(k, fx, fz);
+            highest.put(line, Math.max(highest.get(line), wallTop(level, x, z, surface)));
         }
+        int crest = Integer.MAX_VALUE;
+        for (int top : highest.values()) crest = Math.min(crest, top);
         return crest == Integer.MAX_VALUE ? surface : crest;
     }
 
@@ -399,20 +461,31 @@ public final class Reservoirs {
         if (r.state == State.DRAINING) return drain(level, r);
         if (!solid(level.getBlockState(r.dam))) {
             // The wall is gone from under it: it runs out.
-            r.state = State.DRAINING;
+            letGo(level, r);
             return false;
         }
-        if (holds(level, r)) {
-            if (r.state == State.FILLING) fill(level, r);
+        if (!holds(level, r)) {
+            breach(level, r);
             return false;
         }
-        breach(level, r);
+        recrest(level, r);
+        if (r.state == State.DRAINING) return false;
+        if (r.state == State.FILLING) {
+            holdBack(level, r);
+            fill(level, r);
+        } else {
+            // Full: the river runs on below again, over the spillway where the water stands at the crest.
+            runOn(level, r);
+            if (r.level >= r.crest) spillway(level, r);
+            else stopSpill(level, r);
+        }
         return false;
     }
 
     /** A layer at a time, as fast as the river brings water, to the top of the wall or the lowest gap in the valley. */
     private static void fill(ServerLevel level, Reservoir r) {
-        r.owed = Math.min(LAYER_MOST, r.owed + r.inflow * EVERY / 20.0 * (level.isRaining() ? 1.5 : 1.0));
+        r.owed = Math.min(LAYER_MOST, r.owed + r.inflow * EVERY / 20.0
+                * (1.0 + com.jeladastudios.ftsgeology.weather.Storms.intensityAt(level, r.dam.getX(), r.dam.getZ())));
         int y = r.level + 1;
         if (y > r.crest) {
             full(level, r, "crest");
@@ -427,6 +500,7 @@ public final class Reservoirs {
         if (r.owed < layer.size()) return;
         BlockState water = ModBlocks.RIVER_WATER.get().defaultBlockState();
         for (long k : layer) level.setBlock(BlockPos.of(k), water, Block.UPDATE_CLIENTS);
+        r.laid.add(new LongArrayList(layer));
         r.owed -= layer.size();
         r.level = y;
     }
@@ -435,9 +509,180 @@ public final class Reservoirs {
         r.state = State.FULL;
         r.owed = 0;
         filled++;
+        runOn(level, r);
         tell(level, r.dam, Component.translatable("message.fts_geology.dam.full", r.level - r.base).withStyle(ChatFormatting.AQUA));
         com.jeladastudios.ftsgeology.util.Diagnostics.info("dam at {}: reservoir full at {} ({} over the river, {})", r.dam.toShortString(),
                 r.level, r.level - r.base, why);
+    }
+
+    /** The top of a column of the wall: from the river's surface up while it is solid, or down to the floor of a notch cut into it. */
+    private static int wallTop(ServerLevel level, int x, int z, int from) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos(x, from, z);
+        int y = from;
+        if (solid(level.getBlockState(m))) {
+            while (y < from + 32 && solid(level.getBlockState(m.setY(y + 1)))) y++;
+            return y;
+        }
+        while (y > from - 16 && !solid(level.getBlockState(m.setY(y)))) y--;
+        return y;
+    }
+
+    /**
+     * Reads the crest again from the wall's columns: a notch cut into the wall is the lowest point the water runs out
+     * over, and the water above it goes, a layer a look; a wall built up higher fills again.
+     */
+    private static void recrest(ServerLevel level, Reservoir r) {
+        if (r.wall.length == 0) return;
+        int crest = crestOf(level, r.wall, r.wallY, r.fx, r.fz);
+        if (crest == Integer.MIN_VALUE || crest == r.crest) return;
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("dam at {}: crest {} now {}", r.dam.toShortString(), r.crest, crest);
+        stopSpill(level, r);
+        if (crest <= r.base) {
+            // Cut down to the river: it runs out as through a breach.
+            r.crest = crest;
+            letGo(level, r);
+            return;
+        }
+        if (crest > r.crest && r.state == State.FULL && r.level >= r.crest) r.state = State.FILLING;
+        r.crest = crest;
+        while (r.level > r.crest && dropLayer(level, r)) {
+            // The water over the notch runs out through it.
+        }
+    }
+
+    /** While the reservoir fills the river below it gets nothing from above: its top water there goes, where it is two deep. */
+    private static void holdBack(ServerLevel level, Reservoir r) {
+        if (!r.lowered.isEmpty() || r.downstream.length == 0) return;
+        for (long k : r.downstream) {
+            BlockPos p = BlockPos.of(k);
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, p)) continue;
+            if (!riverWater(level.getFluidState(p)) || !riverWater(level.getFluidState(p.below())) || !level.getBlockState(p.above()).isAir()) continue;
+            level.setBlock(p, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+            r.lowered.add(k);
+        }
+        if (r.lowered.isEmpty()) {
+            r.downstream = new long[0];                 // a shallow river: nothing to take
+            return;
+        }
+        rebuildHeld(level);
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("dam at {}: the river below it falls a block over {} columns while it fills",
+                r.dam.toShortString(), r.lowered.size());
+    }
+
+    /** The river below runs as before: the water taken while the reservoir filled comes back. */
+    private static void runOn(ServerLevel level, Reservoir r) {
+        if (r.lowered.isEmpty()) return;
+        LongArrayList left = new LongArrayList();
+        for (int i = 0; i < r.lowered.size(); i++) {
+            long k = r.lowered.getLong(i);
+            BlockPos p = BlockPos.of(k);
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, p)) {
+                left.add(k);
+                continue;
+            }
+            if (!level.getBlockState(p).isAir()) continue;
+            BlockState under = level.getBlockState(p.below());
+            level.setBlock(p, riverWater(under.getFluidState()) ? under : ModBlocks.RIVER_WATER.get().defaultBlockState(), Block.UPDATE_CLIENTS);
+        }
+        r.lowered = left;
+        rebuildHeld(level);
+    }
+
+    /**
+     * Where the reservoir stands at its crest the river pours over the lowest point of the wall, down its face: running
+     * water, kept running as the river brings it, that a water wheel or a turbine set in it turns on.
+     */
+    private static void spillway(ServerLevel level, Reservoir r) {
+        if (r.spill == Long.MIN_VALUE) {
+            BlockPos at = findSpill(level, r);
+            if (at == null) return;
+            r.spill = at.asLong();
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("dam at {}: spilling over the crest at {}", r.dam.toShortString(), at.toShortString());
+        }
+        BlockPos at = BlockPos.of(r.spill);
+        if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, at)) return;
+        BlockState s = level.getBlockState(at);
+        if (s.getFluidState().is(net.minecraft.world.level.material.Fluids.WATER) && s.getFluidState().isSource()) return;
+        if (!Floods.open(s) && !s.getFluidState().is(net.minecraft.tags.FluidTags.WATER) || !solid(level.getBlockState(at.below()))) {
+            r.spill = Long.MIN_VALUE;                 // something built over it, or the crest cut: found again next look
+            return;
+        }
+        level.setBlock(at, Blocks.WATER.defaultBlockState(), Block.UPDATE_ALL);
+    }
+
+    /** The top of the wall's lowest column at its downstream edge, where water over the crest drops down its face; null if none. */
+    private static BlockPos findSpill(ServerLevel level, Reservoir r) {
+        // The lines through the wall whose highest part is the crest, and on each the column furthest down the river
+        // that still reaches it: the water comes over there and down whatever stands lower below it.
+        it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap highest = new it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap();
+        it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap tops = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
+        highest.defaultReturnValue(Integer.MIN_VALUE);
+        for (long k : r.wall) {
+            int top = wallTop(level, BlockPos.getX(k), BlockPos.getZ(k), r.wallY);
+            tops.put(k, top);
+            int line = across(k, r.fx, r.fz);
+            highest.put(line, Math.max(highest.get(line), top));
+        }
+        it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap last = new it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap();
+        for (long k : r.wall) {
+            int line = across(k, r.fx, r.fz);
+            if (highest.get(line) != r.crest || tops.get(k) != r.crest) continue;
+            if (!last.containsKey(line) || downstream(k, r.fx, r.fz) > downstream(last.get(line), r.fx, r.fz)) last.put(line, k);
+        }
+        BlockPos best = null;
+        double bestD = Double.MAX_VALUE;
+        for (long k : last.values()) {
+            BlockPos at = new BlockPos(BlockPos.getX(k), r.crest + 1, BlockPos.getZ(k)), over = at.offset(r.fx, 0, r.fz);
+            if (!Floods.open(level.getBlockState(at)) && !level.getBlockState(at).getFluidState().is(net.minecraft.tags.FluidTags.WATER)) continue;
+            if (!Floods.open(level.getBlockState(over))) continue;
+            double d = at.distSqr(r.dam);
+            if (d < bestD) {
+                bestD = d;
+                best = at;
+            }
+        }
+        return best;
+    }
+
+    private static void stopSpill(ServerLevel level, Reservoir r) {
+        if (r.spill == Long.MIN_VALUE) return;
+        BlockPos at = BlockPos.of(r.spill);
+        if (com.jeladastudios.ftsgeology.util.Loaded.at(level, at) && level.getBlockState(at).getFluidState().is(net.minecraft.world.level.material.Fluids.WATER)) {
+            level.setBlock(at, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        }
+        r.spill = Long.MIN_VALUE;
+    }
+
+    /** The wall gone or cut down to the river: the river runs on below, and the reservoir runs out. */
+    private static void letGo(ServerLevel level, Reservoir r) {
+        stopSpill(level, r);
+        runOn(level, r);
+        r.state = State.DRAINING;
+    }
+
+    // === Columns of rivers held back ============================================
+
+    /** Columns whose river water a filling reservoir has taken, for the rivers' upkeep to leave alone. */
+    private static LongOpenHashSet held = new LongOpenHashSet();
+    private static boolean heldRead;
+
+    private static void rebuildHeld(ServerLevel level) {
+        LongOpenHashSet h = new LongOpenHashSet();
+        Store s = level.getDataStorage().get(Store::load, "fts_geology_reservoirs");
+        if (s != null) {
+            for (Reservoir r : s.all) {
+                for (int i = 0; i < r.lowered.size(); i++) {
+                    long k = r.lowered.getLong(i);
+                    h.add(net.minecraft.world.level.ChunkPos.asLong(BlockPos.getX(k), BlockPos.getZ(k)));
+                }
+            }
+        }
+        held = h;
+    }
+
+    /** Whether a reservoir filling upstream holds this column's river water back: the rivers' upkeep lays none there. */
+    public static boolean heldBack(int x, int z) {
+        return !held.isEmpty() && held.contains(net.minecraft.world.level.ChunkPos.asLong(x, z));
     }
 
     /**
@@ -597,15 +842,46 @@ public final class Reservoirs {
         tell(level, r.dam, Component.translatable("message.fts_geology.dam.broke").withStyle(ChatFormatting.RED));
         com.jeladastudios.ftsgeology.util.Diagnostics.info("dam at {}: broke with {} blocks of water behind it", r.dam.toShortString(), r.level - r.below);
         broke++;
-        r.state = State.DRAINING;
+        letGo(level, r);
+        floodBelow(level, r);
     }
 
-    /** The reservoir runs out through the gap, its top layer at a time, down to the river it was. */
-    private static boolean drain(ServerLevel level, Reservoir r) {
-        if (r.level <= r.base) return true;
+    /**
+     * The wave out of a broken dam: the valley floor below it goes under, as deep as half the water that stood behind
+     * the wall (one to three blocks), for a minute, and the water goes back down a layer every twenty seconds (see
+     * {@link Floods}). Only below the dam.
+     */
+    private static void floodBelow(ServerLevel level, Reservoir r) {
+        int height = Mth.clamp((r.level - r.below) / 2, 1, 3);
+        List<BlockPos> tops = new ArrayList<>();
+        for (long k : r.downstream) {
+            BlockPos p = BlockPos.of(k);
+            while (p.getY() > r.below - 32 && !riverWater(level.getFluidState(p))) p = p.below();
+            if (riverWater(level.getFluidState(p))) tops.add(p);
+        }
+        if (tops.isEmpty()) return;
+        List<LongOpenHashSet> layers = Floods.spread(level, tops, height, r.dam, FLOOD_REACH, 6000,
+                k -> (BlockPos.getX(k) - r.dam.getX()) * r.fx + (BlockPos.getZ(k) - r.dam.getZ()) * r.fz >= 2);
+        Floods.surge(level, layers, 1200, 400, "dam broke at " + r.dam.toShortString());
+    }
+
+    /** Takes the reservoir's top layer away: the water it laid there, where it still stands. False when there is none. */
+    private static boolean dropLayer(ServerLevel level, Reservoir r) {
+        if (r.level <= r.base) return false;
+        if (!r.laid.isEmpty()) {
+            LongArrayList top = r.laid.remove(r.laid.size() - 1);
+            for (int i = 0; i < top.size(); i++) {
+                BlockPos p = BlockPos.of(top.getLong(i));
+                if (com.jeladastudios.ftsgeology.util.Loaded.at(level, p) && riverWater(level.getFluidState(p))) {
+                    level.setBlock(p, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+                }
+            }
+            r.level--;
+            return true;
+        }
+        // A reservoir saved before its layers were kept: its top water joined to it near the seed or the dam.
         LongOpenHashSet layer = new LongOpenHashSet();
         LongArrayFIFOQueue todo = new LongArrayFIFOQueue();
-        // Any of its water at the top level near the seed or the dam will do to start from.
         for (BlockPos from : new BlockPos[]{r.seed, r.dam.offset(-r.fx * 2, 0, -r.fz * 2)}) {
             for (int dx = -8; dx <= 8 && layer.isEmpty(); dx++) {
                 for (int dz = -8; dz <= 8 && layer.isEmpty(); dz++) {
@@ -626,9 +902,16 @@ public final class Reservoirs {
             }
         }
         for (long k : layer) level.setBlock(BlockPos.of(k), Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+        r.level--;
+        return true;
+    }
+
+    /** The reservoir runs out through the gap, its top layer at a time, down to the river it was. */
+    private static boolean drain(ServerLevel level, Reservoir r) {
+        runOn(level, r);
+        if (!dropLayer(level, r)) return true;
         level.sendParticles(ParticleTypes.SPLASH, r.dam.getX() + 0.5 + r.fx * 3, r.below + 1, r.dam.getZ() + 0.5 + r.fz * 3,
                 60, 2.0, 0.5, 2.0, 0.2);
-        r.level--;
         return r.level <= r.base;
     }
 

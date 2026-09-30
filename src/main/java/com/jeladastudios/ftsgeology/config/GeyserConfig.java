@@ -199,6 +199,13 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue SEA_WATER_SALTY;        // sea water waters no field
     public static final ForgeConfigSpec.BooleanValue DAMS;                   // dammed rivers fill; weak dams break
     public static final ForgeConfigSpec.BooleanValue WATER_LOAD_COLLAPSE;    // cave roofs under new water, drained karst
+    public static final ForgeConfigSpec.DoubleValue SINKHOLE_WARNING_DAYS;    // days a drawn-down karst roof takes to fall
+    public static final ForgeConfigSpec.BooleanValue REGIONAL_RAIN;           // storms instead of one weather for the world
+    public static final ForgeConfigSpec.DoubleValue RAIN_AMOUNT;              // how much of the land the weather keeps under rain
+    public static final ForgeConfigSpec.BooleanValue PUDDLES;                 // the mod's own puddles, without Puddles & Floods
+    public static final ForgeConfigSpec.BooleanValue RIVER_SPILLS;            // a river runs out through a bank taken away
+    public static final ForgeConfigSpec.BooleanValue STREAMS_DRY_UP;          // a well's cone dries the small streams over it
+    public static final ForgeConfigSpec.BooleanValue RIVER_FLOODS;            // rivers over their banks in heavy rain on soaked ground
     public static final ForgeConfigSpec.BooleanValue KARST;                  // rivers sink, caves, sinkholes
     public static final ForgeConfigSpec.BooleanValue WATER_TABLE_ENABLED;
     public static final ForgeConfigSpec.DoubleValue WATER_TABLE_SUBDUAL;      // relief it copies, 0..1
@@ -1129,6 +1136,41 @@ public final class GeyserConfig {
                         "two first. The lakes and rivers the world was made with are the load the roofs grew up under, and",
                         "water that only passes (a flood, another mod's water finding its level) does not count.")
                 .define("waterLoadCollapsesCaves", true);
+        SINKHOLE_WARNING_DAYS = b
+                .comment("Game days a cave roof in karst takes to come down once the wells round it have drawn its water out:",
+                        "the ground over it cracks a third of the way, sinks a block in a ring round the middle at two thirds,",
+                        "and then the sinkhole opens. A roof under water brought over it goes in a minute or two.")
+                .defineInRange("sinkholeWarningDays", 1.5, 0.001, 30.0);
+        REGIONAL_RAIN = b
+                .comment("Rain in storms that drift with the wind, not over the whole world at once: each region goes through",
+                        "wet and dry spells lasting days to weeks, wet biomes get more rain than dry ones, a windward mountainside",
+                        "more than its lee. It rains, snows, fills cauldrons and strikes lightning only under a storm, and each",
+                        "player sees the weather where they stand. /weather still works: rain brings a storm over the players.",
+                        "Not in TerraFirmaCraft, which keeps its own climate.")
+                .define("regionalRain", true);
+        RAIN_AMOUNT = b
+                .comment("How much rain the storms bring, 1 as designed: about a fifth of the land under rain in a temperate",
+                        "region on average, most of it in a wet spell, little in a dry one.")
+                .defineInRange("rainAmount", 1.0, 0.0, 4.0);
+        PUDDLES = b
+                .comment("Puddles after rain where the ground holds water: in hollows of rock, clay, paths and soaked loam, never on",
+                        "sand, in ragged shapes that shrink as the ground dries; a pixel of water a shader draws as water. Only",
+                        "without Puddles & Floods, whose own puddles are told where the ground holds water instead. Needs soilWater.")
+                .define("puddles", true);
+        RIVER_SPILLS = b
+                .comment("A river runs out through its bank where a block beside or under its water is taken away: ordinary running",
+                        "water into the gap, kept coming from the river until the hole is full (with Flowing Fluids too).")
+                .define("riverSpills", true);
+        STREAMS_DRY_UP = b
+                .comment("A small stream over ground the wells round it have drawn down two blocks and more runs dry there, and",
+                        "fills back in from its ends once the water comes back under a block.")
+                .define("streamsDryUp", true);
+        RIVER_FLOODS = b
+                .comment("A river over its banks where it rains hard over it on ground already soaked: a block over the low ground",
+                        "beside it, two in the heaviest rain, for as long as the rain goes on, then down a layer at a time, leaving",
+                        "some mud (with soilWaterChangesGround). In a narrow valley it comes as a flash flood and carries along",
+                        "what stands in it. The ground is not moved. Needs soilWater.")
+                .define("riverFloods", true);
         DAMS = b
                 .comment("A river walled across fills up behind the wall, a layer at a time, as fast as the river brings water,",
                         "up to the top of the wall or the lowest gap in the valley; a wall too thin for the water it holds",

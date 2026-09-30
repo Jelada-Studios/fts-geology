@@ -213,8 +213,34 @@ public final class TectonicCommands {
                                 .executes(ctx -> fillVoids(ctx, 32))
                                 .then(Commands.argument("radius", IntegerArgumentType.integer(4, 96))
                                         .executes(ctx -> fillVoids(ctx, IntegerArgumentType.getInteger(ctx, "radius")))))
+                        // The storms round here, and the region's weather (see weather.Storms).
+                        .then(Commands.literal("storms")
+                                // A storm of a given strength over here, for trying the weather out.
+                                .then(Commands.literal("spawn").then(Commands.argument("peak", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(0.0, 1.0))
+                                        .executes(ctx -> spawnStorm(ctx, 800))
+                                        .then(Commands.argument("radius", IntegerArgumentType.integer(50, 4000))
+                                                .executes(ctx -> spawnStorm(ctx, IntegerArgumentType.getInteger(ctx, "radius"))))))
+                                .executes(ctx -> {
+                            ServerLevel level = ctx.getSource().getLevel();
+                            BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+                            for (String line : com.jeladastudios.ftsgeology.weather.Storms.describe(level, at.getX(), at.getZ())) {
+                                GeysersMod.LOGGER.info("{}", line);
+                                ctx.getSource().sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.AQUA), false);
+                            }
+                            return 1;
+                        }))
                         .then(Commands.literal("debug")
                                 .then(Commands.literal("cost").executes(TectonicCommands::cost))));
+    }
+
+    /** /geology storms spawn &lt;peak&gt; [radius]: a storm of that strength standing over here for a game day, or none at 0. */
+    static int spawnStorm(CommandContext<CommandSourceStack> ctx, int radius) {
+        double peak = com.mojang.brigadier.arguments.DoubleArgumentType.getDouble(ctx, "peak");
+        BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+        int n = com.jeladastudios.ftsgeology.weather.Storms.spawnHere(ctx.getSource().getLevel(), at.getX(), at.getZ(), peak, radius);
+        ctx.getSource().sendSuccess(() -> Component.literal(peak > 0 ? "storm over " + at.toShortString() + ", peak " + peak + ", radius " + radius
+                : "storms over " + at.toShortString() + " cleared: " + n).withStyle(ChatFormatting.AQUA), true);
+        return 1;
     }
 
     /** /geology water weather dry|wet &lt;days&gt; [chunkRadius]: what a drought or a wet spell does to the ground round here. */

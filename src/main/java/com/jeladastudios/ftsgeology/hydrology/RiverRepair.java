@@ -72,7 +72,7 @@ public final class RiverRepair {
      * What the network says of a chunk's columns and the ring round it, 18 by 18: the water level, or
      * {@link Integer#MIN_VALUE} where no river or lake is; which way it runs; whether it is a lake.
      */
-    private record Plan(int[] water, byte[] flow, boolean[] lake) {
+    private record Plan(int[] water, byte[] flow, boolean[] lake, boolean[] narrow) {
         static int index(int lx, int lz) {
             return (lx + 1) * 18 + (lz + 1);
         }
@@ -83,7 +83,7 @@ public final class RiverRepair {
     }
 
     /** A chunk with no river or lake anywhere near it. */
-    private static final Plan DRY = new Plan(new int[0], new byte[0], new boolean[0]);
+    private static final Plan DRY = new Plan(new int[0], new byte[0], new boolean[0], new boolean[0]);
 
     private static final Map<Long, Plan> PLANS = java.util.Collections.synchronizedMap(
             new LinkedHashMap<>(256, 0.75f, true) {
@@ -98,7 +98,11 @@ public final class RiverRepair {
     private static final LongLinkedOpenHashSet MOVED = new LongLinkedOpenHashSet(), KEEP = new LongLinkedOpenHashSet();
 
     private static final LongAdder LAID = new LongAdder(), RECUT_COLUMNS = new LongAdder(), BANKS = new LongAdder(),
-            CHUNKS = new LongAdder();
+            CHUNKS = new LongAdder(), DRIED_COLUMNS = new LongAdder();
+
+    /** Columns of small streams a well's cone has dried, until the water comes back under a block; and the drawdowns. */
+    private static final it.unimi.dsi.fastutil.longs.LongOpenHashSet DRIED = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+    private static final double DRY_AT = 2.0, WET_AT = 1.0;
 
     private static boolean enabled(ServerLevel level) {
         return GeyserConfig.RIVERS.get() && GeyserConfig.RIVERS_REFILL.get() && !TfcCompat.active()
@@ -204,6 +208,7 @@ public final class RiverRepair {
         int[] water = new int[18 * 18];
         byte[] flow = new byte[18 * 18];
         boolean[] lake = new boolean[18 * 18];
+        boolean[] narrow = new boolean[18 * 18];
         boolean any = false;
         for (int lx = -1; lx <= 16; lx++) {
             for (int lz = -1; lz <= 16; lz++) {
@@ -217,10 +222,11 @@ public final class RiverRepair {
                 water[i] = w;
                 flow[i] = (byte) RiverWaterFluid.wayOf(a.fx(), a.fz());
                 lake[i] = a.lake();
+                narrow[i] = !a.lake() && a.halfWidth() <= 2.5;
                 if (lx >= 0 && lx < 16 && lz >= 0 && lz < 16) any = true;
             }
         }
-        return any ? new Plan(water, flow, lake) : DRY;
+        return any ? new Plan(water, flow, lake, narrow) : DRY;
     }
 
     /**
@@ -237,9 +243,11 @@ public final class RiverRepair {
                 int w = plan.waterAt(lx, lz);
                 if (w == Integer.MIN_VALUE) continue;
                 int x = cp.getMinBlockX() + lx, z = cp.getMinBlockZ() + lz;
+                if (Reservoirs.heldBack(x, z)) continue;       // a reservoir filling upstream takes this water
                 int g = ground(chunk, x, z, m);
                 if (g == Integer.MIN_VALUE) continue;
                 boolean lake = plan.lake()[Plan.index(lx, lz)];
+                if (dryStream(level, chunk, plan, x, z, lx, lz, g, w, m)) continue;
                 if (g >= w) {
                     // Ground the quake lifted into a river's channel is cut through again; a lake's shore is its shore.
                     if (!moved || lake || g - w >= RECUT || !recut(chunk, x, z, g, w, placed, m)) continue;
@@ -376,10 +384,32 @@ public final class RiverRepair {
         return true;
     }
 
+    /**
+     * A small stream over ground the wells round it have drawn down two blocks and more runs dry there: its water goes,
+     * and stays gone until the drawdown is back under a block, when the column fills from its ends as any drained
+     * stretch does. A river or a lake holds. True while the column is dry.
+     */
+    private static boolean dryStream(ServerLevel level, LevelChunk chunk, Plan plan, int x, int z, int lx, int lz, int g, int w,
+                                     BlockPos.MutableBlockPos m) {
+        if (!GeyserConfig.STREAMS_DRY_UP.get() || !plan.narrow()[Plan.index(lx, lz)]) return false;
+        long col = ChunkPos.asLong(x, z);
+        double drawn = Aquifer.drawdown(level, x + 0.5, z + 0.5);
+        boolean dry = DRIED.contains(col) ? drawn >= WET_AT : drawn >= DRY_AT;
+        if (!dry) {
+            DRIED.remove(col);
+            return false;
+        }
+        if (DRIED.add(col)) DRIED_COLUMNS.increment();
+        for (int y = w; y > g; y--) {
+            if (chunk.getBlockState(m.set(x, y, z)).is(ModBlocks.RIVER_WATER.get())) level.setBlock(m, Blocks.AIR.defaultBlockState(), FLAGS);
+        }
+        return true;
+    }
+
     public static String summary() {
         return String.format(java.util.Locale.ROOT,
-                "river repair: %d chunks laid again, %d blocks of water, %d channels cut through, %d banks built up",
-                CHUNKS.sum(), LAID.sum(), RECUT_COLUMNS.sum(), BANKS.sum());
+                "river repair: %d chunks laid again, %d blocks of water, %d channels cut through, %d banks built up, %d stream columns run dry",
+                CHUNKS.sum(), LAID.sum(), RECUT_COLUMNS.sum(), BANKS.sum(), DRIED_COLUMNS.sum());
     }
 
     @SubscribeEvent
@@ -387,5 +417,6 @@ public final class RiverRepair {
         PLANS.clear();
         MOVED.clear();
         KEEP.clear();
+        DRIED.clear();
     }
 }

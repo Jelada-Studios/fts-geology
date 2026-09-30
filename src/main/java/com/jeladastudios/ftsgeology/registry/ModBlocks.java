@@ -72,6 +72,13 @@ public final class ModBlocks {
                     () -> (net.minecraft.world.level.material.FlowingFluid) ModFluids.SEA_WATER.get(),
                     BlockBehaviour.Properties.copy(Blocks.WATER).noLootTable()));
 
+    /** A film of rain water in a hollow, laid and taken back by the ground's water; see {@code Puddles}. */
+    public static final RegistryObject<Block> PUDDLE = BLOCKS.register("puddle",
+            () -> new com.jeladastudios.ftsgeology.block.PuddleBlock(BlockBehaviour.Properties.of()
+                    .mapColor(net.minecraft.world.level.material.MapColor.WATER).replaceable().noCollission().instabreak()
+                    .noLootTable().noOcclusion().pushReaction(net.minecraft.world.level.material.PushReaction.DESTROY)
+                    .sound(net.minecraft.world.level.block.SoundType.WET_GRASS)));
+
     public static final RegistryObject<Block> SPRING_SOURCE = BLOCKS.register("spring_source",
             () -> new SpringSourceBlock(BlockBehaviour.Properties.copy(Blocks.DEEPSLATE)
                     .strength(-1.0F, 3600000.0F)

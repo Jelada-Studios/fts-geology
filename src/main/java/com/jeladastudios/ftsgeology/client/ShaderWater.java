@@ -36,6 +36,12 @@ public final class ShaderWater {
             out.put(s, id);
             added++;
         }
+        // A puddle is water too: a shader draws its surface as water's.
+        for (BlockState s : ModBlocks.PUDDLE.get().getStateDefinition().getPossibleStates()) {
+            if (out.containsKey(s)) continue;
+            out.put(s, id);
+            added++;
+        }
         GeysersMod.LOGGER.info("Shader pack: the river's {} block states drawn as water (id {})", added, id);
         return out;
     }

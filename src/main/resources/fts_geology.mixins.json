@@ -13,7 +13,9 @@
     "NoiseChunkWrapMixin",
     "HolderHolderWrapMixin",
     "GrassSpreadMixin",
-    "FarmlandSaltMixin"
+    "FarmlandSaltMixin",
+    "LevelWeatherMixin",
+    "ServerLevelWeatherMixin"
   ],
   "client": [
     "OculusBlockIdsMixin",

@@ -211,6 +211,7 @@
   "message.fts_geology.dam.strain": "The dam is straining: %s blocks of water behind it, %s thick where it wants %s. It seeps and creaks.",
   "message.fts_geology.dam.broke": "The dam has broken! The reservoir is running out.",
   "block.fts_geology.sea_water": "Sea Water",
+  "block.fts_geology.puddle": "Puddle",
   "item.fts_geology.sea_water_bucket": "Bucket of Sea Water",
   "item.fts_geology.sea_water_bucket.tooltip": "Salt water: it waters no field wherever it is poured.",
   "message.fts_geology.update_available": "FT's Geology %s is out; this is %s.",

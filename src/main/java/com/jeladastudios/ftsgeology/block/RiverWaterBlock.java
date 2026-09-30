@@ -28,6 +28,16 @@ public class RiverWaterBlock extends LiquidBlock {
         builder.add(RiverWaterFluid.FLOW);
     }
 
+    /** A bank beside the river opened: the river runs into the gap (see {@code RiverSpill}). */
+    @Override
+    public void neighborChanged(@Nonnull BlockState state, @Nonnull net.minecraft.world.level.Level level, @Nonnull net.minecraft.core.BlockPos pos,
+                                @Nonnull Block block, @Nonnull net.minecraft.core.BlockPos from, boolean moving) {
+        super.neighborChanged(state, level, pos, block, from, moving);
+        if (level instanceof net.minecraft.server.level.ServerLevel server) {
+            com.jeladastudios.ftsgeology.hydrology.RiverSpill.consider(server, pos, from);
+        }
+    }
+
     @Override
     @Nonnull
     public FluidState getFluidState(@Nonnull BlockState state) {

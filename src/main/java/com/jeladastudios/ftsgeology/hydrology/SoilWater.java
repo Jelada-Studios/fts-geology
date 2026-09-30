@@ -153,6 +153,8 @@ public final class SoilWater {
         final int[] loadGround = new int[16];
         /** When water first stood two blocks and more over each cell's load, or 0: the rise has to hold. Not kept. */
         final long[] riseSince = new long[16];
+        /** How likely a puddle is on each cell now, eased down as it dries (see Puddles). Not kept. */
+        final float[] puddle = new float[16];
 
         Cells() {
             java.util.Arrays.fill(usable, 1f);
@@ -365,11 +367,15 @@ public final class SoilWater {
         boolean first = c.last < 0;
         double hours = first ? 0 : (now - c.last) * HOURS_PER_TICK;
         boolean away = hours > EVERY * HOURS_PER_TICK * 3;          // not looked at for a while: unloaded
-        advance(level, chunk, c, first, hours, away, level.isRaining(), level.isThundering(), level.isDay());
+        // The rain over this chunk, where the storms are (see Storms); the world's one weather where they are off.
+        float sky = com.jeladastudios.ftsgeology.weather.Storms.intensityAt(level, chunk.getPos().getMiddleBlockX(), chunk.getPos().getMiddleBlockZ());
+        advance(level, chunk, c, first, hours, away, sky >= com.jeladastudios.ftsgeology.weather.Storms.WET,
+                sky >= com.jeladastudios.ftsgeology.weather.Storms.HEAVY, level.isDay());
         c.last = now;
         looks++;
         sendWet(chunk, c);
         loads(level, chunk, c);
+        Puddles.update(level, chunk, c, sky, first || away ? 0 : hours);
         // Away, the place had its average weather, rain and all: no drought or flood is carried over it.
         if (GeyserConfig.SOIL_WATER_GROUND.get()) showGround(level, chunk, c, first || away ? -1 : hours);
     }
@@ -928,6 +934,24 @@ public final class SoilWater {
     }
 
     /** Whether this ground is in a drought, with the ground changing on: grass does not spread onto it. */
+    /**
+     * A flood has stood on this ground and gone (see {@link Floods}): natural soil that holds water turns to mud, and
+     * dries back as the mud of a hollow does, once its top has dried. Only with {@code soilWaterChangesGround}; the rest
+     * of the time a flood leaves the ground as it found it. Nothing a player placed is touched.
+     */
+    public static boolean floodMud(ServerLevel level, BlockPos ground) {
+        if (!GeyserConfig.SOIL_WATER_GROUND.get() || !enabled(level)) return false;
+        BlockState s = level.getBlockState(ground);
+        if (!s.is(SoilBlocks.TURNS_TO_MUD) || com.jeladastudios.ftsgeology.eruption.EruptionHandler.isPlayerPlaced(s)) return false;
+        if (com.jeladastudios.ftsgeology.quake.PlayerBuilt.inChunk(level, ground.getX() >> 4, ground.getZ() >> 4).contains(ground.asLong())) return false;
+        Cells c = CELLS.get(key(level, ground.getX() >> 4, ground.getZ() >> 4));
+        if (c == null) return false;
+        level.setBlock(ground, Blocks.MUD.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        int i = ((ground.getZ() & 15) >> 2) * 4 + ((ground.getX() & 15) >> 2);
+        c.mud[i] |= (short) (1 << ((ground.getZ() & 3) * 4 + (ground.getX() & 3)));
+        return true;
+    }
+
     public static boolean parched(net.minecraft.world.level.LevelReader level, BlockPos pos) {
         if (!(level instanceof ServerLevel sl) || !GeyserConfig.SOIL_WATER_GROUND.get() || !enabled(sl)) return false;
         Cells c = CELLS.get(key(sl, pos.getX() >> 4, pos.getZ() >> 4));
@@ -1104,6 +1128,24 @@ public final class SoilWater {
     // === Reading ==========================================================
 
     /** The cell a column is in, as last looked at, or null where nothing is kept (not loaded, or not looked at). */
+    /**
+     * How much of a chunk's ground is soaked: the share of its cells with water standing on them or the roots full, which
+     * rain can no longer soak into and runs off. -1 where it is not known.
+     */
+    static double soaked(ServerLevel level, int cx, int cz) {
+        Cells c = CELLS.get(key(level, cx, cz));
+        if (c == null || c.last < 0) return -1;
+        int n = 0, wet = 0;
+        for (int i = 0; i < 16; i++) {
+            if (c.kind[i] < 0) continue;
+            Soil s = Soil.values()[c.kind[i]];
+            if (!s.ground()) continue;
+            n++;
+            if (c.pond[i] > PUDDLE || sat(c.root[i], s.root) >= 0.9) wet++;
+        }
+        return n == 0 ? -1 : wet / (double) n;
+    }
+
     public static Reading at(ServerLevel level, int x, int z) {
         if (!enabled(level)) return null;
         Cells c = CELLS.get(key(level, x >> 4, z >> 4));
