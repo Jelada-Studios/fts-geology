@@ -111,6 +111,22 @@ public final class Storms {
             return peak * life(now) * edge * bands;
         }
 
+        /**
+         * Whether it rains at a point, or will: where it will stand halfway through its life if it is younger, at its
+         * full strength, until it starts to die away. How the land's rain is reckoned when storms are formed.
+         */
+        boolean reaches(double px, double pz, long now) {
+            double span = Math.max(1, dies - born);
+            if (now - born > 0.8 * span) return false;
+            double ahead = Math.max(0, born + span * 0.5 - now);
+            double dx = px - (x + vx * ahead), dz = pz - (z + vz * ahead);
+            double d2 = dx * dx + dz * dz;
+            if (d2 >= radius * radius) return false;
+            double edge = Mth.clamp((1.0 - Math.sqrt(d2) / radius) * 1.8, 0.0, 1.0);
+            edge = edge * edge * (3 - 2 * edge);
+            return peak * edge * 0.85 >= WET;
+        }
+
         /** Its strength through its life: it builds over the first tenth, and dies away over the last fifth. */
         double life(long now) {
             double span = Math.max(1, dies - born), t = (now - born) / span;
@@ -329,16 +345,14 @@ public final class Storms {
             seen.add(new double[]{p.getX(), p.getZ()});
             double wet = wetness(level, p.getX(), p.getZ());
             var climate = level.getBiome(p.blockPosition()).value().getModifiedClimateSettings();
-            double downfall = Mth.clamp(climate.downfall(), 0, 1);
-            // Of the land round here, the share under rain the weather would have now.
-            // A wet biome's land under rain a fifth of the time on average, half of it in a wet spell, a twentieth in a
-            // dry one; a desert's hardly ever.
-            double want = Mth.clamp(GeyserConfig.RAIN_AMOUNT.get() * (0.1 + 0.9 * downfall) * (0.05 + 0.7 * wet * wet), 0, 0.9);
-            double have = covered(level, st, p.getX(), p.getZ());
+            double want = wanted(level, p.blockPosition());
+            // Storms still gathering, or upwind on their way, count at once: counted only once they rained here, more
+            // kept forming meanwhile, and the land came to be under rain two or three times as much as its weather has.
+            double have = covered(level, st, p.getX(), p.getZ(), true);
             if (have >= want) continue;
             // One now and then, not one a minute: storms take their time to gather.
             if (level.random.nextDouble() > 0.35) continue;
-            Storm s = storm(level, p.getX(), p.getZ(), wet, climate.temperature());
+            Storm s = storm(level, p.getX(), p.getZ(), wet, climate.temperature(), want - have);
             st.all.add(s);
             formed++;
             com.jeladastudios.ftsgeology.util.Diagnostics.info("storm: a {} forms {} blocks from {} ({} across, {}{}, {} game hours; weather here {}, rain over {} of the land, wanting {})",
@@ -352,36 +366,52 @@ public final class Storms {
     /** How far round a player the land's rain is reckoned, and the storms for it formed. */
     private static final double AROUND = 3000;
 
-    /** The share of the land within three thousand blocks of a place that is under rain: sixteen points on two rings and the middle. */
-    private static double covered(ServerLevel level, Store st, double x, double z) {
+    /**
+     * Of the land round a place, the share under rain its weather would have now: a wet biome's a fifth of the time on
+     * average, half of it in a wet spell, a twentieth in a dry one; a desert's hardly ever.
+     */
+    static double wanted(ServerLevel level, BlockPos pos) {
+        double wet = wetness(level, pos.getX(), pos.getZ());
+        double downfall = Mth.clamp(level.getBiome(pos).value().getModifiedClimateSettings().downfall(), 0, 1);
+        return Mth.clamp(GeyserConfig.RAIN_AMOUNT.get() * (0.1 + 0.9 * downfall) * (0.05 + 0.7 * wet * wet), 0, 0.9);
+    }
+
+    /** Points spread evenly over the land round a place, on a sunflower's spiral: where its rain is reckoned. */
+    private static final int POINTS = 32;
+
+    /**
+     * The share of the land within {@link #AROUND} blocks of a place under rain: now, or {@code planned}, counting each
+     * storm where it will stand halfway through its life and at its full strength (see {@link Storm#reaches}).
+     */
+    private static double covered(ServerLevel level, Store st, double x, double z, boolean planned) {
         long now = level.getGameTime();
-        int wet = 0, n = 0;
-        for (int ring = 0; ring <= 2; ring++) {
-            int points = ring == 0 ? 1 : 8;
-            double r = ring * AROUND / 2;
-            for (int i = 0; i < points; i++) {
-                double a = i * Math.PI * 2 / points + ring * 0.4;
-                double px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
-                n++;
-                for (Storm s : st.all) {
-                    if (s.at(px, pz, now) >= WET) {
-                        wet++;
-                        break;
-                    }
+        int wet = 0;
+        for (int i = 0; i < POINTS; i++) {
+            double r = AROUND * Math.sqrt((i + 0.5) / POINTS), a = i * 2.399963;
+            double px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+            for (Storm s : st.all) {
+                if (planned ? s.reaches(px, pz, now) : s.at(px, pz, now) >= WET) {
+                    wet++;
+                    break;
                 }
             }
         }
-        return wet / (double) n;
+        return wet / (double) POINTS;
     }
 
-    /** A new storm, of the kind the weather makes, upwind of a place so the wind brings it over. */
-    private static Storm storm(ServerLevel level, double x, double z, double wet, float temperature) {
+    /**
+     * A new storm, of the kind the weather makes, somewhere in the land round a place; no bigger than the share of that
+     * land, {@code room}, still wanting rain, so a dry land gets its rain from showers.
+     */
+    private static Storm storm(ServerLevel level, double x, double z, double wet, float temperature, double room) {
         var rnd = level.random;
         Storm s = new Storm();
         double roll = rnd.nextDouble();
         if (wet > 0.75 && roll < 0.35) s.kind = Kind.SPELL;
         else if (roll < (wet < 0.4 ? 0.7 : 0.35) * (temperature > 0.8 ? 1.2 : temperature < 0.3 ? 0.5 : 1.0)) s.kind = Kind.SHOWER;
         else s.kind = Kind.FRONT;
+        double most = AROUND * Math.sqrt(Math.max(1.5 * room, 0.012));
+        if (most < 800) s.kind = Kind.SHOWER;
         double[] w = wind(level, x, z);
         long now = level.getGameTime();
         switch (s.kind) {
@@ -408,6 +438,7 @@ public final class Storms {
                 s.vz = w[1] * 0.15;
             }
         }
+        s.radius = Math.min(s.radius, Math.max(250, most));
         s.born = now;
         s.seed = rnd.nextInt(1 << 20);
         // Anywhere in the land round the place, where it will be halfway through its life, and upwind of that by the way
@@ -566,6 +597,8 @@ public final class Storms {
                 wetness(level, x, z), Math.hypot(w[0], w[1]) * 20, Math.toDegrees(Math.atan2(w[1], w[0]))));
         Store st = level.getDataStorage().get(Store::load, "fts_geology_storms");
         if (st == null) return out;
+        out.add(String.format(Locale.ROOT, "the land within %d blocks: %.2f under rain now, %.2f with the storms on their way; its weather wants %.2f",
+                (int) AROUND, covered(level, st, x, z, false), covered(level, st, x, z, true), wanted(level, at)));
         long now = level.getGameTime();
         for (Storm s : st.all) {
             out.add(String.format(Locale.ROOT, "%s %s %d blocks off, %d across, peak %.2f now %.2f, %.1f game hours left",
