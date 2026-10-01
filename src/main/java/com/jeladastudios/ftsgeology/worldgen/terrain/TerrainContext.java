@@ -44,6 +44,7 @@ public final class TerrainContext {
         known = true;
         boolean tall = isTall(event.getServer());
         TerrainContext.tall = tall;
+        WorldgenRevision.open(event.getServer());
         GeologyParams.take(tall ? TALL_HORIZONTAL : 1.0);
         com.jeladastudios.ftsgeology.compat.ThinAirHeights.open(tall, TALL_HORIZONTAL, seaLevel(event.getServer()));
         TerrainCache.clear();

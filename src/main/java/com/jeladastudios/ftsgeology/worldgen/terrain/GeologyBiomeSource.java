@@ -133,6 +133,16 @@ public class GeologyBiomeSource extends BiomeSource {
                 }
             }
         }
+        // Beside a mountain belt the ground comes up out of the sea while the climate is still at sea: a coastal plain
+        // came out as ocean, sand and gravel under grass-green hills. Where the ground stands dry it is the land round
+        // it. Only in worlds made since, or the new chunks would meet the old at a seam.
+        if (sea && !underground(base) && WorldgenRevision.has(WorldgenRevision.LAND_COASTS)) {
+            Holder<Biome> land = dryCoast(qx, qz, sampler);
+            if (land != null) {
+                base = land;
+                sea = false;
+            }
+        }
         if (!sea && !underground(base)) {
             boolean onChannel = river != null
                     && com.jeladastudios.ftsgeology.hydrology.RiverNetwork.onRiver(bx, bz, ON_CHANNEL);
@@ -168,6 +178,59 @@ public class GeologyBiomeSource extends BiomeSource {
             }
         }
         return base;
+    }
+
+    /** Below this the offset's ground is under the sea whatever the rest of the terrain does to it; not looked at. */
+    private static final double COAST_LOW = 60.0;
+    /** How far out, in quarts, the land a dry coast belongs to is looked for, nearest first. */
+    private static final int[] INLAND = {4, 8, 16, 32, 64};
+    private static final int[][] WAYS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {-1, 1}, {1, -1}, {-1, -1}};
+
+    /** A column's answer, the same at every height of it; {@code land} null where the sea is the sea. */
+    private record Coast(Holder<Biome> land) {}
+
+    private final com.jeladastudios.ftsgeology.util.ColumnCache<Coast> coasts = new com.jeladastudios.ftsgeology.util.ColumnCache<>(14);
+
+    /**
+     * The land biome for a column the climate calls sea but whose ground stands out of the water, or null. Dry is the
+     * built column's own answer ({@link RawGround#wet}), asked only where the offset alone could put ground near the
+     * surface. The land is the nearest column round it the parent calls land, read at the ground's height.
+     */
+    private Holder<Biome> dryCoast(int qx, int qz, Climate.Sampler sampler) {
+        long key = com.jeladastudios.ftsgeology.util.ColumnCache.key(qx, qz);
+        Coast known = coasts.get(key);
+        if (known != null) return known.land();
+        Holder<Biome> land = null;
+        int bx = QuartPos.toBlock(qx) + 2, bz = QuartPos.toBlock(qz) + 2;
+        if (RawGround.ready()) {
+            double h = RawGround.heightAt(bx, bz);
+            if (h > COAST_LOW && !RawGround.wet(bx, bz)) {
+                int qy = QuartPos.fromBlock((int) Math.max(h, SEA_LEVEL) + 2);
+                // The climate's own coast is a strip of shore between its sea and its land; this ground is past it, on
+                // the land side of the real water, so it is the land beyond the strip. A shore only if there is no other.
+                Holder<Biome> shore = null;
+                search:
+                for (int r : INLAND) {
+                    for (int[] w : WAYS) {
+                        Holder<Biome> near = parent.getNoiseBiome(qx + w[0] * r, qy, qz + w[1] * r, sampler);
+                        if (TfcCompat.ocean(near) || TfcCompat.river(near) || TfcCompat.beach(near) || underground(near)) continue;
+                        if (!shoreline(near)) {
+                            land = near;
+                            break search;
+                        }
+                        if (shore == null) shore = near;
+                    }
+                }
+                if (land == null) land = shore;
+            }
+        }
+        coasts.put(key, new Coast(land));
+        return land;
+    }
+
+    /** A coast's own biome that is not tagged a beach: vanilla's stony shore, a terrain mod's rocky or gravel shores. */
+    private static boolean shoreline(Holder<Biome> biome) {
+        return biome.unwrapKey().map(k -> k.location().getPath().contains("shore")).orElse(false);
     }
 
     /** The ones of ours that are green and warm, and so out of place under snow. */
