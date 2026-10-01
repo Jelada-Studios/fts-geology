@@ -560,8 +560,17 @@ public class GasManager {
         }
         lastSweepSize = sweep.size();
         awakeCount = lastSweepSize;
-        allowGrowth = activeCellCount() < GasConfig.MAX_CELLS.get();
+        int cells = activeCellCount();
+        allowGrowth = cells < GasConfig.MAX_CELLS.get();
+        // A cloud spread thin through a great cave keeps every cell it reached, each a hair off plain air; past a few
+        // tens of thousands of cells the thinnest edge of it counts as air, and hands what it held back inwards.
+        thin = cells <= THIN_FROM ? 1.0 : Math.min(THIN_MOST, 1.0 + 3.0 * (cells - THIN_FROM) / THIN_FROM);
     }
+
+    /** How many cells a dimension holds before thin gas counts as air, and the most the threshold is raised. */
+    private static final double THIN_FROM = 20000, THIN_MOST = 8.0;
+    /** The factor on the near-air thresholds now. */
+    private double thin = 1.0;
 
     private void simulateCell(long packed, long now) {
         int x = BlockPos.getX(packed), y = BlockPos.getY(packed), z = BlockPos.getZ(packed);
@@ -633,7 +642,7 @@ public class GasManager {
             else exchange(cell, other);
 
             if (virtual) {
-                if (!other.isNearAir(N0, MATERIALIZE_SCALE) || !cell.isNearAir(N0, SOURCE_SCALE)) {
+                if (!other.isNearAir(N0, MATERIALIZE_SCALE * thin) || !cell.isNearAir(N0, SOURCE_SCALE * thin)) {
                     GasMix born = other.copy();
                     born.simulatedAt = now;
                     nd.cells.put(nkey, born);
@@ -702,7 +711,7 @@ public class GasManager {
             }
         }
 
-        if (cell.isNearAir(N0, DEACTIVATE_SCALE)) deactivate(cd, key, cell);
+        if (cell.isNearAir(N0, DEACTIVATE_SCALE * thin)) deactivate(cd, key, cell);
     }
 
     /** The oxygen below which a candle, a torch or a fire goes out. */
