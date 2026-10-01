@@ -66,6 +66,13 @@ public abstract class RiverWaterFluid extends ForgeFlowingFluid {
         return super.createLegacyBlock(state).setValue(FLOW, state.getValue(FLOW));
     }
 
+    /** On the client, near the player: the foam and the leaves and twigs the river carries (see {@link RiverLife}). */
+    @Override
+    protected void animateTick(@Nonnull Level level, @Nonnull BlockPos pos, @Nonnull FluidState state,
+                               @Nonnull net.minecraft.util.RandomSource random) {
+        RiverLife.animate(level, pos, state, random);
+    }
+
     /** Nothing to do, ever: the generator decided where this water is and it stays there. */
     @Override
     public void tick(@Nonnull Level level, @Nonnull BlockPos pos, @Nonnull FluidState state) {}

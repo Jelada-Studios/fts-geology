@@ -100,5 +100,9 @@ public final class ClientSetup {
                 com.jeladastudios.ftsgeology.client.particle.VolcanicParticles.FlakeProvider::new);
         event.registerSpriteSet(ModParticles.VENT_SMOKE.get(),
                 com.jeladastudios.ftsgeology.client.particle.VolcanicParticles.VentProvider::new);
+        event.registerSpriteSet(ModParticles.RIVER_FOAM.get(),
+                com.jeladastudios.ftsgeology.client.particle.RiverParticles.FoamProvider::new);
+        event.registerSpecial(ModParticles.RIVER_LEAF.get(), new com.jeladastudios.ftsgeology.client.particle.RiverParticles.LeafProvider());
+        event.registerSpecial(ModParticles.RIVER_TWIG.get(), new com.jeladastudios.ftsgeology.client.particle.RiverParticles.TwigProvider());
     }
 }

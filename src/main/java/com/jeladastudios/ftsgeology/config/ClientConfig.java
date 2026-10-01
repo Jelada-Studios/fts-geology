@@ -15,6 +15,8 @@ public final class ClientConfig {
     public static final ForgeConfigSpec.DoubleValue WIND_VOLUME;
     public static final ForgeConfigSpec.BooleanValue STORM_CLOUDS;
     public static final ForgeConfigSpec.DoubleValue RAIN_SLANT;
+    public static final ForgeConfigSpec.BooleanValue RIVER_FOAM;
+    public static final ForgeConfigSpec.BooleanValue RIVER_DEBRIS;
 
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -35,6 +37,14 @@ public final class ClientConfig {
                 .comment("How far the wind may drive the rain aslant: the most a drop moves sideways for each block it falls",
                         "(0.35 is about 20 degrees, in a gale; 0 keeps it upright).")
                 .defineInRange("rainSlant", 0.35, 0.0, 1.0);
+        b.pop();
+        b.push("rivers");
+        RIVER_FOAM = b
+                .comment("Foam on the rivers where they come down a step, and a little on fast water and in rain.")
+                .define("riverFoam", true);
+        RIVER_DEBRIS = b
+                .comment("Leaves and bits of twig drifting down the rivers, more under trees and in wind and rain.")
+                .define("riverDebris", true);
         b.pop();
         SPEC = b.build();
     }

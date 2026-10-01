@@ -64,4 +64,19 @@ public final class ModParticles {
     /** Black smoke out of a flank chimney while the mountain erupts. */
     public static final RegistryObject<SimpleParticleType> VENT_SMOKE =
             PARTICLES.register("vent_smoke", () -> new SimpleParticleType(false));
+
+    // What a river carries on its surface (see client.particle.RiverParticles): flat on the water and moved with it,
+    // which no vanilla particle is.
+
+    /** Foam where a river comes down a step. */
+    public static final RegistryObject<SimpleParticleType> RIVER_FOAM =
+            PARTICLES.register("river_foam", () -> new SimpleParticleType(false));
+
+    /** A leaf drifting down a river. */
+    public static final RegistryObject<SimpleParticleType> RIVER_LEAF =
+            PARTICLES.register("river_leaf", () -> new SimpleParticleType(false));
+
+    /** A bit of twig drifting down a river. */
+    public static final RegistryObject<SimpleParticleType> RIVER_TWIG =
+            PARTICLES.register("river_twig", () -> new SimpleParticleType(false));
 }
