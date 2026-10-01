@@ -20,7 +20,8 @@
   ],
   "client": [
     "OculusBlockIdsMixin",
-    "PuddleRainMixin"
+    "PuddleRainMixin",
+    "RiverMudMixin"
   ],
   "injectors": {
     "defaultRequire": 1
