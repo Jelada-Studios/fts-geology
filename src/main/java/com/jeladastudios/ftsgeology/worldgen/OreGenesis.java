@@ -78,6 +78,8 @@ public final class OreGenesis {
         nativeCopper(d);
         modOres(d);
         d.placed += PetroleumFields.generate(level, cp);
+        fossilBeds(d);
+        gypsumBeds(d);
         gasSeeps(d);
         return d.placed;
     }
@@ -185,6 +187,19 @@ public final class OreGenesis {
             placed++;
         }
 
+        /** Writes a state into a host the predicate takes, inside this chunk and {@code cover} blocks under its ground. */
+        boolean setIn(int x, int y, int z, BlockState state, int cover, java.util.function.Predicate<BlockState> host) {
+            if (!inside(x, z) || y <= level.getMinBuildHeight()) return false;
+            int g = ground(x, z);
+            if (g == Integer.MIN_VALUE || y > g - cover) return false;
+            BlockPos p = new BlockPos(x, y, z);
+            BlockState s = level.getBlockState(p);
+            if (s.is(state.getBlock()) || s.hasBlockEntity() || !host.test(s)) return false;
+            level.setBlock(p, state, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+            placed++;
+            return true;
+        }
+
         /** Visits every cell of a grid whose deposit, anchored anywhere in it and reaching {@code reach} blocks, can touch this chunk. */
         void cells(int size, int reach, long salt, CellVisitor visit) {
             int minCx = Math.floorDiv(x0 - reach, size), maxCx = Math.floorDiv(x0 + 15 + reach, size);
@@ -281,6 +296,7 @@ public final class OreGenesis {
         double centre = TectonicMap.sampleCached(d.world, d.x0 + 8, d.z0 + 8).stress();
         if (centre > 0.86) return;
         boolean perColumn = centre > 0.54;
+        boolean fossils = d.own && FossilBeds.geological();
 
         for (int lx = 0; lx < 16; lx++) {
             for (int lz = 0; lz < 16; lz++) {
@@ -303,6 +319,7 @@ public final class OreGenesis {
                         d.set(x, y + 1, z, ModBlocks.SHALE.get(), 4);
                         d.set(x, y, z, Blocks.COAL_ORE, 4);
                         d.set(x, y - 1, z, roll(x, y, z, 3) == 0 ? Blocks.COAL_ORE : ModBlocks.SHALE.get(), 4);
+                        if (fossils) coalRoof(d, x, y, z, false);
                     }
                 }
 
@@ -310,6 +327,7 @@ public final class OreGenesis {
                 if (noise(x + 7919, z - 7919, 64.0) > 0.30) {
                     int y = (int) Math.round(-8.0 + 5.0 * Math.sin(x * 0.0056 + 1.2) + Math.sin(z * 0.13));
                     d.set(x, y, z, roll(x, y, z, 3) == 0 ? ModBlocks.SHALE.get() : Blocks.DEEPSLATE_COAL_ORE, 4);
+                    if (fossils) coalRoof(d, x, y, z, true);
                 }
 
                 // Ironstone: a thin oolitic horizon around Y=18, with grains of ore scattered through it.
@@ -353,6 +371,201 @@ public final class OreGenesis {
         }
         if (headOn && s.convergence() < 0 && dist < 1.5 * width) return true;
         return noise(x - 7717, z + 7717, 1500.0) > 0.3;
+    }
+
+    // === Fossils (Jurassic Reborn) ==============================================
+
+    /**
+     * Plant fossils in the shale over a coal seam -- the leaves and bark of the swamp forest the coal was made of, as in
+     * the roof of every coal mine -- and amber over the young seam, the resin of its trees.
+     */
+    private static void coalRoof(Deposit d, int x, int y, int z, boolean deep) {
+        if (roll(x, y + 1, z, 9) == 0) {
+            Block flora = FossilBeds.block(deep ? "deepslate_flora_fossil" : "flora_fossil");
+            java.util.function.Predicate<BlockState> roof = deep
+                    ? s -> s.is(Blocks.DEEPSLATE) || s.is(ModBlocks.SHALE.get()) : s -> s.is(ModBlocks.SHALE.get());
+            if (flora != null && d.setIn(x, y + 1, z, variant(flora.defaultBlockState(), roll(x, y, z, 64)), 4, roof)) {
+                FossilBeds.PLANTS.increment();
+            }
+        }
+        if (!deep && roll(x, y + 2, z, 12) == 0) {
+            Block amber = FossilBeds.block("amber_ore");
+            if (amber != null && d.setIn(x, y + 2, z, amber.defaultBlockState(), 4, OreGenesis::sediment)) FossilBeds.AMBER.increment();
+        }
+    }
+
+    /** A block's {@code variant}, if it has one, picked by a roll. */
+    private static BlockState variant(BlockState s, int roll) {
+        net.minecraft.world.level.block.state.properties.Property<?> p = s.getBlock().getStateDefinition().getProperty("variant");
+        return p == null ? s : withValue(s, p, roll);
+    }
+
+    private static <T extends Comparable<T>> BlockState withValue(BlockState s,
+            net.minecraft.world.level.block.state.properties.Property<T> p, int roll) {
+        List<T> values = new java.util.ArrayList<>(p.getPossibleValues());
+        return s.setValue(p, values.get(Math.floorMod(roll, values.size())));
+    }
+
+    /** Grid of bone beds, and the most one reaches from its middle. */
+    private static final int BED_CELL = 40, BED_REACH = 12;
+
+    /** Rock a bone can lie in: what was laid down as sediment, deep or not. */
+    private static boolean boneHost(BlockState s) {
+        return s.is(Blocks.STONE) || s.is(Blocks.DEEPSLATE) || s.is(Blocks.SANDSTONE) || s.is(Blocks.RED_SANDSTONE)
+                || s.is(BlockTags.TERRACOTTA) || s.is(Blocks.CALCITE) || s.is(ModBlocks.SHALE.get()) || s.is(ModBlocks.CHERT.get());
+    }
+
+    /** One bone bed: its middle and height, age, sea or land, how rich, its species, reach and bones, a nest, amber. */
+    public record BoneBed(int x, int z, int y, FossilBeds.Age age, boolean sea, boolean rich, Block[] species, int r,
+                          int bones, Block nest, Block amber, long h) {}
+
+    /**
+     * The bone bed of a grid cell, or null: worked out from the cell alone, so every chunk it reaches lays the same bed
+     * and a search can find it without building anything.
+     */
+    static BoneBed boneBed(ServerLevel world, long seed, long rockSeed, com.jeladastudios.ftsgeology.tectonics.GeologyParams params,
+                           int cellX, int cellZ, long h) {
+        Map<FossilBeds.Age, FossilBeds.Stage> stages = FossilBeds.stages();
+        int ax = cellX + (int) (die(h, 1) * BED_CELL), az = cellZ + (int) (die(h, 2) * BED_CELL);
+        int ox = (int) (seed & 0xFFFFL), oz = (int) ((seed >>> 16) & 0xFFFFL);
+        boolean rich = noise(ax + ox, az - oz, 1200.0) > 0.4;
+        if (die(h, 0) >= (rich ? 0.8 : 0.15)) return null;
+        if (!basin(world, ax, az)) return null;
+        Lithology.Column col = Lithology.column(rockSeed, params, ax, az);
+        // A bed lies in the basin's cover, the sediment on its crystalline basement, never in the basement itself. The
+        // cover holds its ages in order, the oldest at its foot on the basement and the youngest under the soil: a
+        // platform's from the Ordovician up, a foreland's and a rift's only the younger ones, laid since they sank.
+        int g = anchorGround(world, ax, az), top = g - 6, bottom = g - Lithology.coverDepth(col);
+        FossilBeds.Age[] all = FossilBeds.Age.values();
+        int oldest = switch (col.setting()) {
+            case PLATFORM -> 0;
+            case FORELAND -> FossilBeds.Age.TRIASSIC.ordinal();
+            default -> FossilBeds.Age.JURASSIC.ordinal();
+        };
+        int span = all.length - oldest;
+        if (top - bottom + 1 < 2 * span) return null;
+        List<FossilBeds.Age> ages = new java.util.ArrayList<>();
+        for (int i = oldest; i < all.length; i++) if (stages.get(all[i]).has()) ages.add(all[i]);
+        if (ages.isEmpty()) return null;
+        FossilBeds.Age age = ages.get((int) (die(h, 3) * ages.size()));
+        FossilBeds.Stage st = stages.get(age);
+        double slice = (top - bottom + 1) / (double) span;
+        int lo = bottom + (int) Math.floor((age.ordinal() - oldest) * slice);
+        int hi = bottom + (int) Math.floor((age.ordinal() - oldest + 1) * slice) - 1;
+        int y = lo + (int) (die(h, 4) * Math.max(1, hi - lo));
+        Boolean sea;
+        switch (Lithology.rockAt(rockSeed, col, ax, y, az, g)) {
+            case CALCITE, CHERT -> sea = Boolean.TRUE;
+            case SANDSTONE, RED_BEDS -> sea = Boolean.FALSE;
+            case SHALE, KEEP, STONE -> sea = null;
+            default -> {
+                return null;                                                // no bones in marble, basalt or granite
+            }
+        }
+        boolean canSea = !st.sea.isEmpty(), canLand = !st.land.isEmpty();
+        if (sea == null) sea = canSea && (!canLand || die(h, 5) < (col.setting() == Lithology.Setting.RIFT ? 0.25 : 0.55));
+        List<Block> pool = sea ? st.sea : st.land;
+        if (pool.isEmpty()) return null;
+        int kinds = Math.min(pool.size(), rich ? 2 + (int) (die(h, 6) * 3) : 1 + (int) (die(h, 6) * 2));
+        Block[] species = new Block[kinds];
+        int first = (int) (die(h, 7) * pool.size());
+        for (int k = 0; k < kinds; k++) species[k] = pool.get((first + k * 7) % pool.size());
+        int r = rich ? 5 + (int) (die(h, 8) * 5) : 3 + (int) (die(h, 8) * 2);
+        int bones = rich ? 10 + (int) (die(h, 9) * 7) : 4 + (int) (die(h, 9) * 5);
+        Block nest = !sea && age == FossilBeds.Age.CRETACEOUS && die(h, 10) < 0.25 ? FossilBeds.block("nest_fossil") : null;
+        Block amber = !sea && (age == FossilBeds.Age.CRETACEOUS || age == FossilBeds.Age.CENOZOIC) && die(h, 11) < 0.35
+                ? FossilBeds.block(y < 0 ? "deepslate_amber_ore" : "amber_ore") : null;
+        return new BoneBed(ax, az, y, age, sea, rich, species, r, bones, nest, amber, h);
+    }
+
+    /** The salt of the bone beds' grid. */
+    private static final long BED_SALT = 0xF055E1L;
+
+    /**
+     * Bone beds of Jurassic Reborn's animals in the sedimentary cover of a basin (see {@link FossilBeds}). A bed is a
+     * lens a few blocks across of one age -- the age whose band of height it lies in -- with one to four species in
+     * it: sea creatures where the rock is shale or limestone, land animals in sandstone and red beds, the rest by the
+     * setting (a rift's lakes and rivers hold more land animals than a platform's sea). In a few stretches of country
+     * the beds are many and rich (a Morrison, a Holzmaden, a Liaoning); elsewhere one turns up now and then. A Cretaceous
+     * land bed may hold a nest; a young land bed, amber.
+     */
+    private static void fossilBeds(Deposit d) {
+        if (!d.own || !FossilBeds.geological()) return;
+        Block fauna = FossilBeds.block("fauna_fossil");
+        d.cells(BED_CELL, BED_REACH, BED_SALT, (cellX, cellZ, h) -> {
+            BoneBed bed = boneBed(d.world, d.seed, d.rockSeed, d.params, cellX, cellZ, h);
+            if (bed == null) return;
+            if (d.inside(bed.x(), bed.z())) FossilBeds.BEDS.increment();
+            int parts = bed.bones() + 2 + (bed.nest() == null ? 0 : 1) + (bed.amber() == null ? 0 : 3);
+            for (int i = 0; i < parts; i++) {
+                double ang = die(h, 20 + i) * Math.PI * 2, dist = Math.sqrt(die(h, 60 + i)) * bed.r();
+                int bx = bed.x() + (int) Math.round(Math.cos(ang) * dist), bz = bed.z() + (int) Math.round(Math.sin(ang) * dist);
+                if (!d.inside(bx, bz)) continue;
+                int by = bed.y() + (die(h, 100 + i) < 0.5 ? 0 : 1);
+                Block put;
+                if (i < bed.bones()) put = bed.species()[i % bed.species().length];
+                else if (i < bed.bones() + 2) put = fauna;
+                else if (bed.nest() != null && i == bed.bones() + 2) put = bed.nest();
+                else put = bed.amber();
+                if (put == null) continue;
+                if (d.setIn(bx, by, bz, variant(put.defaultBlockState(), (int) (die(h, 140 + i) * 64)), 4, OreGenesis::boneHost)) {
+                    if (i < bed.bones()) FossilBeds.BONES.increment();
+                    else if (put == bed.amber()) FossilBeds.AMBER.increment();
+                }
+            }
+        });
+    }
+
+    /** The bone bed nearest a point, within a reach, or null: for finding one. Pure; safe off the server thread. */
+    public static BoneBed nearestBoneBed(ServerLevel world, int x, int z, int reach) {
+        if (!com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(world) || !FossilBeds.geological()) return null;
+        long seed = world.getSeed();
+        long rockSeed = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed();
+        var params = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params();
+        BoneBed best = null;
+        double bd = Double.MAX_VALUE;
+        for (int cx = Math.floorDiv(x - reach, BED_CELL); cx <= Math.floorDiv(x + reach, BED_CELL); cx++) {
+            for (int cz = Math.floorDiv(z - reach, BED_CELL); cz <= Math.floorDiv(z + reach, BED_CELL); cz++) {
+                double far = Math.hypot((cx + 0.5) * BED_CELL - x, (cz + 0.5) * BED_CELL - z) - BED_CELL;
+                if (far > bd) continue;
+                BoneBed b = boneBed(world, seed, rockSeed, params, cx * BED_CELL, cz * BED_CELL, hash(seed, cx, cz, BED_SALT));
+                if (b == null) continue;
+                double dd = Math.hypot(b.x() - x, b.z() - z);
+                if (dd < bd) {
+                    bd = dd;
+                    best = b;
+                }
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Jurassic Reborn's gypsum where a basin once dried out: the thin limestone beds of its cover turned gypsum, in
+     * the stretches of a basin that lay under a desert sea (the Zechstein, the Messinian, the gypsum hills of Sivas).
+     */
+    private static void gypsumBeds(Deposit d) {
+        if (!d.own || !FossilBeds.geological()) return;
+        int ox = (int) ((d.seed >>> 8) & 0xFFFFL), oz = (int) ((d.seed >>> 24) & 0xFFFFL);
+        if (noise(d.x0 + 8 + ox, d.z0 + 8 - oz, 700.0) < 0.3) return;
+        Block gypsum = FossilBeds.block("gypsum_stone");
+        if (gypsum == null || !basin(d.world, d.x0 + 8, d.z0 + 8)) return;
+        Lithology.Column col = d.column(d.x0 + 8, d.z0 + 8);
+        if (col == null) return;
+        int cover = Lithology.coverDepth(col);
+        if (cover <= 0) return;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int x = d.x0; x < d.x0 + 16; x++) {
+            for (int z = d.z0; z < d.z0 + 16; z++) {
+                if (noise(x + ox, z - oz, 700.0) < 0.4) continue;
+                int g = d.ground(x, z);
+                if (g == Integer.MIN_VALUE) continue;
+                for (int y = g - 3; y > g - cover && y > d.level.getMinBuildHeight(); y--) {
+                    if (!d.level.getBlockState(m.set(x, y, z)).is(Blocks.CALCITE)) continue;
+                    if (d.setIn(x, y, z, gypsum.defaultBlockState(), 3, s -> s.is(Blocks.CALCITE))) FossilBeds.GYPSUM.increment();
+                }
+            }
+        }
     }
 
     // === Veins =================================================================

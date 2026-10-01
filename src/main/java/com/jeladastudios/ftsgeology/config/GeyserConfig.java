@@ -144,6 +144,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue ORE_GENESIS_ENABLED;   // ore laid down by tectonic setting
     public static final ForgeConfigSpec.BooleanValue PETROLEUM;             // oil and gas fields in the basins
     public static final ForgeConfigSpec.DoubleValue PETROLEUM_CHANCE;       // share of basin grid cells with a field
+    public static final ForgeConfigSpec.BooleanValue FOSSIL_BEDS;            // Jurassic Reborn fossils laid by the geology
 
     // --- Earthquakes --------------------------------------------------------
     public static final ForgeConfigSpec.BooleanValue QUAKES_ENABLED;
@@ -748,6 +749,13 @@ public final class GeyserConfig {
         PETROLEUM_CHANCE = b
                 .comment("Share of the 640-block grid cells in a basin that hold a field.")
                 .defineInRange("petroleumFieldChance", 0.4, 0.0, 1.0);
+        FOSSIL_BEDS = b
+                .comment("With Jurassic Reborn, on the mod's own world type: its fossils, amber and gypsum are laid by the",
+                        "geology instead of in every chunk -- bone beds of one age in the sedimentary rock of the basins (sea",
+                        "creatures in shale and limestone, land animals in sandstone), rich in a few places, plant fossils over",
+                        "the coal, amber with the young coal, gypsum in dry basins; the ages in order through the rock, oldest deepest.",
+                        "New chunks only; the world must be restarted for a change.")
+                .define("fossilBeds", true);
         VOLCANO_SPAWN_CHANCE = b
                 .comment("Per-chunk chance of a natural volcano BEFORE tectonic suitability is applied.",
                         "Deliberately tiny: volcanoes are huge structures and should be landmarks.",

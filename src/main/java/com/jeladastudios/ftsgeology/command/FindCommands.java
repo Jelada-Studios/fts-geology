@@ -106,6 +106,15 @@ public final class FindCommands {
                     String.format(java.util.Locale.ROOT, "%.3f", f.sour()), String.format(java.util.Locale.ROOT, "%.2f", f.richness()));
             return f == null ? null : new Hit(f.x(), f.z(), (int) Math.round(Math.hypot(f.x() - at.getX(), f.z() - at.getZ())));
         }
+        // A bone bed (Jurassic Reborn's fossils, where the geology lays them) hangs off a seeded grid too.
+        if (what.equals("fossils")) {
+            var b = com.jeladastudios.ftsgeology.worldgen.OreGenesis.nearestBoneBed(level, at.getX(), at.getZ(), 3000);
+            if (b != null) GeysersMod.LOGGER.info("bone bed at {} {} {}: {} {}, {} species, {} bones over {} blocks{}{}{}",
+                    b.x(), b.y(), b.z(), b.age().name().toLowerCase(java.util.Locale.ROOT), b.sea() ? "sea" : "land",
+                    b.species().length, b.bones(), b.r(), b.rich() ? ", rich" : "", b.nest() != null ? ", a nest" : "",
+                    b.amber() != null ? ", amber" : "");
+            return b == null ? null : new Hit(b.x(), b.z(), (int) Math.round(Math.hypot(b.x() - at.getX(), b.z() - at.getZ())));
+        }
         // Karst stands on the seed too: a sinkhole on its grid, a swallow hole where the network takes a river into a hill.
         if (what.equals("sinkhole") || what.equals("swallowhole")) {
             if (!com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level)) return null;

@@ -154,6 +154,7 @@ public final class PetroleumFields {
         int placed = 0;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         for (Field f : fields) {
+            Block seal = seal(f);
             for (int lx = 0; lx < 16; lx++) {
                 for (int lz = 0; lz < 16; lz++) {
                     int x = cp.getMinBlockX() + lx, z = cp.getMinBlockZ() + lz;
@@ -165,7 +166,7 @@ public final class PetroleumFields {
                         if (y > ground - 8 || y <= level.getMinBuildHeight() + 2) continue;
                         Zone zone = f.zone(x, y, z);
                         Block block = switch (zone) {
-                            case SEAL -> ModBlocks.SHALE.get();
+                            case SEAL -> seal;
                             case OIL -> ModBlocks.OIL_SANDSTONE.get();
                             case GAS, WATER -> Blocks.SANDSTONE;
                             default -> null;
@@ -176,11 +177,24 @@ public final class PetroleumFields {
                         if (s.is(block) || s.hasBlockEntity() || !OreGenesis.isHostRock(s)) continue;
                         level.setBlock(m, TfcCompat.translate(level, m, block.defaultBlockState()), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
                         placed++;
+                        if (zone == Zone.SEAL && block != ModBlocks.SHALE.get()) FossilBeds.GYPSUM.increment();
                     }
                 }
             }
         }
         return placed;
+    }
+
+    /**
+     * What seals a field: shale, or in some fields an evaporite -- Jurassic Reborn's gypsum, where the geology lays it
+     * (see {@link FossilBeds}).
+     */
+    private static Block seal(Field f) {
+        if (rand01(hash(f.id(), 15, 0, 0)) < 0.3 && FossilBeds.geological()) {
+            Block gypsum = FossilBeds.block("gypsum_stone");
+            if (gypsum != null) return gypsum;
+        }
+        return ModBlocks.SHALE.get();
     }
 
     /**

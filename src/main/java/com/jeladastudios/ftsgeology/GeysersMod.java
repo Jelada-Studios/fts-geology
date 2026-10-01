@@ -111,6 +111,9 @@ public class GeysersMod {
         String modOres = com.jeladastudios.ftsgeology.worldgen.OreGenesis.modOresSummary();
         if (modOres != null) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", modOres);
         com.jeladastudios.ftsgeology.compat.OreUnification.clear();
+        String fossils = com.jeladastudios.ftsgeology.worldgen.FossilBeds.summary();
+        if (fossils != null) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", fossils);
+        com.jeladastudios.ftsgeology.worldgen.FossilBeds.clear();
         if (com.jeladastudios.ftsgeology.quake.RoofLoad.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.quake.RoofLoad.summary());
         com.jeladastudios.ftsgeology.quake.RoofLoad.clear();
         com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.hydrology.Subsidence.summary());

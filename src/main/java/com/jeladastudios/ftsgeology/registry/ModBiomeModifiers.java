@@ -23,4 +23,8 @@ public final class ModBiomeModifiers {
     /** One ore of a kind: other mods' features placing an ore the kept mod already places there. See {@link com.jeladastudios.ftsgeology.compat.OreUnification}. */
     public static final RegistryObject<Codec<com.jeladastudios.ftsgeology.compat.OreUnification.Remove>> UNIFY_ORES =
             SERIALIZERS.register("unify_ores", () -> com.jeladastudios.ftsgeology.compat.OreUnification.Remove.CODEC);
+
+    /** Jurassic Reborn's fossils, amber and gypsum laid by the geology instead. See {@link com.jeladastudios.ftsgeology.worldgen.FossilBeds}. */
+    public static final RegistryObject<Codec<com.jeladastudios.ftsgeology.worldgen.FossilBeds.Remove>> FOSSIL_BEDS =
+            SERIALIZERS.register("fossil_beds", () -> com.jeladastudios.ftsgeology.worldgen.FossilBeds.Remove.CODEC);
 }
