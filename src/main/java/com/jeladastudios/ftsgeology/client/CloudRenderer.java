@@ -38,7 +38,7 @@ final class CloudRenderer {
     private int gridI = Integer.MIN_VALUE, gridJ;
     private long sampledAt;
     private final float[] base = new float[N * N], top = new float[N * N], dark = new float[N * N];
-    private final float[] sample = new float[3];
+    private final float[] sample = new float[4];
     /** What the mesh was last built for: the camera's cell and height step, the colour and the cloud setting. */
     private int meshI = Integer.MIN_VALUE, meshJ, meshY;
     private Vec3 meshColor;
@@ -97,27 +97,58 @@ final class CloudRenderer {
         gridJ = j0;
         sampledAt = now;
         remesh = true;
+        float[] cell = new float[3];
         for (int j = 0; j < N; j++) {
             for (int i = 0; i < N; i++) {
-                int k = j * N + i, fi = i0 + i, fj = j0 + j;
-                ClientSky.sample(fi * CELL + CELL / 2.0 + dx, fj * CELL + CELL / 2.0 + dz, now, sample);
-                float cover = sample[0], d = sample[1], tower = sample[2];
-                float n = noise(fi, fj);
-                // The noise's spread is about 0.15 round a half: this share of the cells falls under the line.
-                float line = 0.5f + 0.088f * (float) Math.log(cover / (1f - cover));
-                if (n >= line) {
-                    base[k] = top[k] = Float.NaN;
-                    continue;
-                }
-                float depth = (line - n) / 0.15f;
-                // Fair-weather heaps rise in domes; a low's deck is thick and flat-bottomed; a thunderstorm towers.
-                float thick = (d > 0.35f ? 10f + 12f * depth : 6f + 13f * depth) + tower * 60f * Math.min(depth, 2f);
-                // A storm's underside hangs a little lower, in soft lumps; a fair-weather cloud's is flat.
-                base[k] = -8f * d - smoothNoise(fi / 3f, fj / 3f, 57) * 3f * d;
-                top[k] = base[k] + Math.min(thick, 140f);
-                dark[k] = d;
+                int k = j * N + i;
+                cell(i0 + i, j0 + j, now, dx, dz, sample, cell);
+                base[k] = cell[0];
+                top[k] = cell[1];
+                dark[k] = cell[2];
             }
         }
+    }
+
+    /**
+     * One cell of the field: {@code out[0]} its underside and {@code out[1]} its top over the cloud height (NaN where the
+     * sky is clear), {@code out[2]} how dark.
+     */
+    private static void cell(int fi, int fj, long now, double dx, double dz, float[] sample, float[] out) {
+        ClientSky.sample(fi * CELL + CELL / 2.0 + dx, fj * CELL + CELL / 2.0 + dz, now, sample);
+        float cover = sample[0], d = sample[1], tower = sample[2];
+        float n = noise(fi, fj);
+        // The noise's spread is about 0.15 round a half: this share of the cells falls under the line.
+        float line = 0.5f + 0.088f * (float) Math.log(cover / (1f - cover));
+        // Over the rain there is no gap: a cell the noise would leave open is still a thin cloud there.
+        boolean raining = sample[3] > 0.02f;
+        if (n >= line && !raining) {
+            out[0] = out[1] = Float.NaN;
+            out[2] = 0;
+            return;
+        }
+        float depth = Math.max((line - n) / 0.15f, raining ? 0.3f : 0f);
+        // Fair-weather heaps rise in domes; a low's deck is thick and flat-bottomed; a thunderstorm towers.
+        float thick = (d > 0.35f ? 10f + 12f * depth : 6f + 13f * depth) + tower * 60f * Math.min(depth, 2f);
+        // A storm's underside hangs a little lower, in soft lumps; a fair-weather cloud's is flat.
+        out[0] = -8f * d - smoothNoise(fi / 3f, fj / 3f, 57) * 3f * d;
+        out[1] = out[0] + Math.min(thick, 140f);
+        out[2] = d;
+    }
+
+    /**
+     * The cloud over a place as drawn: {@code out[0]} its underside and {@code out[1]} its top, in world height; false where
+     * the sky over it is clear, or the clouds are not this mod's.
+     */
+    static boolean deckAt(ClientLevel level, double x, double z, float partial, float[] out) {
+        float height = level.effects().getCloudHeight();
+        if (Float.isNaN(height) || !ClientSky.ready()) return false;
+        double dx = ClientSky.driftX(partial), dz = ClientSky.driftZ(partial);
+        float[] sample = new float[4], cell = new float[3];
+        cell(Mth.floor((x - dx) / CELL), Mth.floor((z - dz) / CELL), level.getGameTime(), dx, dz, sample, cell);
+        if (Float.isNaN(cell[0])) return false;
+        out[0] = height + cell[0];
+        out[1] = height + cell[1];
+        return true;
     }
 
     /** Builds the clouds' mesh round the camera's cell and height step. */
@@ -167,17 +198,28 @@ final class CloudRenderer {
         VertexBuffer.unbind();
     }
 
-    /** A cell's side towards a neighbour, where the neighbour does not cover it: all of it, or above the neighbour's top. */
+    /**
+     * A cell's side towards a neighbour, where the neighbour does not cover it: all of it, or above the neighbour's top,
+     * and below the neighbour's underside where this cell hangs lower (else the lumpy underside of a storm shows the sky
+     * through thin cracks between its cells).
+     */
     private void side(BufferBuilder b, int ni, int nj, int k, float lift, float xa, float za, float xb, float zb,
                       float r, float g, float bl, float a, float nx, float nz) {
         float y0 = base[k], y1 = top[k];
         if (ni >= 0 && ni < N && nj >= 0 && nj < N) {
             int n = nj * N + ni;
             if (!Float.isNaN(base[n])) {
+                if (base[n] > y0) span(b, lift, y0, Math.min(y1, base[n]), xa, za, xb, zb, r, g, bl, a, nx, nz);
                 if (top[n] >= y1) return;
                 y0 = Math.max(y0, top[n]);
             }
         }
+        span(b, lift, y0, y1, xa, za, xb, zb, r, g, bl, a, nx, nz);
+    }
+
+    private static void span(BufferBuilder b, float lift, float y0, float y1, float xa, float za, float xb, float zb,
+                             float r, float g, float bl, float a, float nx, float nz) {
+        if (y1 <= y0) return;
         y0 += lift;
         y1 += lift;
         // Darker low down, where less light reaches: a side shades from its top to its foot.

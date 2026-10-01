@@ -17,6 +17,11 @@ public final class LocalWeather {
     private static volatile float targetRain, targetThunder, targetWindX, targetWindZ;
     private static float rain, thunder, oRain, oThunder, windX, windZ;
     private static volatile long heard;
+    /**
+     * How much of the storm's rain reaches the player where they stand against its cloud deck, eased: all of it under
+     * the deck, some in the mist inside it, none above it, where the sky is clear (the client tells it each tick).
+     */
+    private static float overhead = 1f, oOverhead = 1f, targetOverhead = 1f;
 
     public static void set(LocalWeatherPacket p) {
         if (heard == 0) {
@@ -52,6 +57,13 @@ public final class LocalWeather {
         thunder += Mth.clamp(targetThunder - thunder, -0.003f, 0.004f);
         windX += (targetWindX - windX) * 0.01f;
         windZ += (targetWindZ - windZ) * 0.01f;
+        oOverhead = overhead;
+        overhead += Mth.clamp(targetOverhead - overhead, -0.02f, 0.02f);
+    }
+
+    /** Where the player stands against the cloud deck: 1 under it, less in it, 0 above it (see {@link #overhead}). */
+    public static void overhead(float target) {
+        targetOverhead = Mth.clamp(target, 0f, 1f);
     }
 
     /** How hard it is to rain here now, as the server tells it, before the easing: what the rain is coming to. */
@@ -68,17 +80,19 @@ public final class LocalWeather {
         return windZ;
     }
 
+    /** The rain where the player is: the storm's, as much of it as reaches them under, in or over its cloud deck. */
     public static float rain(float partial) {
-        return Mth.lerp(partial, oRain, rain);
+        return Mth.lerp(partial, oRain, rain) * Mth.lerp(partial, oOverhead, overhead);
     }
 
     public static float thunder(float partial) {
-        return Mth.lerp(partial, oThunder, thunder);
+        return Mth.lerp(partial, oThunder, thunder) * Mth.lerp(partial, oOverhead, overhead);
     }
 
     /** Forgets the server's weather: a new world, or a server without it. */
     public static void reset() {
         heard = 0;
+        overhead = oOverhead = targetOverhead = 1f;
         rain = oRain = thunder = oThunder = targetRain = targetThunder = 0;
         windX = windZ = targetWindX = targetWindZ = 0;
     }

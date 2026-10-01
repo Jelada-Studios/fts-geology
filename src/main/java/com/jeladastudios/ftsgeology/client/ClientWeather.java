@@ -54,6 +54,13 @@ public final class ClientWeather {
     private static Boolean recordings;
     private static final java.util.Map<ResourceLocation, Boolean> HAS = new java.util.HashMap<>();
     private static Track light, medium, heavy, wind, intro;
+    /**
+     * The last game tick a recording was heard playing while it rained, and whether vanilla's own rain stands in for them
+     * now: when the sound engine has no stream left for them (other mods' music and ambience use streams too) the rain
+     * is not left silent.
+     */
+    private static long heardAt;
+    private static boolean standIn;
     /** Ticks since the rain was last heard: a rain after a dry while begins with its recording's own beginning. */
     private static int dryTicks = Integer.MAX_VALUE / 2;
     /** How wet the world round the player still is: the rain, and after it a while of dripping. */
@@ -69,6 +76,11 @@ public final class ClientWeather {
     static boolean recordings() {
         if (recordings == null) recordings = has(LIGHT) && has(HEAVY);
         return recordings;
+    }
+
+    /** Whether the recordings play the rain now: they are in the jar and the sound engine is playing them. */
+    static boolean recordingsHeard() {
+        return recordings() && !standIn;
     }
 
     /** Whether one recording is there: the middle strength, the beginnings and the wind may be missing. */
@@ -90,10 +102,14 @@ public final class ClientWeather {
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
-        LocalWeather.tick();
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
         LocalPlayer player = mc.player;
+        // Under, in or over the storm's cloud: the rain reaching the player, and so the sky, the sound and the drops.
+        if (level != null && player != null && LocalWeather.active()) {
+            LocalWeather.overhead(ClientSky.overhead(level, player.getX(), player.getEyeY(), player.getZ()));
+        }
+        LocalWeather.tick();
         if (level == null || player == null) {
             stop();
             return;
@@ -114,7 +130,7 @@ public final class ClientWeather {
     /** Vanilla's rain is not played where the recordings play instead. */
     @SubscribeEvent
     public static void onPlaySound(PlaySoundEvent event) {
-        if (event.getSound() == null || !recordings()) return;
+        if (event.getSound() == null || !recordingsHeard()) return;
         ResourceLocation id = event.getSound().getLocation();
         if (id.getNamespace().equals("minecraft") && (id.getPath().equals("weather.rain") || id.getPath().equals("weather.rain.above"))) {
             event.setSound(null);
@@ -134,12 +150,13 @@ public final class ClientWeather {
         if (player.isUnderWater()) cover *= 0.2f;
         // The strengths hand over as the rain grows: a drizzle, a steady rain, a downpour.
         float l, m, h;
+        // A drizzle is heard as soon as it is seen: the light recording comes in from the first drops.
         if (has(MEDIUM)) {
-            l = smooth((rain - 0.02f) / 0.12f) * (1f - smooth((rain - 0.3f) / 0.2f));
+            l = smooth((rain - 0.01f) / 0.07f) * (1f - smooth((rain - 0.3f) / 0.2f));
             m = smooth((rain - 0.25f) / 0.15f) * (1f - smooth((rain - 0.6f) / 0.2f));
             h = smooth((rain - 0.55f) / 0.2f);
         } else {
-            l = smooth((rain - 0.02f) / 0.15f) * (1f - smooth((rain - 0.45f) / 0.25f));
+            l = smooth((rain - 0.01f) / 0.08f) * (1f - smooth((rain - 0.45f) / 0.25f));
             m = 0;
             h = smooth((rain - 0.4f) / 0.3f);
         }
@@ -178,9 +195,29 @@ public final class ClientWeather {
             if (player.isUnderWater()) w = 0;
             wind = track(wind, WIND, WIND_LEVEL * w * com.jeladastudios.ftsgeology.config.ClientConfig.WIND_VOLUME.get().floatValue());
         }
+        // Heard, or not: with no stream to play on, vanilla's rain stands in until one is free again.
+        var sounds = Minecraft.getInstance().getSoundManager();
+        boolean playing = false;
+        for (Track t : new Track[]{light, medium, heavy, intro}) if (t != null && sounds.isActive(t)) playing = true;
+        long now = level.getGameTime();
+        if (playing || rain * cover < 0.02f || now < heardAt) heardAt = now;
+        boolean was = standIn;
+        standIn = now - heardAt > 100;
+        if (standIn != was) {
+            GeysersMod.LOGGER.info(standIn ? "Rain recordings are not playing (no free sound stream): vanilla's rain stands in"
+                    : "Rain recordings are playing again");
+        }
     }
 
+    /**
+     * Keeps one recording playing at this volume: started when it is wanted, and started again when the sound engine has
+     * dropped it or never began it (no free stream, or the engine was reloaded), a try every two seconds.
+     */
     private static Track track(Track t, ResourceLocation id, float volume) {
+        if (t != null && !t.isStopped()) {
+            if (Minecraft.getInstance().getSoundManager().isActive(t)) t.unheard = 0;
+            else if (++t.unheard > 40) t.end();
+        }
         if (t != null && t.isStopped()) t = null;
         if (t == null) {
             if (volume < 0.01f) return null;
@@ -220,6 +257,8 @@ public final class ClientWeather {
     static final class Track extends AbstractTickableSoundInstance {
         float target, level = 1f;
         int age;
+        /** Ticks the sound engine has not been playing it since it was asked to. */
+        int unheard;
         private int silent;
 
         Track(SoundEvent event, boolean loop) {
@@ -282,24 +321,47 @@ public final class ClientWeather {
         }
     }
 
-    /** A downpour closes the view in: at the heaviest rain, by about a third, outdoors. */
+    /**
+     * A downpour closes the view in: at the heaviest rain, by about a third, outdoors. Inside a cloud, on a mountain or
+     * flying, the mist closes it to some twenty blocks.
+     */
     @SubscribeEvent
     public static void onFog(ViewportEvent.RenderFog event) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || event.getType() != FogType.NONE || mc.player == null || open < 0.3f) return;
-        float h = smooth((intensity(mc.level) - 0.5f) / 0.5f);
-        if (h <= 0) return;
+        if (mc.level == null || event.getType() != FogType.NONE || mc.player == null) return;
+        var cam = event.getCamera().getPosition();
+        float mist = ClientSky.inCloud(mc.level, cam.x, cam.y, cam.z);
+        float h = open < 0.3f ? 0f : smooth((intensity(mc.level) - 0.5f) / 0.5f);
+        if (h <= 0 && mist <= 0) return;
         float k = 1f - 0.35f * h;
-        event.setFarPlaneDistance(event.getFarPlaneDistance() * k);
-        event.setNearPlaneDistance(event.getNearPlaneDistance() * k);
+        float far = event.getFarPlaneDistance() * k, near = event.getNearPlaneDistance() * k;
+        if (mist > 0) {
+            far = Mth.lerp(mist, far, Math.min(far, 20f));
+            near = Mth.lerp(mist, near, 0f);
+        }
+        event.setFarPlaneDistance(far);
+        event.setNearPlaneDistance(near);
         event.setCanceled(true);
     }
 
-    /** A downpour greys the far view: the fog's colour drawn towards a rain-grey, by up to a third, outdoors. */
+    /**
+     * A downpour greys the far view: the fog's colour drawn towards a rain-grey, by up to a third, outdoors. A cloud's mist
+     * is a pale grey, lit by the day.
+     */
     @SubscribeEvent
     public static void onFogColour(ViewportEvent.ComputeFogColor event) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || mc.player == null || open < 0.3f || !LocalWeather.active()) return;
+        if (mc.level == null || mc.player == null || !LocalWeather.active()) return;
+        var cam = event.getCamera().getPosition();
+        float mist = ClientSky.inCloud(mc.level, cam.x, cam.y, cam.z);
+        if (mist > 0) {
+            float day = Mth.clamp(Mth.cos(mc.level.getTimeOfDay((float) event.getPartialTick()) * Mth.TWO_PI) * 2f + 0.5f, 0.1f, 1f);
+            float pale = 0.78f * day;
+            event.setRed(Mth.lerp(mist, event.getRed(), pale));
+            event.setGreen(Mth.lerp(mist, event.getGreen(), pale));
+            event.setBlue(Mth.lerp(mist, event.getBlue(), pale * 1.03f));
+        }
+        if (open < 0.3f) return;
         float h = smooth((intensity(mc.level) - 0.4f) / 0.6f) * 0.33f;
         if (h <= 0) return;
         float grey = (event.getRed() * 0.3f + event.getGreen() * 0.59f + event.getBlue() * 0.11f) * 0.85f;

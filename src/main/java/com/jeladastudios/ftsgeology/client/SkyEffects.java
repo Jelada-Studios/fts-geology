@@ -46,6 +46,17 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
     private final float[] sizeX = new float[1024], sizeZ = new float[1024];
     private final CloudRenderer clouds = new CloudRenderer();
 
+    /**
+     * Each column's streak of rain, where it starts and where it stops, worked out along its slant when the camera moves
+     * a block, the wind turns or half a second has passed; and whether it stops on something (a splash there).
+     */
+    private final int[] streakTop = new int[1024], streakBottom = new int[1024];
+    private final boolean[] landed = new boolean[1024];
+    private int laidX = Integer.MIN_VALUE, laidY, laidZ, laidR, laidTop;
+    private float laidSx, laidSz;
+    private long laidAt;
+    private double laidCamY;
+
     /** The weather's clouds where the server tells the sky and the player has them on; vanilla's otherwise. */
     @Override
     public boolean renderClouds(ClientLevel level, int ticks, float partial, com.mojang.blaze3d.vertex.PoseStack pose,
@@ -70,6 +81,23 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
         if (!LocalWeather.active()) return false;
         float f = level.getRainLevel(partial);
         if (f <= 0f) return true;
+        // Under a shader pack, drawn in its weather phase so that the pack styles it as it styles vanilla's rain; left to
+        // vanilla where that phase cannot be set.
+        OculusWeather.Begun phase = null;
+        if (OculusWeather.shadersOn()) {
+            phase = OculusWeather.begin();
+            if (phase == null) return false;
+        }
+        try {
+            draw(level, ticks, partial, light, camX, camY, camZ, f, phase != null ? phase.writeDepth() : Minecraft.useShaderTransparency());
+        } finally {
+            if (phase != null) OculusWeather.end(phase);
+        }
+        return true;
+    }
+
+    private void draw(ClientLevel level, int ticks, float partial, LightTexture light, double camX, double camY, double camZ,
+                      float f, boolean depth) {
         light.turnOnLightLayer();
         int x0 = Mth.floor(camX), y0 = Mth.floor(camY), z0 = Mth.floor(camZ);
         Tesselator tesselator = Tesselator.getInstance();
@@ -79,7 +107,7 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
         RenderSystem.enableDepthTest();
         boolean fancy = Minecraft.useFancyGraphics();
         int r = fancy ? 10 + Math.round(4 * f) : 5;
-        RenderSystem.depthMask(Minecraft.useShaderTransparency());
+        RenderSystem.depthMask(depth);
         RenderSystem.setShader(GameRenderer::getParticleShader);
         int drawing = -1;
         float time = ticks + partial;
@@ -88,7 +116,11 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
         float alpha = 0.45f + 0.55f * f;
         float speed = 0.85f + 0.6f * f;
         float vScale = 0.25f * (1.15f - 0.35f * f);
-        float sx = Mth.clamp(LocalWeather.windX() / FALL, -0.9f, 0.9f), sz = Mth.clamp(LocalWeather.windZ() / FALL, -0.9f, 0.9f);
+        float sx = slant(LocalWeather.windX()), sz = slant(LocalWeather.windZ());
+        // The drops come from the cloud's underside: under it, from no higher up than that.
+        float under = ClientSky.deckBase(level, camX, camZ);
+        int ceil = !Float.isNaN(under) && camY < under ? Math.max(y0 - r, Math.min(y0 + r, Mth.floor(under))) : y0 + r;
+        layStreaks(level, x0, y0, z0, r, ceil, camY, sx, sz);
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         for (int z = z0 - r; z <= z0 + r; z++) {
             for (int x = x0 - r; x <= x0 + r; x++) {
@@ -98,12 +130,18 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
                 Biome biome = level.getBiome(m).value();
                 if (!biome.hasPrecipitation()) continue;
                 int ground = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z);
-                int bottom = Math.max(y0 - r, ground), top = Math.max(y0 + r, ground);
+                int bottom = Math.max(y0 - r, ground), top = Math.max(ceil, ground);
                 int lit = Math.max(ground, y0);
-                if (bottom == top) continue;
                 RandomSource rnd = RandomSource.create((long) (x * x * 3121 + x * 45238971 ^ z * z * 418711 + z * 13761));
                 m.set(x, bottom, z);
                 Biome.Precipitation fall = biome.getPrecipitationAt(m);
+                if (fall == Biome.Precipitation.RAIN) {
+                    // Along its slant: stopped by the first thing in its way, so it blows in under an eave or a doorway.
+                    bottom = streakBottom[idx];
+                    top = streakTop[idx];
+                    lit = Math.max(bottom, y0);
+                }
+                if (bottom >= top) continue;
                 m.set(x, lit, z);
                 int lightColor = LevelRenderer.getLightColor(level, m);
                 if (fall == Biome.Precipitation.RAIN) {
@@ -159,13 +197,65 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
         light.turnOffLightLayer();
-        return true;
+    }
+
+    /** How far a drop moves sideways for each block it falls in this wind, held to the player's setting. */
+    private static float slant(float wind) {
+        float most = com.jeladastudios.ftsgeology.config.ClientConfig.RAIN_SLANT.get().floatValue();
+        return Mth.clamp(wind / FALL, -most, most);
+    }
+
+    /**
+     * Each column's streak, a straight line through the column's middle at eye height, downwind as it falls: from the top
+     * of the drawn space, if the sky is open above it there, down to the first block in its way or the bottom of the
+     * drawn space. Worked out again when the camera moves a block, the slant turns, or half a second has passed.
+     */
+    private void layStreaks(ClientLevel level, int x0, int y0, int z0, int r, int top, double camY, float sx, float sz) {
+        long now = level.getGameTime();
+        if (x0 == laidX && y0 == laidY && z0 == laidZ && r == laidR && top == laidTop && Math.abs(sx - laidSx) < 0.02f
+                && Math.abs(sz - laidSz) < 0.02f && now - laidAt < 10 && now >= laidAt) return;
+        laidX = x0;
+        laidY = y0;
+        laidZ = z0;
+        laidR = r;
+        laidTop = top;
+        laidSx = sx;
+        laidSz = sz;
+        laidAt = now;
+        laidCamY = camY;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int low = y0 - r;
+        for (int z = z0 - r; z <= z0 + r; z++) {
+            for (int x = x0 - r; x <= x0 + r; x++) {
+                int idx = (z - z0 + 16) * 32 + x - x0 + 16;
+                streakTop[idx] = top;
+                streakBottom[idx] = top;
+                landed[idx] = false;
+                // Above the drawn space the drop comes straight from the sky only where nothing stands over that point.
+                int ax = Mth.floor(x + 0.5 + sx * (camY - top)), az = Mth.floor(z + 0.5 + sz * (camY - top));
+                if (level.getHeight(Heightmap.Types.MOTION_BLOCKING, ax, az) > top) continue;
+                int bottom = low;
+                for (int y = top - 1; y >= low; y--) {
+                    double fallen = camY - (y + 0.5);
+                    int bx = Mth.floor(x + 0.5 + sx * fallen), bz = Mth.floor(z + 0.5 + sz * fallen);
+                    if (y >= level.getHeight(Heightmap.Types.MOTION_BLOCKING, bx, bz)) continue;
+                    BlockState s = level.getBlockState(m.set(bx, y, bz));
+                    if (s.blocksMotion() || !s.getFluidState().isEmpty()) {
+                        bottom = y + 1;
+                        landed[idx] = true;
+                        break;
+                    }
+                }
+                streakBottom[idx] = bottom;
+            }
+        }
     }
 
     @Override
     public boolean tickRain(ClientLevel level, int ticks, Camera camera) {
-        // Without the recordings vanilla's own rain sound is kept, and it is played here.
-        if (!LocalWeather.active() || !ClientWeather.recordings()) return false;
+        // Without the recordings, or while the sound engine has no stream for them, vanilla's own rain sound is kept, and
+        // vanilla plays it here.
+        if (!LocalWeather.active() || !ClientWeather.recordingsHeard()) return false;
         Minecraft mc = Minecraft.getInstance();
         float f = level.getRainLevel(1f) / (Minecraft.useFancyGraphics() ? 1f : 2f);
         if (f <= 0f || mc.options.particles().get() == ParticleStatus.MINIMAL) return true;
@@ -173,12 +263,34 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
         BlockPos at = BlockPos.containing(camera.getPosition());
         // More splashes the harder it rains, and some even in a drizzle; a downpour throws up big ones as well.
         int n = (int) (12 + 160 * f) / (mc.options.particles().get() == ParticleStatus.DECREASED ? 2 : 1);
+        // Where the streaks land, aslant: under an eave or inside a doorway too when the wind blows the rain in.
+        boolean laid = laidX != Integer.MIN_VALUE && Math.abs(laidX - at.getX()) <= 1 && Math.abs(laidZ - at.getZ()) <= 1;
+        int reach = laid ? Math.min(laidR, 10) : 10;
         for (int i = 0; i < n; i++) {
-            BlockPos top = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING, at.offset(rnd.nextInt(21) - 10, 0, rnd.nextInt(21) - 10));
+            int ox = rnd.nextInt(2 * reach + 1) - reach, oz = rnd.nextInt(2 * reach + 1) - reach;
+            BlockPos top;
+            double px, pz;
+            if (laid) {
+                int idx = (oz + 16) * 32 + ox + 16;
+                if (!landed[idx]) continue;
+                int y = streakBottom[idx];
+                double fallen = laidCamY - y;
+                double lx = laidX + ox + 0.5 + laidSx * fallen + (rnd.nextDouble() - 0.5) * 0.8;
+                double lz = laidZ + oz + 0.5 + laidSz * fallen + (rnd.nextDouble() - 0.5) * 0.8;
+                top = BlockPos.containing(lx, y, lz);
+                px = lx - top.getX();
+                pz = lz - top.getZ();
+                // The jitter can step off the block the streak met, into a wall or over an edge: no splash there.
+                BlockState under = level.getBlockState(top.below());
+                if (level.getBlockState(top).blocksMotion() || !under.blocksMotion() && under.getFluidState().isEmpty()) continue;
+            } else {
+                top = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING, at.offset(ox, 0, oz));
+                px = rnd.nextDouble();
+                pz = rnd.nextDouble();
+            }
             if (top.getY() <= level.getMinBuildHeight() || top.getY() > at.getY() + 10 || top.getY() < at.getY() - 10) continue;
             if (level.getBiome(top).value().getPrecipitationAt(top) != Biome.Precipitation.RAIN) continue;
             BlockPos on = top.below();
-            double px = rnd.nextDouble(), pz = rnd.nextDouble();
             BlockState state = level.getBlockState(on);
             FluidState fluid = level.getFluidState(on);
             double h = Math.max(state.getCollisionShape(level, on).max(Direction.Axis.Y, px, pz), fluid.getHeight(level, on));

@@ -60,11 +60,12 @@ public final class ClientSky {
 
     /**
      * The sky at a place and time: {@code out[0]} how much of it is cloud, 0 to 1; {@code out[1]} how dark and heavy the
-     * cloud, 0 fair-weather white to 1 a storm's; {@code out[2]} how high it towers, 1 a thunderstorm's anvil.
+     * cloud, 0 fair-weather white to 1 a storm's; {@code out[2]} how high it towers, 1 a thunderstorm's anvil;
+     * {@code out[3]} how hard it rains under it, 0 to 1, as the server's storms rain (without their bands).
      */
     static void sample(double x, double z, long when, float[] out) {
         SkyPacket p = last;
-        float cover = 0.22f, dark = 0, tower = 0;
+        float cover = 0.22f, dark = 0, tower = 0, rain = 0;
         if (p != null) {
             long dt = when - p.time();
             float[] sy = p.systems();
@@ -90,11 +91,47 @@ public final class ClientSky {
                 cover = Math.max(cover, 0.55f + 0.45f * e * Math.min(1f, s / 0.5f));
                 dark = Math.max(dark, e * Math.min(1f, s / 0.7f));
                 if (st[i + 6] > 0) tower = Math.max(tower, e * Math.min(1f, s / 0.6f));
+                rain = Math.max(rain, s * smooth((float) (1 - d / st[i + 2]) * 1.8f));
             }
         }
+        // Rain falls from a closed deck: wherever it rains the sky is all but shut, broken only past the rain's edge.
+        if (rain > 0.02f) cover = Math.max(cover, 0.88f + 0.09f * Math.min(1f, rain / 0.25f));
         out[0] = Mth.clamp(cover, 0.04f, 0.97f);
         out[1] = Mth.clamp(dark, 0f, 1f);
         out[2] = tower;
+        if (out.length > 3) out[3] = rain;
+    }
+
+    // === Under, in or over the cloud ===============================================
+
+    private static final float[] DECK = new float[2];
+
+    /**
+     * How much of the rain reaches an eye at this height against the cloud over it, as drawn: all of it under the
+     * cloud's underside, some in the mist inside it, fading out over the six blocks above its top, where a mountain stands
+     * clear over a sea of cloud. All of it where this mod's clouds are not drawn.
+     */
+    static float overhead(ClientLevel level, double x, double eyeY, double z) {
+        if (!com.jeladastudios.ftsgeology.config.ClientConfig.STORM_CLOUDS.get()) return 1f;
+        if (!CloudRenderer.deckAt(level, x, z, 1f, DECK)) return 1f;
+        float base = DECK[0], top = DECK[1];
+        if (eyeY <= base) return 1f;
+        if (eyeY <= top) return 0.6f;
+        return 0.6f * Mth.clamp(1f - (float) (eyeY - top) / 6f, 0f, 1f);
+    }
+
+    /** The underside of the cloud over a place, in world height, or NaN where the sky is clear or the clouds not ours. */
+    static float deckBase(ClientLevel level, double x, double z) {
+        if (!com.jeladastudios.ftsgeology.config.ClientConfig.STORM_CLOUDS.get()) return Float.NaN;
+        return CloudRenderer.deckAt(level, x, z, 1f, DECK) ? DECK[0] : Float.NaN;
+    }
+
+    /** How deep in a cloud an eye is, 0 outside to 1 a few blocks in: for the mist. */
+    static float inCloud(ClientLevel level, double x, double eyeY, double z) {
+        if (!com.jeladastudios.ftsgeology.config.ClientConfig.STORM_CLOUDS.get()) return 0f;
+        if (!CloudRenderer.deckAt(level, x, z, 1f, DECK)) return 0f;
+        float in = (float) Math.min(eyeY - DECK[0], DECK[1] - eyeY);
+        return Mth.clamp(in / 3f, 0f, 1f);
     }
 
     // === Lightning among the clouds ===============================================

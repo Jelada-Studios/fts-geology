@@ -214,8 +214,23 @@ public final class Atmosphere {
         return windAt(level, x, z, level.getGameTime());
     }
 
+    /** A wind pinned over a place for a game day, for trying the weather out; not kept over a restart. */
+    private static double pinX, pinZ, pinRadius, pinWx, pinWz;
+    private static long pinUntil = Long.MIN_VALUE;
+
+    /** Pins the wind within {@code radius} of a place to this many blocks a second towards this bearing, or frees it at 0. */
+    public static void pinWind(ServerLevel level, double x, double z, double radius, double blocksPerSecond, double towardDegrees) {
+        pinX = x;
+        pinZ = z;
+        pinRadius = radius;
+        pinWx = blocksPerSecond / 20.0 * Math.cos(Math.toRadians(towardDegrees));
+        pinWz = blocksPerSecond / 20.0 * Math.sin(Math.toRadians(towardDegrees));
+        pinUntil = blocksPerSecond > 0 ? level.getGameTime() + 24000 : Long.MIN_VALUE;
+    }
+
     /** The wind at a place at a time, blocks a tick, the systems where they will be then: for a forecast. */
     public static double[] windAt(ServerLevel level, double x, double z, long when) {
+        if (when < pinUntil && Math.hypot(x - pinX, z - pinZ) < pinRadius) return new double[]{pinWx, pinWz};
         double[] g = gradient(level, x, z, when);
         // North is -z: the wind runs along the isobars, low pressure on its left.
         double ux = WIND_PER_GRADIENT * g[1], uz = -WIND_PER_GRADIENT * g[0];

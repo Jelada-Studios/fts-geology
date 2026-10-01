@@ -220,6 +220,19 @@ public final class TectonicCommands {
                                         .executes(ctx -> spawnStorm(ctx, 800))
                                         .then(Commands.argument("radius", IntegerArgumentType.integer(50, 4000))
                                                 .executes(ctx -> spawnStorm(ctx, IntegerArgumentType.getInteger(ctx, "radius"))))))
+                                // The wind over here held for a game day: blocks a second, towards a bearing (0 east, 90 south).
+                                .then(Commands.literal("wind").then(Commands.argument("speed", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(0.0, 15.0))
+                                        .then(Commands.argument("toward", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(-360.0, 360.0))
+                                                .executes(ctx -> {
+                                                    double speed = com.mojang.brigadier.arguments.DoubleArgumentType.getDouble(ctx, "speed");
+                                                    double toward = com.mojang.brigadier.arguments.DoubleArgumentType.getDouble(ctx, "toward");
+                                                    var at = ctx.getSource().getPosition();
+                                                    com.jeladastudios.ftsgeology.weather.Atmosphere.pinWind(ctx.getSource().getLevel(), at.x, at.z, 2000, speed, toward);
+                                                    ctx.getSource().sendSuccess(() -> Component.literal(speed > 0
+                                                            ? "wind held at " + speed + " blocks/s toward " + toward + " degrees" : "wind freed")
+                                                            .withStyle(ChatFormatting.AQUA), true);
+                                                    return 1;
+                                                }))))
                                 .executes(ctx -> {
                             ServerLevel level = ctx.getSource().getLevel();
                             BlockPos at = BlockPos.containing(ctx.getSource().getPosition());

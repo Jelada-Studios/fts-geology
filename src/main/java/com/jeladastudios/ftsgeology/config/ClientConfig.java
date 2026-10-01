@@ -14,6 +14,7 @@ public final class ClientConfig {
     public static final ForgeConfigSpec.DoubleValue RAIN_VOLUME;
     public static final ForgeConfigSpec.DoubleValue WIND_VOLUME;
     public static final ForgeConfigSpec.BooleanValue STORM_CLOUDS;
+    public static final ForgeConfigSpec.DoubleValue RAIN_SLANT;
 
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -30,6 +31,10 @@ public final class ClientConfig {
                 .comment("Draw the weather's own clouds, which drift with the wind and gather into storms, in place of",
                         "vanilla's flat cloud layer. A shader pack that draws its own clouds keeps them, darkened by the rain.")
                 .define("stormClouds", true);
+        RAIN_SLANT = b
+                .comment("How far the wind may drive the rain aslant: the most a drop moves sideways for each block it falls",
+                        "(0.35 is about 20 degrees, in a gale; 0 keeps it upright).")
+                .defineInRange("rainSlant", 0.35, 0.0, 1.0);
         b.pop();
         SPEC = b.build();
     }
