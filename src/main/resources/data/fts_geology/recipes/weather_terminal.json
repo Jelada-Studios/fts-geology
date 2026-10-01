@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "GGG",
+    "IRI",
+    "SCS"
+  ],
+  "key": {
+    "C": { "item": "minecraft:copper_ingot" },
+    "G": { "item": "minecraft:glass_pane" },
+    "I": { "item": "minecraft:iron_ingot" },
+    "R": { "item": "minecraft:redstone" },
+    "S": { "item": "minecraft:smooth_stone" }
+  },
+  "result": { "item": "fts_geology:weather_terminal" }
+}

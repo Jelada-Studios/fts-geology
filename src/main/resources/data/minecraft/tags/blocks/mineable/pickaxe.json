@@ -79,6 +79,10 @@
     "fts_geology:seismograph",
     "fts_geology:geyser_igniter",
     "fts_geology:volcano_igniter",
-    "fts_geology:hot_spring"
+    "fts_geology:hot_spring",
+    "fts_geology:anemometer",
+    "fts_geology:rain_gauge",
+    "fts_geology:soil_probe",
+    "fts_geology:weather_terminal"
   ]
 }

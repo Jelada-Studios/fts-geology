@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:barometer",
+    "fts_geology:hygrometer",
+    "fts_geology:thermometer"
+  ]
+}

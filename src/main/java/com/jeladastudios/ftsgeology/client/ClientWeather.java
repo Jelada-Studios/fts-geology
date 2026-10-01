@@ -32,11 +32,12 @@ import net.minecraftforge.fml.common.Mod;
  * time (see {@link LocalWeather}), which the sky, the rain and the shaders then read; and how the rain sounds and looks
  * where they stand.
  *
- * <p>The rain is heard in two strengths, light and heavy, from recordings of real rain in place of vanilla's, one
- * fading into the other as the rain grows; indoors it is quieter and duller, under water nearly gone, and in snow or a
- * dry biome not there at all. Water drips from leaves and from the edges of roofs while it rains and for a minute or
- * two after, and a downpour closes the view in a little. The recordings are not part of the public source (their
- * licence is not known); a build without them keeps vanilla's rain sound.</p>
+ * <p>The rain is heard in three strengths, light, steady and heavy, from recordings of real rain in place of vanilla's,
+ * one fading into the next as the rain grows; a rain after a dry while begins with its recording's own beginning.
+ * Indoors it is quieter, under water nearly gone, and in snow or a dry biome not there at all; in the open a breath of
+ * wind is heard, more of it high up and in a strong wind. Water drips from leaves and from the edges of roofs while it
+ * rains and for a minute or two after, and a downpour closes the view in a little. The recordings are not part of the
+ * public source (their licence is not known); a build without them keeps vanilla's rain sound.</p>
  */
 @Mod.EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
 public final class ClientWeather {
@@ -44,10 +45,17 @@ public final class ClientWeather {
     private ClientWeather() {}
 
     private static final ResourceLocation LIGHT = new ResourceLocation("fts_geology_rain", "rain_light");
+    private static final ResourceLocation MEDIUM = new ResourceLocation("fts_geology_rain", "rain_medium");
     private static final ResourceLocation HEAVY = new ResourceLocation("fts_geology_rain", "rain_heavy");
+    private static final ResourceLocation LIGHT_START = new ResourceLocation("fts_geology_rain", "rain_light_start");
+    private static final ResourceLocation HEAVY_START = new ResourceLocation("fts_geology_rain", "rain_heavy_start");
+    private static final ResourceLocation WIND = new ResourceLocation("fts_geology_rain", "wind");
 
     private static Boolean recordings;
-    private static RainLoop light, heavy;
+    private static final java.util.Map<ResourceLocation, Boolean> HAS = new java.util.HashMap<>();
+    private static Track light, medium, heavy, wind, intro;
+    /** Ticks since the rain was last heard: a rain after a dry while begins with its recording's own beginning. */
+    private static int dryTicks = Integer.MAX_VALUE / 2;
     /** How wet the world round the player still is: the rain, and after it a while of dripping. */
     private static float wet;
     /** How open to the sky the player stands, 0 indoors to 1 in the open, worked out every half second. */
@@ -58,12 +66,15 @@ public final class ClientWeather {
     }
 
     /** Whether the jar carries the rain recordings. */
-    private static boolean recordings() {
-        if (recordings == null) {
-            recordings = Minecraft.getInstance().getResourceManager()
-                    .getResource(new ResourceLocation("fts_geology_rain", "sounds/rain_light.ogg")).isPresent();
-        }
+    static boolean recordings() {
+        if (recordings == null) recordings = has(LIGHT) && has(HEAVY);
         return recordings;
+    }
+
+    /** Whether one recording is there: the middle strength, the beginnings and the wind may be missing. */
+    private static boolean has(ResourceLocation id) {
+        return HAS.computeIfAbsent(id, k -> Minecraft.getInstance().getResourceManager()
+                .getResource(new ResourceLocation(k.getNamespace(), "sounds/" + k.getPath() + ".ogg")).isPresent());
     }
 
     /**
@@ -110,34 +121,79 @@ public final class ClientWeather {
         }
     }
 
+    /** How loud each recording plays at full strength, before the game's weather slider. */
+    private static final float LIGHT_LEVEL = 0.5f, MEDIUM_LEVEL = 0.75f, HEAVY_LEVEL = 1.0f, WIND_LEVEL = 0.35f;
+    /** A beginning's length, and from when the loop takes over from it: its last seconds fade out as the loop comes in. */
+    private static final int INTRO_TICKS = 500, HANDOVER_FROM = 340;
+    /** How long it must have been dry for a rain to begin with its recording's beginning again. */
+    private static final int DRY_FOR_INTRO = 600;
+
     private static void sound(ClientLevel level, LocalPlayer player, float rain) {
         if (!recordings()) return;
-        // Light rain fades in from a drizzle and gives way to the heavy recording as the rain grows.
-        float l = smooth((rain - 0.03f) / 0.2f) * (1f - smooth((rain - 0.45f) / 0.25f));
-        float h = smooth((rain - 0.4f) / 0.3f);
-        float cover = 0.25f + 0.75f * open;
+        float cover = (0.25f + 0.75f * open) * com.jeladastudios.ftsgeology.config.ClientConfig.RAIN_VOLUME.get().floatValue();
         if (player.isUnderWater()) cover *= 0.2f;
-        float pitch = open < 0.3f ? 0.88f : 1f;
-        light = loop(light, LIGHT, 0.7f * l * cover, pitch);
-        heavy = loop(heavy, HEAVY, 1.0f * h * cover, pitch);
+        // The strengths hand over as the rain grows: a drizzle, a steady rain, a downpour.
+        float l, m, h;
+        if (has(MEDIUM)) {
+            l = smooth((rain - 0.02f) / 0.12f) * (1f - smooth((rain - 0.3f) / 0.2f));
+            m = smooth((rain - 0.25f) / 0.15f) * (1f - smooth((rain - 0.6f) / 0.2f));
+            h = smooth((rain - 0.55f) / 0.2f);
+        } else {
+            l = smooth((rain - 0.02f) / 0.15f) * (1f - smooth((rain - 0.45f) / 0.25f));
+            m = 0;
+            h = smooth((rain - 0.4f) / 0.3f);
+        }
+        // A rain after a dry while begins with its recording's own beginning, the drops coming in one by one; the
+        // loops come in over its last seconds. A downpour arriving at once has the heavy recording's beginning.
+        boolean heard = light != null || medium != null || heavy != null || intro != null;
+        if (rain > 0.02f && !heard && dryTicks > DRY_FOR_INTRO) {
+            boolean hard = LocalWeather.rainComing() >= 0.5f && has(HEAVY_START);
+            if (hard || has(LIGHT_START)) {
+                intro = new Track(SoundEvent.createVariableRangeEvent(hard ? HEAVY_START : LIGHT_START), false);
+                intro.level = hard ? HEAVY_LEVEL : LIGHT_LEVEL;
+                intro.startAt(cover * intro.level);
+                Minecraft.getInstance().getSoundManager().play(intro);
+            }
+        }
+        dryTicks = rain > 0.02f ? 0 : dryTicks + 1;
+        float hold = 1f;
+        if (intro != null) {
+            intro.age++;
+            if (intro.isStopped() || intro.age > INTRO_TICKS + 40
+                    || !Minecraft.getInstance().getSoundManager().isActive(intro) && intro.age > 20) {
+                intro = null;
+            } else {
+                hold = smooth((intro.age - HANDOVER_FROM) / (float) (INTRO_TICKS - HANDOVER_FROM));
+                intro.target = rain < 0.015f ? 0f : cover * intro.level;
+            }
+        }
+        light = track(light, LIGHT, LIGHT_LEVEL * l * cover * hold);
+        medium = has(MEDIUM) ? track(medium, MEDIUM, MEDIUM_LEVEL * m * cover * hold) : null;
+        heavy = track(heavy, HEAVY, HEAVY_LEVEL * h * cover * hold);
+        // A breath of wind in the open, more of it high up and in a strong wind; none indoors or under water.
+        if (has(WIND)) {
+            float speed = Mth.sqrt(LocalWeather.windX() * LocalWeather.windX() + LocalWeather.windZ() * LocalWeather.windZ());
+            float height = 0.4f + 0.6f * smooth((float) (player.getY() - 70) / 90f);
+            float w = smooth((speed - 0.3f) / 3f) * height * open * open;
+            if (player.isUnderWater()) w = 0;
+            wind = track(wind, WIND, WIND_LEVEL * w * com.jeladastudios.ftsgeology.config.ClientConfig.WIND_VOLUME.get().floatValue());
+        }
     }
 
-    private static RainLoop loop(RainLoop loop, ResourceLocation id, float volume, float pitch) {
-        if (loop != null && loop.isStopped()) loop = null;
-        if (loop == null) {
+    private static Track track(Track t, ResourceLocation id, float volume) {
+        if (t != null && t.isStopped()) t = null;
+        if (t == null) {
             if (volume < 0.01f) return null;
-            loop = new RainLoop(SoundEvent.createVariableRangeEvent(id));
-            Minecraft.getInstance().getSoundManager().play(loop);
+            t = new Track(SoundEvent.createVariableRangeEvent(id), true);
+            Minecraft.getInstance().getSoundManager().play(t);
         }
-        loop.target = volume;
-        loop.targetPitch = pitch;
-        return loop;
+        t.target = volume;
+        return t;
     }
 
     private static void stop() {
-        if (light != null) light.end();
-        if (heavy != null) heavy.end();
-        light = heavy = null;
+        for (Track t : new Track[]{light, medium, heavy, wind, intro}) if (t != null) t.end();
+        light = medium = heavy = wind = intro = null;
     }
 
     private static float smooth(float t) {
@@ -157,14 +213,18 @@ public final class ClientWeather {
         return seen / 9f;
     }
 
-    /** One rain recording, looping, not placed anywhere: its volume eased towards what the rain calls for. */
-    static final class RainLoop extends AbstractTickableSoundInstance {
-        float target, targetPitch = 1f;
+    /**
+     * One recording, not placed anywhere: a loop, or a rain's beginning played once; its volume eased towards what the
+     * rain calls for. Indoors it is only quieter: lowered in pitch as well, the rain sounded dull and boomy.
+     */
+    static final class Track extends AbstractTickableSoundInstance {
+        float target, level = 1f;
+        int age;
         private int silent;
 
-        RainLoop(SoundEvent event) {
+        Track(SoundEvent event, boolean loop) {
             super(event, SoundSource.WEATHER, SoundInstance.createUnseededRandom());
-            this.looping = true;
+            this.looping = loop;
             this.delay = 0;
             this.relative = true;
             this.attenuation = SoundInstance.Attenuation.NONE;
@@ -173,10 +233,15 @@ public final class ClientWeather {
 
         @Override
         public void tick() {
-            volume += Mth.clamp(target - volume, -0.02f, 0.02f);
-            pitch += Mth.clamp(targetPitch - pitch, -0.01f, 0.01f);
+            volume += Mth.clamp(target - volume, -0.01f, 0.01f);
             silent = target < 0.01f && volume < 0.02f ? silent + 1 : 0;
             if (silent > 40) stop();
+        }
+
+        /** Starts at once at this volume: a beginning fades itself in. */
+        void startAt(float v) {
+            volume = v;
+            target = v;
         }
 
         void end() {
@@ -230,11 +295,26 @@ public final class ClientWeather {
         event.setCanceled(true);
     }
 
+    /** A downpour greys the far view: the fog's colour drawn towards a rain-grey, by up to a third, outdoors. */
+    @SubscribeEvent
+    public static void onFogColour(ViewportEvent.ComputeFogColor event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || mc.player == null || open < 0.3f || !LocalWeather.active()) return;
+        float h = smooth((intensity(mc.level) - 0.4f) / 0.6f) * 0.33f;
+        if (h <= 0) return;
+        float grey = (event.getRed() * 0.3f + event.getGreen() * 0.59f + event.getBlue() * 0.11f) * 0.85f;
+        event.setRed(Mth.lerp(h, event.getRed(), grey));
+        event.setGreen(Mth.lerp(h, event.getGreen(), grey));
+        event.setBlue(Mth.lerp(h, event.getBlue(), grey * 1.05f));
+    }
+
     @SubscribeEvent
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         LocalWeather.reset();
         stop();
         wet = 0;
         recordings = null;
+        HAS.clear();
+        dryTicks = Integer.MAX_VALUE / 2;
     }
 }

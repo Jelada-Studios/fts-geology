@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "PGP",
+    "PSP",
+    "PRP"
+  ],
+  "key": {
+    "G": { "item": "minecraft:glass_pane" },
+    "P": { "item": "minecraft:spruce_planks" },
+    "R": { "item": "minecraft:redstone" },
+    "S": { "item": "minecraft:string" }
+  },
+  "result": { "item": "fts_geology:hygrometer" }
+}

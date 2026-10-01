@@ -459,5 +459,26 @@ public final class ModBlocks {
                     .mapColor(MapColor.COLOR_GREEN)
                     .strength(0.6F)));
 
+    // === A weather station: its instruments, each its own block, and the terminal they are read at ===
+
+    public static final RegistryObject<Block> BAROMETER = instrument("barometer", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.BAROMETER, Blocks.DARK_OAK_PLANKS, MapColor.COLOR_BROWN);
+    public static final RegistryObject<Block> ANEMOMETER = instrument("anemometer", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.ANEMOMETER, Blocks.IRON_BARS, MapColor.METAL);
+    public static final RegistryObject<Block> HYGROMETER = instrument("hygrometer", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.HYGROMETER, Blocks.SPRUCE_PLANKS, MapColor.PODZOL);
+    public static final RegistryObject<Block> RAIN_GAUGE = instrument("rain_gauge", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.RAIN_GAUGE, Blocks.COPPER_BLOCK, MapColor.COLOR_ORANGE);
+    public static final RegistryObject<Block> THERMOMETER = instrument("thermometer", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.THERMOMETER, Blocks.BIRCH_PLANKS, MapColor.SAND);
+    public static final RegistryObject<Block> SOIL_PROBE = instrument("soil_probe", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.SOIL_PROBE, Blocks.IRON_BARS, MapColor.METAL);
+
+    /** A weather station's terminal: the instruments round it read, kept, and turned into a forecast. */
+    public static final RegistryObject<Block> WEATHER_TERMINAL = BLOCKS.register("weather_terminal",
+            () -> new com.jeladastudios.ftsgeology.block.WeatherTerminalBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)
+                    .mapColor(MapColor.COLOR_GRAY)
+                    .strength(3.0F, 6.0F)
+                    .noOcclusion()));
+
+    private static RegistryObject<Block> instrument(String name, com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument kind, Block like, MapColor color) {
+        return BLOCKS.register(name, () -> new com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock(kind,
+                BlockBehaviour.Properties.copy(like).mapColor(color).strength(1.5F, 3.0F).noOcclusion()));
+    }
+
     private ModBlocks() {}
 }

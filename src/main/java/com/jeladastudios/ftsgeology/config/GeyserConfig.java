@@ -202,6 +202,9 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue SINKHOLE_WARNING_DAYS;    // days a drawn-down karst roof takes to fall
     public static final ForgeConfigSpec.BooleanValue REGIONAL_RAIN;           // storms instead of one weather for the world
     public static final ForgeConfigSpec.DoubleValue RAIN_AMOUNT;              // how much of the land the weather keeps under rain
+    public static final ForgeConfigSpec.DoubleValue RAIN_STRENGTH;            // how hard the storms rain
+    public static final ForgeConfigSpec.DoubleValue STORM_LENGTH;             // how long the storms last
+    public static final ForgeConfigSpec.DoubleValue STORM_SIZE;               // how wide the storms are
     public static final ForgeConfigSpec.BooleanValue PUDDLES;                 // the mod's own puddles, without Puddles & Floods
     public static final ForgeConfigSpec.BooleanValue RIVER_SPILLS;            // a river runs out through a bank taken away
     public static final ForgeConfigSpec.BooleanValue STREAMS_DRY_UP;          // a well's cone dries the small streams over it
@@ -1152,6 +1155,17 @@ public final class GeyserConfig {
                 .comment("How much rain the storms bring, 1 as designed: about a fifth of the land under rain in a temperate",
                         "region on average, most of it in a wet spell, little in a dry one.")
                 .defineInRange("rainAmount", 1.0, 0.0, 4.0);
+        RAIN_STRENGTH = b
+                .comment("How hard the storms rain, 1 as designed: under 1 more drizzle and fewer downpours, over 1 the other way.")
+                .defineInRange("rainStrength", 1.0, 0.25, 2.0);
+        STORM_LENGTH = b
+                .comment("How long the storms last, 1 as designed: a shower an hour or so, a front most of a day, a wet spell's rain",
+                        "days to weeks. Twice as long is half as many of them for the same amount of rain.")
+                .defineInRange("stormLength", 1.0, 0.25, 4.0);
+        STORM_SIZE = b
+                .comment("How wide the storms are, 1 as designed: showers a few hundred blocks across, fronts a couple of thousand.",
+                        "Where the land wants little rain a storm is kept small enough not to bring more than it wants.")
+                .defineInRange("stormSize", 1.0, 0.25, 3.0);
         PUDDLES = b
                 .comment("Puddles after rain where the ground holds water: in hollows of rock, clay, paths and soaked loam, never on",
                         "sand, in ragged shapes that shrink as the ground dries; a pixel of water a shader draws as water. Only",

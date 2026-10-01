@@ -31,11 +31,19 @@ public final class TerrainContext {
      */
     public static final double TALL_HORIZONTAL = 2.5;
 
+    private static volatile boolean tall;
+
+    /** Whether the world running is the tall world type, its mountains standing far higher over the same sea. */
+    public static boolean tall() {
+        return tall;
+    }
+
     @SubscribeEvent
     public static void onServerAboutToStart(ServerAboutToStartEvent event) {
         seed = event.getServer().getWorldData().worldGenOptions().seed();
         known = true;
         boolean tall = isTall(event.getServer());
+        TerrainContext.tall = tall;
         GeologyParams.take(tall ? TALL_HORIZONTAL : 1.0);
         com.jeladastudios.ftsgeology.compat.ThinAirHeights.open(tall, TALL_HORIZONTAL, seaLevel(event.getServer()));
         TerrainCache.clear();

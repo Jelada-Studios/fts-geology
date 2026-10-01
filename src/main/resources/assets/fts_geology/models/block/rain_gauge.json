@@ -1,0 +1,23 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "t0": "minecraft:block/smooth_stone",
+    "t1": "minecraft:block/cut_copper",
+    "t2": "minecraft:block/iron_block",
+    "t3": "minecraft:block/black_concrete",
+    "t4": "minecraft:block/white_concrete",
+    "particle": "minecraft:block/smooth_stone"
+  },
+  "elements": [
+    { "from": [4, 0, 4], "to": [12, 1, 12],
+      "faces": { "north": { "texture": "#t0" }, "south": { "texture": "#t0" }, "east": { "texture": "#t0" }, "west": { "texture": "#t0" }, "up": { "texture": "#t0" }, "down": { "texture": "#t0" } } },
+    { "from": [5, 1, 5], "to": [11, 11, 11],
+      "faces": { "north": { "texture": "#t1" }, "south": { "texture": "#t1" }, "east": { "texture": "#t1" }, "west": { "texture": "#t1" }, "up": { "texture": "#t1" }, "down": { "texture": "#t1" } } },
+    { "from": [4, 11, 4], "to": [12, 13, 12],
+      "faces": { "north": { "texture": "#t2" }, "south": { "texture": "#t2" }, "east": { "texture": "#t2" }, "west": { "texture": "#t2" }, "up": { "texture": "#t2" }, "down": { "texture": "#t2" } } },
+    { "from": [5, 12.9, 5], "to": [11, 13, 11],
+      "faces": { "north": { "texture": "#t3" }, "south": { "texture": "#t3" }, "east": { "texture": "#t3" }, "west": { "texture": "#t3" }, "up": { "texture": "#t3" }, "down": { "texture": "#t3" } } },
+    { "from": [4.8, 2, 7.5], "to": [5, 10, 8.5],
+      "faces": { "north": { "texture": "#t4" }, "south": { "texture": "#t4" }, "east": { "texture": "#t4" }, "west": { "texture": "#t4" }, "up": { "texture": "#t4" }, "down": { "texture": "#t4" } } }
+  ]
+}

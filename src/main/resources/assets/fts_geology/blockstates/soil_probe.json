@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "fts_geology:block/soil_probe" },
+    "facing=east":  { "model": "fts_geology:block/soil_probe", "y": 90 },
+    "facing=south": { "model": "fts_geology:block/soil_probe", "y": 180 },
+    "facing=west":  { "model": "fts_geology:block/soil_probe", "y": 270 }
+  }
+}

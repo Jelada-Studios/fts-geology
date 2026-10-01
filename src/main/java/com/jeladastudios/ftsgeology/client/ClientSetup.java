@@ -22,6 +22,12 @@ public final class ClientSetup {
 
     private ClientSetup() {}
 
+    /** The overworld's rain drawn where it falls (see {@link SkyEffects}); vanilla's where the rain is not regional. */
+    @SubscribeEvent
+    public static void skyEffects(net.minecraftforge.client.event.RegisterDimensionSpecialEffectsEvent event) {
+        event.register(net.minecraft.world.level.dimension.BuiltinDimensionTypes.OVERWORLD_EFFECTS, new SkyEffects());
+    }
+
     /**
      * The river's water is drawn like water. Without this the fluid falls back on the solid render type and a river
      * comes out as a blue wall: opaque, unlit underneath and with nothing visible through it.
@@ -71,11 +77,14 @@ public final class ClientSetup {
     public static void registerRenderers(net.minecraftforge.client.event.EntityRenderersEvent.RegisterRenderers event) {
         event.registerBlockEntityRenderer(com.jeladastudios.ftsgeology.registry.ModBlockEntities.GEOTHERMAL_TURBINE.get(),
                 TurbineRenderer::new);
+        event.registerBlockEntityRenderer(com.jeladastudios.ftsgeology.registry.ModBlockEntities.INSTRUMENT.get(),
+                AnemometerRenderer::new);
     }
 
     @SubscribeEvent
     public static void registerModels(net.minecraftforge.client.event.ModelEvent.RegisterAdditional event) {
         event.register(TurbineRenderer.ROTOR);
+        event.register(AnemometerRenderer.CUPS);
     }
 
     @SubscribeEvent

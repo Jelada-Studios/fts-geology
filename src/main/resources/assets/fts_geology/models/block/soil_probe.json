@@ -1,0 +1,17 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "t0": "minecraft:block/iron_block",
+    "t1": "minecraft:block/polished_blackstone",
+    "t2": "minecraft:block/redstone_lamp_on",
+    "particle": "minecraft:block/iron_block"
+  },
+  "elements": [
+    { "from": [7.5, -8, 7.5], "to": [8.5, 4, 8.5],
+      "faces": { "north": { "texture": "#t0" }, "south": { "texture": "#t0" }, "east": { "texture": "#t0" }, "west": { "texture": "#t0" }, "up": { "texture": "#t0" }, "down": { "texture": "#t0" } } },
+    { "from": [6, 4, 6], "to": [10, 7, 10],
+      "faces": { "north": { "texture": "#t1" }, "south": { "texture": "#t1" }, "east": { "texture": "#t1" }, "west": { "texture": "#t1" }, "up": { "texture": "#t1" }, "down": { "texture": "#t1" } } },
+    { "from": [7, 7, 7], "to": [9, 8, 9],
+      "faces": { "north": { "texture": "#t2" }, "south": { "texture": "#t2" }, "east": { "texture": "#t2" }, "west": { "texture": "#t2" }, "up": { "texture": "#t2" }, "down": { "texture": "#t2" } } }
+  ]
+}

@@ -162,6 +162,12 @@ public final class Storms {
         return level.getDataStorage().computeIfAbsent(Store::load, Store::new, "fts_geology_storms");
     }
 
+    /** The storms out now, for a forecast; empty where none have formed. */
+    static List<Storm> storms(ServerLevel level) {
+        Store st = level.getDataStorage().get(Store::load, "fts_geology_storms");
+        return st == null ? List.of() : st.all;
+    }
+
     /** Whether the rain is regional in this level: the overworld, with the setting on, and not in TerraFirmaCraft. */
     public static boolean on(Level level) {
         return !level.isClientSide && GeyserConfig.REGIONAL_RAIN.get() && Level.OVERWORLD.equals(level.dimension())
@@ -283,19 +289,9 @@ public final class Storms {
         return a + (b - a) * f;
     }
 
-    /** The wind over a region: its heading turns slowly, and its strength, 0.5 to 3 blocks a second. */
+    /** The wind at a place, blocks a tick: round the highs and lows (see {@link Atmosphere#wind}). */
     static double[] wind(ServerLevel level, double x, double z) {
-        int rx = Mth.floor(x / (REGION * 2.0)), rz = Mth.floor(z / (REGION * 2.0));
-        double t = level.getGameTime() / 24000.0 / 5.0;
-        int t0 = Mth.floor(t);
-        double f = t - t0;
-        long seed = level.getSeed();
-        double a0 = SeedHash.rand01(SeedHash.hash(seed, rx, rz, 0x71DL * 31 + t0)) * Math.PI * 2;
-        double a1 = SeedHash.rand01(SeedHash.hash(seed, rx, rz, 0x71DL * 31 + t0 + 1)) * Math.PI * 2;
-        double da = Mth.wrapDegrees(Math.toDegrees(a1 - a0));
-        double a = a0 + Math.toRadians(da) * f;
-        double speed = 0.5 + 2.5 * SeedHash.rand01(SeedHash.hash(seed, rx, rz, 0x5EEDL + t0));
-        return new double[]{Math.cos(a) * speed / 20.0, Math.sin(a) * speed / 20.0};
+        return Atmosphere.wind(level, x, z);
     }
 
     // === Every second ======================================================
@@ -326,11 +322,47 @@ public final class Storms {
         st.setDirty();
         steer(level, st);
         if (now % 40 == 0) tell(level, players);
+        if (now % 100 == 0) sky(level, players, st);
+    }
+
+    /** Each player's sky: the storms within sight and the highs and lows round them, for the clouds drawn. */
+    private static void sky(ServerLevel level, List<ServerPlayer> players, Store st) {
+        long now = level.getGameTime();
+        for (ServerPlayer p : players) {
+            it.unimi.dsi.fastutil.floats.FloatArrayList storms = new it.unimi.dsi.fastutil.floats.FloatArrayList();
+            for (Storm s : st.all) {
+                if (Math.hypot(s.x - p.getX(), s.z - p.getZ()) > s.radius * 1.4 + 1500) continue;
+                storms.add((float) s.x);
+                storms.add((float) s.z);
+                storms.add((float) s.radius);
+                storms.add((float) (s.peak * s.life(now)));
+                storms.add((float) s.vx);
+                storms.add((float) s.vz);
+                storms.add(s.thunder ? 1f : 0f);
+                storms.add(s.kind.ordinal());
+            }
+            it.unimi.dsi.fastutil.floats.FloatArrayList systems = new it.unimi.dsi.fastutil.floats.FloatArrayList();
+            for (Atmosphere.Cell c : Atmosphere.cells(level)) {
+                if (Math.hypot(c.x - p.getX(), c.z - p.getZ()) > 20000) continue;
+                systems.add((float) c.xAt(now));
+                systems.add((float) c.zAt(now));
+                systems.add((float) c.radius);
+                systems.add((float) c.anomaly(now));
+                systems.add((float) c.vx);
+                systems.add((float) c.vz);
+            }
+            ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p),
+                    new com.jeladastudios.ftsgeology.network.SkyPacket(now, storms.toFloatArray(), systems.toFloatArray()));
+        }
     }
 
     /** How far from every player a storm may drift before it is let go, beyond its own radius. */
     private static final double FAR = 6000;
-    private static final int MOST = 32;
+    /**
+     * Storms at most round one player's land, and in the whole world: a cap for the world alone, reached by a few
+     * players far apart, held each of them to a part of their rain.
+     */
+    private static final int MOST_NEAR = 16, MOST = 160;
 
     /**
      * Brings storms to where the players are, as their regions' weather calls for: where less of the land round a
@@ -343,6 +375,11 @@ public final class Storms {
             for (double[] q : seen) near |= (q[0] - p.getX()) * (q[0] - p.getX()) + (q[1] - p.getZ()) * (q[1] - p.getZ()) < 1500 * 1500;
             if (near || st.all.size() >= MOST) continue;
             seen.add(new double[]{p.getX(), p.getZ()});
+            int around = 0;
+            for (Storm s : st.all) {
+                if (Math.hypot(s.x - p.getX(), s.z - p.getZ()) < AROUND + s.radius + 2500) around++;
+            }
+            if (around >= MOST_NEAR) continue;
             double wet = wetness(level, p.getX(), p.getZ());
             var climate = level.getBiome(p.blockPosition()).value().getModifiedClimateSettings();
             double want = wanted(level, p.blockPosition());
@@ -350,8 +387,9 @@ public final class Storms {
             // kept forming meanwhile, and the land came to be under rain two or three times as much as its weather has.
             double have = covered(level, st, p.getX(), p.getZ(), true);
             if (have >= want) continue;
-            // One now and then, not one a minute: storms take their time to gather.
-            if (level.random.nextDouble() > 0.35) continue;
+            // One now and then, not one a minute: storms take their time to gather -- less of it where a low has come over
+            // dry land and much more of it wants rain than has it.
+            if (level.random.nextDouble() > Math.min(0.8, 0.25 + 1.5 * (want - have))) continue;
             Storm s = storm(level, p.getX(), p.getZ(), wet, climate.temperature(), want - have);
             st.all.add(s);
             formed++;
@@ -371,9 +409,20 @@ public final class Storms {
      * average, half of it in a wet spell, a twentieth in a dry one; a desert's hardly ever.
      */
     static double wanted(ServerLevel level, BlockPos pos) {
+        return wantedAt(level, pos, level.getGameTime());
+    }
+
+    /** The same at a time ahead, the highs and lows where they will be then: for a forecast. */
+    static double wantedAt(ServerLevel level, BlockPos pos, long when) {
         double wet = wetness(level, pos.getX(), pos.getZ());
         double downfall = Mth.clamp(level.getBiome(pos).value().getModifiedClimateSettings().downfall(), 0, 1);
-        return Mth.clamp(GeyserConfig.RAIN_AMOUNT.get() * (0.1 + 0.9 * downfall) * (0.05 + 0.7 * wet * wet), 0, 0.9);
+        // More under a low passing over, less under a high: taken over the land round the place, not its middle alone.
+        double air = 0;
+        for (int i = 0; i < 5; i++) {
+            double a = i * Math.PI / 2, d = i == 4 ? 0 : AROUND * 0.6;
+            air += Atmosphere.rainFactor(level, pos.getX() + Math.cos(a) * d, pos.getZ() + Math.sin(a) * d, when) / 5;
+        }
+        return Mth.clamp(GeyserConfig.RAIN_AMOUNT.get() * (0.1 + 0.9 * downfall) * (0.05 + 0.7 * wet * wet) * air, 0, 0.9);
     }
 
     /** Points spread evenly over the land round a place, on a sunflower's spiral: where its rain is reckoned. */
@@ -406,13 +455,35 @@ public final class Storms {
     private static Storm storm(ServerLevel level, double x, double z, double wet, float temperature, double room) {
         var rnd = level.random;
         Storm s = new Storm();
+        // Where it will stand halfway through its life: anywhere in the land round the place, but mostly where the
+        // pressure is low -- a few places tried, each as likely as the rain its air brings, squared.
+        double mx = x, mz = z, total = 0;
+        double[] px = new double[6], pz = new double[6], weight = new double[6];
+        for (int i = 0; i < 6; i++) {
+            double a = rnd.nextDouble() * Math.PI * 2, d = Math.sqrt(rnd.nextDouble()) * AROUND;
+            px[i] = x + Math.cos(a) * d;
+            pz[i] = z + Math.sin(a) * d;
+            double f = Atmosphere.rainFactor(level, px[i], pz[i]);
+            weight[i] = f * f;
+            total += weight[i];
+        }
+        double pick = rnd.nextDouble() * total;
+        for (int i = 0; i < 6; i++) {
+            mx = px[i];
+            mz = pz[i];
+            if ((pick -= weight[i]) <= 0) break;
+        }
+        double air = Atmosphere.rainFactor(level, mx, mz);
         double roll = rnd.nextDouble();
-        if (wet > 0.75 && roll < 0.35) s.kind = Kind.SPELL;
+        if (wet > 0.75 && air > 1.2 && roll < 0.35) s.kind = Kind.SPELL;
         else if (roll < (wet < 0.4 ? 0.7 : 0.35) * (temperature > 0.8 ? 1.2 : temperature < 0.3 ? 0.5 : 1.0)) s.kind = Kind.SHOWER;
         else s.kind = Kind.FRONT;
+        // Under a high only a shower breaks out, from a hot afternoon's rising air.
+        if (air < 0.6) s.kind = Kind.SHOWER;
         double most = AROUND * Math.sqrt(Math.max(1.5 * room, 0.012));
         if (most < 800) s.kind = Kind.SHOWER;
-        double[] w = wind(level, x, z);
+        // Carried on the prevailing wind, as the lows and highs are.
+        double[] w = Atmosphere.steering(level, mx, mz, level.getGameTime());
         long now = level.getGameTime();
         switch (s.kind) {
             case SHOWER -> {
@@ -438,17 +509,19 @@ public final class Storms {
                 s.vz = w[1] * 0.15;
             }
         }
-        s.radius = Math.min(s.radius, Math.max(250, most));
+        // The settings: how hard, how long and how wide; a wider storm still no bigger than the rain wanted round here.
+        double size = GeyserConfig.STORM_SIZE.get();
+        s.peak = Math.min(1.0, s.peak * GeyserConfig.RAIN_STRENGTH.get());
+        s.dies = now + (long) ((s.dies - now) * GeyserConfig.STORM_LENGTH.get());
+        s.radius = Math.min(s.radius * size, Math.max(250 * size, most));
         s.born = now;
         s.seed = rnd.nextInt(1 << 20);
-        // Anywhere in the land round the place, where it will be halfway through its life, and upwind of that by the way
-        // it drifts till then: so a place is under rain as much of the time as the land round it is. Aimed at the place
-        // itself, it kept whoever stood there under rain most of the time.
+        // Upwind of that place by the way it drifts till then: so a place is under rain as much of the time as the land
+        // round it is. Aimed at the place itself, it kept whoever stood there under rain most of the time.
         double speed = Math.max(1e-4, Math.hypot(s.vx, s.vz));
-        double a = rnd.nextDouble() * Math.PI * 2, d = Math.sqrt(rnd.nextDouble()) * AROUND;
         double back = Math.min(2500, speed * (s.dies - now) * 0.5);
-        s.x = x + Math.cos(a) * d - s.vx / speed * back;
-        s.z = z + Math.sin(a) * d - s.vz / speed * back;
+        s.x = mx - s.vx / speed * back;
+        s.z = mz - s.vz / speed * back;
         return s;
     }
 
@@ -467,10 +540,30 @@ public final class Storms {
     /** Each player's own weather, to draw. */
     private static void tell(ServerLevel level, List<ServerPlayer> players) {
         for (ServerPlayer p : players) {
-            float rain = intensityAt(level, p.getBlockX(), p.getBlockZ());
-            float thunder = thunderAt(level, p.getBlockX(), p.getBlockZ());
-            ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), new LocalWeatherPacket(rain, thunder));
+            float[] here = smoothAt(level, p.getX(), p.getZ());
+            double[] w = wind(level, p.getX(), p.getZ());
+            ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p),
+                    new LocalWeatherPacket(here[0], here[1], (float) (w[0] * 20), (float) (w[1] * 20)));
         }
+    }
+
+    /**
+     * Rain and thunder at a point, blended between the middles of the four chunks round it: taken chunk by chunk, the
+     * rain a player heard jumped at a chunk's edge where the slope under the wind changed.
+     */
+    static float[] smoothAt(ServerLevel level, double x, double z) {
+        double fx = (x - 8) / 16.0, fz = (z - 8) / 16.0;
+        int cx = Mth.floor(fx), cz = Mth.floor(fz);
+        double tx = fx - cx, tz = fz - cz;
+        float rain = 0, thunder = 0;
+        for (int i = 0; i < 4; i++) {
+            int ox = i & 1, oz = i >> 1;
+            double w = (ox == 0 ? 1 - tx : tx) * (oz == 0 ? 1 - tz : tz);
+            int bx = (cx + ox) * 16 + 8, bz = (cz + oz) * 16 + 8;
+            rain += (float) (w * intensityAt(level, bx, bz));
+            thunder += (float) (w * thunderAt(level, bx, bz));
+        }
+        return new float[]{rain, thunder};
     }
 
     // === Commands and sleep ===================================================
@@ -595,6 +688,7 @@ public final class Storms {
         out.add(String.format(Locale.ROOT, "rain here %.2f (%s, %s), thunder %.2f; the region's weather %.2f (0 dry spell, 1 wet); wind %.1f blocks/s towards %.0f deg",
                 intensityAt(level, x, z), biome.unwrapKey().map(k -> k.location().toString()).orElse("?"), falls, thunderAt(level, x, z),
                 wetness(level, x, z), Math.hypot(w[0], w[1]) * 20, Math.toDegrees(Math.atan2(w[1], w[0]))));
+        out.addAll(Atmosphere.describe(level, x, z));
         Store st = level.getDataStorage().get(Store::load, "fts_geology_storms");
         if (st == null) return out;
         out.add(String.format(Locale.ROOT, "the land within %d blocks: %.2f under rain now, %.2f with the storms on their way; its weather wants %.2f",

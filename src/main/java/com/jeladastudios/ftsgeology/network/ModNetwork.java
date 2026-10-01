@@ -31,7 +31,7 @@ public final class ModNetwork {
 
     private ModNetwork() {}
 
-    private static final String VERSION = "6";
+    private static final String VERSION = "7";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(GeysersMod.MODID, "main"),
@@ -70,6 +70,21 @@ public final class ModNetwork {
                 .encoder(LocalWeatherPacket::encode)
                 .decoder(LocalWeatherPacket::decode)
                 .consumerMainThread(LocalWeatherPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(SkyPacket.class, id++)
+                .encoder(SkyPacket::encode)
+                .decoder(SkyPacket::decode)
+                .consumerMainThread(SkyPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(TerminalPacket.class, id++, net.minecraftforge.network.NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(TerminalPacket::encode)
+                .decoder(TerminalPacket::decode)
+                .consumerMainThread(TerminalPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(TerminalRequestPacket.class, id++, net.minecraftforge.network.NetworkDirection.PLAY_TO_SERVER)
+                .encoder(TerminalRequestPacket::encode)
+                .decoder(TerminalRequestPacket::decode)
+                .consumerMainThread(TerminalRequestPacket::handle)
                 .add();
     }
 

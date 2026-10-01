@@ -62,6 +62,8 @@ public class GeysersMod {
         // to clients on join. The file lives in <world>/serverconfig/fts_geology.toml; a file in the
         // instance's defaultconfigs/ folder is copied into each new world.
         ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, GeyserConfig.SPEC, "fts_geology.toml");
+        // The player's own sound and sky settings, on their machine.
+        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, com.jeladastudios.ftsgeology.config.ClientConfig.SPEC, "fts_geology-client.toml");
 
         // The geology advancements' trigger, registered before advancements are read.
         com.jeladastudios.ftsgeology.advancement.GeologyTrigger.init();
@@ -108,6 +110,8 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.hydrology.Floods.clear();
         if (com.jeladastudios.ftsgeology.weather.Storms.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.weather.Storms.summary());
         com.jeladastudios.ftsgeology.weather.Storms.clear();
+        if (com.jeladastudios.ftsgeology.weather.Atmosphere.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.weather.Atmosphere.summary());
+        com.jeladastudios.ftsgeology.weather.Atmosphere.clear();
         if (com.jeladastudios.ftsgeology.hydrology.Puddles.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.hydrology.Puddles.summary());
         com.jeladastudios.ftsgeology.hydrology.Puddles.clear();
         if (com.jeladastudios.ftsgeology.hydrology.RiverSpill.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.hydrology.RiverSpill.summary());
@@ -145,6 +149,13 @@ public class GeysersMod {
             // The instruments belong with the tools, not with the terrain: they are the only
             // things in the mod a player is meant to carry.
             event.accept(ModItems.SEISMOGRAPH.get());
+            event.accept(ModItems.WEATHER_TERMINAL.get());
+            event.accept(ModItems.BAROMETER.get());
+            event.accept(ModItems.ANEMOMETER.get());
+            event.accept(ModItems.HYGROMETER.get());
+            event.accept(ModItems.RAIN_GAUGE.get());
+            event.accept(ModItems.THERMOMETER.get());
+            event.accept(ModItems.SOIL_PROBE.get());
             event.accept(ModItems.GEOTHERMAL_TURBINE.get());
             event.accept(ModItems.WELL_PUMP.get());
             event.accept(ModItems.WELL_CASING.get());

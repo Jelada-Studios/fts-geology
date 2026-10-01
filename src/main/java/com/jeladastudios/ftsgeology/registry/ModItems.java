@@ -273,6 +273,19 @@ public final class ModItems {
     public static final RegistryObject<Item> SEISMOGRAPH = ITEMS.register("seismograph",
             () -> new BlockItem(ModBlocks.SEISMOGRAPH.get(), new Item.Properties()));
 
+    // A weather station: each instrument says in its tooltip what it reads and where it wants to stand.
+    public static final RegistryObject<Item> BAROMETER = described("barometer", ModBlocks.BAROMETER, 2);
+    public static final RegistryObject<Item> ANEMOMETER = described("anemometer", ModBlocks.ANEMOMETER, 2);
+    public static final RegistryObject<Item> HYGROMETER = described("hygrometer", ModBlocks.HYGROMETER, 2);
+    public static final RegistryObject<Item> RAIN_GAUGE = described("rain_gauge", ModBlocks.RAIN_GAUGE, 2);
+    public static final RegistryObject<Item> THERMOMETER = described("thermometer", ModBlocks.THERMOMETER, 2);
+    public static final RegistryObject<Item> SOIL_PROBE = described("soil_probe", ModBlocks.SOIL_PROBE, 2);
+    public static final RegistryObject<Item> WEATHER_TERMINAL = described("weather_terminal", ModBlocks.WEATHER_TERMINAL, 3);
+
+    private static RegistryObject<Item> described(String name, RegistryObject<net.minecraft.world.level.block.Block> block, int lines) {
+        return ITEMS.register(name, () -> new com.jeladastudios.ftsgeology.item.DescribedBlockItem(block.get(), new Item.Properties(), lines));
+    }
+
     /**
      * Reads a rock and the beds under it. Durable, because it is struck against stone.
      *

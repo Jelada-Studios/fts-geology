@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "I I",
+    "CGC",
+    "CCC"
+  ],
+  "key": {
+    "C": { "item": "minecraft:copper_ingot" },
+    "G": { "item": "minecraft:glass_bottle" },
+    "I": { "item": "minecraft:iron_ingot" }
+  },
+  "result": { "item": "fts_geology:rain_gauge" }
+}
