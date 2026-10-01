@@ -84,13 +84,19 @@ public final class OreGenesis {
         return d.placed;
     }
 
+    /** Soil and loose ground a seep's vent comes up through. */
+    private static boolean thinCover(BlockState s) {
+        return s.is(BlockTags.DIRT) || s.is(Blocks.GRAVEL) || s.is(BlockTags.SAND) || s.is(Blocks.CLAY);
+    }
+
     /** Grid of natural gas seeps, and how far a group of vents spreads from its middle. */
     private static final int SEEP_CELL = 96, SEEP_REACH = 6;
 
     /**
      * Burning methane seeps where an ophiolite's serpentinite comes to the surface: sea water working on the mantle rock
      * makes methane and hydrogen, which find their way up its cracks -- the Chimaera of Lycia (Yanartas), a hillside of
-     * flames that have burned for thousands of years. A few vents together, lit, on the bare rock only.
+     * flames that have burned for thousands of years. A few vents together, lit, on the rock or burnt through a thin soil
+     * over it.
      */
     private static void gasSeeps(Deposit d) {
         if (!d.own || !com.jeladastudios.ftsgeology.gas.GasConfig.ENABLED.get()) return;
@@ -108,9 +114,14 @@ public final class OreGenesis {
                 int g = d.ground(x, z);
                 if (g == Integer.MIN_VALUE) continue;
                 BlockPos p = new BlockPos(x, g, z);
-                BlockState s = d.level.getBlockState(p);
-                if (!s.is(ModBlocks.SERPENTINITE.get()) && !s.is(ModBlocks.PERIDOTITE.get())) continue;
-                if (!d.level.getBlockState(p.above()).isAir()) continue;
+                // Bare rock, or rock under a thin soil (the vent burns its way through, and the plants over it).
+                BlockPos.MutableBlockPos q = p.mutable();
+                while (q.getY() > g - 4 && thinCover(d.level.getBlockState(q))) q.move(0, -1, 0);
+                BlockState rock = d.level.getBlockState(q);
+                if (!rock.is(ModBlocks.SERPENTINITE.get()) && !rock.is(ModBlocks.PERIDOTITE.get())) continue;
+                BlockState over = d.level.getBlockState(p.above());
+                if (!over.isAir() && !over.is(BlockTags.REPLACEABLE)) continue;
+                if (!over.isAir()) d.level.setBlock(p.above(), Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
                 d.level.setBlock(p, com.jeladastudios.ftsgeology.gas.registry.GasBlocks.GAS_SEEP.get().defaultBlockState(),
                         Block.UPDATE_CLIENTS);
                 d.placed++;
