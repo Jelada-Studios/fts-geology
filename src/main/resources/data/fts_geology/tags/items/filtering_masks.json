@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    {"id": "adpother:iron_respirator", "required": false},
+    {"id": "adpother:gold_respirator", "required": false},
+    {"id": "adpother:diamond_respirator", "required": false},
+    {"id": "createbigcannons:gas_mask", "required": false},
+    {"id": "hbm:m65_mask", "required": false},
+    {"id": "mekanism:hazmat_mask", "required": false}
+  ]
+}

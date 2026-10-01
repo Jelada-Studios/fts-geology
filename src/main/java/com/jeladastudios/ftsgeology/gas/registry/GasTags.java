@@ -19,6 +19,9 @@ public final class GasTags {
     /** Organic matter accepted by the biogas digester. */
     public static final TagKey<Item> BIOMASS = item("biomass");
 
+    /** Other mods' masks that filter the air (Pollution of the Realms' respirators and the like): worn, they keep out the
+     *  poisons as the gas mask does, but not a want of oxygen or a weight of CO2. Their wear is their own mod's business. */
+    public static final TagKey<Item> FILTERING_MASKS = item("filtering_masks");
 
     /** Entities that do not breathe. */
     public static final TagKey<EntityType<?>> GAS_IMMUNE = TagKey.create(Registries.ENTITY_TYPE, id("gas_immune"));

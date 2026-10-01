@@ -86,6 +86,8 @@ public final class GasHealth {
                 }
             }
             coPpm = h2sPpm = so2Ppm = 0;
+        } else if (head.is(GasTags.FILTERING_MASKS)) {
+            coPpm = h2sPpm = so2Ppm = 0;
         } else if (e instanceof Player p && GasConfig.SMELL_MESSAGES.get()) {
             smellHints(p, h2sPpm, so2Ppm);
         }
