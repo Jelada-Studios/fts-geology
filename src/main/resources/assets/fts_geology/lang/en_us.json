@@ -827,5 +827,10 @@
   "message.fts_geology.wellhead.spent": "The field is spent: its own pressure lifts no more oil.",
   "message.fts_geology.wellhead.tank": "Tank: %s / %s mB.",
   "block.fts_geology.wellhead.tooltip.createdieselgenerators": "Create Diesel Generators: its distillation takes this crude oil, and its pumpjack finds oil only over a field.",
-  "message.fts_geology.gas.over_voltage": "The line brings %s V: the machine runs at 120 V and takes nothing higher."
+  "message.fts_geology.gas.over_voltage": "The line brings %s V: the machine runs at 120 V and takes nothing higher.",
+  "gui.fts_geology.gas_panel.energy": "Energy",
+  "gui.fts_geology.gas_panel.tank": "Tank",
+  "gui.fts_geology.gas_panel.mix": "In the tank",
+  "gui.fts_geology.gas_panel.empty": "Empty",
+  "gui.fts_geology.gas_panel.refused": "Electrodynamics: %s V refused, it takes 120 V only"
 }

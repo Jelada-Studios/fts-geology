@@ -84,6 +84,8 @@ public final class GasCommand {
                         .executes(c -> ignite(c, BlockPos.containing(c.getSource().getPosition())))
                         .then(Commands.argument("pos", BlockPosArgument.blockPos())
                                 .executes(c -> ignite(c, BlockPosArgument.getLoadedBlockPos(c, "pos")))))
+                .then(Commands.literal("panel").then(Commands.argument("pos", BlockPosArgument.blockPos())
+                        .executes(c -> panel(c, BlockPosArgument.getLoadedBlockPos(c, "pos")))))
                 .then(Commands.literal("tap").executes(GasCommand::tap))
                 .then(Commands.literal("sum")
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, 256))
@@ -221,6 +223,18 @@ public final class GasCommand {
         if (c.getSource().getEntity() != null) c.getSource().getEntity().teleportTo(x + 0.5, ground + 1, z + 1.5);
         c.getSource().sendSuccess(() -> Component.literal("Tapped the gas cap at " + tx + " " + top + " " + tz
                 + ", a shaft up to " + shaft + "."), true);
+        return 1;
+    }
+
+    /** Opens a gas machine's gauge panel for the player running it, as a right-click would. */
+    private static int panel(CommandContext<CommandSourceStack> c, BlockPos pos) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        net.minecraft.server.level.ServerPlayer player = c.getSource().getPlayerOrException();
+        if (!(c.getSource().getLevel().getBlockEntity(pos) instanceof com.jeladastudios.ftsgeology.gas.block.entity.GasMachineBlockEntity m)) {
+            c.getSource().sendFailure(Component.literal("No gas machine there."));
+            return 0;
+        }
+        com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player),
+                new com.jeladastudios.ftsgeology.network.TerminalPacket(pos, m.panelData(), true));
         return 1;
     }
 

@@ -39,6 +39,9 @@ public record TerminalRequestPacket(BlockPos pos, boolean chat) {
             if (be instanceof WeatherTerminalBlockEntity terminal) {
                 ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
                         new TerminalPacket(p.pos, terminal.data(player.serverLevel()), false));
+            } else if (be instanceof com.jeladastudios.ftsgeology.gas.block.entity.GasMachineBlockEntity machine) {
+                ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                        new TerminalPacket(p.pos, machine.panelData(), false));
             } else if (be instanceof SeismographBlockEntity station) {
                 if (p.chat) {
                     for (Component c : station.report(player.serverLevel().getGameTime())) player.sendSystemMessage(c);

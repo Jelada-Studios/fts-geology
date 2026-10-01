@@ -69,13 +69,50 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
         return new ArrayList<>();
     }
 
+    /** Opens the gauge panel on the player's screen (see {@code GasPanelScreen}); it asks for fresh readings while open. */
     public InteractionResult onUse(Player player, InteractionHand hand, BlockHitResult hit) {
-        for (Component c : status()) player.sendSystemMessage(c);
-        if (level != null && refusedAt >= 0 && level.getGameTime() - refusedAt < 40) {
-            player.sendSystemMessage(Component.translatable("message.fts_geology.gas.over_voltage",
-                    String.format(java.util.Locale.ROOT, "%.0f", refusedVolts)));
+        if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
+            com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
+                    net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> sp),
+                    new com.jeladastudios.ftsgeology.network.TerminalPacket(worldPosition, panelData(), true));
         }
         return InteractionResult.CONSUME;
+    }
+
+    /**
+     * What the gauge panel shows: the machine's name and status lines, its energy, a voltage it refused lately, and
+     * its own tank's pressure and mix.
+     */
+    public net.minecraft.nbt.CompoundTag panelData() {
+        net.minecraft.nbt.CompoundTag t = new net.minecraft.nbt.CompoundTag();
+        t.putBoolean("Gas", true);
+        t.putString("Name", getBlockState().getBlock().getDescriptionId());
+        net.minecraft.nbt.ListTag lines = new net.minecraft.nbt.ListTag();
+        for (Component c : status()) lines.add(net.minecraft.nbt.StringTag.valueOf(Component.Serializer.toJson(c)));
+        t.put("Status", lines);
+        MachineEnergy e = energy();
+        if (e != null) {
+            t.putInt("Energy", e.getEnergyStored());
+            t.putInt("EnergyMax", e.getMaxEnergyStored());
+        }
+        if (level != null && refusedAt >= 0 && level.getGameTime() - refusedAt < 100) t.putDouble("Refused", refusedVolts);
+        GasTank tank = tankFor(null);
+        if (tank != null) {
+            t.putDouble("Atm", tank.pressure());
+            t.putDouble("MaxAtm", tank.maxPressure);
+            t.putDouble("Moles", tank.total());
+            net.minecraft.nbt.ListTag mix = new net.minecraft.nbt.ListTag();
+            for (com.jeladastudios.ftsgeology.gas.Gas g : com.jeladastudios.ftsgeology.gas.Gas.VALUES) {
+                double f = tank.gas.fraction(g);
+                if (f < 1e-6) continue;
+                net.minecraft.nbt.CompoundTag c = new net.minecraft.nbt.CompoundTag();
+                c.putString("Id", g.id);
+                c.putDouble("F", f);
+                mix.add(c);
+            }
+            t.put("Mix", mix);
+        }
+        return t;
     }
 
     /** Called when the block is broken or replaced. */

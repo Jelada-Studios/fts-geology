@@ -31,7 +31,8 @@ public record TerminalPacket(BlockPos pos, CompoundTag data, boolean open) {
         ctx.get().enqueueWork(() ->
                 DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
                         () -> () -> {
-                            if (p.data.getBoolean("Seismo")) com.jeladastudios.ftsgeology.client.SeismographScreen.receive(p);
+                            if (p.data.getBoolean("Gas")) com.jeladastudios.ftsgeology.client.GasPanelScreen.receive(p);
+                            else if (p.data.getBoolean("Seismo")) com.jeladastudios.ftsgeology.client.SeismographScreen.receive(p);
                             else com.jeladastudios.ftsgeology.client.WeatherTerminalScreen.receive(p);
                         }));
         ctx.get().setPacketHandled(true);
