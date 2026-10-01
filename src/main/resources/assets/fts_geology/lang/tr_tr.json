@@ -634,5 +634,6 @@
   "gui.fts_geology.terminal.advice.frost": "Don olası: dondan zarar görecekleri ört ya da hasat et.",
   "gui.fts_geology.terminal.advice.heat": "Sıcak bir gün geliyor: öğlen değil akşam sula.",
   "gui.fts_geology.terminal.advice.storm": "Yarım gün içinde gök gürültülü fırtına: rüzgârın ya da dolunun bozacaklarını topla.",
-  "gui.fts_geology.terminal.advice.dry_window": "Kuru bir gün geliyor: hasat için uygun."
+  "gui.fts_geology.terminal.advice.dry_window": "Kuru bir gün geliyor: hasat için uygun.",
+  "command.fts_geology.water.subsidence": "Zemin burada kilin üstünde %s blok oturdu (%s blok indi); kuyuların suyu çektiği en derin: %s blok"
 }

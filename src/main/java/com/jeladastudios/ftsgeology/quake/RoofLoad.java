@@ -113,12 +113,12 @@ public final class RoofLoad {
 
     /** Columns looked at, to when. */
     private static final Long2LongOpenHashMap LOOKED = new Long2LongOpenHashMap();
-    private static long considered, warned, fell, held, cracked, sunk;
+    private static long considered, warned, fell, held, cracked, sunk, refills;
     private static int goingNow;
 
     public static void clear() {
         LOOKED.clear();
-        considered = warned = fell = held = cracked = sunk = 0;
+        considered = warned = fell = held = cracked = sunk = refills = 0;
         goingNow = 0;
     }
 
@@ -205,13 +205,18 @@ public final class RoofLoad {
         Store st = level.getDataStorage().get(Store::load, "fts_geology_roof_load");
         goingNow = st == null ? 0 : st.going.size();
         if (goingNow == 0) return;
-        List<Long> go = new ArrayList<>();
+        List<Long> go = new ArrayList<>(), back = new ArrayList<>();
         for (var e : st.going.long2ObjectEntrySet()) {
             int x = BlockPos.getX(e.getLongKey()), z = BlockPos.getZ(e.getLongKey());
             if (!com.jeladastudios.ftsgeology.util.Loaded.chunk(level, x >> 4, z >> 4)) continue;
             Going g = e.getValue();
             if (now >= g.due) {
                 go.add(e.getLongKey());
+                continue;
+            }
+            if (g.drawn && now % 100 == 0 && refilled(level, x, z)) {
+                // The pumps stopped in time: the water is back up in the cave, and holds the roof up again.
+                back.add(e.getLongKey());
                 continue;
             }
             if (g.drawn) {
@@ -232,6 +237,13 @@ public final class RoofLoad {
             }
             warn(level, x, z);
         }
+        for (long k : back) {
+            st.going.remove(k);
+            st.setDirty();
+            refills++;
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("roof load: the water has come back up under {} {} before its roof went; it holds",
+                    BlockPos.getX(k), BlockPos.getZ(k));
+        }
         for (long k : go) {
             Going g = st.going.remove(k);
             st.setDirty();
@@ -243,6 +255,12 @@ public final class RoofLoad {
             }
             fall(level, x, z);
         }
+    }
+
+    /** Whether the water under a karst roof the wells drew down stands up in its cave again, over the cave's top. */
+    private static boolean refilled(ServerLevel level, int x, int z) {
+        CaveCollapse.Cave cave = CaveCollapse.caveUnder(level, x, z);
+        return cave != null && com.jeladastudios.ftsgeology.hydrology.Aquifer.waterY(level, x, z) >= cave.top() + 1;
     }
 
     /** How wide the ground over a going roof is felt to move: a third of the cave's span, two to five blocks. */
@@ -393,7 +411,7 @@ public final class RoofLoad {
     }
 
     public static String summary() {
-        return String.format(java.util.Locale.ROOT, "roof load: %d columns looked at, %d roofs warned, %d came down, %d held once the water went, %d going; sinkholes: %d cracked, %d rings sunk",
-                considered, warned, fell, held, goingNow, cracked, sunk);
+        return String.format(java.util.Locale.ROOT, "roof load: %d columns looked at, %d roofs warned, %d came down, %d held once the water went, %d going; sinkholes: %d cracked, %d rings sunk, %d called off as the water came back",
+                considered, warned, fell, held, goingNow, cracked, sunk, refills);
     }
 }

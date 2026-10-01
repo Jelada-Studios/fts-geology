@@ -222,6 +222,11 @@ public final class InspectCommands {
             source.sendSuccess(() -> Component.translatable("command.fts_geology.water.wells", dec(lowered, 2),
                     com.jeladastudios.ftsgeology.hydrology.Aquifer.count(level)).withStyle(ChatFormatting.AQUA), false);
         }
+        double[] settled = com.jeladastudios.ftsgeology.hydrology.SoilWater.settling(level, at.getX(), at.getZ());
+        if (settled != null && settled[2] >= 0.05) {
+            source.sendSuccess(() -> Component.translatable("command.fts_geology.water.subsidence", dec(settled[0], 2),
+                    (int) settled[1], dec(settled[2], 2)).withStyle(ChatFormatting.AQUA), false);
+        }
         source.sendSuccess(() -> Component.translatable("command.fts_geology.water.looked", dec(r.hoursSinceLook(), 1),
                 r.grassDryness(), dec(r.droughtHours() / 168.0, 1)).withStyle(ChatFormatting.DARK_GRAY), false);
         return 1;

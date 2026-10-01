@@ -155,6 +155,11 @@ public final class SoilWater {
         final long[] riseSince = new long[16];
         /** How likely a puddle is on each cell now, eased down as it dries (see Puddles). Not kept. */
         final float[] puddle = new float[16];
+        /** How much each cell has settled, in blocks, and how many whole blocks each column has gone down (see Subsidence). */
+        final float[] compacted = new float[16];
+        final byte[] settled = new byte[256];
+        /** The deepest the wells have drawn the water down under the chunk, in blocks: what its clay has settled to. */
+        float deepest;
 
         Cells() {
             java.util.Arrays.fill(usable, 1f);
@@ -216,6 +221,11 @@ public final class SoilWater {
         if (l.length == 16) System.arraycopy(l, 0, c.load, 0, 16);
         int[] lg = tag.getIntArray("lg");
         if (lg.length == 16) System.arraycopy(lg, 0, c.loadGround, 0, 16);
+        int[] cp = tag.getIntArray("cp");
+        if (cp.length == 16) for (int i = 0; i < 16; i++) c.compacted[i] = cp[i] / 1000f;
+        byte[] st = tag.getByteArray("st");
+        if (st.length == 256) System.arraycopy(st, 0, c.settled, 0, 256);
+        c.deepest = tag.getFloat("dl");
         ChunkPos p = event.getChunk().getPos();
         CELLS.put(key(level, p.x, p.z), c);
     }
@@ -282,6 +292,13 @@ public final class SoilWater {
         tag.putIntArray("w", w);
         tag.putByteArray("l", c.load.clone());
         tag.putIntArray("lg", c.loadGround.clone());
+        if (c.deepest > 0) {
+            int[] cp = new int[16];
+            for (int i = 0; i < 16; i++) cp[i] = Math.round(c.compacted[i] * 1000);
+            tag.putIntArray("cp", cp);
+            tag.putByteArray("st", c.settled.clone());
+            tag.putFloat("dl", c.deepest);
+        }
         event.getData().put(TAG, tag);
         if (c.leaving) CELLS.remove(k);
     }
@@ -375,6 +392,7 @@ public final class SoilWater {
         looks++;
         sendWet(chunk, c);
         loads(level, chunk, c);
+        Subsidence.look(level, chunk, c, hours);
         Puddles.update(level, chunk, c, sky, first || away ? 0 : hours);
         // Away, the place had its average weather, rain and all: no drought or flood is carried over it.
         if (GeyserConfig.SOIL_WATER_GROUND.get()) showGround(level, chunk, c, first || away ? -1 : hours);
@@ -1164,6 +1182,18 @@ public final class SoilWater {
         double rootSat = sat(c.root[i], soil.root);
         return new Reading(soil, c.top[i], c.root[i], c.deep[i], c.pond[i], sat(c.top[i], soil.top), rootSat,
                 sat(c.deep[i], soil.deep), soil.available(rootSat), c.table[i], c.depth, hours, c.tint[i], c.dry[i]);
+    }
+
+    /**
+     * How far the ground of the cell at a column has settled over the clay the wells drew down (see Subsidence): {blocks
+     * so far, whole blocks laid down, the deepest drawdown yet}; null where the cell is not kept.
+     */
+    public static double[] settling(ServerLevel level, int x, int z) {
+        if (!enabled(level)) return null;
+        Cells c = CELLS.get(key(level, x >> 4, z >> 4));
+        if (c == null || c.last < 0) return null;
+        int i = ((z & 15) >> 2) * 4 + ((x & 15) >> 2);
+        return new double[]{c.compacted[i], c.settled[(z & 15) * 16 + (x & 15)], c.deepest};
     }
 
     public static String summary() {

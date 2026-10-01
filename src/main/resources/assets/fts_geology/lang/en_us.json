@@ -644,5 +644,6 @@
   "gui.fts_geology.terminal.advice.frost": "Frost is likely: cover or harvest what frost would kill.",
   "gui.fts_geology.terminal.advice.heat": "A hot day ahead: water in the evening, not at midday.",
   "gui.fts_geology.terminal.advice.storm": "Thunderstorms within half a day: bring in what wind or hail would spoil.",
-  "gui.fts_geology.terminal.advice.dry_window": "A dry day ahead: good for the harvest."
+  "gui.fts_geology.terminal.advice.dry_window": "A dry day ahead: good for the harvest.",
+  "command.fts_geology.water.subsidence": "The ground here has settled %s blocks over its clay (%s laid down); the deepest the wells have drawn the water: %s blocks"
 }

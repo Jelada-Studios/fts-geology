@@ -200,6 +200,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue DAMS;                   // dammed rivers fill; weak dams break
     public static final ForgeConfigSpec.BooleanValue WATER_LOAD_COLLAPSE;    // cave roofs under new water, drained karst
     public static final ForgeConfigSpec.DoubleValue SINKHOLE_WARNING_DAYS;    // days a drawn-down karst roof takes to fall
+    public static final ForgeConfigSpec.DoubleValue SUBSIDENCE;               // clay settling over ground the wells drew down
     public static final ForgeConfigSpec.BooleanValue REGIONAL_RAIN;           // storms instead of one weather for the world
     public static final ForgeConfigSpec.DoubleValue RAIN_AMOUNT;              // how much of the land the weather keeps under rain
     public static final ForgeConfigSpec.DoubleValue RAIN_STRENGTH;            // how hard the storms rain
@@ -1144,6 +1145,13 @@ public final class GeyserConfig {
                         "the ground over it cracks a third of the way, sinks a block in a ring round the middle at two thirds,",
                         "and then the sinkhole opens. A roof under water brought over it goes in a minute or two.")
                 .defineInRange("sinkholeWarningDays", 1.5, 0.001, 30.0);
+        SUBSIDENCE = b
+                .comment("The ground settling over clay and soft soil the wells round it have drawn the water out of, as on the",
+                        "Konya plain: slowly, over game days, a block at a time in rings round the wells, the soil cracking first,",
+                        "and for good -- the water coming back does not lift it again. How far it settles follows the deepest the",
+                        "water has been drawn and how much soft ground is under it; sand, gravel and rock hardly settle. What",
+                        "a player built stays where it stands. 1 is the mod's rate, 2 twice as much, 0 none.")
+                .defineInRange("groundSubsidence", 1.0, 0.0, 5.0);
         REGIONAL_RAIN = b
                 .comment("Rain in storms that drift with the wind, not over the whole world at once: each region goes through",
                         "wet and dry spells lasting days to weeks, wet biomes get more rain than dry ones, a windward mountainside",
