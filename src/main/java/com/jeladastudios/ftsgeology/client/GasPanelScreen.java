@@ -21,7 +21,8 @@ import java.util.Locale;
 /**
  * A gas machine's gauges, drawn in code: its energy, a voltage it refused lately, its tank's pressure against the most it
  * holds, the mix in the tank as a bar of the gases' colours with the largest named, and the machine's own status lines.
- * Read only; the readings come fresh from the server every second while it is open.
+ * Buttons under them set what the machine has to set (the valve's opening, the separator's gas, the sensor's mode);
+ * the readings come fresh from the server every second while it is open.
  */
 public class GasPanelScreen extends Screen {
 
@@ -68,7 +69,8 @@ public class GasPanelScreen extends Screen {
             Component c = Component.Serializer.fromJson(t.getAsString());
             if (c != null) lines.addAll(font.split(c, W - 16));
         }
-        int h = 22 + (power ? 24 : 0) + (refused ? 12 : 0) + (tank ? 65 : 0) + lines.size() * 10 + 8;
+        ListTag controls = data.getList("Controls", Tag.TAG_COMPOUND);
+        int h = 22 + (power ? 24 : 0) + (refused ? 12 : 0) + (tank ? 65 : 0) + lines.size() * 10 + 8 + (controls.isEmpty() ? 0 : 22);
         int left = (width - W) / 2, top = Math.max(4, (height - h) / 2);
         g.fill(left, top, left + W, top + h, BG);
         frame(g, left, top, W, h);
@@ -105,7 +107,53 @@ public class GasPanelScreen extends Screen {
             g.drawString(font, line, x, y, TEXT, false);
             y += 10;
         }
+        buttons(g, controls, x, y + 4, w, mx, my);
         super.render(g, mx, my, partial);
+    }
+
+    /** Where the buttons were drawn last, for the click. */
+    private record Hit(int x0, int y0, int x1, int y1, String key) {}
+
+    private final List<Hit> hits = new ArrayList<>();
+
+    /** The machine's buttons in one row: a one-character button narrow, the rest sharing the width left. */
+    private void buttons(GuiGraphics g, ListTag controls, int x, int y, int w, int mx, int my) {
+        hits.clear();
+        if (controls.isEmpty()) return;
+        int n = controls.size(), gap = 4, narrow = 20, wide = 0;
+        List<Component> labels = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            Component c = Component.Serializer.fromJson(controls.getCompound(i).getString("Text"));
+            labels.add(c == null ? Component.empty() : c);
+            if (labels.get(i).getString().length() > 1) wide++;
+        }
+        int wideW = wide == 0 ? narrow : (w - gap * (n - 1) - narrow * (n - wide)) / wide;
+        int at = x;
+        for (int i = 0; i < n; i++) {
+            int bw = labels.get(i).getString().length() > 1 ? wideW : narrow;
+            boolean over = mx >= at && mx < at + bw && my >= y && my < y + 16;
+            g.fill(at, y, at + bw, y + 16, over ? BORDER : HEADER);
+            frame(g, at, y, bw, 16);
+            Component label = labels.get(i);
+            g.drawString(font, label, at + (bw - font.width(label)) / 2, y + 4, TEXT, false);
+            hits.add(new Hit(at, y, at + bw, y + 16, controls.getCompound(i).getString("Key")));
+            at += bw + gap;
+        }
+    }
+
+    @Override
+    public boolean mouseClicked(double mx, double my, int button) {
+        if (button == 0) {
+            for (Hit h : hits) {
+                if (mx >= h.x0() && mx < h.x1() && my >= h.y0() && my < h.y1()) {
+                    Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance
+                            .forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0f));
+                    ModNetwork.CHANNEL.sendToServer(new com.jeladastudios.ftsgeology.network.GasControlPacket(pos, h.key()));
+                    return true;
+                }
+            }
+        }
+        return super.mouseClicked(mx, my, button);
     }
 
     /** The tank's mix: one bar of the gases' shares in their colours, and the largest of them named under it. */

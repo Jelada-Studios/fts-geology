@@ -103,6 +103,14 @@ public final class ModBlocks {
                     .strength(2.5F)
                     .noOcclusion()));
 
+    /** A thermoelectric generator: Forge Energy from a hot plate against a cold side, nothing moving. */
+    public static final RegistryObject<Block> THERMOELECTRIC_GENERATOR = BLOCKS.register("thermoelectric_generator",
+            () -> new com.jeladastudios.ftsgeology.block.ThermoelectricBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)
+                    .mapColor(MapColor.METAL)
+                    .strength(3.0F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .noOcclusion()));
+
     /** A geothermal turbine: Forge Energy from the heat a well under it reaches. */
     public static final RegistryObject<Block> GEOTHERMAL_TURBINE = BLOCKS.register("geothermal_turbine",
             () -> new com.jeladastudios.ftsgeology.block.GeothermalTurbineBlock(BlockBehaviour.Properties.copy(Blocks.COPPER_BLOCK)

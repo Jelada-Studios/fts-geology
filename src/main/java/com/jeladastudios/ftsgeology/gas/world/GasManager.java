@@ -137,9 +137,16 @@ public class GasManager {
     }
     public int awakeCount;
     final RandomSource random = RandomSource.create();
+    /** Standing flames where rich gas meets the air. */
+    private final VentFlames flames;
 
     private GasManager(ServerLevel level) {
         this.level = level;
+        this.flames = new VentFlames(this);
+    }
+
+    public VentFlames flames() {
+        return flames;
     }
 
     // ------------------------------------------------------------------ chunk lifecycle
@@ -396,6 +403,55 @@ public class GasManager {
         return any;
     }
 
+    /** What a spark did: lit the gas, or found it too lean or too rich to burn, or found none. */
+    public enum Spark { LIT, LEAN, RICH, NONE }
+
+    /**
+     * A spark struck at a place, from a lighter or a flint: it lights the nearest flammable gas within {@code radius}
+     * blocks, as a flame does more than the one point it touches. Where there is fuel but none of it will burn, says why:
+     * too little of it in the air, or too much (and too little air). {@code why[0]} and {@code why[1]} get the fuel's share
+     * and the limit it missed, for the telling.
+     */
+    public Spark spark(BlockPos centre, int radius, @Nullable Entity cause, double[] why) {
+        List<BlockPos> near = new ArrayList<>();
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dy = -radius; dy <= radius; dy++) {
+                for (int dz = -radius; dz <= radius; dz++) near.add(centre.offset(dx, dy, dz));
+            }
+        }
+        near.sort(java.util.Comparator.comparingDouble(p -> p.distSqr(centre)));
+        GasMix best = null;
+        BlockPos bestPos = null;
+        for (BlockPos p : near) {
+            GasMix c = getCell(p);
+            if (c == null) continue;
+            if (Combustion.isFlammable(c) && ignite(p, cause)) return Spark.LIT;
+            if (Combustion.fuelFraction(c) > 0.002 && (best == null || Combustion.fuelFraction(c) > Combustion.fuelFraction(best))) {
+                best = c;
+                bestPos = p;
+            }
+        }
+        // A bore's mouth a gas field pours out of lights however thin the air makes the gas over it.
+        for (BlockPos p : near) {
+            if (GasFields.isMouth(p) && flames.start(p)) return Spark.LIT;
+        }
+        if (best == null) return Spark.NONE;
+        double f = Combustion.fuelFraction(best);
+        why[0] = f;
+        if (f < Combustion.lfl(best)) {
+            why[1] = Combustion.lfl(best);
+            return Spark.LEAN;
+        }
+        // Too rich to burn as it is, but beside the air: it burns where the two meet, a standing flame.
+        if (flames.start(bestPos)) return Spark.LIT;
+        for (BlockPos p : near) {
+            GasMix c = getCell(p);
+            if (c != null && VentFlames.tooRich(c) && flames.start(p)) return Spark.LIT;
+        }
+        why[1] = Combustion.ufl(best);
+        return Spark.RICH;
+    }
+
     /**
      * Keeps trying to ignite around {@code center} for a while (e.g. a ruptured tank whose
      * contents first have to mix with air before they can burn).
@@ -418,6 +474,7 @@ public class GasManager {
         if (!deflagrations.isEmpty()) {
             deflagrations.removeIf(Deflagration::tick);
         }
+        flames.tick();
         if (GasConfig.SWAMP_GAS.get() && level.getGameTime() % 40 == 0) swampGas();
         if (level.getGameTime() % 20 == 0 && level.dimension() == Level.OVERWORLD) GasFields.tick(this);
         simulate();
@@ -700,13 +757,16 @@ public class GasManager {
         if (!state.isAir() && putsOutFlames(cell)
                 && snuff(state, cpos)) return;
 
-        if (Combustion.isFlammable(cell)) {
+        boolean flammable = Combustion.isFlammable(cell);
+        if (flammable || VentFlames.tooRich(cell)) {
             boolean spark = isIgnitionSource(state);
             for (int i = 0; i < 6 && !spark; i++) {
                 if (nStates[i] != null && isIgnitionSource(nStates[i], DIRS[i].getOpposite())) spark = true;
             }
             if (spark) {
-                ignite(cpos, null);
+                // A flame by gas too rich to burn lights it where it meets the air.
+                if (flammable) ignite(cpos, null);
+                else flames.start(cpos.immutable());
                 return;
             }
         }

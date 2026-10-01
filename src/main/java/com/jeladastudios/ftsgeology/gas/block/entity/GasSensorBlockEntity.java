@@ -62,6 +62,27 @@ public class GasSensorBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
+    protected void controls(net.minecraft.nbt.ListTag out) {
+        button(out, "prev", Component.literal("<"));
+        button(out, "next_mode", Component.translatable("gui.fts_geology.gas_panel.mode", Component.translatable(mode.key())));
+        button(out, "next", Component.literal(">"));
+    }
+
+    @Override
+    public boolean control(String key, net.minecraft.server.level.ServerPlayer player) {
+        int n = Mode.values().length;
+        int step = switch (key) {
+            case "prev" -> n - 1;
+            case "next", "next_mode" -> 1;
+            default -> 0;
+        };
+        if (step == 0) return false;
+        mode = Mode.values()[(mode.ordinal() + step) % n];
+        setChanged();
+        return true;
+    }
+
+    @Override
     public void serverTick() {
         if (level.getGameTime() % 10 != 0) return;
         Direction f = getBlockState().getValue(GasSensorBlock.FACING);

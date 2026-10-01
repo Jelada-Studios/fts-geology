@@ -142,9 +142,28 @@ public final class CommonEvents {
         Direction face = event.getFace();
         BlockPos pos = event.getPos();
         Player player = event.getEntity();
-        if (face != null && mgr.ignite(pos.relative(face), player)) return;
-        if (mgr.ignite(pos, player)) return;
-        mgr.ignite(BlockPos.containing(player.getEyePosition()), player);
+        spark(mgr, player, face != null ? pos.relative(face) : pos);
+    }
+
+    /**
+     * A spark at a place lights the nearest flammable gas round it, a block either way, else round the striker's head;
+     * where there is gas that will not burn, the striker is told why.
+     */
+    private static void spark(GasManager mgr, Player player, BlockPos at) {
+        double[] why = new double[2];
+        GasManager.Spark s = mgr.spark(at, 1, player, why);
+        if (s == GasManager.Spark.LIT) return;
+        double[] why2 = new double[2];
+        GasManager.Spark t = mgr.spark(BlockPos.containing(player.getEyePosition()), 1, player, why2);
+        if (t == GasManager.Spark.LIT) return;
+        if (s == GasManager.Spark.NONE) {
+            s = t;
+            why = why2;
+        }
+        if (s == GasManager.Spark.NONE) return;
+        player.displayClientMessage(Component.translatable(s == GasManager.Spark.LEAN ? "message.fts_geology.gas.spark_lean"
+                        : "message.fts_geology.gas.spark_rich", String.format(java.util.Locale.ROOT, "%.1f", why[0] * 100),
+                String.format(java.util.Locale.ROOT, "%.0f", why[1] * 100)).withStyle(net.minecraft.ChatFormatting.YELLOW), true);
     }
 
     /** Striking flint and steel into the air still makes sparks. */
@@ -157,7 +176,7 @@ public final class CommonEvents {
         level.sendParticles(ParticleTypes.SMALL_FLAME, spark.x, spark.y, spark.z, 3, 0.05, 0.05, 0.05, 0.01);
         GasManager mgr = GasManager.get(level);
         // No wear: vanilla's flint and steel only wears on what it lights.
-        if (!mgr.ignite(BlockPos.containing(spark), player)) mgr.ignite(BlockPos.containing(player.getEyePosition()), player);
+        spark(mgr, player, BlockPos.containing(spark));
     }
 
     /** Placing a torch, candle, campfire... in or next to flammable gas. */
@@ -222,6 +241,12 @@ public final class CommonEvents {
     public static void onExplosion(ExplosionEvent.Detonate event) {
         if (!(event.getLevel() instanceof ServerLevel level) || !on()) return;
         GasManager.get(level).igniteAround(BlockPos.containing(event.getExplosion().getPosition()), 3, null);
+        // A blast that is not the gas's own blows out the standing flames it reaches, as a well fire is put out.
+        if (!event.getExplosion().getDamageSource().is(com.jeladastudios.ftsgeology.gas.registry.GasDamageTypes.GAS_EXPLOSION)) {
+            double reach = 2.0;
+            for (BlockPos p : event.getAffectedBlocks()) reach = Math.max(reach, p.getCenter().distanceTo(event.getExplosion().getPosition()));
+            GasManager.get(level).flames().blowOut(event.getExplosion().getPosition(), Math.min(reach, 12.0));
+        }
         int n = 0;
         for (BlockPos p : event.getAffectedBlocks()) {
             if (n++ > 256) break;

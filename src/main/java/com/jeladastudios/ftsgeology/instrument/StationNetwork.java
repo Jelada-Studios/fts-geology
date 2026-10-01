@@ -159,7 +159,7 @@ public final class StationNetwork {
 
     private static String clean(String name) {
         if (name == null) return "";
-        String n = name.strip().replaceAll("[\\p{Cntrl}§]", "");
+        String n = name.strip().replaceAll("[\\p{Cntrl}\\u00a7]", "");
         return n.length() > NAME ? n.substring(0, NAME) : n;
     }
 

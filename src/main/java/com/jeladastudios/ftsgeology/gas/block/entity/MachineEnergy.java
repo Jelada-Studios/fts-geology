@@ -60,15 +60,32 @@ public class MachineEnergy extends EnergyStorage {
         energy = Math.max(0, Math.min(capacity, value));
     }
 
-    /** Pushes energy into neighbouring receivers (generators). */
+    /**
+     * Pushes energy into neighbouring receivers (generators): Electrodynamics' electricity at 120 V where the block takes
+     * it there -- its wires take nothing else -- and Forge Energy where not.
+     */
     public void pushTo(Level level, BlockPos pos, Direction skip, int maxPerSide) {
+        pushTo(level, pos, d -> d == skip, maxPerSide);
+    }
+
+    /** The same, leaving out every side {@code skip} says. */
+    public void pushTo(Level level, BlockPos pos, java.util.function.Predicate<Direction> skip, int maxPerSide) {
         for (Direction d : Direction.values()) {
-            if (d == skip || energy <= 0) continue;
+            if (skip.test(d) || energy <= 0) continue;
             BlockEntity be = level.getBlockEntity(pos.relative(d));
             if (be == null) continue;
+            int offered = Math.min(energy, maxPerSide);
+            int taken = com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower.give(be, d.getOpposite(), offered);
+            if (taken >= 0) {
+                if (taken > 0) {
+                    energy -= taken;
+                    onChange.run();
+                }
+                continue;
+            }
             IEnergyStorage target = be.getCapability(ForgeCapabilities.ENERGY, d.getOpposite()).orElse(null);
             if (target == null || !target.canReceive()) continue;
-            int sent = target.receiveEnergy(Math.min(energy, maxPerSide), false);
+            int sent = target.receiveEnergy(offered, false);
             if (sent > 0) {
                 energy -= sent;
                 onChange.run();

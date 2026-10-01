@@ -69,6 +69,8 @@ public class GasPipeBlock extends MachineBlock {
         BlockPos n = pos.relative(dir);
         BlockEntity be = level.getBlockEntity(n);
         if (be == null) return false;
+        // A furnace, a smoker or a blast furnace takes a pipe as its own gas burner (see gas.GasFurnaces).
+        if (be instanceof net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity) return true;
         return be.getCapability(GasCapabilities.GAS_HANDLER, dir.getOpposite())
                 .map(h -> h.connectsTo(dir.getOpposite())).orElse(false);
     }

@@ -42,6 +42,13 @@ public final class GasFields {
     private record Hole(long pos, long field, double atm, double sour) {}
 
     private static final Long2ObjectLinkedOpenHashMap<Hole> HOLES = new Long2ObjectLinkedOpenHashMap<>();
+    /** The mouths gas came out of at the last second's round: a flame there is fed (see VentFlames). */
+    private static final it.unimi.dsi.fastutil.longs.LongOpenHashSet MOUTHS = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+
+    /** Whether gas from a field comes out at a place now, the mouth of a bore. */
+    public static boolean isMouth(BlockPos p) {
+        return MOUTHS.contains(p.asLong());
+    }
     private static long holes, closed;
     private static double released;
 
@@ -73,7 +80,11 @@ public final class GasFields {
 
     /** Once a second: every open hole gives out what it can. */
     static void tick(GasManager gas) {
-        if (HOLES.isEmpty()) return;
+        if (HOLES.isEmpty()) {
+            MOUTHS.clear();
+            return;
+        }
+        MOUTHS.clear();
         ServerLevel level = gas.level;
         Fields store = Fields.of(level);
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
@@ -91,10 +102,18 @@ public final class GasFields {
                 it.remove();
                 continue;
             }
-            GasMix air = gas.sample(m);
-            double want = (h.atm() * GasManager.N0 - air.total()) * DRAW;
+            // Up a straight bore open to the sky the gas comes out at its mouth, as it does up a well; into anything else it
+            // fills what it was let into.
+            BlockPos mouth = mouth(gas, level, m);
+            BlockPos out = mouth != null ? mouth : m.immutable();
+            if (mouth != null) MOUTHS.add(mouth.asLong());
+            GasMix air = gas.sample(out);
+            // The cap's pressure falls as its gas is taken.
+            double atm = 1.0 + (h.atm() - 1.0) * store.share(h.field());
+            double want = (atm * GasManager.N0 - air.total()) * DRAW;
             if (want <= 0.01 || !gas.simulated(m.getX(), m.getZ())) continue;
             double moles = Math.min(Math.min(MOST_FLOW, want), left);
+            m.set(out);
             if (gas.release(m, mix(moles, h.sour()))) {
                 store.take(h.field(), moles);
                 released += moles;
@@ -105,6 +124,25 @@ public final class GasFields {
                 }
             }
         }
+    }
+
+    /**
+     * The mouth of a straight bore up from a hole: going up it, the first cell level with the ground round it (the land
+     * on two of its sides no higher); null where the way up is shut first.
+     */
+    private static BlockPos mouth(GasManager gas, ServerLevel level, BlockPos hole) {
+        BlockPos p = hole;
+        for (int i = 0; i < 192; i++) {
+            int open = 0;
+            for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                if (level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING,
+                        p.getX() + d.getStepX(), p.getZ() + d.getStepZ()) <= p.getY()) open++;
+            }
+            if (open >= 2) return p.immutable();
+            if (!gas.canFlow(p, net.minecraft.core.Direction.UP)) return null;
+            p = p.above();
+        }
+        return null;
     }
 
     /** Natural gas: methane, a little CO2, and hydrogen sulphide in a sour field. */
@@ -136,6 +174,7 @@ public final class GasFields {
 
     public static void clear() {
         HOLES.clear();
+        MOUTHS.clear();
     }
 
     /** What each field has given, with the world. */
@@ -154,6 +193,12 @@ public final class GasFields {
 
         double left(long field) {
             return total.containsKey(field) ? total.get(field) - taken.get(field) : 0.0;
+        }
+
+        /** The share of a field's gas still in it, 0 to 1. */
+        double share(long field) {
+            double t = total.get(field);
+            return t <= 0 ? 0.0 : Math.max(0.0, Math.min(1.0, (t - taken.get(field)) / t));
         }
 
         void take(long field, double moles) {

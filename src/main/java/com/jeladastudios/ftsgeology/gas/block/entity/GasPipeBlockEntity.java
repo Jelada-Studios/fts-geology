@@ -42,6 +42,10 @@ public class GasPipeBlockEntity extends GasMachineBlockEntity {
         BlockState state = getBlockState();
         for (Direction d : Direction.values()) {
             if (!state.getValue(GasPipeBlock.PROPS.get(d))) continue;
+            if (level.getBlockEntity(worldPosition.relative(d)) instanceof net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity furnace) {
+                feedFurnace(furnace, worldPosition.relative(d));
+                continue;
+            }
             IGasHandler h = GasCapabilities.handlerAt(level, worldPosition.relative(d), d.getOpposite());
             if (h == null) continue;
             GasTank other = h.getTank(d.getOpposite());
@@ -53,6 +57,22 @@ public class GasPipeBlockEntity extends GasMachineBlockEntity {
                 GasTank.equalize(tank, other, 0.35, 0.05);
             }
         }
+    }
+
+    /**
+     * A furnace on the end of the pipe, burning gas as its own burner while it has something to cook: as much as it takes
+     * (see {@link com.jeladastudios.ftsgeology.gas.GasFurnaces}), out of what the pipe holds over the air's pressure.
+     */
+    private void feedFurnace(net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity furnace, BlockPos at) {
+        if (!com.jeladastudios.ftsgeology.gas.GasFurnaces.wantsHeat(level, furnace)) return;
+        double spare = tank.total() - tank.molesAt(1.0);
+        if (spare <= 1e-7) return;
+        double want = com.jeladastudios.ftsgeology.gas.GasFurnaces.molesFor(tank.gas,
+                com.jeladastudios.ftsgeology.gas.GasFurnaces.demand(furnace));
+        if (want <= 0 || !com.jeladastudios.ftsgeology.gas.Combustion.canSustainJet(tank.gas)) return;
+        if (!com.jeladastudios.ftsgeology.gas.GasFurnaces.takeTurn(level, at)) return;
+        com.jeladastudios.ftsgeology.gas.GasMix fuel = tank.extract(Math.min(want, spare));
+        com.jeladastudios.ftsgeology.gas.GasFurnaces.burn((net.minecraft.server.level.ServerLevel) level, at, furnace, fuel);
     }
 
     @Override

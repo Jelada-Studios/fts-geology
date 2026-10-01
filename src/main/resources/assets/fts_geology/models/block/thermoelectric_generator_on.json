@@ -1,0 +1,6 @@
+{
+  "parent": "fts_geology:block/thermoelectric_generator",
+  "textures": {
+    "hot": "minecraft:block/magma"
+  }
+}

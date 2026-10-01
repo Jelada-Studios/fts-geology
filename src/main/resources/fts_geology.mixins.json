@@ -16,7 +16,8 @@
     "FarmlandSaltMixin",
     "LevelWeatherMixin",
     "ServerLevelWeatherMixin",
-    "DieselOilChunksMixin"
+    "DieselOilChunksMixin",
+    "AbstractFurnaceAccessor"
   ],
   "client": [
     "OculusBlockIdsMixin",

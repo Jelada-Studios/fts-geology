@@ -65,6 +65,9 @@ public class GeysersMod {
         // Distant Horizons' far terrain from the plate model, when it is installed.
         modBus.addListener((net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent e) ->
                 e.enqueueWork(com.jeladastudios.ftsgeology.compat.dh.DhTerrain::init));
+        // A gas burner under a Create boiler heats it, where Create is installed.
+        modBus.addListener((net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent e) ->
+                e.enqueueWork(com.jeladastudios.ftsgeology.compat.CreateBoiler::register));
 
         // SERVER, not COMMON: every setting decides what the world does, and SERVER configs are synced
         // to clients on join. The file lives in <world>/serverconfig/fts_geology.toml; a file in the
@@ -177,6 +180,7 @@ public class GeysersMod {
             event.accept(ModItems.GPS_STATION.get());
             event.accept(ModItems.GAS_METER.get());
             event.accept(ModItems.GEOTHERMAL_TURBINE.get());
+            event.accept(ModItems.THERMOELECTRIC_GENERATOR.get());
             event.accept(ModItems.WELL_PUMP.get());
             event.accept(ModItems.WELL_CASING.get());
             event.accept(ModItems.WELLHEAD.get());

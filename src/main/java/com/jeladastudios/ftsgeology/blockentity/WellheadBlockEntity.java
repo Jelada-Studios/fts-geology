@@ -84,6 +84,17 @@ public class WellheadBlockEntity extends BlockEntity {
     };
     private final LazyOptional<IFluidHandler> oil = LazyOptional.of(() -> outlet);
 
+    /**
+     * The gas that comes up with the oil, as out of a real well: dissolved in it down in the reservoir, it bubbles out as
+     * the pressure falls on the way up -- some hundred moles a bucket, mostly methane, with a little carbon dioxide and
+     * nitrogen, and hydrogen sulphide from a sour field. A gas pipe on a side takes it, to be burnt in an engine or a
+     * burner; with none the wellhead lets it off over its top.
+     */
+    private static final double GAS_PER_MB = 0.1;
+    private final com.jeladastudios.ftsgeology.gas.GasTank gas = new com.jeladastudios.ftsgeology.gas.GasTank(0.5, 20.0).onChange(this::setChanged);
+    private final com.jeladastudios.ftsgeology.gas.IGasHandler gasPort = side -> side == Direction.DOWN ? null : gas;
+    private final LazyOptional<com.jeladastudios.ftsgeology.gas.IGasHandler> gasCap = LazyOptional.of(() -> gasPort);
+
     private int well, nextSurvey;
     @Nullable
     private PetroleumFields.Field field;
@@ -102,6 +113,7 @@ public class WellheadBlockEntity extends BlockEntity {
         }
         be.flow(server);
         be.push(level, pos);
+        if (server.getGameTime() % 20 == 0) be.ventGas(server, pos);
     }
 
     /** Follows the casing down to its foot, and reads what the foot is in. */
@@ -140,7 +152,33 @@ public class WellheadBlockEntity extends BlockEntity {
         tank.fill(new FluidStack(ModFluids.CRUDE_OIL.get(), want), IFluidHandler.FluidAction.EXECUTE);
         owed -= want;
         store.take(field, want);
+        if (com.jeladastudios.ftsgeology.gas.GasConfig.ENABLED.get()) {
+            double mol = want * GAS_PER_MB, sour = Math.max(0, Math.min(0.2, field.sour()));
+            com.jeladastudios.ftsgeology.gas.GasMix g = new com.jeladastudios.ftsgeology.gas.GasMix();
+            g.add(com.jeladastudios.ftsgeology.gas.Gas.METHANE, mol * (0.90 - sour));
+            g.add(com.jeladastudios.ftsgeology.gas.Gas.CARBON_DIOXIDE, mol * 0.06);
+            g.add(com.jeladastudios.ftsgeology.gas.Gas.NITROGEN, mol * 0.04);
+            g.add(com.jeladastudios.ftsgeology.gas.Gas.HYDROGEN_SULFIDE, mol * sour);
+            gas.insert(g);
+        }
         setChanged();
+    }
+
+    /**
+     * The associated gas: into a gas pipe on a side where there is one (the pipes draw it themselves), else let off over
+     * the top once it is a little over the air's pressure.
+     */
+    private void ventGas(ServerLevel level, BlockPos pos) {
+        if (gas.gas.isEmpty()) return;
+        for (Direction d : Direction.values()) {
+            if (d == Direction.DOWN) continue;
+            var h = com.jeladastudios.ftsgeology.gas.registry.GasCapabilities.handlerAt(level, pos.relative(d), d.getOpposite());
+            if (h != null && h.getTank(d.getOpposite()) != null) return;
+        }
+        double excess = gas.total() - gas.molesAt(1.2);
+        if (excess <= 1e-4) return;
+        var gm = com.jeladastudios.ftsgeology.gas.world.GasManager.getIfPresent(level);
+        if (gm != null && !gm.isGasTight(level.getBlockState(pos.above()), pos.above())) gm.release(pos.above(), gas.extract(excess));
     }
 
     /** Hands the oil to whatever takes it on its four sides and its top; its foot is the well. */
@@ -186,6 +224,9 @@ public class WellheadBlockEntity extends BlockEntity {
             }
         }
         out.add(Component.translatable("message.fts_geology.wellhead.tank", tank.getFluidAmount(), TANK));
+        if (!gas.gas.isEmpty()) {
+            out.add(Component.translatable("message.fts_geology.wellhead.gas", String.format(Locale.ROOT, "%.2f", gas.pressure())));
+        }
         return out;
     }
 
@@ -199,6 +240,7 @@ public class WellheadBlockEntity extends BlockEntity {
     @Override
     public <T> @NotNull LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
         if (cap == ForgeCapabilities.FLUID_HANDLER && side != Direction.DOWN) return oil.cast();
+        if (cap == com.jeladastudios.ftsgeology.gas.registry.GasCapabilities.GAS_HANDLER && side != Direction.DOWN) return gasCap.cast();
         return super.getCapability(cap, side);
     }
 
@@ -206,17 +248,20 @@ public class WellheadBlockEntity extends BlockEntity {
     public void invalidateCaps() {
         super.invalidateCaps();
         oil.invalidate();
+        gasCap.invalidate();
     }
 
     @Override
     protected void saveAdditional(CompoundTag tag) {
         super.saveAdditional(tag);
         tag.put("Tank", tank.writeToNBT(new CompoundTag()));
+        tag.put("Gas", gas.save());
     }
 
     @Override
     public void load(CompoundTag tag) {
         super.load(tag);
         tank.readFromNBT(tag.getCompound("Tank"));
+        gas.load(tag.getCompound("Gas"));
     }
 }

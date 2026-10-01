@@ -112,7 +112,27 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
             }
             t.put("Mix", mix);
         }
+        net.minecraft.nbt.ListTag buttons = new net.minecraft.nbt.ListTag();
+        controls(buttons);
+        if (!buttons.isEmpty()) t.put("Controls", buttons);
         return t;
+    }
+
+    /** The panel's buttons, in a row: each with the key {@link #control} answers to and its label. None by default. */
+    protected void controls(net.minecraft.nbt.ListTag out) {
+    }
+
+    /** One button for {@link #controls}. */
+    protected static void button(net.minecraft.nbt.ListTag out, String key, Component label) {
+        net.minecraft.nbt.CompoundTag c = new net.minecraft.nbt.CompoundTag();
+        c.putString("Key", key);
+        c.putString("Text", Component.Serializer.toJson(label));
+        out.add(c);
+    }
+
+    /** A panel button pressed by a player standing at the machine. Returns whether anything changed. */
+    public boolean control(String key, net.minecraft.server.level.ServerPlayer player) {
+        return false;
     }
 
     /** Called when the block is broken or replaced. */
@@ -187,6 +207,17 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
                 if (energy() != null) energy().set(v);
             },
             this::setChanged, this::tooHigh);
+    /**
+     * For a machine that makes power, the gas engine: Electrodynamics' wires take its output straight at 120 V, as they
+     * take the geothermal turbine's (see {@link MachineEnergy#pushTo}).
+     */
+    private final LazyOptional<Object> voltsOut = com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower.generator(
+            () -> energy() == null ? 0 : energy().getEnergyStored(),
+            () -> energy() == null ? 0 : energy().getMaxEnergyStored(),
+            v -> {
+                if (energy() != null) energy().set(v);
+            },
+            this::setChanged);
     /** The last voltage it refused, and when, for the reading. */
     private double refusedVolts;
     private long refusedAt = -1;
@@ -207,6 +238,9 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
         if (com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower.is(cap) && energy() != null && energy().canReceive()) {
             return energyOn(side) ? volts.cast() : LazyOptional.empty();
         }
+        if (com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower.is(cap) && energy() != null && energy().canExtract()) {
+            return energyOn(side) ? voltsOut.cast() : LazyOptional.empty();
+        }
         return super.getCapability(cap, side);
     }
 
@@ -216,5 +250,6 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
         gasCap.invalidate();
         energyCap.invalidate();
         volts.invalidate();
+        voltsOut.invalidate();
     }
 }

@@ -1,0 +1,12 @@
+{
+  "variants": {
+    "facing=north,lit=false": { "model": "fts_geology:block/thermoelectric_generator" },
+    "facing=east,lit=false": { "model": "fts_geology:block/thermoelectric_generator", "y": 90 },
+    "facing=south,lit=false": { "model": "fts_geology:block/thermoelectric_generator", "y": 180 },
+    "facing=west,lit=false": { "model": "fts_geology:block/thermoelectric_generator", "y": 270 },
+    "facing=north,lit=true": { "model": "fts_geology:block/thermoelectric_generator_on" },
+    "facing=east,lit=true": { "model": "fts_geology:block/thermoelectric_generator_on", "y": 90 },
+    "facing=south,lit=true": { "model": "fts_geology:block/thermoelectric_generator_on", "y": 180 },
+    "facing=west,lit=true": { "model": "fts_geology:block/thermoelectric_generator_on", "y": 270 }
+  }
+}

@@ -252,6 +252,9 @@ public final class ModItems {
     // reachable only by someone who already knew the mod was there. An instrument makes the model
     // discoverable, and in a classroom it is the difference between a demonstration and a lesson.
 
+    public static final RegistryObject<Item> THERMOELECTRIC_GENERATOR = ITEMS.register("thermoelectric_generator",
+            () -> new DescribedBlockItem(ModBlocks.THERMOELECTRIC_GENERATOR.get(), new Item.Properties(), 3, "electrodynamics"));
+
     public static final RegistryObject<Item> GEOTHERMAL_TURBINE = ITEMS.register("geothermal_turbine",
             () -> new DescribedBlockItem(ModBlocks.GEOTHERMAL_TURBINE.get(), new Item.Properties(), 3, "electrodynamics"));
 
@@ -262,9 +265,19 @@ public final class ModItems {
             () -> new DescribedBlockItem(ModBlocks.WELLHEAD.get(), new Item.Properties(), 2, "createdieselgenerators"));
 
     /** A bucket of crude oil from a well head. */
+    /**
+     * A bucket of crude oil. It burns in a furnace -- smoky, but long: as long as a bucket of lava, less a fifth -- and the
+     * empty bucket is left; refining it is Create Diesel Generators' work.
+     */
     public static final RegistryObject<Item> CRUDE_OIL_BUCKET = ITEMS.register("crude_oil_bucket",
             () -> new net.minecraft.world.item.BucketItem(ModFluids.CRUDE_OIL, new Item.Properties()
-                    .craftRemainder(net.minecraft.world.item.Items.BUCKET).stacksTo(1)));
+                    .craftRemainder(net.minecraft.world.item.Items.BUCKET).stacksTo(1)) {
+                @Override
+                public int getBurnTime(net.minecraft.world.item.ItemStack stack,
+                                       @org.jetbrains.annotations.Nullable net.minecraft.world.item.crafting.RecipeType<?> type) {
+                    return 16000;
+                }
+            });
 
     /** A bucket of sea water: it pours out as water that waters no field. */
     public static final RegistryObject<Item> SEA_WATER_BUCKET = ITEMS.register("sea_water_bucket",

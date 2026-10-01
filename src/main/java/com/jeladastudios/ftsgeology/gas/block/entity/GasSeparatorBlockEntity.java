@@ -69,6 +69,27 @@ public class GasSeparatorBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
+    protected void controls(net.minecraft.nbt.ListTag out) {
+        button(out, "prev", Component.literal("<"));
+        button(out, "next_gas", Component.translatable("gui.fts_geology.gas_panel.target",
+                Component.literal(selected.formula).withStyle(s -> s.withColor(selected.color)), selected.displayName()));
+        button(out, "next", Component.literal(">"));
+    }
+
+    @Override
+    public boolean control(String key, net.minecraft.server.level.ServerPlayer player) {
+        int step = switch (key) {
+            case "prev" -> Gas.COUNT - 1;
+            case "next", "next_gas" -> 1;
+            default -> 0;
+        };
+        if (step == 0) return false;
+        selected = Gas.VALUES[(selected.ordinal() + step) % Gas.COUNT];
+        setChanged();
+        return true;
+    }
+
+    @Override
     public void serverTick() {
         ventIfUnconnected(rest, Direction.UP, 1.1);
         lastRate = 0;

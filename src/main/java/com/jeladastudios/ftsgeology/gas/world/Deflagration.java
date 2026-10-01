@@ -77,8 +77,14 @@ public class Deflagration {
             for (int i = 0; i < frontier.size(); i++) {
                 BlockPos p = BlockPos.of(frontier.getLong(i));
                 GasMix cell = mgr.getCell(p);
-                if (cell == null || !Combustion.isFlammable(cell)) continue;
+                if (cell == null || !Combustion.isFlammable(cell)) {
+                    // The front reaches gas too rich to burn: where that meets the air, it burns on as a standing flame.
+                    if (cell != null && VentFlames.tooRich(cell)) mgr.flames().start(p);
+                    continue;
+                }
 
+                // The mouth of a bore a gas field pours out of goes on burning there.
+                if (GasFields.isMouth(p)) mgr.flames().start(p);
                 double violence = Combustion.violence(cell);
                 boolean hydrogen = cell.fraction(Gas.H2) > Combustion.fuelFraction(cell) * 0.6;
                 double energy = Combustion.burn(cell);

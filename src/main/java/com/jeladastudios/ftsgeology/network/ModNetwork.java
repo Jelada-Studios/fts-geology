@@ -31,7 +31,7 @@ public final class ModNetwork {
 
     private ModNetwork() {}
 
-    private static final String VERSION = "8";
+    private static final String VERSION = "9";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(GeysersMod.MODID, "main"),
@@ -90,6 +90,11 @@ public final class ModNetwork {
                 .encoder(StationRenamePacket::encode)
                 .decoder(StationRenamePacket::decode)
                 .consumerMainThread(StationRenamePacket::handle)
+                .add();
+        CHANNEL.messageBuilder(GasControlPacket.class, id++, net.minecraftforge.network.NetworkDirection.PLAY_TO_SERVER)
+                .encoder(GasControlPacket::encode)
+                .decoder(GasControlPacket::decode)
+                .consumerMainThread(GasControlPacket::handle)
                 .add();
     }
 

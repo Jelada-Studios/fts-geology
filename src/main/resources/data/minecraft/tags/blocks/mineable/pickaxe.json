@@ -1,6 +1,7 @@
 {
   "values": [
     "fts_geology:geothermal_turbine",
+    "fts_geology:thermoelectric_generator",
     "fts_geology:well_pump",
     "fts_geology:well_casing",
     "fts_geology:travertine",

@@ -91,6 +91,7 @@ public final class GasCommand {
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, 256))
                                 .executes(c -> sum(c, IntegerArgumentType.getInteger(c, "radius")))))
                 .then(Commands.literal("view").executes(GasCommand::view))
+                .then(Commands.literal("flames").executes(GasCommand::flames))
                 .then(Commands.literal("stats").executes(GasCommand::stats))));
     }
 
@@ -259,8 +260,17 @@ public final class GasCommand {
         return cells[0];
     }
 
+    private static int flames(CommandContext<CommandSourceStack> c) {
+        for (String line : GasManager.get(c.getSource().getLevel()).flames().describe()) {
+            c.getSource().sendSuccess(() -> Component.literal(line), false);
+        }
+        return 1;
+    }
+
     private static int ignite(CommandContext<CommandSourceStack> c, BlockPos pos) {
         boolean ok = GasManager.get(c.getSource().getLevel()).igniteAround(pos, 1, c.getSource().getEntity());
+        // Gas too rich to burn by the air: a standing flame where they meet.
+        if (!ok) ok = GasManager.get(c.getSource().getLevel()).spark(pos, 1, c.getSource().getEntity(), new double[2]) == GasManager.Spark.LIT;
         if (ok) c.getSource().sendSuccess(() -> Component.translatable("commands.fts_geology.gas.ignite"), true);
         else c.getSource().sendFailure(Component.translatable("commands.fts_geology.gas.not_flammable"));
         return ok ? 1 : 0;
