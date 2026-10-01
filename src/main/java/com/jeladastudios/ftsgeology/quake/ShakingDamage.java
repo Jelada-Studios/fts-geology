@@ -96,11 +96,14 @@ public final class ShakingDamage {
     private static final double TREE = 0.8;
     private static final int CROWN = 40;
 
-    private static final LongAdder KNOCKED = new LongAdder(), SHATTERED = new LongAdder(), CHUNKS = new LongAdder(), FLED = new LongAdder(),
+    private static final LongAdder KNOCKED = new LongAdder(), SHATTERED = new LongAdder(), CHUNKS = new LongAdder(), FLED = new LongAdder(), ROCKS = new LongAdder(),
             OF_STRUCTURES = new LongAdder(), ORNAMENTS = new LongAdder(), TREES = new LongAdder();
 
     /** A block shaken loose, to come off at its moment if it is still what was there. */
     private record Loose(ResourceKey<Level> dimension, BlockPos pos, BlockState state, long due) {}
+
+    /** A rock to come off a cliff face at its moment, out over the drop. */
+    private record Rock(ResourceKey<Level> dimension, BlockPos pos, BlockState state, Direction out, long due) {}
 
     /** A painting or an item frame shaken off its wall, to come down at its moment. */
     private record LooseHanging(ResourceKey<Level> dimension, java.util.UUID id, long due) {}
@@ -134,6 +137,7 @@ public final class ShakingDamage {
     private static final PriorityQueue<Loose> DUE = new PriorityQueue<>(Comparator.comparingLong(Loose::due));
     private static final PriorityQueue<LooseHanging> HANGING =
             new PriorityQueue<>(Comparator.comparingLong(LooseHanging::due));
+    private static final PriorityQueue<Rock> ROCKFALL = new PriorityQueue<>(Comparator.comparingLong(Rock::due));
 
     /** The least intensity that still shakes a block loose now and then. */
     private static final double DAMAGING = 4.0;
@@ -176,7 +180,7 @@ public final class ShakingDamage {
 
     /** Goes through queued chunks and lets due blocks come off, for at most {@code nanos}. Server thread. */
     public static void drain(MinecraftServer server, long nanos) {
-        if (JOBS.isEmpty() && DUE.isEmpty() && HANGING.isEmpty()) return;
+        if (JOBS.isEmpty() && DUE.isEmpty() && HANGING.isEmpty() && ROCKFALL.isEmpty()) return;
         long deadline = System.nanoTime() + nanos;
         long now = server.getTickCount();
         while (!DUE.isEmpty() && DUE.peek().due() <= now && System.nanoTime() < deadline) {
@@ -185,6 +189,13 @@ public final class ShakingDamage {
             if (level == null || !com.jeladastudios.ftsgeology.util.Loaded.at(level, l.pos())) continue;
             if (level.getBlockState(l.pos()) != l.state()) continue;   // changed meanwhile: left as it now is
             fall(level, l.pos(), l.state());
+        }
+        while (!ROCKFALL.isEmpty() && ROCKFALL.peek().due() <= now && System.nanoTime() < deadline) {
+            Rock r = ROCKFALL.poll();
+            ServerLevel level = server.getLevel(r.dimension());
+            if (level == null || !com.jeladastudios.ftsgeology.util.Loaded.at(level, r.pos())) continue;
+            if (level.getBlockState(r.pos()) != r.state()) continue;
+            tumble(level, r);
         }
         while (!HANGING.isEmpty() && HANGING.peek().due() <= now && System.nanoTime() < deadline) {
             LooseHanging l = HANGING.poll();
@@ -246,6 +257,73 @@ public final class ShakingDamage {
         KNOCKED.increment();
     }
 
+    /** The shaking from which rock comes off cliffs, and how high a face has to stand over the ground beside it. */
+    private static final double ROCKFALL_FROM = 6.0;
+    private static final int CLIFF = 5, TRIES = 24;
+
+    /**
+     * Rock coming off cliffs: in strong shaking a block or a few off the top of a bare rock face that stands over the
+     * ground beside it, tumbling down it when the S wave comes. Not off a build, not off soil (that is a landslide's);
+     * it lands as rubble or is lost, never as an item.
+     */
+    private static void rockfall(ServerLevel level, Job job, LevelChunk chunk, double intensity, long now) {
+        ChunkPos cp = chunk.getPos();
+        double chance = Math.min(0.6, (intensity - ROCKFALL_FROM) / 3.0 + 0.1);
+        LongSet placed = PlayerBuilt.inChunk(level, cp.x, cp.z);
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int n = 0; n < TRIES; n++) {
+            if (level.random.nextDouble() >= chance) continue;
+            int lx = level.random.nextInt(16), lz = level.random.nextInt(16);
+            int x = cp.getMinBlockX() + lx, z = cp.getMinBlockZ() + lz;
+            int g = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, lx, lz) - 1;
+            if (!bareRock(chunk.getBlockState(m.set(x, g, z))) || placed.contains(m.asLong())) continue;
+            // The open side the face looks out over: the lowest neighbour, well below.
+            Direction out = null;
+            int lowest = g;
+            for (Direction d : Direction.Plane.HORIZONTAL) {
+                int nx = x + d.getStepX(), nz = z + d.getStepZ();
+                if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, nx, nz)) continue;
+                int ng = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, nx, nz) - 1;
+                if (ng < lowest) {
+                    lowest = ng;
+                    out = d;
+                }
+            }
+            if (out == null || g - lowest < CLIFF) continue;
+            long at = now + job.delay + level.random.nextInt(job.spread);
+            int k = 1 + level.random.nextInt(3);
+            for (int j = 0; j < k; j++) {
+                m.set(x, g - j, z);
+                BlockState s = chunk.getBlockState(m);
+                if (!bareRock(s) || placed.contains(m.asLong())) break;
+                if (job.loosened++ >= MOST) return;
+                // The top first, the ones under it as it goes.
+                ROCKFALL.add(new Rock(level.dimension(), m.immutable(), s, out, at + j * 4L));
+            }
+        }
+    }
+
+    /** Rock as the ground has it, not a block anyone worked. */
+    private static boolean bareRock(BlockState s) {
+        return (com.jeladastudios.ftsgeology.instrument.RockTypes.isRock(s) || s.is(BlockTags.BASE_STONE_OVERWORLD))
+                && !s.hasBlockEntity() && !EruptionHandler.isPlayerPlaced(s);
+    }
+
+    /** A rock coming away from its face: pushed out over the drop and falling, with what grew on it. */
+    private static void tumble(ServerLevel level, Rock r) {
+        BlockPos free = r.pos().relative(r.out());
+        if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, free) || !level.getBlockState(free).isAir()) return;
+        BlockPos above = r.pos().above();
+        if (TerrainProbe.isVegetation(level.getBlockState(above))) level.destroyBlock(above, false);
+        level.levelEvent(2001, r.pos(), Block.getId(r.state()));   // the crack and dust of it coming away
+        level.setBlock(r.pos(), Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        FallingBlockEntity rock = FallingBlockEntity.fall(level, free, r.state());
+        rock.setDeltaMovement(r.out().getStepX() * 0.25, 0.05, r.out().getStepZ() * 0.25);
+        rock.setHurtsEntities(2.0F, 20);
+        rock.dropItem = false;
+        ROCKS.increment();
+    }
+
     /** The shaking from which animals and villagers in a chunk bolt. */
     private static final double FLEE = 4.5;
 
@@ -296,6 +374,7 @@ public final class ShakingDamage {
         }
         floor -= BELOW_GROUND;
         if (trees()) trees(level, job, chunk, cp, shaking, now);
+        if (intensity >= ROCKFALL_FROM) rockfall(level, job, chunk, intensity, now);
         if (!builds()) return;
         LongSet placed = PlayerBuilt.inChunk(level, cp.x, cp.z);
         List<BoundingBox> built = structureBoxes(level, chunk, floor);
@@ -592,14 +671,15 @@ public final class ShakingDamage {
     }
 
     public static String summary() {
-        return String.format(java.util.Locale.ROOT, "shaking: %d chunks gone through, %d blocks shaken off, %d panes broken, %d ornaments down, %d loosened in a structure, %d trees felled, %d animals bolted",
-                CHUNKS.sum(), KNOCKED.sum(), SHATTERED.sum(), ORNAMENTS.sum(), OF_STRUCTURES.sum(), TREES.sum(), FLED.sum());
+        return String.format(java.util.Locale.ROOT, "shaking: %d chunks gone through, %d blocks shaken off, %d panes broken, %d ornaments down, %d loosened in a structure, %d trees felled, %d animals bolted, %d rocks off cliffs",
+                CHUNKS.sum(), KNOCKED.sum(), SHATTERED.sum(), ORNAMENTS.sum(), OF_STRUCTURES.sum(), TREES.sum(), FLED.sum(), ROCKS.sum());
     }
 
     public static void clear() {
         JOBS.clear();
         DUE.clear();
         HANGING.clear();
+        ROCKFALL.clear();
     }
 
     @SubscribeEvent
