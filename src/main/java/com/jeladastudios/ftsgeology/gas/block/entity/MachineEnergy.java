@@ -51,6 +51,11 @@ public class MachineEnergy extends EnergyStorage {
         return capacity - energy;
     }
 
+    /** What it takes in from outside now: its free space, no more than its intake allows. */
+    public int room() {
+        return Math.min(maxReceive, capacity - energy);
+    }
+
     public void set(int value) {
         energy = Math.max(0, Math.min(capacity, value));
     }

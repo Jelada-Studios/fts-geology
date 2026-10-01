@@ -71,6 +71,10 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
 
     public InteractionResult onUse(Player player, InteractionHand hand, BlockHitResult hit) {
         for (Component c : status()) player.sendSystemMessage(c);
+        if (level != null && refusedAt >= 0 && level.getGameTime() - refusedAt < 40) {
+            player.sendSystemMessage(Component.translatable("message.fts_geology.gas.over_voltage",
+                    String.format(java.util.Locale.ROOT, "%.0f", refusedVolts)));
+        }
         return InteractionResult.CONSUME;
     }
 
@@ -134,6 +138,27 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
 
     private final LazyOptional<IEnergyStorage> energyCap = LazyOptional.of(this::energy);
 
+    /**
+     * The same store as Electrodynamics' electricity, where it is installed, for a machine that takes power: its wires
+     * feed it straight at 120 V; a higher voltage it refuses and says so, as the well pump does, rather than burning out.
+     */
+    private final LazyOptional<Object> volts = com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower.receiver(
+            () -> energy() == null ? 0 : energy().getEnergyStored(),
+            () -> energy() == null ? 0 : energy().getMaxEnergyStored(),
+            () -> energy() == null ? 0 : energy().room(),
+            v -> {
+                if (energy() != null) energy().set(v);
+            },
+            this::setChanged, this::tooHigh);
+    /** The last voltage it refused, and when, for the reading. */
+    private double refusedVolts;
+    private long refusedAt = -1;
+
+    private void tooHigh(double v) {
+        refusedVolts = v;
+        if (level != null) refusedAt = level.getGameTime();
+    }
+
     @Override
     public @NotNull <T> LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
         if (cap == GasCapabilities.GAS_HANDLER) {
@@ -141,6 +166,9 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
         }
         if (cap == ForgeCapabilities.ENERGY && energy() != null) {
             return energyOn(side) ? energyCap.cast() : LazyOptional.empty();
+        }
+        if (com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower.is(cap) && energy() != null && energy().canReceive()) {
+            return energyOn(side) ? volts.cast() : LazyOptional.empty();
         }
         return super.getCapability(cap, side);
     }
@@ -150,5 +178,6 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
         super.invalidateCaps();
         gasCap.invalidate();
         energyCap.invalidate();
+        volts.invalidate();
     }
 }

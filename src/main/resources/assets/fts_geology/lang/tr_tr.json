@@ -816,5 +816,6 @@
   "message.fts_geology.wellhead.flow": "Saniyede %1$s mB akıyor; sahanın %3$s kovasının %%%2$s'i kaldı.",
   "message.fts_geology.wellhead.spent": "Saha tükendi: kendi basıncı artık petrol çıkarmıyor.",
   "message.fts_geology.wellhead.tank": "Tank: %s / %s mB.",
-  "block.fts_geology.wellhead.tooltip.createdieselgenerators": "Create Diesel Generators: damıtması bu ham petrolü alır, pompa kulesi yalnız sahaların üstünde petrol bulur."
+  "block.fts_geology.wellhead.tooltip.createdieselgenerators": "Create Diesel Generators: damıtması bu ham petrolü alır, pompa kulesi yalnız sahaların üstünde petrol bulur.",
+  "message.fts_geology.gas.over_voltage": "Hattan %s V geliyor: makine 120 V ile çalışır, daha yükseğini almaz."
 }
