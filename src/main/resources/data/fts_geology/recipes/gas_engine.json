@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["III", "PFP", "CRC"],
+  "key": {
+    "I": {"item": "minecraft:iron_ingot"},
+    "P": {"item": "minecraft:piston"},
+    "F": {"item": "minecraft:furnace"},
+    "C": {"item": "minecraft:copper_ingot"},
+    "R": {"item": "minecraft:redstone"}
+  },
+  "result": {"item": "fts_geology:gas_engine", "count": 1}
+}

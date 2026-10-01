@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["LIL", "ICI", "LIL"],
+  "key": {
+    "L": {"item": "minecraft:leather"},
+    "I": {"item": "minecraft:iron_ingot"},
+    "C": {"item": "minecraft:copper_block"}
+  },
+  "result": {"item": "fts_geology:breathing_apparatus", "count": 1}
+}

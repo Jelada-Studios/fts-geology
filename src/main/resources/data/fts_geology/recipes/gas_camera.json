@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [" S ", "IRI", "IAI"],
+  "key": {
+    "S": {"item": "minecraft:spyglass"},
+    "I": {"item": "minecraft:iron_ingot"},
+    "R": {"item": "minecraft:redstone"},
+    "A": {"item": "minecraft:gold_ingot"}
+  },
+  "result": {"item": "fts_geology:gas_camera", "count": 1}
+}

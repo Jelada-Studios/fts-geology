@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["CGC", "RAR", "CCC"],
+  "key": {
+    "C": {"item": "minecraft:copper_ingot"},
+    "G": {"item": "minecraft:glass_pane"},
+    "R": {"item": "minecraft:redstone"},
+    "A": {"item": "minecraft:gold_ingot"}
+  },
+  "result": {"item": "fts_geology:gas_detector", "count": 1}
+}

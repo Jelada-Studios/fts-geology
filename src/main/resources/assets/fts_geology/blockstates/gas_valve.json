@@ -1,0 +1,28 @@
+{
+  "variants": {
+    "facing=north,lit=false,open=false": {"model": "fts_geology:block/gas_valve"},
+    "facing=north,lit=true,open=false": {"model": "fts_geology:block/gas_valve"},
+    "facing=north,lit=false,open=true": {"model": "fts_geology:block/gas_valve_open"},
+    "facing=north,lit=true,open=true": {"model": "fts_geology:block/gas_valve_lit"},
+    "facing=south,lit=false,open=false": {"model": "fts_geology:block/gas_valve", "y": 180},
+    "facing=south,lit=true,open=false": {"model": "fts_geology:block/gas_valve", "y": 180},
+    "facing=south,lit=false,open=true": {"model": "fts_geology:block/gas_valve_open", "y": 180},
+    "facing=south,lit=true,open=true": {"model": "fts_geology:block/gas_valve_lit", "y": 180},
+    "facing=east,lit=false,open=false": {"model": "fts_geology:block/gas_valve", "y": 90},
+    "facing=east,lit=true,open=false": {"model": "fts_geology:block/gas_valve", "y": 90},
+    "facing=east,lit=false,open=true": {"model": "fts_geology:block/gas_valve_open", "y": 90},
+    "facing=east,lit=true,open=true": {"model": "fts_geology:block/gas_valve_lit", "y": 90},
+    "facing=west,lit=false,open=false": {"model": "fts_geology:block/gas_valve", "y": 270},
+    "facing=west,lit=true,open=false": {"model": "fts_geology:block/gas_valve", "y": 270},
+    "facing=west,lit=false,open=true": {"model": "fts_geology:block/gas_valve_open", "y": 270},
+    "facing=west,lit=true,open=true": {"model": "fts_geology:block/gas_valve_lit", "y": 270},
+    "facing=up,lit=false,open=false": {"model": "fts_geology:block/gas_valve", "x": 270},
+    "facing=up,lit=true,open=false": {"model": "fts_geology:block/gas_valve", "x": 270},
+    "facing=up,lit=false,open=true": {"model": "fts_geology:block/gas_valve_open", "x": 270},
+    "facing=up,lit=true,open=true": {"model": "fts_geology:block/gas_valve_lit", "x": 270},
+    "facing=down,lit=false,open=false": {"model": "fts_geology:block/gas_valve", "x": 90},
+    "facing=down,lit=true,open=false": {"model": "fts_geology:block/gas_valve", "x": 90},
+    "facing=down,lit=false,open=true": {"model": "fts_geology:block/gas_valve_open", "x": 90},
+    "facing=down,lit=true,open=true": {"model": "fts_geology:block/gas_valve_lit", "x": 90}
+  }
+}

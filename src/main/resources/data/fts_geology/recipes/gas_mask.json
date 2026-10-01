@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["LLL", "GFG", " L "],
+  "key": {
+    "L": {"item": "minecraft:leather"},
+    "G": {"item": "minecraft:glass_pane"},
+    "F": {"item": "fts_geology:gas_filter"}
+  },
+  "result": {"item": "fts_geology:gas_mask", "count": 1}
+}

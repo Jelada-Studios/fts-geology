@@ -94,6 +94,11 @@ public final class VolcanicGas {
         seep(level, summit, craterR, magnitude, vents, false);
     }
 
+    /** The same with no vents on the flanks: a volcano's gas set going from the console, to test it. */
+    public static void seep(ServerLevel level, BlockPos summit, int craterR, int magnitude) {
+        seep(level, summit, craterR, magnitude, new long[0], false);
+    }
+
     /** Once a second from a live volcano between eruptions: gas in its crater and round its vents. */
     public static void breatheQuietly(ServerLevel level, BlockPos summit, int craterR, int magnitude, long[] vents) {
         seep(level, summit, craterR, magnitude, vents, true);
@@ -205,16 +210,48 @@ public final class VolcanicGas {
                 it.remove();
                 continue;
             }
+            // With the gases simulated, the volcano breathes into the air itself, which carries the gas where it goes and
+            // is what anything breathes, burns in or reads; without them, the pockets act by themselves.
+            boolean sim = simulated();
             for (Pocket p : f.pockets) {
                 if (!PyroclasticFlow.ticking(level, p.x(), p.z())) continue;
-                breathe(level, p);
+                if (sim) emit(level, p, f.quiet);
+                else breathe(level, p);
                 if (douse) {
-                    douse(level, p);
+                    if (!sim) douse(level, p);
                     wither(level, p);
                 }
             }
         }
     }
+
+    private static boolean simulated() {
+        return com.jeladastudios.ftsgeology.gas.GasConfig.ENABLED.get() && com.jeladastudios.ftsgeology.gas.GasConfig.VOLCANO_GAS.get();
+    }
+
+    /**
+     * A second's breath of a pocket into the air: carbon dioxide at its floor, a few moles a second over a hollow's width
+     * and more over a crater's, half as much from a quiet volcano, with a little sulphur dioxide and hydrogen sulphide. It
+     * is heavier than air and lies there and runs downhill, and what blows off the top is lost to the wind. Not into a
+     * place no player is near enough for the air to move, nor past what a cell can hold.
+     */
+    private static void emit(ServerLevel level, Pocket p, boolean quiet) {
+        com.jeladastudios.ftsgeology.gas.world.GasManager gas = com.jeladastudios.ftsgeology.gas.world.GasManager.get(level);
+        if (!gas.simulated(p.x(), p.z())) return;
+        BlockPos at = new BlockPos(p.x(), p.floor(), p.z());
+        com.jeladastudios.ftsgeology.gas.GasMix here = gas.sample(at);
+        if (here.fraction(com.jeladastudios.ftsgeology.gas.Gas.CARBON_DIOXIDE) > FULL) return;
+        double co2 = PER_WIDTH * (2 * p.r() + 1) * (quiet ? 0.5 : 1.0);
+        com.jeladastudios.ftsgeology.gas.GasMix breath = new com.jeladastudios.ftsgeology.gas.GasMix();
+        breath.add(com.jeladastudios.ftsgeology.gas.Gas.CARBON_DIOXIDE, co2);
+        breath.add(com.jeladastudios.ftsgeology.gas.Gas.SULFUR_DIOXIDE, co2 * SO2);
+        breath.add(com.jeladastudios.ftsgeology.gas.Gas.HYDROGEN_SULFIDE, co2 * H2S);
+        if (gas.release(at, breath)) emitted += co2;
+    }
+
+    /** Moles of CO2 a second per block of a pocket's width, the share of SO2 and H2S with it, and when a cell is full. */
+    private static final double PER_WIDTH = 0.6, SO2 = 0.0005, H2S = 0.0005, FULL = 0.6;
+    private static double emitted;
 
     /**
      * How many seconds running something has breathed the gas, and when it last did: a few breaths only make it short of
@@ -322,8 +359,8 @@ public final class VolcanicGas {
     private static int withered;
 
     public static String summary() {
-        return String.format(java.util.Locale.ROOT, "gas: %d breaths of it, %d flames out, %d plants withered",
-                sickened, flames, withered);
+        return String.format(java.util.Locale.ROOT, "gas: %d breaths of it, %d flames out, %d plants withered, %.0f mol of CO2 breathed into the air",
+                sickened, flames, withered, emitted);
     }
 
     @SubscribeEvent

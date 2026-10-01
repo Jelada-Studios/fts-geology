@@ -43,6 +43,13 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.registry.ModSurfaceRules.MATERIAL_RULES.register(modBus);
         com.jeladastudios.ftsgeology.registry.ModBiomeModifiers.SERIALIZERS.register(modBus);
 
+        // The gases: their own registers, tab and settings, so the module stays whole in itself.
+        com.jeladastudios.ftsgeology.gas.registry.GasBlocks.BLOCKS.register(modBus);
+        com.jeladastudios.ftsgeology.gas.registry.GasItems.ITEMS.register(modBus);
+        com.jeladastudios.ftsgeology.gas.registry.GasBlockEntities.BLOCK_ENTITIES.register(modBus);
+        com.jeladastudios.ftsgeology.gas.registry.GasTabs.TABS.register(modBus);
+        modBus.addListener(com.jeladastudios.ftsgeology.gas.registry.GasCapabilities::register);
+
         // Populate the creative menu once tabs are built (mod bus event).
         modBus.addListener(this::onBuildCreativeTabs);
 
@@ -62,6 +69,8 @@ public class GeysersMod {
         // to clients on join. The file lives in <world>/serverconfig/fts_geology.toml; a file in the
         // instance's defaultconfigs/ folder is copied into each new world.
         ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, GeyserConfig.SPEC, "fts_geology.toml");
+        // The gases' settings, beside it in the same folder.
+        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, com.jeladastudios.ftsgeology.gas.GasConfig.SPEC, "fts_geology-gases.toml");
         // The player's own sound and sky settings, on their machine.
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, com.jeladastudios.ftsgeology.config.ClientConfig.SPEC, "fts_geology-client.toml");
 
@@ -199,6 +208,7 @@ public class GeysersMod {
             event.accept(ModItems.MARBLE.get());
             event.accept(ModItems.QUARTZITE.get());
             event.accept(ModItems.SHALE.get());
+            event.accept(ModItems.OIL_SANDSTONE.get());
             event.accept(ModItems.CHERT.get());
             event.accept(ModItems.COOLING_LAVA_CRUST.get());
             event.accept(ModItems.PYRITE.get());

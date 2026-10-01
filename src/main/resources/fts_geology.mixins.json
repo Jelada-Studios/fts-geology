@@ -15,7 +15,8 @@
     "GrassSpreadMixin",
     "FarmlandSaltMixin",
     "LevelWeatherMixin",
-    "ServerLevelWeatherMixin"
+    "ServerLevelWeatherMixin",
+    "DieselOilChunksMixin"
   ],
   "client": [
     "OculusBlockIdsMixin",

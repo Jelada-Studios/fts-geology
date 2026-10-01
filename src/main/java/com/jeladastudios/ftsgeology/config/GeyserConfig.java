@@ -142,6 +142,8 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue OCEANIC_RIDGE_ENABLED;
     public static final ForgeConfigSpec.BooleanValue GEOLOGY_AT_GENERATION; // deep geology written as chunks generate
     public static final ForgeConfigSpec.BooleanValue ORE_GENESIS_ENABLED;   // ore laid down by tectonic setting
+    public static final ForgeConfigSpec.BooleanValue PETROLEUM;             // oil and gas fields in the basins
+    public static final ForgeConfigSpec.DoubleValue PETROLEUM_CHANCE;       // share of basin grid cells with a field
 
     // --- Earthquakes --------------------------------------------------------
     public static final ForgeConfigSpec.BooleanValue QUAKES_ENABLED;
@@ -737,6 +739,15 @@ public final class GeyserConfig {
                         "seams in the quiet basins between. Applies to chunks that have not had their",
                         "deep geology yet; it never touches player blocks.")
                 .define("oreGenesisEnabled", true);
+        PETROLEUM = b
+                .comment("Oil and gas fields in the sedimentary basins: a dome of reservoir sandstone under shale, gas at",
+                        "its top, oil-soaked sandstone under it, water below. Broken into, its gas comes out under the",
+                        "pressure of its depth. With Create Diesel Generators the pumpjack finds oil over the fields only.",
+                        "New chunks only.")
+                .define("petroleumFields", true);
+        PETROLEUM_CHANCE = b
+                .comment("Share of the 640-block grid cells in a basin that hold a field.")
+                .defineInRange("petroleumFieldChance", 0.4, 0.0, 1.0);
         VOLCANO_SPAWN_CHANCE = b
                 .comment("Per-chunk chance of a natural volcano BEFORE tectonic suitability is applied.",
                         "Deliberately tiny: volcanoes are huge structures and should be landmarks.",

@@ -76,6 +76,22 @@ public class HotSpringBlockEntity extends BlockEntity {
             }
         }
 
+        // The gas the water brings up, once every five seconds: a little carbon dioxide and a trace of hydrogen
+        // sulphide over the pool, the rotten-egg smell of a hot spring, more over a restless volcano.
+        if (time % 100L == 0L && com.jeladastudios.ftsgeology.gas.GasConfig.ENABLED.get()) {
+            com.jeladastudios.ftsgeology.gas.world.GasManager gas = com.jeladastudios.ftsgeology.gas.world.GasManager.get(server);
+            if (gas.simulated(pos.getX(), pos.getZ())) {
+                BlockPos surface = waterTop(server, pos);
+                if (surface != null) {
+                    double unrest = com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.near(server, pos);
+                    com.jeladastudios.ftsgeology.gas.GasMix breath = new com.jeladastudios.ftsgeology.gas.GasMix();
+                    breath.add(com.jeladastudios.ftsgeology.gas.Gas.CARBON_DIOXIDE, 0.3 * (1.0 + 3.0 * unrest));
+                    breath.add(com.jeladastudios.ftsgeology.gas.Gas.HYDROGEN_SULFIDE, 0.0004 * (1.0 + 3.0 * unrest));
+                    gas.release(surface, breath);
+                }
+            }
+        }
+
         // Warmth + thaw, once a second.
         if (time % 20L == 0L) {
             int r = GeyserConfig.HOT_SPRING_RADIUS.get();

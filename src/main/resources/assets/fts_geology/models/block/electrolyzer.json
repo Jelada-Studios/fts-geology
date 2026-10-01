@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "minecraft:block/weathered_cut_copper",
+    "north": "minecraft:block/redstone_lamp",
+    "south": "minecraft:block/furnace_side",
+    "east": "minecraft:block/weathered_cut_copper",
+    "west": "minecraft:block/weathered_cut_copper",
+    "up": "minecraft:block/copper_block",
+    "down": "minecraft:block/smooth_stone"
+  }
+}

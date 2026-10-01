@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["IGI", "CWC", "IRI"],
+  "key": {
+    "I": {"item": "minecraft:iron_ingot"},
+    "G": {"item": "minecraft:glass"},
+    "C": {"item": "minecraft:copper_ingot"},
+    "W": {"item": "minecraft:cauldron"},
+    "R": {"item": "minecraft:redstone"}
+  },
+  "result": {"item": "fts_geology:electrolyzer", "count": 1}
+}

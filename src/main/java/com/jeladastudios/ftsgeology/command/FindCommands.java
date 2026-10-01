@@ -98,6 +98,14 @@ public final class FindCommands {
             return s == null ? null : new Hit(s[0], s[1], (int) Math.round(Math.hypot(s[0] - at.getX(), s[1] - at.getZ())));
         }
         if (what.equals("valley")) return searchValley(level, at);
+        // An oil field is a dome on a seeded grid: the nearest crest is worked out directly.
+        if (what.equals("oil")) {
+            var f = com.jeladastudios.ftsgeology.worldgen.PetroleumFields.nearest(level, at.getX(), at.getZ(), 8000);
+            if (f != null) GeysersMod.LOGGER.info("oil field at {} {}: crest {}, gas to {}, oil to {}, {} by {} blocks, closure {}, {} thick, sour {}, richness {}",
+                    f.x(), f.z(), f.crest(), f.goc(), f.owc(), (int) (2 * f.a()), (int) (2 * f.b()), f.closure(), f.thick(),
+                    String.format(java.util.Locale.ROOT, "%.3f", f.sour()), String.format(java.util.Locale.ROOT, "%.2f", f.richness()));
+            return f == null ? null : new Hit(f.x(), f.z(), (int) Math.round(Math.hypot(f.x() - at.getX(), f.z() - at.getZ())));
+        }
         // Karst stands on the seed too: a sinkhole on its grid, a swallow hole where the network takes a river into a hill.
         if (what.equals("sinkhole") || what.equals("swallowhole")) {
             if (!com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level)) return null;

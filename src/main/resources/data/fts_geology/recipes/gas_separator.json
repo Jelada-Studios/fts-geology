@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["IPI", "FRF", "IPI"],
+  "key": {
+    "I": {"item": "minecraft:iron_ingot"},
+    "P": {"item": "fts_geology:gas_pipe"},
+    "F": {"item": "fts_geology:gas_filter"},
+    "R": {"item": "minecraft:redstone"}
+  },
+  "result": {"item": "fts_geology:gas_separator", "count": 1}
+}

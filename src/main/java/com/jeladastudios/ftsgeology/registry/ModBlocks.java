@@ -248,6 +248,12 @@ public final class ModBlocks {
                     .mapColor(MapColor.COLOR_GRAY)
                     .strength(0.8F, 3.0F)));
 
+    /** Reservoir sandstone soaked with oil, in a field's dome (see PetroleumFields). */
+    public static final RegistryObject<Block> OIL_SANDSTONE = BLOCKS.register("oil_sandstone",
+            () -> new Block(BlockBehaviour.Properties.copy(Blocks.SANDSTONE)
+                    .mapColor(MapColor.COLOR_BLACK)
+                    .strength(0.8F, 0.8F)));
+
     /** Chert: brittle, fine-grained nodular cryptocrystalline silica. */
     public static final RegistryObject<Block> CHERT = BLOCKS.register("chert",
             () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)

@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "facing=north,lit=false": {"model": "fts_geology:block/ventilation_fan"},
+    "facing=north,lit=true": {"model": "fts_geology:block/ventilation_fan_on"},
+    "facing=south,lit=false": {"model": "fts_geology:block/ventilation_fan", "y": 180},
+    "facing=south,lit=true": {"model": "fts_geology:block/ventilation_fan_on", "y": 180},
+    "facing=east,lit=false": {"model": "fts_geology:block/ventilation_fan", "y": 90},
+    "facing=east,lit=true": {"model": "fts_geology:block/ventilation_fan_on", "y": 90},
+    "facing=west,lit=false": {"model": "fts_geology:block/ventilation_fan", "y": 270},
+    "facing=west,lit=true": {"model": "fts_geology:block/ventilation_fan_on", "y": 270},
+    "facing=up,lit=false": {"model": "fts_geology:block/ventilation_fan", "x": 270},
+    "facing=up,lit=true": {"model": "fts_geology:block/ventilation_fan_on", "x": 270},
+    "facing=down,lit=false": {"model": "fts_geology:block/ventilation_fan", "x": 90},
+    "facing=down,lit=true": {"model": "fts_geology:block/ventilation_fan_on", "x": 90}
+  }
+}

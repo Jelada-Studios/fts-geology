@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["IBI", "BRB", "IBI"],
+  "key": {
+    "I": {"item": "minecraft:iron_ingot"},
+    "B": {"item": "minecraft:iron_bars"},
+    "R": {"item": "minecraft:redstone"}
+  },
+  "result": {"item": "fts_geology:ventilation_fan", "count": 1}
+}

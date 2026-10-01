@@ -77,7 +77,44 @@ public final class OreGenesis {
         magnetite(d);
         nativeCopper(d);
         modOres(d);
+        d.placed += PetroleumFields.generate(level, cp);
+        gasSeeps(d);
         return d.placed;
+    }
+
+    /** Grid of natural gas seeps, and how far a group of vents spreads from its middle. */
+    private static final int SEEP_CELL = 96, SEEP_REACH = 6;
+
+    /**
+     * Burning methane seeps where an ophiolite's serpentinite comes to the surface: sea water working on the mantle rock
+     * makes methane and hydrogen, which find their way up its cracks -- the Chimaera of Lycia (Yanartas), a hillside of
+     * flames that have burned for thousands of years. A few vents together, lit, on the bare rock only.
+     */
+    private static void gasSeeps(Deposit d) {
+        if (!d.own || !com.jeladastudios.ftsgeology.gas.GasConfig.ENABLED.get()) return;
+        double chance = com.jeladastudios.ftsgeology.gas.GasConfig.SEEP_CHANCE.get();
+        if (chance <= 0) return;
+        d.cells(SEEP_CELL, SEEP_REACH, 0x5EE9C41L, (cellX, cellZ, h) -> {
+            if (die(h, 0) >= chance) return;
+            int ax = cellX + SEEP_REACH + (int) (die(h, 1) * (SEEP_CELL - 2 * SEEP_REACH));
+            int az = cellZ + SEEP_REACH + (int) (die(h, 2) * (SEEP_CELL - 2 * SEEP_REACH));
+            int vents = 2 + (int) (die(h, 3) * 5);
+            for (int i = 0; i < vents; i++) {
+                int x = ax + (int) Math.round((die(h, 10 + i) - 0.5) * 2 * SEEP_REACH);
+                int z = az + (int) Math.round((die(h, 30 + i) - 0.5) * 2 * SEEP_REACH);
+                if (!d.inside(x, z)) continue;
+                int g = d.ground(x, z);
+                if (g == Integer.MIN_VALUE) continue;
+                BlockPos p = new BlockPos(x, g, z);
+                BlockState s = d.level.getBlockState(p);
+                if (!s.is(ModBlocks.SERPENTINITE.get()) && !s.is(ModBlocks.PERIDOTITE.get())) continue;
+                if (!d.level.getBlockState(p.above()).isAir()) continue;
+                d.level.setBlock(p, com.jeladastudios.ftsgeology.gas.registry.GasBlocks.GAS_SEEP.get().defaultBlockState(),
+                        Block.UPDATE_CLIENTS);
+                d.placed++;
+                com.jeladastudios.ftsgeology.util.Diagnostics.info("methane seep at {} {} {}", x, g, z);
+            }
+        });
     }
 
     /** One chunk's writing: its corner, its surface read once, and a running count. */
@@ -193,6 +230,11 @@ public final class OreGenesis {
         return g;
     }
 
+    /** The generator's ground at a point, kept: for a deposit's anchor anywhere (see {@link #anchorGround}). */
+    static int anchorGroundAt(ServerLevel world, int x, int z) {
+        return anchorGround(world, x, z);
+    }
+
     /** Drops the anchor grounds kept for a world that has stopped. */
     public static void clear() {
         synchronized (ANCHOR_GROUND) {
@@ -286,7 +328,12 @@ public final class OreGenesis {
      * shields and the ocean floor have none.
      */
     private static boolean coalBasin(Deposit d, int x, int z) {
-        PlateSample s = TectonicMap.sampleCached(d.world, x, z);
+        return basin(d.world, x, z);
+    }
+
+    /** The same for any world: where a basin sank and filled (coal, oil and gas are in them; see {@link PetroleumFields}). */
+    static boolean basin(ServerLevel world, int x, int z) {
+        PlateSample s = TectonicMap.sampleCached(world, x, z);
         if (s.plateKind().isOceanic()) return false;
         double width = com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().faultWidth();
         // A ragged margin rather than a line at a fixed distance.
@@ -1098,7 +1145,7 @@ public final class OreGenesis {
         });
     }
 
-    private static boolean isHostRock(BlockState s) {
+    static boolean isHostRock(BlockState s) {
         return s.is(BlockTags.BASE_STONE_OVERWORLD)
                 || s.is(Blocks.CALCITE) || s.is(Blocks.BLACKSTONE) || s.is(Blocks.BASALT)
                 || s.is(Blocks.SANDSTONE) || s.is(Blocks.RED_SANDSTONE)

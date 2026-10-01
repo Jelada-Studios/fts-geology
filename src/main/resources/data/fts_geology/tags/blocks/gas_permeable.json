@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "#minecraft:leaves",
+    "minecraft:mangrove_roots",
+    "minecraft:muddy_mangrove_roots"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {"item": "minecraft:charcoal"},
+    {"item": "minecraft:charcoal"},
+    {"item": "minecraft:paper"},
+    {"item": "minecraft:iron_nugget"}
+  ],
+  "result": {"item": "fts_geology:gas_filter", "count": 2}
+}

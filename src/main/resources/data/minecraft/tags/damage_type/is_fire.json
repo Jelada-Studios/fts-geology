@@ -1,6 +1,7 @@
 {
   "replace": false,
   "values": [
-    "fts_geology:pyroclastic_flow"
+    "fts_geology:pyroclastic_flow",
+    "fts_geology:burner_flame"
   ]
 }

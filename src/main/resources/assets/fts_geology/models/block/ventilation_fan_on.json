@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "minecraft:block/exposed_cut_copper",
+    "north": "minecraft:block/dispenser_front",
+    "south": "minecraft:block/furnace_side",
+    "east": "minecraft:block/exposed_cut_copper",
+    "west": "minecraft:block/exposed_cut_copper",
+    "up": "minecraft:block/cut_copper",
+    "down": "minecraft:block/smooth_stone"
+  }
+}

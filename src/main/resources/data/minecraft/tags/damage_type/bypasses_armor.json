@@ -1,6 +1,8 @@
 {
   "replace": false,
   "values": [
-    "fts_geology:volcanic_gas"
+    "fts_geology:volcanic_gas",
+    "fts_geology:asphyxiation",
+    "fts_geology:gas_poisoning"
   ]
 }

@@ -1,0 +1,12 @@
+{
+  "variants": {
+    "facing=north,lit=false": {"model": "fts_geology:block/gas_engine"},
+    "facing=north,lit=true": {"model": "fts_geology:block/gas_engine_on"},
+    "facing=south,lit=false": {"model": "fts_geology:block/gas_engine", "y": 180},
+    "facing=south,lit=true": {"model": "fts_geology:block/gas_engine_on", "y": 180},
+    "facing=east,lit=false": {"model": "fts_geology:block/gas_engine", "y": 90},
+    "facing=east,lit=true": {"model": "fts_geology:block/gas_engine_on", "y": 90},
+    "facing=west,lit=false": {"model": "fts_geology:block/gas_engine", "y": 270},
+    "facing=west,lit=true": {"model": "fts_geology:block/gas_engine_on", "y": 270}
+  }
+}

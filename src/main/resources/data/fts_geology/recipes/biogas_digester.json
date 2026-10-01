@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["IPI", "IMI", "III"],
+  "key": {
+    "I": {"item": "minecraft:iron_ingot"},
+    "P": {"item": "fts_geology:gas_pipe"},
+    "M": {"item": "minecraft:composter"}
+  },
+  "result": {"item": "fts_geology:biogas_digester", "count": 1}
+}

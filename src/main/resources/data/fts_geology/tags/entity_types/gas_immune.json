@@ -1,0 +1,13 @@
+{
+  "replace": false,
+  "values": [
+    "minecraft:iron_golem",
+    "minecraft:snow_golem",
+    "minecraft:wither",
+    "minecraft:ender_dragon",
+    "minecraft:blaze",
+    "minecraft:magma_cube",
+    "minecraft:vex",
+    "minecraft:allay"
+  ]
+}

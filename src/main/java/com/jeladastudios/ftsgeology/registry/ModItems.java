@@ -88,6 +88,9 @@ public final class ModItems {
     public static final RegistryObject<Item> SHALE = ITEMS.register("shale",
             () -> new BlockItem(ModBlocks.SHALE.get(), new Item.Properties()));
 
+    public static final RegistryObject<Item> OIL_SANDSTONE = ITEMS.register("oil_sandstone",
+            () -> new BlockItem(ModBlocks.OIL_SANDSTONE.get(), new Item.Properties()));
+
     public static final RegistryObject<Item> CHERT = ITEMS.register("chert",
             () -> new BlockItem(ModBlocks.CHERT.get(), new Item.Properties()));
 

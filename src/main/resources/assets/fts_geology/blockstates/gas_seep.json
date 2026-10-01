@@ -1,0 +1,6 @@
+{
+  "variants": {
+    "lit=false": { "model": "fts_geology:block/gas_seep" },
+    "lit=true": { "model": "fts_geology:block/gas_seep" }
+  }
+}

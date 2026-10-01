@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "minecraft:block/oxidized_cut_copper",
+    "north": "minecraft:block/observer_front",
+    "south": "minecraft:block/observer_back",
+    "east": "minecraft:block/oxidized_cut_copper",
+    "west": "minecraft:block/oxidized_cut_copper",
+    "up": "minecraft:block/copper_block",
+    "down": "minecraft:block/smooth_stone"
+  }
+}

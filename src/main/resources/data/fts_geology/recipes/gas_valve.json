@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [" L ", "PIP"],
+  "key": {
+    "L": {"item": "minecraft:lever"},
+    "P": {"item": "fts_geology:gas_pipe"},
+    "I": {"item": "minecraft:iron_ingot"}
+  },
+  "result": {"item": "fts_geology:gas_valve", "count": 1}
+}
