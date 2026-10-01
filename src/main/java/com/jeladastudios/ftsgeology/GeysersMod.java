@@ -32,6 +32,7 @@ public class GeysersMod {
 
         ModBlocks.BLOCKS.register(modBus);
         ModItems.ITEMS.register(modBus);
+        com.jeladastudios.ftsgeology.registry.ModFluids.FLUID_TYPES.register(modBus);
         com.jeladastudios.ftsgeology.registry.ModFluids.FLUIDS.register(modBus);
         ModBlockEntities.BLOCK_ENTITIES.register(modBus);
         com.jeladastudios.ftsgeology.registry.ModSounds.SOUNDS.register(modBus);
@@ -178,6 +179,8 @@ public class GeysersMod {
             event.accept(ModItems.GEOTHERMAL_TURBINE.get());
             event.accept(ModItems.WELL_PUMP.get());
             event.accept(ModItems.WELL_CASING.get());
+            event.accept(ModItems.WELLHEAD.get());
+            event.accept(ModItems.CRUDE_OIL_BUCKET.get());
             event.accept(ModItems.SEA_WATER_BUCKET.get());
             event.accept(ModItems.GEOLOGISTS_HAMMER.get());
             event.accept(ModItems.FAULT_COMPASS.get());

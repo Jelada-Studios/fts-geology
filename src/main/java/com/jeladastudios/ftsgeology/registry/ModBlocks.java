@@ -119,6 +119,20 @@ public final class ModBlocks {
                     .requiresCorrectToolForDrops()
                     .noOcclusion()));
 
+    /** A well head on a well cased down into an oil field's oil: crude oil up the casing; see {@code WellheadBlockEntity}. */
+    public static final RegistryObject<Block> WELLHEAD = BLOCKS.register("wellhead",
+            () -> new com.jeladastudios.ftsgeology.block.WellheadBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)
+                    .mapColor(MapColor.METAL)
+                    .strength(3.0F, 6.0F)
+                    .requiresCorrectToolForDrops()
+                    .noOcclusion()));
+
+    /** Crude oil poured out of a bucket. */
+    public static final RegistryObject<Block> CRUDE_OIL = BLOCKS.register("crude_oil",
+            () -> new net.minecraft.world.level.block.LiquidBlock(
+                    () -> (net.minecraft.world.level.material.FlowingFluid) ModFluids.CRUDE_OIL.get(),
+                    BlockBehaviour.Properties.copy(Blocks.WATER).mapColor(MapColor.COLOR_BLACK).noLootTable()));
+
     /** Well casing: the steel pipe a turbine's well is lined with, down to the heat. */
     public static final RegistryObject<Block> WELL_CASING = BLOCKS.register("well_casing",
             () -> new com.jeladastudios.ftsgeology.block.WellCasingBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BARS)

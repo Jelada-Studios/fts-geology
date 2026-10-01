@@ -32,6 +32,60 @@ public final class ModFluids {
     public static final RegistryObject<Fluid> FLOWING_SEA_WATER =
             FLUIDS.register("flowing_sea_water", () -> new ForgeFlowingFluid.Flowing(seaProperties()));
 
+    public static final DeferredRegister<net.minecraftforge.fluids.FluidType> FLUID_TYPES =
+            DeferredRegister.create(net.minecraftforge.registries.ForgeRegistries.Keys.FLUID_TYPES, GeysersMod.MODID);
+
+    /**
+     * Crude oil from a well head on an oil field: heavy, slow, black, burning rather than putting a fire out. In the
+     * {@code forge:crude_oil} tag, so another mod's refinery takes it (Create Diesel Generators' distillation does).
+     * Drawn with water's own textures, darkened: no texture of its own.
+     */
+    public static final RegistryObject<net.minecraftforge.fluids.FluidType> CRUDE_OIL_TYPE = FLUID_TYPES.register("crude_oil",
+            () -> new net.minecraftforge.fluids.FluidType(net.minecraftforge.fluids.FluidType.Properties.create()
+                    .descriptionId("fluid_type.fts_geology.crude_oil")
+                    .density(870).viscosity(8000).temperature(300)
+                    .motionScale(0.002).canSwim(false).canExtinguish(false).canHydrate(false).supportsBoating(false)
+                    .fallDistanceModifier(0.5F)
+                    .sound(net.minecraftforge.common.SoundActions.BUCKET_FILL, net.minecraft.sounds.SoundEvents.BUCKET_FILL)
+                    .sound(net.minecraftforge.common.SoundActions.BUCKET_EMPTY, net.minecraft.sounds.SoundEvents.BUCKET_EMPTY)) {
+                @Override
+                public void initializeClient(java.util.function.Consumer<net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions> consumer) {
+                    consumer.accept(new net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions() {
+                        private static final net.minecraft.resources.ResourceLocation STILL =
+                                new net.minecraft.resources.ResourceLocation("minecraft", "block/water_still");
+                        private static final net.minecraft.resources.ResourceLocation FLOW =
+                                new net.minecraft.resources.ResourceLocation("minecraft", "block/water_flow");
+
+                        @Override
+                        public net.minecraft.resources.ResourceLocation getStillTexture() {
+                            return STILL;
+                        }
+
+                        @Override
+                        public net.minecraft.resources.ResourceLocation getFlowingTexture() {
+                            return FLOW;
+                        }
+
+                        @Override
+                        public int getTintColor() {
+                            return 0xFF2B1D12;
+                        }
+                    });
+                }
+            });
+
+    public static final RegistryObject<Fluid> CRUDE_OIL =
+            FLUIDS.register("crude_oil", () -> new ForgeFlowingFluid.Source(oilProperties()));
+    public static final RegistryObject<Fluid> FLOWING_CRUDE_OIL =
+            FLUIDS.register("flowing_crude_oil", () -> new ForgeFlowingFluid.Flowing(oilProperties()));
+
+    private static ForgeFlowingFluid.Properties oilProperties() {
+        return new ForgeFlowingFluid.Properties(CRUDE_OIL_TYPE, CRUDE_OIL, FLOWING_CRUDE_OIL)
+                .block(() -> (net.minecraft.world.level.block.LiquidBlock) ModBlocks.CRUDE_OIL.get())
+                .bucket(() -> ModItems.CRUDE_OIL_BUCKET.get())
+                .slopeFindDistance(2).levelDecreasePerBlock(2).tickRate(30).explosionResistance(100.0F);
+    }
+
     private static ForgeFlowingFluid.Properties seaProperties() {
         return new ForgeFlowingFluid.Properties(ForgeMod.WATER_TYPE, SEA_WATER, FLOWING_SEA_WATER)
                 .block(() -> (net.minecraft.world.level.block.LiquidBlock) ModBlocks.SEA_WATER.get())

@@ -69,6 +69,11 @@ public final class ModBlockEntities {
                     .of(com.jeladastudios.ftsgeology.blockentity.WellPumpBlockEntity::new, ModBlocks.WELL_PUMP.get())
                     .build(null));
 
+    public static final RegistryObject<BlockEntityType<com.jeladastudios.ftsgeology.blockentity.WellheadBlockEntity>> WELLHEAD =
+            BLOCK_ENTITIES.register("wellhead", () -> BlockEntityType.Builder
+                    .of(com.jeladastudios.ftsgeology.blockentity.WellheadBlockEntity::new, ModBlocks.WELLHEAD.get())
+                    .build(null));
+
     /** A weather instrument: a rain gauge adding up the day, an anemometer's cups, every one's comparator signal. */
     public static final RegistryObject<BlockEntityType<com.jeladastudios.ftsgeology.blockentity.InstrumentBlockEntity>> INSTRUMENT =
             BLOCK_ENTITIES.register("weather_instrument", () -> BlockEntityType.Builder

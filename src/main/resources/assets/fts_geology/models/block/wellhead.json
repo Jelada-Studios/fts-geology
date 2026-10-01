@@ -1,0 +1,98 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "minecraft:block/anvil",
+    "flange": "minecraft:block/anvil",
+    "steel": "minecraft:block/iron_block",
+    "wheel": "minecraft:block/red_concrete",
+    "outlet": "minecraft:block/copper_block",
+    "bore": "minecraft:block/black_concrete"
+  },
+  "elements": [
+    {
+      "name": "casing flange",
+      "from": [2, 0, 2],
+      "to": [14, 3, 14],
+      "faces": {
+        "down": {"texture": "#flange", "cullface": "down"},
+        "up": {"texture": "#flange"},
+        "north": {"texture": "#flange"},
+        "south": {"texture": "#flange"},
+        "west": {"texture": "#flange"},
+        "east": {"texture": "#flange"}
+      }
+    },
+    {
+      "name": "master valve body",
+      "from": [5, 3, 5],
+      "to": [11, 9, 11],
+      "faces": {
+        "north": {"texture": "#steel"},
+        "south": {"texture": "#steel"},
+        "west": {"texture": "#steel"},
+        "east": {"texture": "#steel"}
+      }
+    },
+    {
+      "name": "cross with the wing outlets",
+      "from": [1, 7, 6],
+      "to": [15, 11, 10],
+      "faces": {
+        "up": {"texture": "#outlet"},
+        "down": {"texture": "#outlet"},
+        "north": {"texture": "#outlet"},
+        "south": {"texture": "#outlet"},
+        "west": {"texture": "#bore"},
+        "east": {"texture": "#bore"}
+      }
+    },
+    {
+      "name": "swab valve",
+      "from": [5.5, 9, 5.5],
+      "to": [10.5, 14, 10.5],
+      "faces": {
+        "north": {"texture": "#steel"},
+        "south": {"texture": "#steel"},
+        "west": {"texture": "#steel"},
+        "east": {"texture": "#steel"}
+      }
+    },
+    {
+      "name": "tree cap",
+      "from": [4.5, 14, 4.5],
+      "to": [11.5, 16, 11.5],
+      "faces": {
+        "up": {"texture": "#flange"},
+        "down": {"texture": "#flange"},
+        "north": {"texture": "#flange"},
+        "south": {"texture": "#flange"},
+        "west": {"texture": "#flange"},
+        "east": {"texture": "#flange"}
+      }
+    },
+    {
+      "name": "master valve wheel",
+      "from": [3, 5, 7.5],
+      "to": [5, 7, 8.5],
+      "faces": {
+        "up": {"texture": "#wheel"},
+        "down": {"texture": "#wheel"},
+        "north": {"texture": "#wheel"},
+        "south": {"texture": "#wheel"},
+        "west": {"texture": "#wheel"}
+      }
+    },
+    {
+      "name": "swab valve wheel",
+      "from": [7.5, 11, 3],
+      "to": [8.5, 13, 5.5],
+      "faces": {
+        "up": {"texture": "#wheel"},
+        "down": {"texture": "#wheel"},
+        "north": {"texture": "#wheel"},
+        "west": {"texture": "#wheel"},
+        "east": {"texture": "#wheel"}
+      }
+    }
+  ]
+}

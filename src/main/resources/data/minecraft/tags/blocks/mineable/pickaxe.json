@@ -98,6 +98,7 @@
     "fts_geology:gas_sensor",
     "fts_geology:ventilation_fan",
     "fts_geology:oil_sandstone",
-    "fts_geology:gas_seep"
+    "fts_geology:gas_seep",
+    "fts_geology:wellhead"
   ]
 }

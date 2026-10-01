@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:crude_oil",
+    "fts_geology:flowing_crude_oil"
+  ]
+}

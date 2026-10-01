@@ -258,6 +258,14 @@ public final class ModItems {
     public static final RegistryObject<Item> WELL_PUMP = ITEMS.register("well_pump",
             () -> new DescribedBlockItem(ModBlocks.WELL_PUMP.get(), new Item.Properties(), 3, "electrodynamics", "create"));
 
+    public static final RegistryObject<Item> WELLHEAD = ITEMS.register("wellhead",
+            () -> new DescribedBlockItem(ModBlocks.WELLHEAD.get(), new Item.Properties(), 2, "createdieselgenerators"));
+
+    /** A bucket of crude oil from a well head. */
+    public static final RegistryObject<Item> CRUDE_OIL_BUCKET = ITEMS.register("crude_oil_bucket",
+            () -> new net.minecraft.world.item.BucketItem(ModFluids.CRUDE_OIL, new Item.Properties()
+                    .craftRemainder(net.minecraft.world.item.Items.BUCKET).stacksTo(1)));
+
     /** A bucket of sea water: it pours out as water that waters no field. */
     public static final RegistryObject<Item> SEA_WATER_BUCKET = ITEMS.register("sea_water_bucket",
             () -> new net.minecraft.world.item.BucketItem(ModFluids.SEA_WATER, new Item.Properties()
