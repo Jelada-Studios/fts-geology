@@ -1,12 +1,14 @@
 {
-  "parent": "minecraft:block/cube",
+  "parent": "minecraft:block/block",
   "textures": {
     "particle": "minecraft:block/observer_side",
-    "north": "minecraft:block/target_top",
-    "south": "minecraft:block/observer_side",
-    "east": "minecraft:block/observer_side",
-    "west": "minecraft:block/observer_side",
-    "up": "minecraft:block/observer_side",
-    "down": "minecraft:block/observer_side"
-  }
+    "andesite": "minecraft:block/polished_andesite",
+    "dial": "minecraft:block/target_top",
+    "observer": "minecraft:block/observer_side"
+  },
+  "elements": [
+    { "from": [1, 1, 14], "to": [15, 15, 16], "faces": { "north": {"texture": "#andesite"}, "south": {"texture": "#andesite"}, "east": {"texture": "#andesite"}, "west": {"texture": "#andesite"}, "up": {"texture": "#andesite"}, "down": {"texture": "#andesite"} } },
+    { "from": [3, 3, 9], "to": [13, 13, 14], "faces": { "north": {"texture": "#observer"}, "south": {"texture": "#observer"}, "east": {"texture": "#observer"}, "west": {"texture": "#observer"}, "up": {"texture": "#observer"}, "down": {"texture": "#observer"} } },
+    { "from": [4, 4, 8], "to": [12, 12, 9], "faces": { "north": {"texture": "#dial"}, "south": {"texture": "#dial"}, "east": {"texture": "#dial"}, "west": {"texture": "#dial"}, "up": {"texture": "#dial"}, "down": {"texture": "#dial"} } }
+  ]
 }

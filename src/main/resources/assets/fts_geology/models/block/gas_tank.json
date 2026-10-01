@@ -1,7 +1,20 @@
 {
-  "parent": "minecraft:block/cube_column",
+  "parent": "minecraft:block/block",
   "textures": {
-    "end": "minecraft:block/iron_block",
-    "side": "minecraft:block/iron_block"
-  }
+    "particle": "minecraft:block/iron_block",
+    "andesite": "minecraft:block/polished_andesite",
+    "black": "minecraft:block/polished_blackstone",
+    "dial": "minecraft:block/target_top",
+    "iron": "minecraft:block/iron_block"
+  },
+  "elements": [
+    { "from": [3, 0, 3], "to": [13, 1, 13], "faces": { "north": {"texture": "#andesite"}, "south": {"texture": "#andesite"}, "east": {"texture": "#andesite"}, "west": {"texture": "#andesite"}, "up": {"texture": "#andesite"}, "down": {"texture": "#andesite"} } },
+    { "from": [2, 1, 2], "to": [14, 15, 14], "faces": { "north": {"texture": "#iron"}, "south": {"texture": "#iron"}, "east": {"texture": "#iron"}, "west": {"texture": "#iron"}, "up": {"texture": "#iron"}, "down": {"texture": "#iron"} } },
+    { "from": [1, 2, 4], "to": [15, 14, 12], "faces": { "north": {"texture": "#iron"}, "south": {"texture": "#iron"}, "east": {"texture": "#iron"}, "west": {"texture": "#iron"}, "up": {"texture": "#iron"}, "down": {"texture": "#iron"} } },
+    { "from": [4, 2, 1], "to": [12, 14, 15], "faces": { "north": {"texture": "#iron"}, "south": {"texture": "#iron"}, "east": {"texture": "#iron"}, "west": {"texture": "#iron"}, "up": {"texture": "#iron"}, "down": {"texture": "#iron"} } },
+    { "from": [1.5, 4, 1.5], "to": [14.5, 5, 14.5], "faces": { "north": {"texture": "#black"}, "south": {"texture": "#black"}, "east": {"texture": "#black"}, "west": {"texture": "#black"}, "up": {"texture": "#black"}, "down": {"texture": "#black"} } },
+    { "from": [1.5, 11, 1.5], "to": [14.5, 12, 14.5], "faces": { "north": {"texture": "#black"}, "south": {"texture": "#black"}, "east": {"texture": "#black"}, "west": {"texture": "#black"}, "up": {"texture": "#black"}, "down": {"texture": "#black"} } },
+    { "from": [4, 15, 4], "to": [12, 16, 12], "faces": { "north": {"texture": "#iron"}, "south": {"texture": "#iron"}, "east": {"texture": "#iron"}, "west": {"texture": "#iron"}, "up": {"texture": "#iron"}, "down": {"texture": "#iron"} } },
+    { "from": [6.5, 7, 0.5], "to": [9.5, 10, 1], "faces": { "north": {"texture": "#dial"}, "south": {"texture": "#dial"}, "east": {"texture": "#dial"}, "west": {"texture": "#dial"}, "up": {"texture": "#dial"}, "down": {"texture": "#dial"} } }
+  ]
 }

@@ -1,12 +1,18 @@
 {
-  "parent": "minecraft:block/cube",
+  "parent": "minecraft:block/block",
   "textures": {
-    "particle": "minecraft:block/barrel_side",
-    "north": "minecraft:block/composter_compost",
-    "south": "minecraft:block/barrel_side",
-    "east": "minecraft:block/barrel_side",
-    "west": "minecraft:block/barrel_side",
-    "up": "minecraft:block/barrel_top",
-    "down": "minecraft:block/smooth_stone"
-  }
+    "particle": "minecraft:block/light_gray_concrete",
+    "compost": "minecraft:block/composter_compost",
+    "composter": "minecraft:block/composter_side",
+    "cut": "minecraft:block/cut_copper",
+    "gray": "minecraft:block/light_gray_concrete"
+  },
+  "elements": [
+    { "from": [2, 0, 2], "to": [14, 10, 14], "faces": { "north": {"texture": "#gray"}, "south": {"texture": "#gray"}, "east": {"texture": "#gray"}, "west": {"texture": "#gray"}, "up": {"texture": "#gray"}, "down": {"texture": "#gray"} } },
+    { "from": [3, 10, 3], "to": [13, 12, 13], "faces": { "north": {"texture": "#gray"}, "south": {"texture": "#gray"}, "east": {"texture": "#gray"}, "west": {"texture": "#gray"}, "up": {"texture": "#gray"}, "down": {"texture": "#gray"} } },
+    { "from": [5, 12, 5], "to": [11, 14, 11], "faces": { "north": {"texture": "#gray"}, "south": {"texture": "#gray"}, "east": {"texture": "#gray"}, "west": {"texture": "#gray"}, "up": {"texture": "#gray"}, "down": {"texture": "#gray"} } },
+    { "from": [7, 14, 7], "to": [9, 16, 9], "faces": { "north": {"texture": "#cut"}, "south": {"texture": "#cut"}, "east": {"texture": "#cut"}, "west": {"texture": "#cut"}, "up": {"texture": "#cut"}, "down": {"texture": "#cut"} } },
+    { "from": [4, 4, 0], "to": [12, 10, 2], "faces": { "north": {"texture": "#composter"}, "south": {"texture": "#composter"}, "east": {"texture": "#composter"}, "west": {"texture": "#composter"}, "up": {"texture": "#composter"}, "down": {"texture": "#composter"} } },
+    { "from": [5, 9.5, 0.5], "to": [11, 10, 1.5], "faces": { "north": {"texture": "#compost"}, "south": {"texture": "#compost"}, "east": {"texture": "#compost"}, "west": {"texture": "#compost"}, "up": {"texture": "#compost"}, "down": {"texture": "#compost"} } }
+  ]
 }

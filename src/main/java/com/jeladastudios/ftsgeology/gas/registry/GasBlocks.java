@@ -24,8 +24,12 @@ import java.util.function.Supplier;
 public final class GasBlocks {
     public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, GeysersMod.MODID);
 
+    /**
+     * The machines' blocks: shaped models short of a full cube, so no neighbour's face is hidden behind them; their
+     * collision stays a full block, and with it their being gas-tight.
+     */
     private static BlockBehaviour.Properties metal() {
-        return BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.0f, 6.0f).sound(SoundType.METAL);
+        return BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.0f, 6.0f).sound(SoundType.METAL).noOcclusion();
     }
 
     private static BlockBehaviour.Properties glowing(int light) {

@@ -1,12 +1,19 @@
 {
-  "parent": "minecraft:block/cube",
+  "parent": "minecraft:block/block",
   "textures": {
     "particle": "minecraft:block/cut_copper",
-    "north": "minecraft:block/magma",
-    "south": "minecraft:block/copper_block",
-    "east": "minecraft:block/cut_copper",
-    "west": "minecraft:block/cut_copper",
-    "up": "minecraft:block/cut_copper",
-    "down": "minecraft:block/cut_copper"
-  }
+    "copper": "minecraft:block/copper_block",
+    "cut": "minecraft:block/cut_copper",
+    "iron": "minecraft:block/iron_block",
+    "magma": "minecraft:block/magma",
+    "red": "minecraft:block/red_concrete"
+  },
+  "elements": [
+    { "from": [5, 5, 2], "to": [11, 11, 16], "faces": { "north": {"texture": "#cut"}, "south": {"texture": "#cut"}, "east": {"texture": "#cut"}, "west": {"texture": "#cut"}, "up": {"texture": "#cut"}, "down": {"texture": "#cut"} } },
+    { "from": [4, 4, 14], "to": [12, 12, 16], "faces": { "north": {"texture": "#copper"}, "south": {"texture": "#copper"}, "east": {"texture": "#copper"}, "west": {"texture": "#copper"}, "up": {"texture": "#copper"}, "down": {"texture": "#copper"} } },
+    { "from": [4, 4, 6], "to": [12, 12, 7], "faces": { "north": {"texture": "#copper"}, "south": {"texture": "#copper"}, "east": {"texture": "#copper"}, "west": {"texture": "#copper"}, "up": {"texture": "#copper"}, "down": {"texture": "#copper"} } },
+    { "from": [6, 6, 0], "to": [10, 10, 2], "faces": { "north": {"texture": "#magma"}, "south": {"texture": "#magma"}, "east": {"texture": "#magma"}, "west": {"texture": "#magma"}, "up": {"texture": "#magma"}, "down": {"texture": "#magma"} } },
+    { "from": [7.5, 11, 7.5], "to": [8.5, 15, 8.5], "faces": { "north": {"texture": "#iron"}, "south": {"texture": "#iron"}, "east": {"texture": "#iron"}, "west": {"texture": "#iron"}, "up": {"texture": "#iron"}, "down": {"texture": "#iron"} } },
+    { "from": [4, 15, 4], "to": [12, 16, 12], "faces": { "north": {"texture": "#red"}, "south": {"texture": "#red"}, "east": {"texture": "#red"}, "west": {"texture": "#red"}, "up": {"texture": "#red"}, "down": {"texture": "#red"} } }
+  ]
 }
