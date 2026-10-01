@@ -365,12 +365,13 @@ public final class TerrainCommands {
                         com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(),
                         com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params(), at.getX(), at.getZ())));
         var plate = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.sampleAt(com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(), com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params(), at.getX(), at.getZ());
-        String line = String.format(Locale.ROOT, "terrain at %d,%d: %sbase %d, role %s%s; level seed %d, terrain seed %d, own %s",
+        String line = String.format(Locale.ROOT, "terrain at %d,%d: %sbase %d, role %s%s; level seed %d, terrain seed %d, own %s, worldgen revision %d",
                 at.getX(), at.getZ(), sb, base,
                 com.jeladastudios.ftsgeology.worldgen.terrain.GeologyRoles.roleAt(at.getX(), at.getZ()),
                 com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.worn(plate, com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed()) ? " (worn belt)" : "",
                 level.getSeed(), com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(),
-                com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level));
+                com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level),
+                com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.revision());
         source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
         String edges = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.debugAt(
                 com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(),

@@ -471,7 +471,9 @@ public final class TerrainFields {
                     : -0.25 * peak(a, TRENCH_AT, TRENCH_HALF);
             case DIVERGENT -> {
                 double r = riftAcross(s, p);
-                yield graben(r) + SHOULDER_RISE * peak(r, SHOULDER_AT, SHOULDER_HALF);
+                double relief = graben(r) + SHOULDER_RISE * peak(r, SHOULDER_AT, SHOULDER_HALF);
+                if (WorldgenRevision.has(WorldgenRevision.DEEP_RIFTS)) relief += axisTrough(r, s);
+                yield relief;
             }
             case TRANSFORM, INTERIOR -> 0.0;
         };
@@ -633,6 +635,21 @@ public final class TerrainFields {
             return smooth(Mth.clamp((riftAcross(s, p) - RIFT_CALM_FROM) / RIFT_CALM_OVER, 0, 1));
         }
         return 1.0;
+    }
+
+    /** Half width of a rift's axial trough, in the units of riftAcross, and how deep it sinks, at the least and more where the plates part fast. */
+    private static final double AXIS_HALF = 0.075, AXIS_DEEP = -0.06, AXIS_OPEN = -0.09;
+
+    /**
+     * The axis of a rift that goes on opening: a narrower trough sunk in the middle of its floor, where the plates have
+     * pulled furthest apart and the crust is thinnest, as the Danakil sinks in the middle of the Afar. The faster the
+     * plates part the deeper, until the floor of a fast one is under the sea's level, and the sea comes in -- the Red Sea,
+     * which the Afar is on its way to becoming.
+     */
+    private static double axisTrough(double a, PlateSample s) {
+        if (a >= AXIS_HALF) return 0.0;
+        double open = Mth.clamp(-s.convergence() / 1.2, 0.0, 1.0);
+        return (AXIS_DEEP + AXIS_OPEN * open) * (1.0 - smooth(a / AXIS_HALF));
     }
 
     /** A rift's floor and the two fault scarps up out of it, in relief units: flat, half the drop, then the rim. */

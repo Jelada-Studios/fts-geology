@@ -218,6 +218,14 @@ public final class FindCommands {
             boolean convergent = k == FaultType.CONVERGENT_COLLISION || k == FaultType.CONVERGENT_SUBDUCTION;
             return convergent && belt >= 0.45 && crest <= 0.05;
         }
+        // On the mod's own world types a rift is its valley: the graben the terrain sinks between the two scarps, which
+        // the plate model's stress alone missed by hundreds of blocks.
+        if (what.equals("rift") && com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level)) {
+            return com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.field(
+                    com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.Field.GRABEN,
+                    com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed(),
+                    com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params(), x, z) >= 0.9;
+        }
         PlateSample s = TectonicMap.sampleCached(level, x, z);
         // Require decent stress so we land somewhere the setting is actually expressed, not on the
         // faint outer edge of the fault zone.

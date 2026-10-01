@@ -31,8 +31,10 @@ public final class WorldgenRevision {
 
     /** Coasts the ground stands dry over are land, not the sea the climate called them (round 118). */
     public static final int LAND_COASTS = 1;
+    /** A rift's axis sunk in its floor, deeper where it opens fast (round 118). */
+    public static final int DEEP_RIFTS = 2;
     /** What a world made now gets. */
-    public static final int CURRENT = 1;
+    public static final int CURRENT = 2;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;
