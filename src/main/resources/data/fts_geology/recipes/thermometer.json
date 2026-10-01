@@ -6,7 +6,7 @@
     "BRB"
   ],
   "key": {
-    "B": { "item": "minecraft:birch_planks" },
+    "B": { "tag": "minecraft:planks" },
     "G": { "item": "minecraft:glass_pane" },
     "R": { "item": "minecraft:redstone" }
   },

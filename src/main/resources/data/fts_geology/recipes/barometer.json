@@ -8,7 +8,7 @@
   "key": {
     "C": { "item": "minecraft:clock" },
     "G": { "item": "minecraft:glass_pane" },
-    "P": { "item": "minecraft:dark_oak_planks" },
+    "P": { "tag": "minecraft:planks" },
     "R": { "item": "minecraft:redstone" }
   },
   "result": { "item": "fts_geology:barometer" }

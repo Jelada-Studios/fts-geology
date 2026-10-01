@@ -7,7 +7,7 @@
   ],
   "key": {
     "G": { "item": "minecraft:glass_pane" },
-    "P": { "item": "minecraft:spruce_planks" },
+    "P": { "tag": "minecraft:planks" },
     "R": { "item": "minecraft:redstone" },
     "S": { "item": "minecraft:string" }
   },
