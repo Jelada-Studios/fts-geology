@@ -280,6 +280,8 @@ public final class Landslides {
                                 0.05 + level.random.nextDouble() * 0.1,
                                 down.getStepZ() * push + (level.random.nextDouble() - 0.5) * 0.1));
                         f.setHurtsEntities(1.0f, 10);
+                        // Earth that lands on a flower or a fence is lost in the heap, not left lying as an item.
+                        f.dropItem = false;
                         f.hurtMarked = true;
                     } else {
                         QuakeWrites.set(level, p, Blocks.AIR.defaultBlockState());

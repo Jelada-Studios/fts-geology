@@ -45,9 +45,9 @@ public final class VolcanoUnrest {
     /** How long an entry outlives the volcano's last report, in ticks. */
     private static final long LAPSE = 1200L;
 
-    /** A volcano in unrest: how far it reaches, how far along it is (0 to 1), and until when this holds. */
+    /** A volcano in unrest: how far it reaches, how far along it is (0 to 1), whether it is erupting, and until when this holds. */
     public record Restless(ResourceKey<Level> dimension, BlockPos summit, int magnitude, double reach, double progress,
-                           long until) {}
+                           boolean erupting, long until) {}
 
     private static final Map<Long, Restless> RESTLESS = new HashMap<>();
 
@@ -69,7 +69,7 @@ public final class VolcanoUnrest {
         if (!GeyserConfig.VOLCANO_UNREST.get()) return;
         double reach = REACH + REACH_PER_MAGNITUDE * magnitude;
         RESTLESS.put(summit.asLong(), new Restless(level.dimension(), summit.immutable(), magnitude, reach,
-                Math.max(0.0, Math.min(1.0, progress)), level.getGameTime() + LAPSE));
+                Math.max(0.0, Math.min(1.0, progress)), !swarm, level.getGameTime() + LAPSE));
         if (!swarm) return;
         double rate = RATE_START + (RATE_END - RATE_START) * progress * progress;
         if (level.random.nextDouble() < rate) swarmQuake(level, summit, magnitude, progress);
@@ -137,9 +137,14 @@ public final class VolcanoUnrest {
      * flanks as the eruption nears, much less further out.
      */
     public static int swellCm(Restless r, int x, int z) {
+        return (int) Math.round(swell(r, x, z));
+    }
+
+    /** The same, unrounded: a tiltmeter reads the slope of it over a few blocks. */
+    public static double swell(Restless r, double x, double z) {
         double d = Math.hypot(x - r.summit().getX(), z - r.summit().getZ());
         double near = Math.max(0.0, 1.0 - d / r.reach());
-        return (int) Math.round((4.0 + 60.0 * r.progress()) * near * near * (0.5 + r.magnitude() / 24.0));
+        return (4.0 + 60.0 * r.progress()) * near * near * (0.5 + r.magnitude() / 24.0);
     }
 
     public static String summary() {

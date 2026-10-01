@@ -83,6 +83,9 @@
     "fts_geology:anemometer",
     "fts_geology:rain_gauge",
     "fts_geology:soil_probe",
-    "fts_geology:weather_terminal"
+    "fts_geology:weather_terminal",
+    "fts_geology:tiltmeter",
+    "fts_geology:gps_station",
+    "fts_geology:gas_meter"
   ]
 }

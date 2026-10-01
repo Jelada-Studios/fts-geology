@@ -33,7 +33,7 @@ import java.util.Locale;
 
 /**
  * One instrument of a weather station, each its own block: a barometer, an anemometer, a hygrometer, a rain gauge, a
- * thermometer and a soil probe. Right-click one to read it; a comparator beside it reads it too, as a signal from 0 to
+ * thermometer and a soil probe; or of a volcano observatory: a tiltmeter, a GPS station and a gas meter. Right-click one to read it; a comparator beside it reads it too, as a signal from 0 to
  * 15 over the instrument's range. Set round a station's terminal (see {@link WeatherTerminalBlock}), they are read and
  * kept by it. What each reads is {@link Meteorology}'s: an anemometer wants to stand clear and high, a rain gauge open to
  * the sky, a soil probe in the ground.
@@ -48,7 +48,11 @@ public class WeatherInstrumentBlock extends BaseEntityBlock {
         HYGROMETER(Block.box(4, 0, 4, 12, 12, 12)),
         RAIN_GAUGE(Block.box(4, 0, 4, 12, 14, 12)),
         THERMOMETER(Block.box(5, 0, 5, 11, 15, 11)),
-        SOIL_PROBE(Block.box(6, 0, 6, 10, 8, 10));
+        SOIL_PROBE(Block.box(6, 0, 6, 10, 8, 10)),
+        // A volcano observatory's: see Observatory.
+        TILTMETER(Block.box(4, 0, 4, 12, 6, 12)),
+        GPS(Block.box(5, 0, 5, 11, 15, 11)),
+        GAS_METER(Block.box(4, 0, 4, 12, 12, 12));
 
         final VoxelShape shape;
 
@@ -147,6 +151,7 @@ public class WeatherInstrumentBlock extends BaseEntityBlock {
                         Component.translatable("message.fts_geology.soil." + r.soil().name().toLowerCase(Locale.ROOT)),
                         String.format(Locale.ROOT, "%.1f", Math.max(0, r.depth())));
             }
+            case TILTMETER, GPS, GAS_METER -> com.jeladastudios.ftsgeology.instrument.Observatory.reading(level, pos, instrument);
         };
     }
 
@@ -181,6 +186,7 @@ public class WeatherInstrumentBlock extends BaseEntityBlock {
                 var r = com.jeladastudios.ftsgeology.hydrology.SoilWater.at(sl, pos.getX(), pos.getZ());
                 yield r == null ? 0 : r.rootAvailable();
             }
+            case TILTMETER, GPS, GAS_METER -> com.jeladastudios.ftsgeology.instrument.Observatory.signal(sl, pos, instrument);
         };
         return Mth.clamp((int) Math.round(f * 15), 0, 15);
     }

@@ -73,6 +73,8 @@ public final class Weathering {
 
     /** Ground must stand at least this far above its LOWEST neighbour before the crest sheds. */
     private static final int SCARP = 4;
+    /** The same for loose ground, and how many blocks one column may shed in a pass. */
+    private static final int LOOSE_SCARP = 3, SHED_MOST = 8;
 
     /** One rupture corridor relaxing. */
     private static final class Job {
@@ -97,6 +99,11 @@ public final class Weathering {
         long lastPassAt;
         /** Only a sweep for pieces of buildings left in the air ({@link #sweep}): the ground is not touched. */
         final boolean sweep;
+        /**
+         * The columns the quake itself moved, or null where not known (settling parked for a chunk and taken up again): a
+         * loose bank slumps to a slope only beside them, so the cliffs the land had of its own stay.
+         */
+        LongOpenHashSet quaked;
 
         /** Bounding box, so {@link #pendingNear} does not walk every column each tick. Generous, never early. */
         final int minX, maxX, minZ, maxZ;
@@ -194,7 +201,9 @@ public final class Weathering {
             }
         }
 
-        QUEUE.add(new Job(level.dimension(), seen.keySet().toLongArray(), seen));
+        Job job = new Job(level.dimension(), seen.keySet().toLongArray(), seen);
+        job.quaked = new LongOpenHashSet(base.keySet());
+        QUEUE.add(job);
         com.jeladastudios.ftsgeology.util.Diagnostics.info("weathering queued: {} columns ({} from {} edits, {} on the edge)",
                 seen.size(), base.size(), edits.size(), edge.size());
     }
@@ -940,17 +949,56 @@ public final class Weathering {
             dug(job, k, g);
             return true;
         }
-        if (g - lowest >= SCARP && foot != null) {
+        // Rock stands as a scarp. Soil, sand and gravel do not stand as a wall: a bank left by ground that rose beside
+        // ground that stayed slumps to a slope, block after block, until it is a step or two.
+        boolean shed = false;
+        boolean slump = loose(top) && beside(job.quaked, x, z);
+        for (int i = 0; i < (slump ? SHED_MOST : 1) && foot != null && g - lowest >= (slump ? LOOSE_SCARP : SCARP); i++) {
             // The crest sheds one block onto the foot: talus, not deletion.
             BlockState at = level.getBlockState(foot);
-            if (!at.isAir() && !TerrainProbe.isVegetation(at)) return false;
-            if (EruptionHandler.isPlayerPlaced(at)) return false;
+            if (!at.isAir() && !TerrainProbe.isVegetation(at)) break;
+            if (EruptionHandler.isPlayerPlaced(at)) break;
+            BlockPos over = crest.above();
+            // Grass and flowers on the crest come off with it, not left over the new edge.
+            if (TerrainProbe.isVegetation(level.getBlockState(over))) QuakeWrites.set(level, over, Blocks.AIR.defaultBlockState());
+            if (!at.isAir()) QuakeWrites.set(level, foot, Blocks.AIR.defaultBlockState());
             QuakeWrites.set(level, crest, Blocks.AIR.defaultBlockState());
             QuakeWrites.set(level, foot, top);
             dug(job, k, g);
-            return true;
+            shed = true;
+            if (!slump || !loose(top)) break;
+            // The next block down is the new crest; the foot, one higher, is looked for again round it.
+            g--;
+            crest = crest.below();
+            top = level.getBlockState(crest);
+            if (top.isAir() || !top.getFluidState().isEmpty() || top.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(top)) break;
+            lowest = Integer.MAX_VALUE;
+            foot = null;
+            for (Direction d : Direction.Plane.HORIZONTAL) {
+                int nx = x + d.getStepX(), nz = z + d.getStepZ();
+                int n = TerrainProbe.groundY(level, nx, nz);
+                if (n == Integer.MIN_VALUE) {
+                    foot = null;
+                    break;
+                }
+                if (n < lowest) { lowest = n; foot = new BlockPos(nx, n + 1, nz); }
+            }
         }
-        return false;
+        return shed;
+    }
+
+    /** Whether a column, or one beside it, is one the quake moved. */
+    private static boolean beside(LongOpenHashSet moved, int x, int z) {
+        if (moved == null) return false;
+        return moved.contains(key(x, z)) || moved.contains(key(x + 1, z)) || moved.contains(key(x - 1, z))
+                || moved.contains(key(x, z + 1)) || moved.contains(key(x, z - 1));
+    }
+
+    /** Ground that slumps rather than stands: soil of any kind, sand, gravel, snow, clay. */
+    private static boolean loose(BlockState s) {
+        return s.is(net.minecraft.tags.BlockTags.DIRT) || s.is(net.minecraft.tags.BlockTags.SAND)
+                || s.is(net.minecraftforge.common.Tags.Blocks.GRAVEL) || s.is(Blocks.CLAY) || s.is(Blocks.MUD)
+                || s.is(Blocks.SNOW_BLOCK) || s.is(com.jeladastudios.ftsgeology.hydrology.SoilBlocks.NATURAL_GROUND);
     }
 
     /** The ground at {@code y} went from this column: what stood on it is brought down by the next falling pass. */

@@ -73,7 +73,8 @@ public final class ModBlockEntities {
     public static final RegistryObject<BlockEntityType<com.jeladastudios.ftsgeology.blockentity.InstrumentBlockEntity>> INSTRUMENT =
             BLOCK_ENTITIES.register("weather_instrument", () -> BlockEntityType.Builder
                     .of(com.jeladastudios.ftsgeology.blockentity.InstrumentBlockEntity::new, ModBlocks.BAROMETER.get(), ModBlocks.ANEMOMETER.get(),
-                            ModBlocks.HYGROMETER.get(), ModBlocks.RAIN_GAUGE.get(), ModBlocks.THERMOMETER.get(), ModBlocks.SOIL_PROBE.get())
+                            ModBlocks.HYGROMETER.get(), ModBlocks.RAIN_GAUGE.get(), ModBlocks.THERMOMETER.get(), ModBlocks.SOIL_PROBE.get(),
+                            ModBlocks.TILTMETER.get(), ModBlocks.GPS_STATION.get(), ModBlocks.GAS_METER.get())
                     .build(null));
 
     public static final RegistryObject<BlockEntityType<com.jeladastudios.ftsgeology.blockentity.WeatherTerminalBlockEntity>> WEATHER_TERMINAL =

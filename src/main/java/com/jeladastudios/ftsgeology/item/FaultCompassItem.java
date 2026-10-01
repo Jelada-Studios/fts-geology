@@ -95,9 +95,34 @@ public class FaultCompassItem extends Item {
                 String.valueOf(Math.round(s.stress() * 100)),
                 Component.translatable(stressKey(s.stress()))).withStyle(ChatFormatting.WHITE));
 
+        // The fault's past, read off the layers it broke: only in a trench dug across it, where they show.
+        if (s.faultDistance() <= TRENCH_REACH) {
+            // The ground's top round the trench, its rim: an open trench's own floor is the top of its column.
+            int surface = Integer.MIN_VALUE;
+            for (int dx = -3; dx <= 3; dx += 3) {
+                for (int dz = -3; dz <= 3; dz += 3) {
+                    surface = Math.max(surface, server.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x + dx, z + dz));
+                }
+            }
+            if (player.getBlockY() <= surface - TRENCH_DEPTH) {
+                double[] c = com.jeladastudios.ftsgeology.quake.FaultClocks.cycle(server, x, z);
+                if (c != null) {
+                    player.sendSystemMessage(Component.translatable("message.fts_geology.compass.cycle",
+                            String.format(Locale.ROOT, "%.1f", c[0]), String.format(Locale.ROOT, "%.1f", c[1]),
+                            String.valueOf(Math.round(100 * c[0] / c[1]))).withStyle(c[0] >= c[1] ? ChatFormatting.RED : ChatFormatting.AQUA));
+                }
+            } else {
+                player.sendSystemMessage(Component.translatable("message.fts_geology.compass.trench", TRENCH_DEPTH, TRENCH_REACH)
+                        .withStyle(ChatFormatting.GRAY));
+            }
+        }
+
         ping(server, player, 1.0f + (float) s.stress());
         return InteractionResultHolder.consume(stack);
     }
+
+    /** How close to the line, and how deep under the ground's top, a trench reads the fault's past quakes. */
+    private static final int TRENCH_REACH = 16, TRENCH_DEPTH = 3;
 
     /** A needle settling. Pitch rises with how live the ground is, so the tool has a feel to it. */
     private static void ping(ServerLevel level, Player player, float pitch) {

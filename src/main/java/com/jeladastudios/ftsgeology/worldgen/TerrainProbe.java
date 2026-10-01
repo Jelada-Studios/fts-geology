@@ -45,7 +45,20 @@ public final class TerrainProbe {
                 || s.is(Blocks.SUGAR_CANE) || s.is(Blocks.BAMBOO) || s.is(Blocks.CACTUS)
                 || s.is(Blocks.SWEET_BERRY_BUSH) || s.is(Blocks.LILY_PAD)
                 || s.is(Blocks.SEAGRASS) || s.is(Blocks.TALL_SEAGRASS) || s.is(Blocks.KELP)
-                || s.is(Blocks.KELP_PLANT);
+                || s.is(Blocks.KELP_PLANT)
+                || modPlant(s);
+    }
+
+    /**
+     * Another mod's plant, which no vanilla tag names: its wild crops, herbs and flowers are built on the game's own
+     * plant block, and a plant is still a plant without the tag. Taken for a build, it stopped a quake moving the ground
+     * under it the way it moves cover -- the ground went up round it and it was buried, or copied up with the surface.
+     */
+    private static boolean modPlant(BlockState s) {
+        net.minecraft.world.level.block.Block b = s.getBlock();
+        return b instanceof net.minecraft.world.level.block.BushBlock
+                || b instanceof net.minecraft.world.level.block.VineBlock
+                || b instanceof net.minecraft.world.level.block.GrowingPlantBlock;
     }
 
     /**

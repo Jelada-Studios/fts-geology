@@ -103,8 +103,25 @@ public class SeismographBlock extends BaseEntityBlock {
             level.playSound(null, pos, net.minecraft.sounds.SoundEvents.BOOK_PAGE_TURN, net.minecraft.sounds.SoundSource.BLOCKS, 1.0f, 1.0f);
             return InteractionResult.CONSUME;
         }
-        List<Component> lines = be.report(level.getGameTime());
-        for (Component c : lines) player.sendSystemMessage(c);
+        // An empty map: the drum's last minute printed on it.
+        if (held.is(net.minecraft.world.item.Items.MAP)) {
+            if (!player.getAbilities().instabuild) held.shrink(1);
+            net.minecraft.world.item.ItemStack print = be.traceMap((net.minecraft.server.level.ServerLevel) level);
+            if (!player.getInventory().add(print)) player.drop(print, false);
+            level.playSound(null, pos, net.minecraft.sounds.SoundEvents.UI_CARTOGRAPHY_TABLE_TAKE_RESULT, net.minecraft.sounds.SoundSource.BLOCKS, 1.0f, 1.0f);
+            return InteractionResult.CONSUME;
+        }
+        // Sneaking, the log is read out into chat as it always was; otherwise the drum's own screen opens.
+        if (player.isShiftKeyDown()) {
+            List<Component> lines = be.report(level.getGameTime());
+            for (Component c : lines) player.sendSystemMessage(c);
+            return InteractionResult.CONSUME;
+        }
+        if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
+            com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
+                    net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> sp),
+                    new com.jeladastudios.ftsgeology.network.TerminalPacket(pos, be.data((net.minecraft.server.level.ServerLevel) level), true));
+        }
         return InteractionResult.CONSUME;
     }
 

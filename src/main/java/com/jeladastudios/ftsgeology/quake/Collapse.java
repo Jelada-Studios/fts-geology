@@ -174,9 +174,13 @@ public final class Collapse {
         TOUCHED.computeIfAbsent(level.dimension(), k -> new it.unimi.dsi.fastutil.longs.LongOpenHashSet())
                 .add(Weathering.column(p.getX(), p.getZ()));
         boolean full = s.isCollisionShapeFullBlock(level, p);
+        // What a player built comes back to them as items where it cannot come down as a block; what the world built,
+        // a village's walls and roofs, is rubble. Every block of a wrecked village left lying as an item was thousands
+        // of them over the ground, and taken for blocks copied.
+        boolean own = PlayerBuilt.inChunk(level, p.getX() >> 4, p.getZ() >> 4).contains(p.asLong());
         if (s.hasBlockEntity() || !full || shownThisTick >= SHOWN_PER_TICK || shownThisEvent >= SHOWN) {
             // Contents spill, ornaments drop, and past what can be shown falling the block breaks where it is.
-            level.destroyBlock(p, true);
+            level.destroyBlock(p, own || s.hasBlockEntity());
             BROKE.increment();
             return;
         }
@@ -185,7 +189,7 @@ public final class Collapse {
         FallingBlockEntity f = FallingBlockEntity.fall(level, p, s);
         f.setDeltaMovement(new Vec3(pushX * 0.3, 0.05, pushZ * 0.3));
         f.setHurtsEntities(2.0f, 20);
-        f.dropItem = true;
+        f.dropItem = own;
         f.hurtMarked = true;
         if (level.random.nextInt(6) == 0) {
             level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, s), p.getX() + 0.5, p.getY() + 0.5,

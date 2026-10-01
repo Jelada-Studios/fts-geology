@@ -158,6 +158,9 @@ public class GeysersMod {
             event.accept(ModItems.RAIN_GAUGE.get());
             event.accept(ModItems.THERMOMETER.get());
             event.accept(ModItems.SOIL_PROBE.get());
+            event.accept(ModItems.TILTMETER.get());
+            event.accept(ModItems.GPS_STATION.get());
+            event.accept(ModItems.GAS_METER.get());
             event.accept(ModItems.GEOTHERMAL_TURBINE.get());
             event.accept(ModItems.WELL_PUMP.get());
             event.accept(ModItems.WELL_CASING.get());

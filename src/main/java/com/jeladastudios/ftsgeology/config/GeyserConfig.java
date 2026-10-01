@@ -153,6 +153,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue CAVE_COLLAPSE_DEPTH;           // how deep a probe looks
     public static final ForgeConfigSpec.IntValue QUAKE_BLOCKS_PER_TICK;    // main-thread apply budget
     public static final ForgeConfigSpec.IntValue QUAKE_WARNING_TICKS;      // alert window before the ground moves
+    public static final ForgeConfigSpec.BooleanValue QUAKE_CHAT;           // quake alerts in chat, not over the hotbar
     public static final ForgeConfigSpec.IntValue QUAKE_FELT_RANGE;         // farthest a quake's shaking is felt
     public static final ForgeConfigSpec.IntValue QUAKE_DAMAGE_RANGE;       // farthest the shaking loosens builds
     public static final ForgeConfigSpec.BooleanValue QUAKE_AFTERSHOCKS;
@@ -235,6 +236,7 @@ public final class GeyserConfig {
 
     // --- Instruments ---------------------------------------------------------
     public static final ForgeConfigSpec.IntValue SEISMOGRAPH_RANGE;   // blocks a station can hear
+    public static final ForgeConfigSpec.DoubleValue SEISMOGRAPH_SIREN; // magnitude from which a station wails, not chimes
     public static final ForgeConfigSpec.IntValue TURBINE_MAX_FE;      // FE/t of a turbine over the hottest ground
     public static final ForgeConfigSpec.IntValue TURBINE_MIN_FE;      // FE/t over the faintest heat it runs on
     public static final ForgeConfigSpec.IntValue TURBINE_WELL_DEPTH;  // lengths of casing a well may run to
@@ -849,6 +851,12 @@ public final class GeyserConfig {
                         "20 = 1 second; 200 is ten seconds. Set 0 for no warning: the ground moves at",
                         "once and the siren and the shaking coincide.")
                 .defineInRange("quakeWarningTicks", 200, 0, 1200);
+        QUAKE_CHAT = b
+                .comment("Where a quake is told to the players who feel it. Off: a few seconds over the hotbar -- the",
+                        "alert, the P wave's countdown to the strong shaking, and how hard it shook here -- and nothing",
+                        "in chat. On: the alert also goes to chat, as it used to. A seismograph's own report is chat",
+                        "either way.")
+                .define("quakeMessagesInChat", false);
         QUAKE_FELT_RANGE = b
                 .comment("The farthest from the rupture, in blocks, a quake's shaking is felt. Each player feels",
                         "it as strongly as their distance allows: a quick jolt and a rumble as the P wave arrives,",
@@ -1067,6 +1075,10 @@ public final class GeyserConfig {
                         "100 km at the default horizontal scale, comfortably wider than anywhere a",
                         "player is likely to have built a second station.")
                 .defineInRange("seismographRange", 4000, 64, 100000);
+        SEISMOGRAPH_SIREN = b
+                .comment("The magnitude, as a station reads it, from which it sounds its siren. Smaller quakes it",
+                        "records with a short chime of notes. 11 never wails.")
+                .defineInRange("seismographSirenMagnitude", 6.0, 0.0, 11.0);
         TURBINE_MAX_FE = b
                 .comment("Forge Energy per tick a geothermal turbine makes when its well reaches the hottest",
                         "ground: a hot spring's or geyser's deep chamber with its magma bed. A short well to a",

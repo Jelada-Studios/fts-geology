@@ -271,7 +271,7 @@ public final class ModItems {
             () -> new DescribedBlockItem(ModBlocks.WELL_CASING.get(), new Item.Properties(), 2));
 
     public static final RegistryObject<Item> SEISMOGRAPH = ITEMS.register("seismograph",
-            () -> new BlockItem(ModBlocks.SEISMOGRAPH.get(), new Item.Properties()));
+            () -> new DescribedBlockItem(ModBlocks.SEISMOGRAPH.get(), new Item.Properties(), 3));
 
     // A weather station: each instrument says in its tooltip what it reads and where it wants to stand.
     public static final RegistryObject<Item> BAROMETER = described("barometer", ModBlocks.BAROMETER, 2);
@@ -280,6 +280,9 @@ public final class ModItems {
     public static final RegistryObject<Item> RAIN_GAUGE = described("rain_gauge", ModBlocks.RAIN_GAUGE, 2);
     public static final RegistryObject<Item> THERMOMETER = described("thermometer", ModBlocks.THERMOMETER, 2);
     public static final RegistryObject<Item> SOIL_PROBE = described("soil_probe", ModBlocks.SOIL_PROBE, 2);
+    public static final RegistryObject<Item> TILTMETER = described("tiltmeter", ModBlocks.TILTMETER, 2);
+    public static final RegistryObject<Item> GPS_STATION = described("gps_station", ModBlocks.GPS_STATION, 2);
+    public static final RegistryObject<Item> GAS_METER = described("gas_meter", ModBlocks.GAS_METER, 2);
     public static final RegistryObject<Item> WEATHER_TERMINAL = described("weather_terminal", ModBlocks.WEATHER_TERMINAL, 3);
 
     private static RegistryObject<Item> described(String name, RegistryObject<net.minecraft.world.level.block.Block> block, int lines) {

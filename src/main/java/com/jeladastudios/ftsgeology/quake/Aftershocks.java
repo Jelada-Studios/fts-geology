@@ -110,11 +110,26 @@ public final class Aftershocks {
      * Gutenberg-Richter up to half a magnitude under the main shock, with one near Båth's size among the first third.
      */
     public static void afterMain(ServerLevel level, List<QuakePlanner.TracePoint> trace, FaultType type, double magnitude) {
+        afterMain(level, trace, type, magnitude, false);
+    }
+
+    /** An aftershock this large has a few of its own. */
+    public static final double BREEDS = 6.0;
+    /** How many a large aftershock has at most. */
+    private static final int BRED_MOST = 3;
+
+    /**
+     * The same for an aftershock large enough to have its own ({@code secondary}): fewer, and only from its own size
+     * down, so a sequence dies away instead of feeding itself.
+     */
+    public static void afterMain(ServerLevel level, List<QuakePlanner.TracePoint> trace, FaultType type, double magnitude,
+                                 boolean secondary) {
         if (!GeyserConfig.QUAKE_AFTERSHOCKS.get() || magnitude < MAIN_MIN || trace.isEmpty()) return;
         double smallest = Math.max(SMALLEST, magnitude - NOTABLE);
         double largest = magnitude - 0.5;
         int n = (int) Math.round(Math.pow(10.0, magnitude - BATH - smallest) * GeyserConfig.AFTERSHOCK_RATE.get());
         n = Mth.clamp(n, 1, GeyserConfig.AFTERSHOCK_MAX.get());
+        if (secondary) n = Mth.clamp(n / 2, 1, BRED_MOST);
         double span = GeyserConfig.AFTERSHOCK_DAYS.get() * 24000.0;
         RandomSource rng = level.random;
         long now = level.getGameTime();
@@ -136,8 +151,8 @@ public final class Aftershocks {
             schedule.add(new Shock(now + GeyserConfig.QUAKE_WARNING_TICKS.get() + 100 + times.get(i), x, z, m, type,
                     t.strikeX(), t.strikeZ(), false));
         }
-        com.jeladastudios.ftsgeology.util.Diagnostics.info("aftershocks: {} scheduled over {} days after an M{}, M{} to M{}",
-                n, GeyserConfig.AFTERSHOCK_DAYS.get(), String.format(java.util.Locale.ROOT, "%.1f", magnitude),
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("aftershocks: {}{} scheduled over {} days after an M{}, M{} to M{}",
+                n, secondary ? " of its own" : "", GeyserConfig.AFTERSHOCK_DAYS.get(), String.format(java.util.Locale.ROOT, "%.1f", magnitude),
                 String.format(java.util.Locale.ROOT, "%.1f", smallest), String.format(java.util.Locale.ROOT, "%.1f", largest));
     }
 

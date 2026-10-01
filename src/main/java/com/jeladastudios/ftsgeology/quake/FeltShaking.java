@@ -129,6 +129,8 @@ public final class FeltShaking {
         final double magnitude, depthMetres, range;
         final long startAt, endAt;
         final Map<UUID, Felt> felt = new HashMap<>();
+        /** Who the network's early warning has reached, for the log. */
+        final java.util.Set<UUID> warned = new java.util.HashSet<>();
 
         Quake(ResourceKey<Level> dimension, BlockPos epicentre, List<QuakePlanner.TracePoint> trace, double magnitude,
               double depthMetres, long startAt) {
@@ -189,12 +191,35 @@ public final class FeltShaking {
         QuakePlanner.TracePoint at = nearest(q.trace, p.getX(), p.getZ(), d);
         if (at == null || d[0] > q.range) return;
         double intensity = intensity(q.magnitude, d[0]);
+        // Felt harder on soft ground and where the rupture ran toward (see SiteResponse); only where it is felt at all.
+        if (intensity >= FELT - 1.2) {
+            intensity += SiteResponse.ground(level, p.getBlockX(), p.getBlockZ()) + SiteResponse.directivity(q.epicentre, at, q.trace);
+        }
         if (intensity < FELT) return;
         long sent = q.startAt + ruptureDelay(q.epicentre, at);
         long pAt = sent + travelTicks(d[0], q.depthMetres, SeismicWave.VP);
         long sAt = sent + travelTicks(d[0], q.depthMetres, SeismicWave.VS);
         int lasts = durationTicks(q.magnitude, d[0]);
-        if (now < pAt || now > sAt + lasts) return;
+        if (now < pAt) {
+            // Before the waves are here: the seismograph network's early warning, once two of its stations have caught
+            // the P wave, to whoever is near enough one of them and will be shaken hard.
+            if (now % 20 == 0 && intensity >= 4.0
+                    && now >= com.jeladastudios.ftsgeology.instrument.SeismicStations.detects(q.dimension, q.epicentre.getX(),
+                            q.epicentre.getZ(), q.depthMetres, q.startAt, GeyserConfig.SEISMOGRAPH_RANGE.get())
+                    && com.jeladastudios.ftsgeology.instrument.SeismicStations.covers(q.dimension, p.getX(), p.getZ())) {
+                int mmi = mercalli(intensity);
+                p.displayClientMessage(Component.translatable("message.fts_geology.early_warning",
+                                String.format(java.util.Locale.ROOT, "%.1f", q.magnitude),
+                                Component.translatable("message.fts_geology.mercalli." + mmi), roman(mmi), (int) ((sAt - now + 19) / 20))
+                        .withStyle(mmi >= 7 ? ChatFormatting.RED : ChatFormatting.GOLD), true);
+                if (q.warned.add(p.getUUID())) {
+                    com.jeladastudios.ftsgeology.util.Diagnostics.info("early warning: {} warned {} s before the S wave, {} s before the P wave",
+                            p.getName().getString(), (sAt - now) / 20, (pAt - now) / 20);
+                }
+            }
+            return;
+        }
+        if (now > sAt + lasts) return;
 
         Felt f = q.felt.computeIfAbsent(p.getUUID(), u -> new Felt());
         // The view: a small, quick jolt for the P wave, then the slow heavy swaying of the S wave, dying away.
@@ -206,15 +231,22 @@ public final class FeltShaking {
             // The P wave: a sharp jolt and a boom, and, far enough out to be worth it, the warning it is.
             p.playNotifySound(net.minecraft.sounds.SoundEvents.GENERIC_EXPLODE, net.minecraft.sounds.SoundSource.BLOCKS,
                     (float) Mth.clamp((intensity - 2.0) / 6.0, 0.2, 0.8), 0.45f);
-            int warn = (int) ((sAt - now) / 20);
-            if (warn >= 1 && intensity >= 4.0) {
-                p.displayClientMessage(Component.translatable("message.fts_geology.p_wave", warn)
-                        .withStyle(ChatFormatting.GOLD), true);
-            }
             com.jeladastudios.ftsgeology.util.Diagnostics.info(
                     "felt: {} {} blocks from the rupture, intensity {}, P at +{} ticks, S at +{}, shaking {} ticks",
                     p.getName().getString(), Math.round(d[0]), String.format(java.util.Locale.ROOT, "%.2f", intensity),
                     pAt - q.startAt, sAt - q.startAt, lasts);
+        }
+        // Between the waves, over the hotbar, once a second: the countdown to the strong shaking and how strong it will be,
+        // as an early warning system says it. Only where it will be strong enough to matter.
+        if (!s && intensity >= 4.0 && (now - pAt) % 20 == 0) {
+            int warn = (int) ((sAt - now + 19) / 20);
+            int mmi = mercalli(intensity);
+            if (warn >= 1) {
+                p.displayClientMessage(Component.translatable("message.fts_geology.p_wave_count",
+                                String.format(java.util.Locale.ROOT, "%.1f", q.magnitude),
+                                Component.translatable("message.fts_geology.mercalli." + mmi), roman(mmi), warn)
+                        .withStyle(mmi >= 7 ? ChatFormatting.RED : ChatFormatting.GOLD), true);
+            }
         }
         // The rumble starts with the P wave, starts again, louder, as the S wave arrives, and runs until the end.
         boolean sArrives = now == sAt;

@@ -467,6 +467,9 @@ public final class ModBlocks {
     public static final RegistryObject<Block> RAIN_GAUGE = instrument("rain_gauge", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.RAIN_GAUGE, Blocks.COPPER_BLOCK, MapColor.COLOR_ORANGE);
     public static final RegistryObject<Block> THERMOMETER = instrument("thermometer", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.THERMOMETER, Blocks.BIRCH_PLANKS, MapColor.SAND);
     public static final RegistryObject<Block> SOIL_PROBE = instrument("soil_probe", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.SOIL_PROBE, Blocks.IRON_BARS, MapColor.METAL);
+    public static final RegistryObject<Block> TILTMETER = instrument("tiltmeter", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.TILTMETER, Blocks.POLISHED_ANDESITE, MapColor.STONE);
+    public static final RegistryObject<Block> GPS_STATION = instrument("gps_station", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.GPS, Blocks.IRON_BARS, MapColor.METAL);
+    public static final RegistryObject<Block> GAS_METER = instrument("gas_meter", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.GAS_METER, Blocks.COPPER_BLOCK, MapColor.COLOR_CYAN);
 
     /** A weather station's terminal: the instruments round it read, kept, and turned into a forecast. */
     public static final RegistryObject<Block> WEATHER_TERMINAL = BLOCKS.register("weather_terminal",

@@ -147,6 +147,14 @@ public final class Structural {
     private static void column(ServerLevel level, LevelChunk chunk, int x, int z, int ground, double left, double intensity,
                                LongSet placed, List<BoundingBox> pieces, LongSet failing, BlockPos.MutableBlockPos m,
                                long from, int spread) {
+        // What was done under and into the building: a deep footing, an isolating course, bracing. It shakes the
+        // building as if the quake were that much weaker.
+        double work = groundwork(level, chunk, x, z, ground, placed, pieces, m);
+        if (work != 0) {
+            intensity += work;
+            left = left(intensity);
+            if (intensity < LOOSE_ONSET) return;
+        }
         // The column's built blocks, bottom up, to the sky.
         int top = ground, air = 0;
         for (int y = ground + 1; y <= ground + HEIGHT && air < SKY && y < level.getMaxBuildHeight(); y++) {
@@ -231,6 +239,69 @@ public final class Structural {
                 TOPPLED.increment();
             }
         }
+    }
+
+    /** Strong blocks of a footing, and the most of them that count. */
+    private static final int FOOTING_MOST = 8;
+    /** Intensity taken off per block of footing, for a footing down to rock, for an isolating course, per brace. */
+    private static final double PER_FOOTING = 0.15, ON_ROCK = 0.5, ISOLATED = 1.0, PER_BRACE = 0.3, BRACES_MOST = 1.0;
+
+    /**
+     * How much less hard a building's column is shaken for the work done in its ground, in units of intensity (negative):
+     * <ul>
+     *   <li><b>A footing</b>: the strong blocks (stone, brick, concrete) at the bottom of the column that stand in the
+     *   ground, the ground on all four sides of them -- the deeper the better, and better again where it reaches rock.</li>
+     *   <li><b>An isolating course</b>: slime or honey under the walls, which give and spring back and let the ground move
+     *   under the building without shaking it as hard, as a modern building's rubber bearings do.</li>
+     *   <li><b>Bracing</b>: iron bars and chains in the column, tying it across.</li>
+     * </ul>
+     * A building on loose fill gets nothing from the ground; that it shakes the harder there is the ground's (see
+     * {@link SiteResponse}).
+     */
+    static double groundwork(ServerLevel level, LevelChunk chunk, int x, int z, int ground, LongSet placed,
+                             List<BoundingBox> pieces, BlockPos.MutableBlockPos m) {
+        double work = 0;
+        int footing = 0, y = ground + 1;
+        for (; y <= ground + FOOTING_MOST * 2; y++) {
+            BlockState s = chunk.getBlockState(m.set(x, y, z));
+            if (s.isAir() || !Collapse.built(level, s, m, placed, pieces) || standsTo(s) < 8.0 || !buried(level, x, y, z, placed, pieces)) break;
+            footing++;
+        }
+        if (footing > 0) {
+            work -= PER_FOOTING * Math.min(footing, FOOTING_MOST);
+            BlockState under = chunk.getBlockState(m.set(x, ground, z));
+            if (under.is(BlockTags.BASE_STONE_OVERWORLD) || under.is(Tags.Blocks.STONE)) work -= ON_ROCK;
+        }
+        // The course: slime or honey among the lowest few blocks over the footing.
+        for (int k = y; k <= y + 2; k++) {
+            BlockState s = chunk.getBlockState(m.set(x, k, z));
+            if (s.is(Blocks.SLIME_BLOCK) || s.is(Blocks.HONEY_BLOCK)) {
+                work -= ISOLATED;
+                break;
+            }
+        }
+        int braces = 0;
+        for (int k = y; k <= y + HEIGHT && k < level.getMaxBuildHeight(); k++) {
+            BlockState s = chunk.getBlockState(m.set(x, k, z));
+            if (s.is(Blocks.IRON_BARS) || s.is(Blocks.CHAIN)) braces++;
+            if (s.isAir() && k > y + 8) break;
+        }
+        work -= Math.min(BRACES_MOST, PER_BRACE * braces);
+        return work;
+    }
+
+    /** Whether a built block stands in the ground: natural ground on all four sides of it. */
+    private static boolean buried(ServerLevel level, int x, int y, int z, LongSet placed, List<BoundingBox> pieces) {
+        BlockPos.MutableBlockPos n = new BlockPos.MutableBlockPos();
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            n.set(x + d.getStepX(), y, z + d.getStepZ());
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, n)) return false;
+            BlockState s = level.getBlockState(n);
+            // A neighbour of the footing itself counts: a slab of footing is buried at its edges only.
+            if (s.isAir() || !s.getFluidState().isEmpty()) return false;
+            if (Collapse.built(level, s, n, placed, pieces) && standsTo(s) < 8.0) return false;
+        }
+        return true;
     }
 
     /** Whether a supported block of the same floor lies within {@code reach} along the building from this one. */

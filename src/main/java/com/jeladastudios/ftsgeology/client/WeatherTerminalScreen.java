@@ -431,6 +431,7 @@ public class WeatherTerminalScreen extends Screen {
             case ANEMOMETER -> WIND;
             case RAIN_GAUGE -> RAIN;
             case SOIL_PROBE -> GOOD;
+            case TILTMETER, GPS, GAS_METER -> DIM;
         };
     }
 

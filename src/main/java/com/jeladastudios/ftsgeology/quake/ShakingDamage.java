@@ -96,7 +96,7 @@ public final class ShakingDamage {
     private static final double TREE = 0.8;
     private static final int CROWN = 40;
 
-    private static final LongAdder KNOCKED = new LongAdder(), SHATTERED = new LongAdder(), CHUNKS = new LongAdder(),
+    private static final LongAdder KNOCKED = new LongAdder(), SHATTERED = new LongAdder(), CHUNKS = new LongAdder(), FLED = new LongAdder(),
             OF_STRUCTURES = new LongAdder(), ORNAMENTS = new LongAdder(), TREES = new LongAdder();
 
     /** A block shaken loose, to come off at its moment if it is still what was there. */
@@ -239,9 +239,33 @@ public final class ShakingDamage {
         if (side == null) return;                    // closed in since it was shaken loose
         level.levelEvent(2001, pos, Block.getId(state));   // the crack and dust of it coming away
         level.setBlock(pos, state.getFluidState().createLegacyBlock(), Block.UPDATE_ALL);
-        FallingBlockEntity.fall(level, pos.relative(side), state);
+        FallingBlockEntity knocked = FallingBlockEntity.fall(level, pos.relative(side), state);
+        // A player's block that cannot land comes back as an item; a village's is lost in the rubble.
+        knocked.dropItem = PlayerBuilt.inChunk(level, pos.getX() >> 4, pos.getZ() >> 4).contains(pos.asLong());
         Collapse.touched(level, pos);
         KNOCKED.increment();
+    }
+
+    /** The shaking from which animals and villagers in a chunk bolt. */
+    private static final double FLEE = 4.5;
+
+    /**
+     * Animals and villagers bolt as the ground starts to move, away from where it broke: herds scattering and dogs
+     * running are among the first things noticed in a strong quake. A dozen or so blocks, at a run.
+     */
+    private static void flee(ServerLevel level, LevelChunk chunk, BlockPos from) {
+        ChunkPos cp = chunk.getPos();
+        net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(cp.getMinBlockX(), level.getMinBuildHeight(), cp.getMinBlockZ(),
+                cp.getMaxBlockX() + 1, level.getMaxBuildHeight(), cp.getMaxBlockZ() + 1);
+        for (net.minecraft.world.entity.PathfinderMob mob : level.getEntitiesOfClass(net.minecraft.world.entity.PathfinderMob.class, box,
+                m -> m instanceof net.minecraft.world.entity.animal.Animal || m instanceof net.minecraft.world.entity.npc.AbstractVillager)) {
+            double dx = mob.getX() - from.getX(), dz = mob.getZ() - from.getZ(), d = Math.max(1.0, Math.hypot(dx, dz));
+            double run = 10 + level.random.nextInt(8);
+            double tx = mob.getX() + dx / d * run + (level.random.nextDouble() - 0.5) * 6;
+            double tz = mob.getZ() + dz / d * run + (level.random.nextDouble() - 0.5) * 6;
+            mob.getNavigation().moveTo(tx, mob.getY(), tz, 1.6);
+            FLED.increment();
+        }
     }
 
     private static void shake(ServerLevel level, Job job, ChunkPos cp, long now) {
@@ -251,10 +275,18 @@ public final class ShakingDamage {
         double[] far = new double[1];
         QuakePlanner.TracePoint at = FeltShaking.nearest(job.trace, cp.getMiddleBlockX(), cp.getMiddleBlockZ(), far);
         double d = far[0];
-        double intensity = job.magnitude - 2.0 * Math.log10(1.0 + d / FALLOFF);
+        // Soft ground shakes harder than rock, and the ground the rupture ran toward harder than where it began.
+        double intensity = job.magnitude - 2.0 * Math.log10(1.0 + d / FALLOFF)
+                + SiteResponse.ground(level, cp.getMiddleBlockX(), cp.getMiddleBlockZ())
+                + SiteResponse.directivity(job.epicentre, at, job.trace);
         job.delay = (int) Math.max(0L, job.startAt - now) + FeltShaking.ruptureDelay(job.epicentre, at)
                 + FeltShaking.travelTicks(d, job.depthMetres, com.jeladastudios.ftsgeology.instrument.SeismicWave.VS);
         job.spread = Math.max(20, FeltShaking.durationTicks(job.magnitude, d));
+        if (intensity >= FLEE) flee(level, chunk, job.epicentre);
+        // A geyser's plumbing shifts in the shaking (see GeyserCoreBlockEntity#shaken).
+        for (net.minecraft.world.level.block.entity.BlockEntity be : chunk.getBlockEntities().values()) {
+            if (be instanceof com.jeladastudios.ftsgeology.blockentity.GeyserCoreBlockEntity geyser) geyser.shaken(level, intensity);
+        }
         double shaking = BASE * GeyserConfig.SHAKING_DAMAGE.get() * Math.pow(10.0, PER_INTENSITY * (intensity - 5.0));
         if (shaking < 1.0e-4) return;
 
@@ -275,6 +307,7 @@ public final class ShakingDamage {
             if (i >= 0 && i < placedIn.length) placedIn[i] = true;
         }
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap groundwork = new it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap();
         LevelChunkSection[] sections = chunk.getSections();
         for (int i = 0; i < sections.length; i++) {
             LevelChunkSection section = sections[i];
@@ -318,6 +351,14 @@ public final class ShakingDamage {
                         boolean made = !byHand && inBox && inside(built, x, y, z) && !ground(s);
                         if (!(byHand || made) || openSide(level, chunk, m) == null) continue;
                         if (s.is(BlockTags.LOGS) && trunk(level, m)) continue;
+                        // The work in its ground spares it as the building's own column is spared (Structural#groundwork).
+                        long col = BlockPos.asLong(x, 0, z);
+                        double work = groundwork.computeIfAbsent(col, k -> {
+                            int[] g = QuakePlanner.naturalGround(chunk, x, z, placed, built, new BlockPos.MutableBlockPos());
+                            return g == null ? 0.0 : Structural.groundwork(level, chunk, x, z, g[0], placed, built, new BlockPos.MutableBlockPos());
+                        });
+                        if (work < 0 && level.random.nextDouble() >= Math.pow(10.0, PER_INTENSITY * work)) continue;
+                        m.set(x, y, z);
                         if (made) OF_STRUCTURES.increment();
                         if (job.loosened++ >= MOST) return;
                         DUE.add(new Loose(level.dimension(), m.immutable(), s, now + job.delay + level.random.nextInt(job.spread)));
@@ -551,8 +592,8 @@ public final class ShakingDamage {
     }
 
     public static String summary() {
-        return String.format(java.util.Locale.ROOT, "shaking: %d chunks gone through, %d blocks shaken off, %d panes broken, %d ornaments down, %d loosened in a structure, %d trees felled",
-                CHUNKS.sum(), KNOCKED.sum(), SHATTERED.sum(), ORNAMENTS.sum(), OF_STRUCTURES.sum(), TREES.sum());
+        return String.format(java.util.Locale.ROOT, "shaking: %d chunks gone through, %d blocks shaken off, %d panes broken, %d ornaments down, %d loosened in a structure, %d trees felled, %d animals bolted",
+                CHUNKS.sum(), KNOCKED.sum(), SHATTERED.sum(), ORNAMENTS.sum(), OF_STRUCTURES.sum(), TREES.sum(), FLED.sum());
     }
 
     public static void clear() {

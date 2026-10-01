@@ -173,7 +173,12 @@ public class GeologyMapItem extends Item {
                 case DIVERGENT -> MapColor.COLOR_CYAN;
                 default -> MapColor.COLOR_MAGENTA;
             };
-            return line.getPackedId(MapColor.Brightness.HIGH);
+            // The seismic gaps: a stretch that broke lately is drawn dark, one most of the way through its cycle as it
+            // was, and one overdue -- quiet for longer than it usually holds -- bright.
+            double[] c = com.jeladastudios.ftsgeology.quake.FaultClocks.cycle(level, x, z);
+            MapColor.Brightness b = c == null || c[0] >= c[1] ? MapColor.Brightness.HIGH
+                    : c[0] < 0.35 * c[1] ? MapColor.Brightness.LOW : MapColor.Brightness.NORMAL;
+            return line.getPackedId(b);
         }
         int top = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos(x, top, z);

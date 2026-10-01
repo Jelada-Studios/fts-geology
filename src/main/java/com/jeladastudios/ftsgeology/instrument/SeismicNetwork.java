@@ -37,7 +37,7 @@ public final class SeismicNetwork {
      * A station never sees this record - it only ever sees what its own drum drew.
      */
     public record Event(long id, ResourceKey<Level> dimension, BlockPos hypocentre,
-                        FaultType type, double magnitude, double depthMetres, long gameTime, boolean volcanic) {}
+                        FaultType type, double magnitude, double depthMetres, long gameTime, boolean volcanic, boolean blast) {}
 
     private static final List<Event> LOG = new ArrayList<>();
     private static long nextId = 1L;
@@ -46,7 +46,7 @@ public final class SeismicNetwork {
     public static synchronized void record(ServerLevel level, BlockPos at, FaultType type,
                                            double magnitude, double depthMetres) {
         LOG.add(new Event(nextId++, level.dimension(), at.immutable(), type, magnitude,
-                depthMetres, level.getGameTime(), false));
+                depthMetres, level.getGameTime(), false, false));
         while (LOG.size() > HISTORY) LOG.remove(0);
     }
 
@@ -57,7 +57,17 @@ public final class SeismicNetwork {
     public static synchronized void recordVolcanic(ServerLevel level, BlockPos at, double magnitude,
                                                    double depthMetres) {
         LOG.add(new Event(nextId++, level.dimension(), at.immutable(), FaultType.INTERIOR, magnitude,
-                depthMetres, level.getGameTime(), true));
+                depthMetres, level.getGameTime(), true, false));
+        while (LOG.size() > HISTORY) LOG.remove(0);
+    }
+
+    /**
+     * Files an explosion: the ground takes the shock as it takes a quake's, and a station near enough draws it, sharp and
+     * short, all P and no S to speak of. Kept apart from the quakes, as a real catalogue keeps its quarry blasts.
+     */
+    public static synchronized void recordBlast(ServerLevel level, BlockPos at, double magnitude) {
+        LOG.add(new Event(nextId++, level.dimension(), at.immutable(), FaultType.INTERIOR, magnitude, 0.0,
+                level.getGameTime(), false, true));
         while (LOG.size() > HISTORY) LOG.remove(0);
     }
 

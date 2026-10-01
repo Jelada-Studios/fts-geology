@@ -68,7 +68,7 @@ public final class FaultClocks {
     private static final Map<ResourceKey<Level>, LongOpenHashSet> QUEUED = new HashMap<>();
     private static final Segment NONE = new Segment(0, 0, FaultType.INTERIOR, 0, 0, 0);
     private static int timer;
-    private static long rolled, broke, felt, filed;
+    private static long rolled, broke, felt, filed, loaded;
 
     /** The clocks and the stations of one dimension, kept with the world. */
     static final class Clocks extends SavedData {
@@ -108,12 +108,38 @@ public final class FaultClocks {
         c.setDirty();
     }
 
+    /**
+     * Where the stretch of boundary at a place is in its cycle: {game days since it last broke, its mean days between
+     * breaks}, or null where no boundary runs through the place's cell. What a trench across a fault reads from its
+     * broken layers, and a map of the seismic gaps shows. A stretch nobody has watched is given its past here as it would
+     * be when first watched.
+     */
+    public static double[] cycle(ServerLevel level, int x, int z) {
+        long k = cell(Math.floorDiv(x, SEG), Math.floorDiv(z, SEG));
+        Long2ObjectOpenHashMap<Segment> cells = CELLS.computeIfAbsent(level.dimension(), d -> new Long2ObjectOpenHashMap<>());
+        Segment s = cells.get(k);
+        if (s == null) {
+            s = segmentIn(level, ChunkPos.getX(k), ChunkPos.getZ(k));
+            cells.put(k, s);
+        }
+        if (s == NONE) return null;
+        Clocks clocks = of(level);
+        long now = level.getGameTime();
+        double mean = meanTicks(s);
+        if (!clocks.last.containsKey(k)) {
+            long age = (long) (mean * Math.sqrt(2.0 / Math.PI) * Math.abs(level.random.nextGaussian()));
+            clocks.last.put(k, now - age);
+            clocks.setDirty();
+        }
+        return new double[]{Math.max(0, now - clocks.last.get(k)) / 24000.0, mean / 24000.0};
+    }
+
     public static void clear() {
         CELLS.clear();
         TODO.clear();
         QUEUED.clear();
         timer = 0;
-        rolled = broke = felt = filed = 0;
+        rolled = broke = felt = filed = loaded = 0;
     }
 
     private static long cell(int cx, int cz) {
@@ -248,8 +274,25 @@ public final class FaultClocks {
                 long k = cell(cx, cz);
                 Segment o = cells.get(k);
                 if (o == null || o == NONE || o.type() != s.type()) continue;
-                if (Mth.square((double) o.x() - s.x()) + Mth.square((double) o.z() - s.z()) > Mth.square((double) half + SEG / 2)) continue;
+                double d2 = Mth.square((double) o.x() - s.x()) + Mth.square((double) o.z() - s.z());
+                if (d2 > Mth.square((double) half + SEG / 2)) continue;
                 clocks.last.put(k, now);
+            }
+        }
+        // What the rupture let go of is passed on to the stretches just beyond its ends: they are loaded the more, and
+        // brought nearer their own breaking, as each great quake on the North Anatolian Fault from 1939 to 1999 brought on
+        // the next one west of it. Each by up to a third of its cycle, the more the nearer.
+        int beyond = r + 2;
+        for (int cx = ccx - beyond; cx <= ccx + beyond; cx++) {
+            for (int cz = ccz - beyond; cz <= ccz + beyond; cz++) {
+                long k = cell(cx, cz);
+                Segment o = cells.get(k);
+                if (o == null || o == NONE || o.type() != s.type() || !clocks.last.containsKey(k)) continue;
+                double d = Math.sqrt(Mth.square((double) o.x() - s.x()) + Mth.square((double) o.z() - s.z()));
+                if (d <= half + SEG / 2.0 || d > half + SEG * 2.5) continue;
+                double push = (1.0 - (d - half - SEG / 2.0) / (SEG * 2.0)) * meanTicks(o) / 3.0;
+                clocks.last.put(k, clocks.last.get(k) - (long) Math.max(0, push));
+                loaded++;
             }
         }
         clocks.last.put(cell(ccx, ccz), now);
@@ -315,7 +358,7 @@ public final class FaultClocks {
             cells += m.size();
             for (Segment s : m.values()) if (s != NONE) segments++;
         }
-        return String.format(Locale.ROOT, "fault clocks: %d cells looked up, %d stretches of boundary, %d rolls, %d broke (%d felt, %d filed)",
-                cells, segments, rolled, broke, felt, filed);
+        return String.format(Locale.ROOT, "fault clocks: %d cells looked up, %d stretches of boundary, %d rolls, %d broke (%d felt, %d filed), %d stretches beyond them loaded",
+                cells, segments, rolled, broke, felt, filed, loaded);
     }
 }

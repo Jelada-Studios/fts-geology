@@ -646,8 +646,29 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         this.cooldownTimer = min + level.random.nextInt(Math.max(1, max - min));
         // A natural geyser refills from the water in the ground: drawn down by the wells round it, it takes the longer.
         if (!emergent) this.cooldownTimer = (int) Math.min(Integer.MAX_VALUE / 2, cooldownTimer * (1.0 + drawnDown(level)));
+        // What a quake did to its plumbing, easing back over its eruptions.
+        this.cooldownTimer = (int) Math.min(Integer.MAX_VALUE / 2, cooldownTimer * intervalFactor);
+        intervalFactor = 1.0 + (intervalFactor - 1.0) * 0.97;
         this.latentSteam = 0.0;
         this.pressure = 0.0;
+    }
+
+    /**
+     * How much longer, or shorter, than its own the time between eruptions has been since a quake shook the geyser's
+     * plumbing. Earthquakes open some of a geyser's cracks and close others: Old Faithful's interval lengthened after
+     * the Hebgen Lake quake of 1959 and again after Borah Peak in 1983, while other geysers in the basin woke up.
+     */
+    private double intervalFactor = 1.0;
+
+    /** A quake shook the ground here this hard (intensity): the plumbing shifts, and a hard enough jolt sets it off. */
+    public void shaken(ServerLevel level, double intensity) {
+        if (intensity < 4.5 || emergent) return;
+        double f = Math.exp(level.random.nextGaussian() * 0.25 * (intensity - 4.0));
+        intervalFactor = Math.max(0.4, Math.min(2.5, intervalFactor * f));
+        if (intensity >= 6.0 && phase == Phase.COOLING) cooldownTimer = Math.min(cooldownTimer, 40 + level.random.nextInt(200));
+        setChanged();
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("geyser at {} shaken at intensity {}: its interval now {} of its own",
+                worldPosition, String.format(java.util.Locale.ROOT, "%.1f", intensity), String.format(java.util.Locale.ROOT, "%.2f", intervalFactor));
     }
 
     // === Accessors used by EruptionHandler ==================================
@@ -766,6 +787,7 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         tag.putInt("Phase", phase.ordinal());
         tag.putInt("EruptionCount", eruptionCount);
         tag.putInt("CooldownTimer", cooldownTimer);
+        tag.putDouble("IntervalFactor", intervalFactor);
         tag.putInt("Magnitude", magnitude);
         tag.putInt("EruptionTargetTicks", eruptionTargetTicks);
         tag.putInt("EruptionTicks", eruptionTicks);
@@ -798,6 +820,7 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         phase = Phase.values()[Math.floorMod(tag.getInt("Phase"), Phase.values().length)];
         eruptionCount = tag.getInt("EruptionCount");
         cooldownTimer = tag.getInt("CooldownTimer");
+        intervalFactor = tag.contains("IntervalFactor") ? tag.getDouble("IntervalFactor") : 1.0;
         magnitude = tag.contains("Magnitude")
                 ? Mth.clamp(tag.getInt("Magnitude"), MIN_MAGNITUDE, MAX_MAGNITUDE)
                 : MIN_MAGNITUDE;

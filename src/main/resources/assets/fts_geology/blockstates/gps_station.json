@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "fts_geology:block/gps_station" },
+    "facing=east":  { "model": "fts_geology:block/gps_station", "y": 90 },
+    "facing=south": { "model": "fts_geology:block/gps_station", "y": 180 },
+    "facing=west":  { "model": "fts_geology:block/gps_station", "y": 270 }
+  }
+}

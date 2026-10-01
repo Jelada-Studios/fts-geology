@@ -1,0 +1,28 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "t0": "minecraft:block/smooth_stone",
+    "t1": "minecraft:block/oxidized_cut_copper",
+    "t2": "minecraft:block/black_concrete",
+    "t3": "minecraft:block/lime_concrete",
+    "t4": "minecraft:block/iron_block",
+    "t5": "minecraft:block/yellow_concrete",
+    "particle": "minecraft:block/smooth_stone"
+  },
+  "elements": [
+    { "from": [4, 0, 4], "to": [12, 1, 12],
+      "faces": { "north": { "texture": "#t0" }, "south": { "texture": "#t0" }, "east": { "texture": "#t0" }, "west": { "texture": "#t0" }, "up": { "texture": "#t0" }, "down": { "texture": "#t0" } } },
+    { "from": [4.5, 1, 5], "to": [11.5, 10, 11],
+      "faces": { "north": { "texture": "#t1" }, "south": { "texture": "#t1" }, "east": { "texture": "#t1" }, "west": { "texture": "#t1" }, "up": { "texture": "#t1" }, "down": { "texture": "#t1" } } },
+    { "from": [5.5, 4, 4.8], "to": [10.5, 8, 5],
+      "faces": { "north": { "texture": "#t2" }, "south": { "texture": "#t2" }, "east": { "texture": "#t2" }, "west": { "texture": "#t2" }, "up": { "texture": "#t2" }, "down": { "texture": "#t2" } } },
+    { "from": [6, 6.5, 4.7], "to": [8, 7.5, 4.8],
+      "faces": { "north": { "texture": "#t3" }, "south": { "texture": "#t3" }, "east": { "texture": "#t3" }, "west": { "texture": "#t3" }, "up": { "texture": "#t3" }, "down": { "texture": "#t3" } } },
+    { "from": [7.5, 10, 7.5], "to": [8.5, 15, 8.5],
+      "faces": { "north": { "texture": "#t4" }, "south": { "texture": "#t4" }, "east": { "texture": "#t4" }, "west": { "texture": "#t4" }, "up": { "texture": "#t4" }, "down": { "texture": "#t4" } } },
+    { "from": [6.5, 15, 6.5], "to": [9.5, 16, 9.5],
+      "faces": { "north": { "texture": "#t4" }, "south": { "texture": "#t4" }, "east": { "texture": "#t4" }, "west": { "texture": "#t4" }, "up": { "texture": "#t4" }, "down": { "texture": "#t4" } } },
+    { "from": [11.5, 2, 7], "to": [12.5, 3, 9],
+      "faces": { "north": { "texture": "#t5" }, "south": { "texture": "#t5" }, "east": { "texture": "#t5" }, "west": { "texture": "#t5" }, "up": { "texture": "#t5" }, "down": { "texture": "#t5" } } }
+  ]
+}

@@ -201,7 +201,9 @@ public final class Earthquake {
         // Its waves go out from the rupture as it runs, and are felt wherever each player is.
         FeltShaking.start(level, epicentreOnFault, trace, magnitude, depthM, startAt);
         // And the fault goes on slipping for days.
+        // A main shock has its sequence; a large aftershock a small one of its own, as aftershocks breed theirs (ETAS).
         if (!aftershock) Aftershocks.afterMain(level, trace, type, magnitude);
+        else if (magnitude >= Aftershocks.BREEDS) Aftershocks.afterMain(level, trace, type, magnitude, true);
 
         PREPARING.add(new Preparing(dim, job, trace, epicentreOnFault, type, magnitude, depthM, seed, mayBreak, startAt));
     }
@@ -487,11 +489,14 @@ public final class Earthquake {
             // Far out it says where: a great quake is felt thousands of blocks from where the ground broke.
             int dx = at.getX() - p.getBlockX(), dz = at.getZ() - p.getBlockZ();
             int d = (int) Math.round(Math.sqrt((double) dx * dx + (double) dz * dz));
-            p.sendSystemMessage(d < FAR ? msg : Component.translatable(
+            Component line = d < FAR ? msg : Component.translatable(
                     aftershock ? "message.fts_geology.aftershock_far" : "message.fts_geology.earthquake_far", m, kind, d,
                     Component.translatable("prospect.fts_geology.dir."
                             + com.jeladastudios.ftsgeology.instrument.Prospecting.bearingOf(dx, dz)),
-                    DepthScale.format(depthMetres)).withStyle(ChatFormatting.RED));
+                    DepthScale.format(depthMetres)).withStyle(ChatFormatting.RED);
+            // Over the hotbar for a few seconds unless the server wants it kept in chat; the P wave's countdown follows it.
+            if (GeyserConfig.QUAKE_CHAT.get()) p.sendSystemMessage(line);
+            else p.displayClientMessage(line, true);
         }
     }
 
