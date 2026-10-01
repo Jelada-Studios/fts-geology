@@ -24,7 +24,7 @@ import java.util.Locale;
  */
 public class SeismographScreen extends Screen {
 
-    private static final int W = 320, H = 226;
+    private static final int W = 320, H = 240;
     private static final int BG = 0xF0161A1E, PANEL = 0xFF1F262C, HEADER = 0xFF2A3239, BORDER = 0xFF56606A, TEXT = 0xFFEDEFF1,
             DIM = 0xFF9AA5AE, PAPER = 0xFFF2ECDA, GRID = 0xFFDCD3BC, MARK = 0xFFC2B89E, INK_Z = 0xFF1E2A5A, INK_N = 0xFF1F4D2E,
             INK_E = 0xFF6A1F1F, WARN = 0xFFE76F51, BUTTON = 0xFF334049, BUTTON_ON = 0xFF46586A;
@@ -100,9 +100,9 @@ public class SeismographScreen extends Screen {
         g.fill(bx, by, bx + buttonW(), by + 12, hover ? BUTTON_ON : BUTTON);
         g.drawString(font, Component.translatable("gui.fts_geology.seismograph.chat"), bx + 6, by + 2, TEXT, false);
 
-        drum(g, left + 8, top + 21, W - 16, 120);
-        site(g, left + 8, top + 145, W - 16);
-        log(g, left + 8, top + 170, W - 16, H - 176);
+        drum(g, left + 8, top + 21, W - 16, 112);
+        site(g, left + 8, top + 137, W - 16);
+        log(g, left + 8, top + 173, W - 16, H - 179);
         super.render(g, mx, my, partial);
     }
 
@@ -145,14 +145,14 @@ public class SeismographScreen extends Screen {
 
     // === The site =============================================================
 
-    /** Where the drum stands and what it hears over: two lines. */
+    /** Where the drum stands and what it hears over: the site on up to two lines, then the noise. */
     private void site(GuiGraphics g, int x, int y, int w) {
-        g.fill(x, y, x + w, y + 22, PANEL);
+        g.fill(x, y, x + w, y + 32, PANEL);
         Component ground = Component.translatable("gui.fts_geology.seismograph.ground." + data.getInt("Ground"));
         Component line = Component.translatable("gui.fts_geology.seismograph.site", ground, data.getInt("Cover"),
                 String.format(Locale.ROOT, "%.3f", data.getFloat("Noise")), String.format(Locale.ROOT, "%.1f", data.getFloat("Hears")));
         List<FormattedCharSequence> wrapped = font.split(line, w - 8);
-        if (!wrapped.isEmpty()) g.drawString(font, wrapped.get(0), x + 4, y + 2, TEXT, false);
+        for (int i = 0; i < Math.min(2, wrapped.size()); i++) g.drawString(font, wrapped.get(i), x + 4, y + 2 + 10 * i, TEXT, false);
         int why = data.getInt("Why");
         List<String> from = new ArrayList<>();
         String[] names = {"wind", "rain", "moving", "surface"};
@@ -161,7 +161,7 @@ public class SeismographScreen extends Screen {
         }
         Component second = from.isEmpty() ? Component.translatable("gui.fts_geology.seismograph.quiet")
                 : Component.translatable("gui.fts_geology.seismograph.noisy", String.join(", ", from));
-        g.drawString(font, second, x + 4, y + 12, from.isEmpty() ? DIM : WARN, false);
+        g.drawString(font, second, x + 4, y + 22, from.isEmpty() ? DIM : WARN, false);
     }
 
     // === The log ==============================================================
@@ -172,7 +172,9 @@ public class SeismographScreen extends Screen {
         ListTag log = data.getList("Log", Tag.TAG_COMPOUND);
         ListTag extra = data.getList("Extra", Tag.TAG_STRING);
         int rows = (h - 14) / 10 - extra.size();
-        int[] cols = {x + 4, x + 44, x + 96, x + 150, x + 186, x + 262};
+        // The last column, when, is set against the right edge; what is to its left is cut to fit.
+        int whenX = x + w - 46;
+        int[] cols = {x + 4, x + 40, x + 98, x + 150, x + 174, whenX};
         String[] heads = {"sp", "trace", "distance", "magnitude", "from", "ago"};
         for (int i = 0; i < heads.length; i++) {
             g.drawString(font, Component.translatable("gui.fts_geology.seismograph.head." + heads[i]), cols[i], y + 3, DIM, false);
@@ -191,7 +193,10 @@ public class SeismographScreen extends Screen {
             g.drawString(font, r.getString("Dist"), cols[2], ry, color, false);
             g.drawString(font, String.format(Locale.ROOT, r.getBoolean("Clip") ? "%.1f+" : "%.1f", r.getFloat("M")), cols[3], ry, color, false);
             Component from = Component.Serializer.fromJson(r.getString("From"));
-            if (from != null) g.drawString(font, from, cols[4], ry, color, false);
+            if (from != null) {
+                List<FormattedCharSequence> cut = font.split(from, whenX - cols[4] - 4);
+                if (!cut.isEmpty()) g.drawString(font, cut.get(0), cols[4], ry, color, false);
+            }
             g.drawString(font, r.getString("Ago"), cols[5], ry, DIM, false);
             ry += 10;
         }

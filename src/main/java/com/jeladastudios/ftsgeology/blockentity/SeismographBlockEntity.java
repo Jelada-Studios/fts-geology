@@ -508,14 +508,8 @@ public class SeismographBlockEntity extends BlockEntity {
         CompoundTag t = new CompoundTag();
         t.putBoolean("Seismo", true);
         String[] names = {"Z", "N", "E"};
-        for (int c = 0; c < 3; c++) {
-            byte[] trace = new byte[SAMPLES];
-            for (int i = 0; i < SAMPLES; i++) {
-                long at = (now / STEP - (SAMPLES - 1 - i)) * STEP;
-                trace[i] = squeeze(swing(at, c));
-            }
-            t.putByteArray(names[c], trace);
-        }
+        byte[][] traces = traces(now);
+        for (int c = 0; c < 3; c++) t.putByteArray(names[c], traces[c]);
         t.putLong("Now", now);
         t.putFloat("Noise", (float) noise);
         t.putInt("Why", noisy);
@@ -558,14 +552,14 @@ public class SeismographBlockEntity extends BlockEntity {
             if (at < a.pAt()) continue;
             double dtP = at - a.pAt();
             double pAmp = (a.kind() == 2 ? 1.0 : 0.3) * a.ampMm();
-            // The first swing is the push away from the source and up; then the P wave's ringing, dying away.
+            // The first swing is the push away from the source and up; then the P wave's ringing, quick and dying away.
             double p = dtP < STEP ? pAmp : pAmp * Math.exp(-dtP / (a.kind() == 2 ? 6.0 : 8.0 + 3.0 * Math.max(0, a.magnitude())))
-                    * jitter(seed ^ a.pAt(), at, 3, comp);
+                    * ring(seed ^ a.pAt(), at, 13.0, 3, comp);
             double s = 0, surf = 0;
             if (a.kind() != 2 && at >= a.sAt()) {
                 double dtS = at - a.sAt();
                 s = a.ampMm() * Math.min(1.0, dtS / 10.0) * Math.exp(-Math.max(0, dtS - 10) / a.lasts())
-                        * jitter(seed ^ a.sAt(), at, 5, comp);
+                        * ring(seed ^ a.sAt(), at, 23.0, 5, comp);
                 double dtR = dtS - 15;
                 if (dtR > 0 && a.magnitude() >= 4.0) {
                     surf = 0.7 * a.ampMm() * Math.min(1.0, dtR / 20.0) * Math.exp(-dtR / (1.5 * a.lasts()))
@@ -606,13 +600,12 @@ public class SeismographBlockEntity extends BlockEntity {
             for (int y = 2; y < 126; y += 2) data.setColor(x, y, grid);
         }
         int lane = 128 / 3;
+        byte[][] traces = traces(now);
         for (int c = 0; c < 3; c++) {
             int mid = lane * c + lane / 2 + 1, half = lane / 2 - 2, prev = mid;
             for (int x = 0; x < 128; x++) data.setColor(x, mid, grid);
             for (int x = 0; x < 128; x++) {
-                int i = x * SAMPLES / 128;
-                long at = (now / STEP - (SAMPLES - 1 - i)) * STEP;
-                int y = mid - squeeze(swing(at, c)) * half / 127;
+                int y = mid - traces[c][x * SAMPLES / 128] * half / 127;
                 int lo = x == 0 ? y : Math.min(prev, y), hi = x == 0 ? y : Math.max(prev, y);
                 for (int yy = lo; yy <= hi; yy++) data.setColor(x, Mth.clamp(yy, 0, 127), inks[c]);
                 prev = y;
@@ -625,6 +618,17 @@ public class SeismographBlockEntity extends BlockEntity {
         return map;
     }
 
+    /**
+     * A wave's ringing: a swing about {@code period} ticks long, its size wandering from swing to swing, the same for the
+     * same station, wave and component.
+     */
+    private static double ring(long seed, long at, double period, int wave, int comp) {
+        double phase = (jitter(seed, 0, wave + 17, comp) + 1.0) * Math.PI;
+        long cycle = (long) Math.floor(at / period);
+        double size = 0.55 + 0.45 * Math.abs(jitter(seed, cycle * STEP, wave + 29, comp));
+        return Math.sin(2 * Math.PI * at / period + phase) * size;
+    }
+
     /** A steady random wobble, -1 to 1, the same for the same station, tick, wave and component. */
     private static double jitter(long seed, long at, int wave, int comp) {
         long h = seed * 0x9E3779B97F4A7C15L + (at / STEP) * 0xC2B2AE3D27D4EB4FL + wave * 0x165667B19E3779F9L + comp * 0x27D4EB2F165667C5L;
@@ -634,11 +638,25 @@ public class SeismographBlockEntity extends BlockEntity {
         return ((h >>> 11) * 0x1.0p-53) * 2.0 - 1.0;
     }
 
-    /** A swing drawn on the paper, -127 to 127: on a log scale, so the drum's hum and a great quake both show. */
-    private static byte squeeze(double mm) {
-        double n0 = SeismicWave.NOISE_FLOOR_MM * 0.5;
-        double v = Math.log10(1.0 + Math.abs(mm) / n0) / Math.log10(1.0 + SeismicWave.CLIP_MM / n0);
-        return (byte) Math.round(Math.signum(mm) * Math.min(1.0, v) * 127.0);
+    /**
+     * The last minute on the three components, each as the paper shows it, -127 to 127: scaled to the largest swing on it,
+     * as a modern drum's gain is set, but never so far up that the ground's own hum fills it -- quiet paper shows a fine
+     * fuzz -- and the square root of it, so a small wave beside a great one still shows.
+     */
+    private byte[][] traces(long now) {
+        byte[][] out = new byte[3][SAMPLES];
+        for (int c = 0; c < 3; c++) {
+            double[] raw = new double[SAMPLES];
+            double most = 30.0 * noise;
+            for (int i = 0; i < SAMPLES; i++) {
+                raw[i] = swing((now / STEP - (SAMPLES - 1 - i)) * STEP, c);
+                most = Math.max(most, Math.abs(raw[i]));
+            }
+            for (int i = 0; i < SAMPLES; i++) {
+                out[c][i] = (byte) Math.round(Math.signum(raw[i]) * Math.sqrt(Math.min(1.0, Math.abs(raw[i]) / most)) * 127.0);
+            }
+        }
+        return out;
     }
 
     /** "3m 20s ago", from a tick count. */
