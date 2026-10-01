@@ -87,6 +87,25 @@ public class SeismographBlock extends BaseEntityBlock {
                 SeismographBlockEntity::serverTick);
     }
 
+    /** Joins the world's network of stations (see {@code StationNetwork}), named as the item was on an anvil. */
+    @Override
+    public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable net.minecraft.world.entity.LivingEntity by,
+                            net.minecraft.world.item.ItemStack stack) {
+        super.setPlacedBy(level, pos, state, by, stack);
+        if (level instanceof net.minecraft.server.level.ServerLevel sl) {
+            com.jeladastudios.ftsgeology.instrument.StationNetwork.placed(sl, pos, com.jeladastudios.ftsgeology.instrument.StationNetwork.Kind.SEISMOGRAPH,
+                    stack.hasCustomHoverName() ? stack.getHoverName().getString() : "", by instanceof Player p ? p.getUUID() : null);
+        }
+    }
+
+    @Override
+    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moved) {
+        if (!state.is(newState.getBlock()) && level instanceof net.minecraft.server.level.ServerLevel sl) {
+            com.jeladastudios.ftsgeology.instrument.StationNetwork.removed(sl, pos);
+        }
+        super.onRemove(state, level, pos, newState, moved);
+    }
+
     @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player,
                                  InteractionHand hand, BlockHitResult hit) {
@@ -120,7 +139,8 @@ public class SeismographBlock extends BaseEntityBlock {
         if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
             com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
                     net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> sp),
-                    new com.jeladastudios.ftsgeology.network.TerminalPacket(pos, be.data((net.minecraft.server.level.ServerLevel) level), true));
+                    new com.jeladastudios.ftsgeology.network.TerminalPacket(pos, com.jeladastudios.ftsgeology.instrument.StationNetwork.decorate(
+                            (net.minecraft.server.level.ServerLevel) level, sp, null, pos, be.data((net.minecraft.server.level.ServerLevel) level)), true));
         }
         return InteractionResult.CONSUME;
     }

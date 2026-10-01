@@ -139,6 +139,10 @@ public class SeismographBlockEntity extends BlockEntity {
     public void onLoad() {
         super.onLoad();
         if (level != null && !level.isClientSide) com.jeladastudios.ftsgeology.instrument.SeismicStations.running(level, worldPosition);
+        if (level instanceof ServerLevel server) {
+            com.jeladastudios.ftsgeology.instrument.StationNetwork.present(server, worldPosition,
+                    com.jeladastudios.ftsgeology.instrument.StationNetwork.Kind.SEISMOGRAPH);
+        }
     }
 
     @Override
@@ -221,8 +225,13 @@ public class SeismographBlockEntity extends BlockEntity {
             }
             be.setChanged();
         }
-        // The faults round a station keep breaking while nobody is near, so there is something for it to draw.
-        if (now % 1200L == 0L) com.jeladastudios.ftsgeology.quake.FaultClocks.station(server, pos);
+        // The faults round a station keep breaking while nobody is near, so there is something for it to draw; and on the
+        // network of stations, what it shows now, for whoever opens it from a terminal while it is not loaded.
+        if (now % 1200L == 0L) {
+            com.jeladastudios.ftsgeology.quake.FaultClocks.station(server, pos);
+            com.jeladastudios.ftsgeology.instrument.StationNetwork.present(server, pos, com.jeladastudios.ftsgeology.instrument.StationNetwork.Kind.SEISMOGRAPH);
+            com.jeladastudios.ftsgeology.instrument.StationNetwork.shown(server, pos, be.data(server));
+        }
         for (SeismicNetwork.Event e : SeismicNetwork.since(server.dimension(), be.seen)) {
             be.seen = Math.max(be.seen, e.id());
             be.consider(server, pos, state, e);

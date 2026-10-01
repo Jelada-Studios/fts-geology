@@ -105,6 +105,20 @@ public final class TectonicCommands {
                                             .withStyle(ChatFormatting.YELLOW), true);
                                     return 1;
                                 }))
+                                // A small quake right here that breaks nothing: felt and recorded, as the faults' small ones.
+                                .then(Commands.literal("tremor").then(Commands.argument("magnitude", DoubleArgumentType.doubleArg(1.0, 6.0))
+                                        .executes(ctx -> {
+                                            ServerLevel level = ctx.getSource().getLevel();
+                                            BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+                                            PlateSample s = TectonicMap.sample(level, at.getX(), at.getZ());
+                                            FaultType type = s.faultType() == FaultType.INTERIOR ? FaultType.TRANSFORM : s.faultType();
+                                            double m = DoubleArgumentType.getDouble(ctx, "magnitude");
+                                            Earthquake.tremor(level, at, type, m, s.onFault() ? s.faultStrikeX() : 1.0,
+                                                    s.onFault() ? s.faultStrikeZ() : 0.0, false);
+                                            ctx.getSource().sendSuccess(() -> Component.literal("tremor M" + m + " at " + at.toShortString())
+                                                    .withStyle(ChatFormatting.YELLOW), true);
+                                            return 1;
+                                        })))
                                 .then(Commands.literal("aftershocks")
                                         .executes(TectonicCommands::aftershocks)
                                         .then(Commands.literal("clear").executes(ctx -> {
@@ -213,6 +227,28 @@ public final class TectonicCommands {
                                 .executes(ctx -> fillVoids(ctx, 32))
                                 .then(Commands.argument("radius", IntegerArgumentType.integer(4, 96))
                                         .executes(ctx -> fillVoids(ctx, IntegerArgumentType.getInteger(ctx, "radius")))))
+                        // The network of stations (see instrument.StationNetwork): a station's screen opened for the
+                        // operator, at it or seen from a terminal afar, and a station renamed.
+                        .then(Commands.literal("station")
+                                .then(Commands.literal("open").then(Commands.argument("pos", net.minecraft.commands.arguments.coordinates.BlockPosArgument.blockPos())
+                                        .executes(ctx -> openStation(ctx, null, 0))
+                                        .then(Commands.argument("tab", IntegerArgumentType.integer(0, 4))
+                                                .executes(ctx -> openStation(ctx, null, IntegerArgumentType.getInteger(ctx, "tab"))))))
+                                .then(Commands.literal("view").then(Commands.argument("via", net.minecraft.commands.arguments.coordinates.BlockPosArgument.blockPos())
+                                        .then(Commands.argument("pos", net.minecraft.commands.arguments.coordinates.BlockPosArgument.blockPos())
+                                                .executes(ctx -> openStation(ctx, net.minecraft.commands.arguments.coordinates.BlockPosArgument.getBlockPos(ctx, "via"), 0))
+                                                .then(Commands.argument("tab", IntegerArgumentType.integer(0, 4))
+                                                        .executes(ctx -> openStation(ctx, net.minecraft.commands.arguments.coordinates.BlockPosArgument.getBlockPos(ctx, "via"),
+                                                                IntegerArgumentType.getInteger(ctx, "tab")))))))
+                                .then(Commands.literal("rename").then(Commands.argument("pos", net.minecraft.commands.arguments.coordinates.BlockPosArgument.blockPos())
+                                        .then(Commands.argument("name", StringArgumentType.greedyString()).executes(ctx -> {
+                                            BlockPos p = net.minecraft.commands.arguments.coordinates.BlockPosArgument.getBlockPos(ctx, "pos");
+                                            boolean ok = ctx.getSource().getPlayer() != null
+                                                    ? com.jeladastudios.ftsgeology.instrument.StationNetwork.rename(ctx.getSource().getLevel(), ctx.getSource().getPlayerOrException(), p, StringArgumentType.getString(ctx, "name"))
+                                                    : com.jeladastudios.ftsgeology.instrument.StationNetwork.renameAny(ctx.getSource().getLevel(), p, StringArgumentType.getString(ctx, "name"));
+                                            ctx.getSource().sendSuccess(() -> Component.literal(ok ? "renamed" : "no station there").withStyle(ChatFormatting.YELLOW), true);
+                                            return ok ? 1 : 0;
+                                        })))))
                         // The storms round here, and the region's weather (see weather.Storms).
                         .then(Commands.literal("storms")
                                 // A storm of a given strength over here, for trying the weather out.
@@ -244,6 +280,24 @@ public final class TectonicCommands {
                         }))
                         .then(Commands.literal("debug")
                                 .then(Commands.literal("cost").executes(TectonicCommands::cost))));
+    }
+
+    /** /geology station open|view: a station's screen for the operator, at it or seen through the terminal at {@code via}. */
+    static int openStation(CommandContext<CommandSourceStack> ctx, BlockPos via, int tab) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        ServerLevel level = ctx.getSource().getLevel();
+        net.minecraft.server.level.ServerPlayer player = ctx.getSource().getPlayerOrException();
+        BlockPos pos = net.minecraft.commands.arguments.coordinates.BlockPosArgument.getBlockPos(ctx, "pos");
+        net.minecraft.nbt.CompoundTag data = com.jeladastudios.ftsgeology.instrument.StationNetwork.view(level, pos);
+        if (data == null) {
+            ctx.getSource().sendFailure(Component.literal("no station there"));
+            return 0;
+        }
+        if (via == null && level.getBlockEntity(pos) instanceof com.jeladastudios.ftsgeology.blockentity.WeatherTerminalBlockEntity) via = pos;
+        data = com.jeladastudios.ftsgeology.instrument.StationNetwork.decorate(level, player, via, pos, data);
+        data.putInt("Tab", tab);
+        com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player),
+                new com.jeladastudios.ftsgeology.network.TerminalPacket(pos, data, true));
+        return 1;
     }
 
     /** /geology storms spawn &lt;peak&gt; [radius]: a storm of that strength standing over here for a game day, or none at 0. */

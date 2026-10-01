@@ -168,6 +168,10 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue FORESHOCK_SHARE;
     public static final ForgeConfigSpec.IntValue QUAKE_AMBIENT_INTERVAL;   // ticks between ambient rolls
     public static final ForgeConfigSpec.DoubleValue QUAKE_RECURRENCE_DAYS; // mean interval between ruptures
+    public static final ForgeConfigSpec.BooleanValue SMALL_QUAKES;         // magnitude 2.5 to 5 on the faults
+    public static final ForgeConfigSpec.DoubleValue SMALL_QUAKE_RATE;      // small quakes a day per stretch
+    public static final ForgeConfigSpec.DoubleValue QUAKE_FELT_FLOOR;      // the faintest shaking felt
+    public static final ForgeConfigSpec.BooleanValue QUAKE_INFO_NEEDS_INSTRUMENT; // size and place only off an instrument
     public static final ForgeConfigSpec.IntValue QUAKE_MAX_FISSURE_DEPTH;  // divergent rift depth cap
     public static final ForgeConfigSpec.IntValue QUAKE_MAX_RUPTURE;        // cap on rupture length, blocks
     public static final ForgeConfigSpec.IntValue QUAKE_PENDING_LIMIT;      // deferred edits held for unloaded chunks
@@ -934,6 +938,27 @@ public final class GeyserConfig {
                         "damage every month or so; a thousand blocks off one is felt every ten to fifteen days, and",
                         "a seismograph there records several a day. The /geology quake command fires one at once.")
                 .defineInRange("quakeRecurrenceDays", 8.0, 0.01, 1000.0);
+        SMALL_QUAKES = b
+                .comment("Small quakes, magnitude 2.5 to 5, on the boundaries between the larger ones: nothing breaks,",
+                        "near the fault they are felt as a faint tremor and a low rumble, and the seismographs record",
+                        "them.")
+                .define("smallQuakes", true);
+        SMALL_QUAKE_RATE = b
+                .comment("Small quakes a game day on each 256 blocks of a fully stressed boundary (a sleepier one has",
+                        "fewer, by its stress); sizes follow Gutenberg-Richter, most of them small, felt only near the",
+                        "fault. With the faint shaking of the large quakes far off, a player living on a boundary feels a",
+                        "faint tremor about once or twice an hour of play, a thousand blocks off about once in two.")
+                .defineInRange("smallQuakeRate", 1.0, 0.0, 50.0);
+        QUAKE_FELT_FLOOR = b
+                .comment("The faintest shaking felt, on the scale where 3 is a light quake felt indoors (Mercalli III):",
+                        "between this and 3 a quake is only a faint tremor in the view and a far rumble, with nothing",
+                        "written. 3 turns the faint ones off; 2 is felt twice as often as 2.5.")
+                .defineInRange("quakeFeltFloor", 2.5, 1.0, 3.0);
+        QUAKE_INFO_NEEDS_INSTRUMENT = b
+                .comment("A quake's size, place and depth are told only to a player near a seismograph that recorded",
+                        "it (or a station terminal on the network): without one a player only feels it -- the P wave",
+                        "and then the S wave and how hard it shook. The instruments' screens list every quake heard.")
+                .define("quakeInfoNeedsInstrument", true);
         TICK_BUDGET_MS = b
                 .comment("Milliseconds the WHOLE MOD may spend on the server thread per tick.",
                         "A hard wall-clock brake shared by everything: the quake itself, deformation",

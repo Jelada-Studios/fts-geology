@@ -822,5 +822,20 @@
   "gui.fts_geology.gas_panel.tank": "Tank",
   "gui.fts_geology.gas_panel.mix": "Tanktaki gaz",
   "gui.fts_geology.gas_panel.empty": "Boş",
-  "gui.fts_geology.gas_panel.refused": "Electrodynamics: %s V reddedildi, yalnız 120 V alır"
+  "gui.fts_geology.gas_panel.refused": "Electrodynamics: %s V reddedildi, yalnız 120 V alır",
+  "message.fts_geology.p_wave_felt": "Deprem: P dalgası",
+  "message.fts_geology.s_wave_felt": "S dalgası: %s sarsıntı (MMI %s)",
+  "gui.fts_geology.terminal.tab.stations": "İstasyonlar",
+  "gui.fts_geology.station.name": "Ad",
+  "gui.fts_geology.station.save": "Kaydet",
+  "gui.fts_geology.station.back": "Bu terminale dön",
+  "gui.fts_geology.station.live": "canlı",
+  "gui.fts_geology.station.never": "henüz okunmadı",
+  "gui.fts_geology.station.ago": "%s önce okundu",
+  "gui.fts_geology.station.remote": "%s (uzaktan, %s)",
+  "gui.fts_geology.station.terminal": "Meteoroloji istasyonu %s, %s",
+  "gui.fts_geology.station.seismograph": "Sismograf %s, %s",
+  "gui.fts_geology.station.empty": "Bu istasyondan henüz okuma yok: bulunduğu yer bir süre yüklü kalınca gelir.",
+  "gui.fts_geology.station.none": "Ağda istasyon yok",
+  "gui.fts_geology.station.this": "burada"
 }

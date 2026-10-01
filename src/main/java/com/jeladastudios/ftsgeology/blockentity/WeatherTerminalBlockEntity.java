@@ -41,6 +41,16 @@ public class WeatherTerminalBlockEntity extends BlockEntity {
         for (float[] s : history) java.util.Arrays.fill(s, Float.NaN);
     }
 
+    /** On the network of stations from the moment it is in a loaded world (see {@code StationNetwork}). */
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        if (level instanceof ServerLevel sl) {
+            com.jeladastudios.ftsgeology.instrument.StationNetwork.present(sl, worldPosition,
+                    com.jeladastudios.ftsgeology.instrument.StationNetwork.Kind.TERMINAL);
+        }
+    }
+
     public static void serverTick(Level level, BlockPos pos, BlockState state, WeatherTerminalBlockEntity be) {
         if (level.getGameTime() % 20 != 0 || !(level instanceof ServerLevel sl)) return;
         long slot = Math.floorDiv(level.getGameTime(), HALF_HOUR);
@@ -56,6 +66,9 @@ public class WeatherTerminalBlockEntity extends BlockEntity {
         be.lastSlot = slot;
         be.record(sl);
         be.setChanged();
+        // On the network: what it shows now, for whoever opens it from another terminal while it is not loaded.
+        com.jeladastudios.ftsgeology.instrument.StationNetwork.present(sl, pos, com.jeladastudios.ftsgeology.instrument.StationNetwork.Kind.TERMINAL);
+        com.jeladastudios.ftsgeology.instrument.StationNetwork.shown(sl, pos, be.data(sl));
     }
 
     /** The instruments within reach, the nearest of each kind. */

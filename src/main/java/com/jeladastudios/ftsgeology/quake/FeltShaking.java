@@ -67,9 +67,17 @@ public final class FeltShaking {
         return Mth.clamp((int) Math.round(1.35 * intensity - 1.0), 1, 12);
     }
 
-    /** How far out a quake of this magnitude is felt at all, capped by the config. */
+    /**
+     * The faintest shaking felt at all (Mercalli II, felt by a few at rest), from the config: between it and
+     * {@link #FELT} a quake is only a faint tremor and a far rumble.
+     */
+    public static double floor() {
+        return Math.min(FELT, GeyserConfig.QUAKE_FELT_FLOOR.get());
+    }
+
+    /** How far out a quake of this magnitude is felt at all, if only faintly, capped by the config. */
     public static double feltRange(double magnitude) {
-        return Math.min(GeyserConfig.QUAKE_FELT_RANGE.get(), Math.max(0.0, distanceFor(magnitude, FELT)));
+        return Math.min(GeyserConfig.QUAKE_FELT_RANGE.get(), Math.max(0.0, distanceFor(magnitude, floor())));
     }
 
     /** Ticks for a wave at {@code speed} to reach a point this far from a hypocentre this deep. */
@@ -116,6 +124,8 @@ public final class FeltShaking {
 
     private static final class Felt {
         boolean jolted, told;
+        /** Whether this player reads the quake's size and place off an instrument near them; asked once. */
+        Boolean informed;
         /** When the rumble was last started here; never, at first. */
         long rumbled = NEVER;
     }
@@ -195,7 +205,10 @@ public final class FeltShaking {
         if (intensity >= FELT - 1.2) {
             intensity += SiteResponse.ground(level, p.getBlockX(), p.getBlockZ()) + SiteResponse.directivity(q.epicentre, at, q.trace);
         }
-        if (intensity < FELT) return;
+        double floor = floor();
+        if (intensity < floor) return;
+        // Under a light quake's shaking (Mercalli III) only a faint tremor in the view and a far rumble: nothing told.
+        boolean faint = intensity < FELT;
         long sent = q.startAt + ruptureDelay(q.epicentre, at);
         long pAt = sent + travelTicks(d[0], q.depthMetres, SeismicWave.VP);
         long sAt = sent + travelTicks(d[0], q.depthMetres, SeismicWave.VS);
@@ -222,23 +235,33 @@ public final class FeltShaking {
         if (now > sAt + lasts) return;
 
         Felt f = q.felt.computeIfAbsent(p.getUUID(), u -> new Felt());
-        // The view: a small, quick jolt for the P wave, then the slow heavy swaying of the S wave, dying away.
-        float strong = (float) Math.max(0.0, 0.55 * (intensity - 2.5));
+        if (f.informed == null) {
+            f.informed = com.jeladastudios.ftsgeology.instrument.QuakeNews.informs(level, p, q.epicentre.getX(), q.epicentre.getZ(),
+                    q.magnitude, q.depthMetres);
+        }
+        // The view: a small, quick jolt for the P wave, then the slow heavy swaying of the S wave, dying away; a faint
+        // quake only a tremor of a tenth of a degree or two, hardly seen.
+        float strong = faint ? (float) (0.10 + 0.2 * (intensity - floor)) : (float) Math.max(0.0, 0.55 * (intensity - 2.5));
         boolean s = now >= sAt;
         if (!f.jolted) {
             f.jolted = true;
             jolts++;
-            // The P wave: a sharp jolt and a boom, and, far enough out to be worth it, the warning it is.
-            p.playNotifySound(net.minecraft.sounds.SoundEvents.GENERIC_EXPLODE, net.minecraft.sounds.SoundSource.BLOCKS,
-                    (float) Mth.clamp((intensity - 2.0) / 6.0, 0.2, 0.8), 0.45f);
+            if (!faint) {
+                // The P wave: a sharp jolt and a boom, and what it is, told; its size only off an instrument (below).
+                p.playNotifySound(net.minecraft.sounds.SoundEvents.GENERIC_EXPLODE, net.minecraft.sounds.SoundSource.BLOCKS,
+                        (float) Mth.clamp((intensity - 2.0) / 6.0, 0.2, 0.8), 0.45f);
+                if (!f.informed || intensity < 4.0) {
+                    p.displayClientMessage(Component.translatable("message.fts_geology.p_wave_felt").withStyle(ChatFormatting.GOLD), true);
+                }
+            }
             com.jeladastudios.ftsgeology.util.Diagnostics.info(
-                    "felt: {} {} blocks from the rupture, intensity {}, P at +{} ticks, S at +{}, shaking {} ticks",
-                    p.getName().getString(), Math.round(d[0]), String.format(java.util.Locale.ROOT, "%.2f", intensity),
-                    pAt - q.startAt, sAt - q.startAt, lasts);
+                    "felt{}: {} {} blocks from the rupture, intensity {}, P at +{} ticks, S at +{}, shaking {} ticks, informed {}",
+                    faint ? " faintly" : "", p.getName().getString(), Math.round(d[0]),
+                    String.format(java.util.Locale.ROOT, "%.2f", intensity), pAt - q.startAt, sAt - q.startAt, lasts, f.informed);
         }
         // Between the waves, over the hotbar, once a second: the countdown to the strong shaking and how strong it will be,
-        // as an early warning system says it. Only where it will be strong enough to matter.
-        if (!s && intensity >= 4.0 && (now - pAt) % 20 == 0) {
+        // as an early warning system says it, to a player at an instrument. Only where it will be strong enough to matter.
+        if (!faint && f.informed && !s && intensity >= 4.0 && (now - pAt) % 20 == 0) {
             int warn = (int) ((sAt - now + 19) / 20);
             int mmi = mercalli(intensity);
             if (warn >= 1) {
@@ -252,8 +275,10 @@ public final class FeltShaking {
         boolean sArrives = now == sAt;
         if (now - f.rumbled >= RUMBLE_CLIP || sArrives) {
             f.rumbled = now;
-            // Heard where the player is, not at the epicentre: the ground under them is what roars.
-            float volume = (float) Mth.clamp((intensity - 2.0) / (sArrives ? 3.0 : 5.0), 0.35, 1.0);
+            // Heard where the player is, not at the epicentre: the ground under them is what roars; a faint quake's
+            // rumble is low and far off.
+            float volume = faint ? (float) Mth.clamp(0.12 + 0.15 * (intensity - floor), 0.1, 0.3)
+                    : (float) Mth.clamp((intensity - 2.0) / (sArrives ? 3.0 : 5.0), 0.35, 1.0);
             float pitch = (float) Mth.clamp(0.75 + 0.05 * (intensity - 3.0), 0.7, 1.0);
             p.playNotifySound(com.jeladastudios.ftsgeology.registry.ModSounds.QUAKE_RUMBLE.get(),
                     net.minecraft.sounds.SoundSource.BLOCKS, volume, pitch);
@@ -266,7 +291,7 @@ public final class FeltShaking {
                 shake = (float) (strong * (into < 0.6 ? 1.0 : 1.0 - (into - 0.6) / 0.4));
                 speed = 1.0f;
             } else {
-                shake = Math.max(0.25f, strong * 0.45f);
+                shake = faint ? 0.06f : Math.max(0.25f, strong * 0.45f);
                 speed = 3.0f;
             }
             if (shake > 0.02f) com.jeladastudios.ftsgeology.network.ModNetwork.sendShake(p, shake, 20, speed);
@@ -276,13 +301,18 @@ public final class FeltShaking {
             f.told = true;
             told++;
             int mmi = mercalli(intensity);
-            if (mmi >= 4) com.jeladastudios.ftsgeology.advancement.GeologyTrigger.award(p, "felt_quake");
-            if (mmi >= 8) com.jeladastudios.ftsgeology.advancement.GeologyTrigger.award(p, "great_quake");
+            if (faint) {
+                // Something in the room rattles, once, softly.
+                p.playNotifySound(net.minecraft.sounds.SoundEvents.CHAIN_PLACE, net.minecraft.sounds.SoundSource.BLOCKS, 0.12f, 1.4f);
+            } else {
+                if (mmi >= 4) com.jeladastudios.ftsgeology.advancement.GeologyTrigger.award(p, "felt_quake");
+                if (mmi >= 8) com.jeladastudios.ftsgeology.advancement.GeologyTrigger.award(p, "great_quake");
+                p.displayClientMessage(Component.translatable("message.fts_geology.s_wave_felt",
+                        Component.translatable("message.fts_geology.mercalli." + mmi), roman(mmi))
+                        .withStyle(mmi >= 7 ? ChatFormatting.RED : mmi >= 5 ? ChatFormatting.GOLD : ChatFormatting.YELLOW), true);
+            }
             com.jeladastudios.ftsgeology.util.Diagnostics.info("felt: {} S wave at +{} ticks, MMI {}",
                     p.getName().getString(), now - q.startAt, mmi);
-            p.displayClientMessage(Component.translatable("message.fts_geology.shaking_here",
-                    Component.translatable("message.fts_geology.mercalli." + mmi), roman(mmi))
-                    .withStyle(mmi >= 7 ? ChatFormatting.RED : mmi >= 5 ? ChatFormatting.GOLD : ChatFormatting.YELLOW), true);
         }
         // Knocked about, and the ground and the ceiling shedding dust, where it is strong enough to.
         double falloff = Mth.clamp((intensity - 4.0) / 4.0, 0.0, 1.0);

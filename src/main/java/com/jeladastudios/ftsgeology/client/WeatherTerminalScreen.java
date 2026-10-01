@@ -31,23 +31,32 @@ public class WeatherTerminalScreen extends Screen {
             RAIN = 0xFF4EA8DE, WARN = 0xFFE76F51, GOOD = 0xFF2A9D8F, SUN = 0xFFFFD166, CLOUD = 0xFFC9D6DC, DARK_CLOUD = 0xFF6C7A82;
     /** The degree sign and the long dash, from their code points: the sources are compiled as ASCII. */
     private static final String DEG = String.valueOf((char) 0xB0), DASH = String.valueOf((char) 0x2014);
-    private static final String[] TABS = {"now", "charts", "forecast", "fields"};
+    private static final String[] TABS = {"now", "charts", "forecast", "fields", "stations"};
+    private static final int TAB_W = 58, TAB_STEP = 61;
+    /** The page the network's stations are on, and the height of a row of their list. */
+    private static final int STATIONS = 4, ROW = 11;
 
     private final BlockPos pos;
     private CompoundTag data;
-    private int tab, left, top, ticks;
+    private int tab, left, top, ticks, scroll;
+    private net.minecraft.client.gui.components.EditBox nameBox;
+    private net.minecraft.client.gui.components.Button back;
 
-    private WeatherTerminalScreen(BlockPos pos, CompoundTag data) {
+    private WeatherTerminalScreen(BlockPos pos, CompoundTag data, int tab) {
         super(Component.translatable("gui.fts_geology.terminal.title"));
         this.pos = pos;
         this.data = data;
+        this.tab = tab;
     }
 
     /** A terminal's data from the server: a new screen, or the open one brought up to date. */
     public static void receive(TerminalPacket p) {
         Minecraft mc = Minecraft.getInstance();
         if (p.open()) {
-            mc.setScreen(new WeatherTerminalScreen(p.pos(), p.data()));
+            // Moving between the stations of the network keeps the page that lists them open.
+            int tab = p.data().contains("Tab") ? p.data().getInt("Tab")
+                    : mc.screen instanceof WeatherTerminalScreen s && s.tab == STATIONS || mc.screen instanceof SeismographScreen ? STATIONS : 0;
+            mc.setScreen(new WeatherTerminalScreen(p.pos(), p.data(), tab));
         } else if (mc.screen instanceof WeatherTerminalScreen s && s.pos.equals(p.pos())) {
             s.data = p.data();
         }
@@ -57,11 +66,31 @@ public class WeatherTerminalScreen extends Screen {
     protected void init() {
         left = (width - W) / 2;
         top = (height - H) / 2;
+        // On the page of stations: the box to rename this one at the station itself, or the way back from afar.
+        String typed = nameBox != null ? nameBox.getValue() : null;
+        int by = top + H - 22;
+        nameBox = StationUi.nameBox(font, left + 14 + font.width(Component.translatable("gui.fts_geology.station.name")), by, 120,
+                pos, data, this::addRenderableWidget);
+        if (nameBox != null && typed != null) nameBox.setValue(typed);
+        BlockPos via = StationUi.via(pos, data);
+        back = via == null ? null : addRenderableWidget(net.minecraft.client.gui.components.Button.builder(
+                Component.translatable("gui.fts_geology.station.back"), b -> StationUi.open(via, via))
+                .bounds(left + 12, by - 1, font.width(Component.translatable("gui.fts_geology.station.back")) + 12, 14).build());
+        showWidgets();
+    }
+
+    /** The name box and the way back are on the page of stations only. */
+    private void showWidgets() {
+        if (nameBox != null) nameBox.visible = tab == STATIONS;
+        for (var w : children()) {
+            if (w instanceof net.minecraft.client.gui.components.Button b) b.visible = tab == STATIONS;
+        }
     }
 
     @Override
     public void tick() {
-        if (++ticks % 40 == 0) ModNetwork.CHANNEL.sendToServer(new TerminalRequestPacket(pos));
+        if (++ticks % 40 == 0) StationUi.request(pos, data);
+        if (nameBox != null) nameBox.tick();
     }
 
     @Override
@@ -69,19 +98,29 @@ public class WeatherTerminalScreen extends Screen {
         return false;
     }
 
-    /** The pages from the keyboard too: 1 to 4, or the arrow keys. */
+    /** The pages from the keyboard too: 1 to 5, or the arrow keys; Enter in the name box renames the station. */
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
-        if (key >= 49 && key <= 52) {
+        if (nameBox != null && nameBox.isFocused() && tab == STATIONS) {
+            if (key == 257 || key == 335) {
+                StationUi.rename(pos, nameBox);
+                return true;
+            }
+            if (key != 256) return nameBox.keyPressed(key, scan, modifiers);
+        }
+        if (key >= 49 && key <= 53) {
             tab = key - 49;
+            showWidgets();
             return true;
         }
         if (key == 262 || key == 258) {
             tab = (tab + 1) % TABS.length;
+            showWidgets();
             return true;
         }
         if (key == 263) {
             tab = (tab + TABS.length - 1) % TABS.length;
+            showWidgets();
             return true;
         }
         return super.keyPressed(key, scan, modifiers);
@@ -90,15 +129,38 @@ public class WeatherTerminalScreen extends Screen {
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
         for (int i = 0; i < TABS.length; i++) {
-            int x = left + 8 + i * 78;
-            if (mx >= x && mx < x + 74 && my >= top + 20 && my < top + 34) {
+            int x = left + 8 + i * TAB_STEP;
+            if (mx >= x && mx < x + TAB_W && my >= top + 20 && my < top + 34) {
                 tab = i;
-                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance
-                        .forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                showWidgets();
+                click();
+                return true;
+            }
+        }
+        if (tab == STATIONS) {
+            BlockPos station = stationAt(mx, my);
+            if (station != null) {
+                click();
+                StationUi.open(StationUi.terminal(pos, data), station);
                 return true;
             }
         }
         return super.mouseClicked(mx, my, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mx, double my, double delta) {
+        if (tab == STATIONS) {
+            int rows = data.getList("Stations", Tag.TAG_COMPOUND).size();
+            scroll = Mth.clamp(scroll - (int) Math.signum(delta), 0, Math.max(0, rows - listRows()));
+            return true;
+        }
+        return super.mouseScrolled(mx, my, delta);
+    }
+
+    private static void click() {
+        Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance
+                .forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
     }
 
     @Override
@@ -107,25 +169,138 @@ public class WeatherTerminalScreen extends Screen {
         g.fill(left, top, left + W, top + H, BG);
         frame(g, left, top, W, H, BORDER);
         g.fill(left + 1, top + 1, left + W - 1, top + 17, HEADER);
-        g.drawString(font, title, left + 8, top + 5, TEXT, false);
         String clock = clock(data.getLong("DayTime"));
+        Component heading = data.getString("Name").isEmpty() && StationUi.via(pos, data) == null ? title
+                : StationUi.title(data, "gui.fts_geology.station.terminal", pos);
+        g.drawString(font, font.plainSubstrByWidth(heading.getString(), W - 24 - font.width(clock)), left + 8, top + 5, TEXT, false);
         g.drawString(font, clock, left + W - 8 - font.width(clock), top + 5, DIM, false);
         for (int i = 0; i < TABS.length; i++) {
-            int x = left + 8 + i * 78;
-            boolean on = i == tab, hover = mx >= x && mx < x + 74 && my >= top + 20 && my < top + 34;
-            g.fill(x, top + 20, x + 74, top + 34, on ? BORDER : hover ? 0xFF2B4652 : PANEL);
+            int x = left + 8 + i * TAB_STEP;
+            boolean on = i == tab, hover = mx >= x && mx < x + TAB_W && my >= top + 20 && my < top + 34;
+            g.fill(x, top + 20, x + TAB_W, top + 34, on ? BORDER : hover ? 0xFF2B4652 : PANEL);
             Component label = Component.translatable("gui.fts_geology.terminal.tab." + TABS[i]);
-            g.drawString(font, label, x + (74 - font.width(label)) / 2, top + 23, on ? TEXT : DIM, false);
+            g.drawString(font, label, x + (TAB_W - font.width(label)) / 2, top + 23, on ? TEXT : DIM, false);
         }
         int cx = left + 8, cy = top + 40, cw = W - 16, ch = H - 48;
         g.fill(cx, cy, cx + cw, cy + ch, PANEL);
-        switch (tab) {
-            case 0 -> now(g, cx, cy, cw, ch);
-            case 1 -> charts(g, cx, cy, cw, ch);
-            case 2 -> forecast(g, cx, cy, cw, ch);
-            default -> fields(g, cx, cy, cw, ch);
+        if (data.getBoolean("Empty") && tab != STATIONS) {
+            StationUi.centred(g, font, Component.translatable("gui.fts_geology.station.empty"), cx + cw / 2, cy + ch / 2, cw - 24, DIM);
+        } else {
+            switch (tab) {
+                case 0 -> now(g, cx, cy, cw, ch);
+                case 1 -> charts(g, cx, cy, cw, ch);
+                case 2 -> forecast(g, cx, cy, cw, ch);
+                case 3 -> fields(g, cx, cy, cw, ch);
+                default -> stations(g, cx, cy, cw, ch, mx, my);
+            }
         }
         super.render(g, mx, my, partial);
+    }
+
+    // === The network's stations ===============================================
+
+    /** Rows the list shows at once. */
+    private int listRows() {
+        return (H - 48 - 30) / ROW;
+    }
+
+    /**
+     * The stations of the network round the terminal it is seen from, the nearest first: each its kind, its name, how far
+     * and which way, and whether it is live or how long since it read; beside them, a little map with north up. A click
+     * opens one. Under them, the box to rename this station, or the way back from afar.
+     */
+    private void stations(GuiGraphics g, int x, int y, int w, int h, int mx, int my) {
+        ListTag list = data.getList("Stations", Tag.TAG_COMPOUND);
+        BlockPos from = StationUi.terminal(pos, data);
+        int lw = w / 2 + 30, rows = listRows();
+        if (list.isEmpty()) {
+            g.drawString(font, Component.translatable("gui.fts_geology.station.none"), x + 6, y + 6, DIM, false);
+        }
+        for (int i = 0; i < rows && scroll + i < list.size(); i++) {
+            CompoundTag c = list.getCompound(scroll + i);
+            BlockPos p = new BlockPos(c.getInt("X"), c.getInt("Y"), c.getInt("Z"));
+            int ry = y + 4 + i * ROW;
+            boolean here = p.equals(pos), hover = mx >= x + 2 && mx < x + lw && my >= ry - 1 && my < ry + ROW - 1;
+            if (here || hover) g.fill(x + 2, ry - 1, x + lw, ry + ROW - 1, here ? 0xFF2B4652 : 0xFF243844);
+            boolean seismo = "SEISMOGRAPH".equals(c.getString("Kind"));
+            g.drawString(font, seismo ? "S" : "M", x + 5, ry + 1, seismo ? WARN : PRESSURE, false);
+            String kindKey = seismo ? "gui.fts_geology.station.seismograph" : "gui.fts_geology.station.terminal";
+            String name = StationUi.name(c, kindKey, p).getString();
+            int dx = p.getX() - from.getX(), dz = p.getZ() - from.getZ();
+            int far = (int) Math.round(Math.sqrt((double) dx * dx + (double) dz * dz));
+            String where = p.equals(from) ? Component.translatable("gui.fts_geology.station.this").getString()
+                    : far + " " + Component.translatable("prospect.fts_geology.dir."
+                    + com.jeladastudios.ftsgeology.instrument.Prospecting.bearingOf(dx, dz)).getString();
+            long age = c.getLong("Age");
+            boolean live = c.getBoolean("Live");
+            int whereW = font.width(where);
+            g.drawString(font, font.plainSubstrByWidth(name, lw - 30 - whereW), x + 14, ry + 1, TEXT, false);
+            g.drawString(font, where, x + lw - 12 - whereW, ry + 1, DIM, false);
+            g.fill(x + lw - 7, ry + 3, x + lw - 3, ry + 7, live ? GOOD : age < 0 ? FAINT : 0xFF8C7A3A);
+        }
+        if (list.size() > rows) {
+            int track = rows * ROW, knob = Math.max(8, track * rows / list.size());
+            int ky = y + 3 + (track - knob) * scroll / Math.max(1, list.size() - rows);
+            g.fill(x + lw + 1, ky, x + lw + 3, ky + knob, FAINT);
+        }
+        // The map: the terminal in the middle, north up, the farthest listed at its edge.
+        int mx0 = x + lw + 8, size = Math.min(w - lw - 12, h - 30), my0 = y + 4;
+        g.fill(mx0, my0, mx0 + size, my0 + size, 0xFF16222A);
+        frame(g, mx0, my0, size, size, FAINT);
+        int half = size / 2;
+        double reach = 64;
+        for (int i = 0; i < list.size(); i++) {
+            CompoundTag c = list.getCompound(i);
+            reach = Math.max(reach, Math.hypot(c.getInt("X") - from.getX(), c.getInt("Z") - from.getZ()) * 1.1);
+        }
+        g.fill(mx0 + half, my0 + 3, mx0 + half + 1, my0 + size - 3, 0xFF22333D);
+        g.fill(mx0 + 3, my0 + half, mx0 + size - 3, my0 + half + 1, 0xFF22333D);
+        g.drawString(font, "N", mx0 + half - 2, my0 + 2, FAINT, false);
+        Component hoverName = null;
+        for (int i = 0; i < list.size(); i++) {
+            CompoundTag c = list.getCompound(i);
+            int px = mx0 + half + (int) Math.round((c.getInt("X") - from.getX()) / reach * (half - 4));
+            int pz = my0 + half + (int) Math.round((c.getInt("Z") - from.getZ()) / reach * (half - 4));
+            boolean seismo = "SEISMOGRAPH".equals(c.getString("Kind"));
+            BlockPos p = new BlockPos(c.getInt("X"), c.getInt("Y"), c.getInt("Z"));
+            if (p.equals(pos)) g.fill(px - 3, pz - 3, px + 4, pz + 4, TEXT);
+            g.fill(px - 2, pz - 2, px + 3, pz + 3, seismo ? WARN : PRESSURE);
+            if (Math.abs(mx - px) <= 3 && Math.abs(my - pz) <= 3) {
+                hoverName = StationUi.name(c, seismo ? "gui.fts_geology.station.seismograph" : "gui.fts_geology.station.terminal", p);
+            }
+        }
+        if (hoverName != null) g.renderTooltip(font, hoverName, mx, my);
+        if (nameBox != null) {
+            g.drawString(font, Component.translatable("gui.fts_geology.station.name"), x + 4, top + H - 20, DIM, false);
+        }
+    }
+
+    /** The station under the mouse in the list or on the map, or null. */
+    private BlockPos stationAt(double mx, double my) {
+        ListTag list = data.getList("Stations", Tag.TAG_COMPOUND);
+        int x = left + 8, y = top + 40, w = W - 16, h = H - 48;
+        int lw = w / 2 + 30, rows = listRows();
+        for (int i = 0; i < rows && scroll + i < list.size(); i++) {
+            int ry = y + 4 + i * ROW;
+            if (mx >= x + 2 && mx < x + lw && my >= ry - 1 && my < ry + ROW - 1) {
+                CompoundTag c = list.getCompound(scroll + i);
+                return new BlockPos(c.getInt("X"), c.getInt("Y"), c.getInt("Z"));
+            }
+        }
+        BlockPos from = StationUi.terminal(pos, data);
+        int mx0 = x + lw + 8, size = Math.min(w - lw - 12, h - 30), my0 = y + 4, half = size / 2;
+        double reach = 64;
+        for (int i = 0; i < list.size(); i++) {
+            CompoundTag c = list.getCompound(i);
+            reach = Math.max(reach, Math.hypot(c.getInt("X") - from.getX(), c.getInt("Z") - from.getZ()) * 1.1);
+        }
+        for (int i = 0; i < list.size(); i++) {
+            CompoundTag c = list.getCompound(i);
+            int px = mx0 + half + (int) Math.round((c.getInt("X") - from.getX()) / reach * (half - 4));
+            int pz = my0 + half + (int) Math.round((c.getInt("Z") - from.getZ()) / reach * (half - 4));
+            if (Math.abs(mx - px) <= 3 && Math.abs(my - pz) <= 3) return new BlockPos(c.getInt("X"), c.getInt("Y"), c.getInt("Z"));
+        }
+        return null;
     }
 
     // === The readings now =====================================================

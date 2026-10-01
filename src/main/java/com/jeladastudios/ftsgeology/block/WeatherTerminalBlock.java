@@ -78,11 +78,31 @@ public class WeatherTerminalBlock extends BaseEntityBlock {
         return createTickerHelper(type, ModBlockEntities.WEATHER_TERMINAL.get(), WeatherTerminalBlockEntity::serverTick);
     }
 
+    /** Joins the world's network of stations (see {@code StationNetwork}), named as the item was on an anvil. */
+    @Override
+    public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable net.minecraft.world.entity.LivingEntity by,
+                            net.minecraft.world.item.ItemStack stack) {
+        super.setPlacedBy(level, pos, state, by, stack);
+        if (level instanceof ServerLevel sl) {
+            com.jeladastudios.ftsgeology.instrument.StationNetwork.placed(sl, pos, com.jeladastudios.ftsgeology.instrument.StationNetwork.Kind.TERMINAL,
+                    stack.hasCustomHoverName() ? stack.getHoverName().getString() : "", by instanceof Player p ? p.getUUID() : null);
+        }
+    }
+
+    @Override
+    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moved) {
+        if (!state.is(newState.getBlock()) && level instanceof ServerLevel sl) {
+            com.jeladastudios.ftsgeology.instrument.StationNetwork.removed(sl, pos);
+        }
+        super.onRemove(state, level, pos, newState, moved);
+    }
+
     @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
         if (level.isClientSide) return InteractionResult.SUCCESS;
         if (level.getBlockEntity(pos) instanceof WeatherTerminalBlockEntity be && player instanceof ServerPlayer sp) {
-            ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), new TerminalPacket(pos, be.data((ServerLevel) level), true));
+            ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), new TerminalPacket(pos,
+                    com.jeladastudios.ftsgeology.instrument.StationNetwork.decorate((ServerLevel) level, sp, pos, pos, be.data((ServerLevel) level)), true));
         }
         return InteractionResult.CONSUME;
     }

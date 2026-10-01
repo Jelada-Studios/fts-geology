@@ -468,8 +468,9 @@ public final class Earthquake {
     }
 
     /**
-     * Told at once to everyone who will feel it: the alert travels at the speed of light, the shaking at the speed of
-     * the waves, so a player far out has seconds to spare.
+     * Told at once to everyone who will feel it and stands at a seismograph that records it (see {@code QuakeNews}): the
+     * alert travels at the speed of light, the shaking at the speed of the waves, so a player far out has seconds to
+     * spare.
      */
     private static void announce(ServerLevel level, List<QuakePlanner.TracePoint> trace, BlockPos at, FaultType type,
                                  double magnitude, double depthMetres, boolean aftershock) {
@@ -486,6 +487,8 @@ public final class Earthquake {
             if (p.distanceToSqr(at.getX() + 0.5, p.getY(), at.getZ() + 0.5) <= r2) told.add(p);
         }
         for (ServerPlayer p : told) {
+            // Its size and place only to whoever is at a seismograph that recorded it: the rest only feel it.
+            if (!com.jeladastudios.ftsgeology.instrument.QuakeNews.informs(level, p, at.getX(), at.getZ(), magnitude, depthMetres)) continue;
             // Far out it says where: a great quake is felt thousands of blocks from where the ground broke.
             int dx = at.getX() - p.getBlockX(), dz = at.getZ() - p.getBlockZ();
             int d = (int) Math.round(Math.sqrt((double) dx * dx + (double) dz * dz));

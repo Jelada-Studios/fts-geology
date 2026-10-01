@@ -34,6 +34,7 @@ public class SeismographScreen extends Screen {
     private final BlockPos pos;
     private CompoundTag data;
     private int left, top, ticks;
+    private net.minecraft.client.gui.components.EditBox nameBox;
 
     private SeismographScreen(BlockPos pos, CompoundTag data) {
         super(Component.translatable("gui.fts_geology.seismograph.title"));
@@ -55,11 +56,34 @@ public class SeismographScreen extends Screen {
     protected void init() {
         left = (width - W) / 2;
         top = (height - H) / 2;
+        // Its name, at the station itself: a box in the header after the kind.
+        String typed = nameBox != null ? nameBox.getValue() : null;
+        nameBox = StationUi.nameBox(font, left + 14 + font.width(title), top + 3, 110, pos, data, this::addRenderableWidget);
+        if (nameBox != null && typed != null) nameBox.setValue(typed);
     }
 
     @Override
     public void tick() {
-        if (++ticks % 10 == 0) ModNetwork.CHANNEL.sendToServer(new TerminalRequestPacket(pos));
+        // Twice a second at the drum; once a second seen from afar through a terminal.
+        if (++ticks % (remote() ? 20 : 10) == 0) StationUi.request(pos, data);
+        if (nameBox != null) nameBox.tick();
+    }
+
+    @Override
+    public boolean keyPressed(int key, int scan, int modifiers) {
+        if (nameBox != null && nameBox.isFocused()) {
+            if (key == 257 || key == 335) {
+                StationUi.rename(pos, nameBox);
+                return true;
+            }
+            if (key != 256) return nameBox.keyPressed(key, scan, modifiers);
+        }
+        return super.keyPressed(key, scan, modifiers);
+    }
+
+    /** Whether this drum is seen from afar, through a terminal. */
+    private boolean remote() {
+        return StationUi.via(pos, data) != null;
     }
 
     @Override
@@ -67,21 +91,31 @@ public class SeismographScreen extends Screen {
         return false;
     }
 
+    /** The header's button: the log to chat at the drum, or back to the terminal from afar. */
+    private Component buttonLabel() {
+        return Component.translatable(remote() ? "gui.fts_geology.station.back" : "gui.fts_geology.seismograph.chat");
+    }
+
     private int buttonX() {
         return left + W - 8 - buttonW();
     }
 
     private int buttonW() {
-        return font.width(Component.translatable("gui.fts_geology.seismograph.chat")) + 12;
+        return font.width(buttonLabel()) + 12;
     }
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
         int bx = buttonX(), by = top + 3;
         if (mx >= bx && mx < bx + buttonW() && my >= by && my < by + 12) {
-            ModNetwork.CHANNEL.sendToServer(new TerminalRequestPacket(pos, true));
             Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance
                     .forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+            BlockPos via = StationUi.via(pos, data);
+            if (via != null) {
+                StationUi.open(via, via);
+                return true;
+            }
+            ModNetwork.CHANNEL.sendToServer(new TerminalRequestPacket(pos, true));
             onClose();
             return true;
         }
@@ -94,11 +128,17 @@ public class SeismographScreen extends Screen {
         g.fill(left, top, left + W, top + H, BG);
         frame(g, left, top, W, H, BORDER);
         g.fill(left + 1, top + 1, left + W - 1, top + 17, HEADER);
-        g.drawString(font, title, left + 8, top + 5, TEXT, false);
+        Component heading = remote() || nameBox == null ? StationUi.title(data, "gui.fts_geology.station.seismograph", pos) : title;
         int bx = buttonX(), by = top + 3;
+        g.drawString(font, font.plainSubstrByWidth(heading.getString(), bx - left - 14), left + 8, top + 5, TEXT, false);
         boolean hover = mx >= bx && mx < bx + buttonW() && my >= by && my < by + 12;
         g.fill(bx, by, bx + buttonW(), by + 12, hover ? BUTTON_ON : BUTTON);
-        g.drawString(font, Component.translatable("gui.fts_geology.seismograph.chat"), bx + 6, by + 2, TEXT, false);
+        g.drawString(font, buttonLabel(), bx + 6, by + 2, TEXT, false);
+        if (data.getBoolean("Empty")) {
+            StationUi.centred(g, font, Component.translatable("gui.fts_geology.station.empty"), left + W / 2, top + H / 2, W - 40, DIM);
+            super.render(g, mx, my, partial);
+            return;
+        }
 
         drum(g, left + 8, top + 21, W - 16, 100);
         site(g, left + 8, top + 125, W - 16);

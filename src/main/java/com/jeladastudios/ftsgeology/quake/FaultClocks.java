@@ -68,7 +68,9 @@ public final class FaultClocks {
     private static final Map<ResourceKey<Level>, LongOpenHashSet> QUEUED = new HashMap<>();
     private static final Segment NONE = new Segment(0, 0, FaultType.INTERIOR, 0, 0, 0);
     private static int timer;
-    private static long rolled, broke, felt, filed, loaded;
+    private static long rolled, broke, felt, filed, loaded, small, smallFelt;
+    /** The smallest of the small quakes. */
+    static final double SMALL_FROM = 2.5;
 
     /** The clocks and the stations of one dimension, kept with the world. */
     static final class Clocks extends SavedData {
@@ -139,7 +141,7 @@ public final class FaultClocks {
         TODO.clear();
         QUEUED.clear();
         timer = 0;
-        rolled = broke = felt = filed = loaded = 0;
+        rolled = broke = felt = filed = loaded = small = smallFelt = 0;
     }
 
     private static long cell(int cx, int cz) {
@@ -258,6 +260,57 @@ public final class FaultClocks {
             if (level.random.nextDouble() < p) due.add(s);
         }
         for (Segment s : due) breakAt(level, clocks, s, players);
+        if (GeyserConfig.SMALL_QUAKES.get()) smallQuakes(level, near, cells, ticks, players);
+    }
+
+    /**
+     * The small quakes between the large ones, 2.5 to 5: each stretch has them at its own rate by its stress, sizes by
+     * Gutenberg-Richter (most of them small), anywhere along it. Nothing breaks; one a player feels, if only faintly,
+     * is felt and recorded, and the rest only recorded for the seismographs.
+     */
+    private static void smallQuakes(ServerLevel level, LongOpenHashSet near, Long2ObjectOpenHashMap<Segment> cells, int ticks,
+                                    List<ServerPlayer> players) {
+        double rate = GeyserConfig.SMALL_QUAKE_RATE.get() * ticks / 24000.0;
+        if (rate <= 0) return;
+        for (long k : near) {
+            Segment s = cells.get(k);
+            if (s == null || s == NONE) continue;
+            // How many in this roll, Poisson: nearly always none, now and then one.
+            double none = Math.exp(-rate * Math.max(0.15, s.stress()));
+            double draw = level.random.nextDouble();
+            while (draw > none) {
+                smallQuake(level, s, players);
+                draw *= level.random.nextDouble();
+            }
+        }
+    }
+
+    private static void smallQuake(ServerLevel level, Segment s, List<ServerPlayer> players) {
+        double m = SMALL_FROM - Math.log10(1.0 - level.random.nextDouble() * (1.0 - Math.pow(10.0, -(SMALLEST - SMALL_FROM))));
+        double along = (level.random.nextDouble() - 0.5) * SEG;
+        int x = (int) Math.round(s.x() + s.strikeX() * along), z = (int) Math.round(s.z() + s.strikeZ() * along);
+        double floor = FeltShaking.floor(), nearest = Double.MAX_VALUE;
+        boolean anyone = false;
+        for (ServerPlayer p : players) {
+            double d = Math.hypot(p.getX() - x, p.getZ() - z);
+            nearest = Math.min(nearest, d);
+            if (FeltShaking.intensity(m, d) >= floor) anyone = true;
+        }
+        int y = com.jeladastudios.ftsgeology.util.Loaded.at(level, x, z)
+                ? com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, x, z) : level.getSeaLevel();
+        if (y == Integer.MIN_VALUE) y = level.getSeaLevel();
+        BlockPos epi = new BlockPos(x, y, z);
+        small++;
+        if (anyone) {
+            smallFelt++;
+            Earthquake.tremor(level, epi, s.type(), m, s.strikeX(), s.strikeZ(), false);
+        } else {
+            com.jeladastudios.ftsgeology.instrument.SeismicNetwork.record(level, epi, s.type(), m,
+                    Earthquake.quakeDepthMetres(s.type(), m, level.random));
+        }
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("small quake: M{} {} at {} {}, {} blocks from the nearest player: {}",
+                String.format(Locale.ROOT, "%.1f", m), s.type(), x, z, nearest == Double.MAX_VALUE ? "-" : String.valueOf((int) nearest),
+                anyone ? "felt" : "filed for the seismographs");
     }
 
     /** One stretch lets go. */
@@ -299,13 +352,16 @@ public final class FaultClocks {
         clocks.setDirty();
 
         // Felt by anyone? Then it is a quake as any; otherwise only the seismographs hear of it.
-        boolean anyone = false;
+        boolean anyone = false, faintly = false;
         double nearest = Double.MAX_VALUE;
         double range = FeltShaking.feltRange(m);
         for (ServerPlayer p : players) {
             double d = Math.sqrt(Mth.square(p.getX() - s.x()) + Mth.square(p.getZ() - s.z()));
             nearest = Math.min(nearest, d);
-            if (d <= range && FeltShaking.intensity(m, d) >= FeltShaking.FELT) anyone = true;
+            if (d > range) continue;
+            double i = FeltShaking.intensity(m, d);
+            if (i >= FeltShaking.FELT) anyone = true;
+            else if (i >= FeltShaking.floor()) faintly = true;
         }
         int y = com.jeladastudios.ftsgeology.util.Loaded.at(level, s.x(), s.z())
                 ? com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, s.x(), s.z()) : level.getSeaLevel();
@@ -321,6 +377,10 @@ public final class FaultClocks {
             } else {
                 Earthquake.tremor(level, epi, s.type(), m, s.strikeX(), s.strikeZ(), false);
             }
+        } else if (faintly) {
+            // Far off: only a faint tremor where anyone is, and the instruments' record; its ground waits unbroken.
+            felt++;
+            Earthquake.tremor(level, epi, s.type(), m, s.strikeX(), s.strikeZ(), false);
         } else {
             filed++;
             com.jeladastudios.ftsgeology.instrument.SeismicNetwork.record(level, epi, s.type(), m,
@@ -328,7 +388,7 @@ public final class FaultClocks {
         }
         com.jeladastudios.ftsgeology.util.Diagnostics.info("fault clock: M{} {} at {} {}, {} blocks from the nearest player: {}",
                 String.format(Locale.ROOT, "%.1f", m), s.type(), s.x(), s.z(),
-                nearest == Double.MAX_VALUE ? "-" : String.valueOf((int) nearest), anyone ? "felt" : "filed for the seismographs");
+                nearest == Double.MAX_VALUE ? "-" : String.valueOf((int) nearest), anyone ? "felt" : faintly ? "felt faintly" : "filed for the seismographs");
     }
 
     /** The largest a boundary of this kind breaks in. */
@@ -358,7 +418,7 @@ public final class FaultClocks {
             cells += m.size();
             for (Segment s : m.values()) if (s != NONE) segments++;
         }
-        return String.format(Locale.ROOT, "fault clocks: %d cells looked up, %d stretches of boundary, %d rolls, %d broke (%d felt, %d filed), %d stretches beyond them loaded",
-                cells, segments, rolled, broke, felt, filed, loaded);
+        return String.format(Locale.ROOT, "fault clocks: %d cells looked up, %d stretches of boundary, %d rolls, %d broke (%d felt, %d filed), %d stretches beyond them loaded, %d small quakes (%d felt)",
+                cells, segments, rolled, broke, felt, filed, loaded, small, smallFelt);
     }
 }

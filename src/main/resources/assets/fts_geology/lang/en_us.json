@@ -832,5 +832,20 @@
   "gui.fts_geology.gas_panel.tank": "Tank",
   "gui.fts_geology.gas_panel.mix": "In the tank",
   "gui.fts_geology.gas_panel.empty": "Empty",
-  "gui.fts_geology.gas_panel.refused": "Electrodynamics: %s V refused, it takes 120 V only"
+  "gui.fts_geology.gas_panel.refused": "Electrodynamics: %s V refused, it takes 120 V only",
+  "message.fts_geology.p_wave_felt": "Earthquake: the P wave",
+  "message.fts_geology.s_wave_felt": "The S wave: %s shaking (MMI %s)",
+  "gui.fts_geology.terminal.tab.stations": "Stations",
+  "gui.fts_geology.station.name": "Name",
+  "gui.fts_geology.station.save": "Save",
+  "gui.fts_geology.station.back": "Back to this terminal",
+  "gui.fts_geology.station.live": "live",
+  "gui.fts_geology.station.never": "not read yet",
+  "gui.fts_geology.station.ago": "read %s ago",
+  "gui.fts_geology.station.remote": "%s (from afar, %s)",
+  "gui.fts_geology.station.terminal": "Weather station %s, %s",
+  "gui.fts_geology.station.seismograph": "Seismograph %s, %s",
+  "gui.fts_geology.station.empty": "No reading from this station yet: it comes once its place has been loaded a while.",
+  "gui.fts_geology.station.none": "No stations on the network",
+  "gui.fts_geology.station.this": "here"
 }
