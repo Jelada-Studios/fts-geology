@@ -664,6 +664,7 @@
   "gui.fts_geology.seismograph.head.from": "Yön",
   "gui.fts_geology.seismograph.head.ago": "Ne zaman",
   "message.fts_geology.seismograph.fix": "Ağın %s istasyonu M%s depremini %s, %s konumuna koyuyor (±%s blok), %s derinlikte",
+  "message.fts_geology.seismograph.fix_far": "Ağın %s istasyonu M%s depremini %s, %s konumuna koyuyor (±%s blok); derinliğini söyleyemeyecek kadar uzakta",
   "message.fts_geology.early_warning": "Sismograf ağından erken uyarı: M%s, %s sarsıntı (MMI %s), %s sn sonra",
   "block.fts_geology.tiltmeter": "Eğim Ölçer",
   "block.fts_geology.tiltmeter.tooltip.1": "Zeminin eğimini mikroradyan olarak ve hangi yöne yükseldiğini okur.",

@@ -424,9 +424,15 @@ public class SeismographBlockEntity extends BlockEntity {
         for (Reading r : readings) {
             double[] f = com.jeladastudios.ftsgeology.instrument.SeismicStations.fix(r.eventId());
             if (f == null) continue;
-            return Component.translatable("message.fts_geology.seismograph.fix", String.valueOf((int) f[3]),
-                    String.format(Locale.ROOT, "%.1f", r.magnitude()), String.valueOf(Math.round(f[0])), String.valueOf(Math.round(f[1])),
-                    String.valueOf(Math.round(f[2])), DepthScale.format(f[4])).withStyle(ChatFormatting.AQUA);
+            String m = String.format(Locale.ROOT, "%.1f", r.magnitude());
+            if (f[4] < 0) {
+                return Component.translatable("message.fts_geology.seismograph.fix_far", String.valueOf((int) f[3]), m,
+                        String.valueOf(Math.round(f[0])), String.valueOf(Math.round(f[1])), String.valueOf(Math.round(f[2])))
+                        .withStyle(ChatFormatting.AQUA);
+            }
+            return Component.translatable("message.fts_geology.seismograph.fix", String.valueOf((int) f[3]), m,
+                    String.valueOf(Math.round(f[0])), String.valueOf(Math.round(f[1])), String.valueOf(Math.round(f[2])),
+                    DepthScale.format(f[4])).withStyle(ChatFormatting.AQUA);
         }
         return null;
     }

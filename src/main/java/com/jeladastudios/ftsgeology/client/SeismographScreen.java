@@ -100,9 +100,9 @@ public class SeismographScreen extends Screen {
         g.fill(bx, by, bx + buttonW(), by + 12, hover ? BUTTON_ON : BUTTON);
         g.drawString(font, Component.translatable("gui.fts_geology.seismograph.chat"), bx + 6, by + 2, TEXT, false);
 
-        drum(g, left + 8, top + 21, W - 16, 112);
-        site(g, left + 8, top + 137, W - 16);
-        log(g, left + 8, top + 173, W - 16, H - 179);
+        drum(g, left + 8, top + 21, W - 16, 100);
+        site(g, left + 8, top + 125, W - 16);
+        log(g, left + 8, top + 159, W - 16, H - 165);
         super.render(g, mx, my, partial);
     }
 
@@ -147,7 +147,7 @@ public class SeismographScreen extends Screen {
 
     /** Where the drum stands and what it hears over: the site on up to two lines, then the noise. */
     private void site(GuiGraphics g, int x, int y, int w) {
-        g.fill(x, y, x + w, y + 32, PANEL);
+        g.fill(x, y, x + w, y + 30, PANEL);
         Component ground = Component.translatable("gui.fts_geology.seismograph.ground." + data.getInt("Ground"));
         Component line = Component.translatable("gui.fts_geology.seismograph.site", ground, data.getInt("Cover"),
                 String.format(Locale.ROOT, "%.3f", data.getFloat("Noise")), String.format(Locale.ROOT, "%.1f", data.getFloat("Hears")));
@@ -161,7 +161,7 @@ public class SeismographScreen extends Screen {
         }
         Component second = from.isEmpty() ? Component.translatable("gui.fts_geology.seismograph.quiet")
                 : Component.translatable("gui.fts_geology.seismograph.noisy", String.join(", ", from));
-        g.drawString(font, second, x + 4, y + 22, from.isEmpty() ? DIM : WARN, false);
+        g.drawString(font, second, x + 4, y + 21, from.isEmpty() ? DIM : WARN, false);
     }
 
     // === The log ==============================================================
@@ -171,7 +171,15 @@ public class SeismographScreen extends Screen {
         g.fill(x, y, x + w, y + h, PANEL);
         ListTag log = data.getList("Log", Tag.TAG_COMPOUND);
         ListTag extra = data.getList("Extra", Tag.TAG_STRING);
-        int rows = (h - 14) / 10 - extra.size();
+        // The network's fix, the swarm and the blasts under the readings, each on up to two lines.
+        List<FormattedCharSequence> under = new ArrayList<>();
+        for (int i = 0; i < extra.size(); i++) {
+            Component c = Component.Serializer.fromJson(extra.getString(i));
+            if (c == null) continue;
+            List<FormattedCharSequence> wrapped = font.split(c, w - 8);
+            under.addAll(wrapped.subList(0, Math.min(2, wrapped.size())));
+        }
+        int rows = (h - 14) / 10 - under.size();
         // The last column, when, is set against the right edge; what is to its left is cut to fit.
         int whenX = x + w - 46;
         int[] cols = {x + 4, x + 40, x + 98, x + 150, x + 174, whenX};
@@ -200,11 +208,8 @@ public class SeismographScreen extends Screen {
             g.drawString(font, r.getString("Ago"), cols[5], ry, DIM, false);
             ry += 10;
         }
-        for (int i = 0; i < extra.size(); i++) {
-            Component c = Component.Serializer.fromJson(extra.getString(i));
-            if (c == null) continue;
-            List<FormattedCharSequence> wrapped = font.split(c, w - 8);
-            if (!wrapped.isEmpty()) g.drawString(font, wrapped.get(0), x + 4, ry, DIM, false);
+        for (FormattedCharSequence line : under) {
+            g.drawString(font, line, x + 4, ry, DIM, false);
             ry += 10;
         }
     }

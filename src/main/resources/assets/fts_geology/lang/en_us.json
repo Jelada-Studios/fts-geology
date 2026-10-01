@@ -674,6 +674,7 @@
   "gui.fts_geology.seismograph.head.from": "From",
   "gui.fts_geology.seismograph.head.ago": "When",
   "message.fts_geology.seismograph.fix": "The network's %s stations put the M%s at %s, %s, give or take %s blocks, %s deep",
+  "message.fts_geology.seismograph.fix_far": "The network's %s stations put the M%s at %s, %s, give or take %s blocks; too far off them to tell its depth",
   "message.fts_geology.early_warning": "Early warning from the seismograph network: M%s, %s shaking (MMI %s) in %s s",
   "block.fts_geology.tiltmeter": "Tiltmeter",
   "block.fts_geology.tiltmeter.tooltip.1": "How far the ground tilts, in microradians, and which way it rises.",
