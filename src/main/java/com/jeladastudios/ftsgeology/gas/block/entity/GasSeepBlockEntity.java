@@ -26,6 +26,8 @@ public class GasSeepBlockEntity extends BlockEntity {
 
     /** Moles a second, and what they are. */
     private static final double FLOW = 0.3, METHANE = 0.87, HYDROGEN = 0.09;
+    /** The pressure the gas comes out of the rock at, in atmospheres. */
+    private static final double SOURCE_ATM = 1.3;
 
     public GasSeepBlockEntity(BlockPos pos, BlockState state) {
         super(GasBlockEntities.GAS_SEEP.get(), pos, state);
@@ -43,10 +45,14 @@ public class GasSeepBlockEntity extends BlockEntity {
             if (lit) setLit(sl, state, false);
             return;
         }
+        // The gas comes out of the rock at a little over the air's pressure: into a closed space it flows only until
+        // that space's air has come up to it.
+        double flow = FLOW * Math.max(0.0, Math.min(1.0, (SOURCE_ATM - gm.sample(above).total() / GasManager.N0) / (SOURCE_ATM - 1.0)));
+        if (flow <= 0.0) return;
         GasMix stream = new GasMix();
-        stream.add(Gas.METHANE, FLOW * METHANE);
-        stream.add(Gas.HYDROGEN, FLOW * HYDROGEN);
-        stream.add(Gas.NITROGEN, FLOW * (1.0 - METHANE - HYDROGEN));
+        stream.add(Gas.METHANE, flow * METHANE);
+        stream.add(Gas.HYDROGEN, flow * HYDROGEN);
+        stream.add(Gas.NITROGEN, flow * (1.0 - METHANE - HYDROGEN));
         if (lit) {
             GasMix cell = gm.getOrCreateCell(above);
             if (cell == null) return;
