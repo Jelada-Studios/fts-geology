@@ -106,6 +106,8 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.quake.RoofLoad.clear();
         com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.hydrology.Subsidence.summary());
         com.jeladastudios.ftsgeology.hydrology.Subsidence.clear();
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.hydrology.HollowPonds.summary());
+        com.jeladastudios.ftsgeology.hydrology.HollowPonds.clear();
         if (com.jeladastudios.ftsgeology.hydrology.Reservoirs.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.hydrology.Reservoirs.summary());
         com.jeladastudios.ftsgeology.hydrology.Reservoirs.clear();
         if (com.jeladastudios.ftsgeology.hydrology.Floods.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.hydrology.Floods.summary());

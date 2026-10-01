@@ -98,7 +98,7 @@ public final class RiverRepair {
     private static final LongLinkedOpenHashSet MOVED = new LongLinkedOpenHashSet(), KEEP = new LongLinkedOpenHashSet();
 
     private static final LongAdder LAID = new LongAdder(), RECUT_COLUMNS = new LongAdder(), BANKS = new LongAdder(),
-            CHUNKS = new LongAdder(), DRIED_COLUMNS = new LongAdder();
+            CHUNKS = new LongAdder(), DRIED_COLUMNS = new LongAdder(), RECEDED = new LongAdder();
 
     /** Columns of small streams a well's cone has dried, until the water comes back under a block; and the drawdowns. */
     private static final it.unimi.dsi.fastutil.longs.LongOpenHashSet DRIED = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
@@ -247,6 +247,16 @@ public final class RiverRepair {
                 int g = ground(chunk, x, z, m);
                 if (g == Integer.MIN_VALUE) continue;
                 boolean lake = plan.lake()[Plan.index(lx, lz)];
+                // A lake in a long drought is down a block: its top water goes as the column is visited, and is not laid
+                // again till the rains come back, when it fills from the water still in it.
+                if (lake && low(level, x, z)) {
+                    BlockState at = chunk.getBlockState(m.set(x, w, z));
+                    if ((at.is(ModBlocks.RIVER_WATER.get()) || at.is(Blocks.ICE)) && chunk.getBlockState(m.set(x, w + 1, z)).getFluidState().isEmpty()) {
+                        level.setBlock(m.set(x, w, z), Blocks.AIR.defaultBlockState(), FLAGS);
+                        RECEDED.increment();
+                    }
+                    w--;
+                }
                 if (dryStream(level, chunk, plan, x, z, lx, lz, g, w, m)) continue;
                 if (g >= w) {
                     // Ground the quake lifted into a river's channel is cut through again; a lake's shore is its shore.
@@ -299,6 +309,14 @@ public final class RiverRepair {
     }
 
     private static final int[][] SIDES = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+
+    /** How dry a region's spell is for its lakes to go down a block (see Storms#spell). */
+    private static final double DROUGHT = 0.2;
+
+    /** Whether the lakes round a place are down a block: the region is in a long drought. */
+    static boolean low(ServerLevel level, int x, int z) {
+        return GeyserConfig.LAKE_LEVELS.get() && com.jeladastudios.ftsgeology.weather.Storms.spell(level, x, z) < DROUGHT;
+    }
 
     /** The ground of a column, under its water, plants and trees; read straight from its chunk. */
     private static int ground(LevelChunk chunk, int x, int z, BlockPos.MutableBlockPos m) {
@@ -408,8 +426,8 @@ public final class RiverRepair {
 
     public static String summary() {
         return String.format(java.util.Locale.ROOT,
-                "river repair: %d chunks laid again, %d blocks of water, %d channels cut through, %d banks built up, %d stream columns run dry",
-                CHUNKS.sum(), LAID.sum(), RECUT_COLUMNS.sum(), BANKS.sum(), DRIED_COLUMNS.sum());
+                "river repair: %d chunks laid again, %d blocks of water, %d channels cut through, %d banks built up, %d stream columns run dry, %d lake columns down a block in a drought",
+                CHUNKS.sum(), LAID.sum(), RECUT_COLUMNS.sum(), BANKS.sum(), DRIED_COLUMNS.sum(), RECEDED.sum());
     }
 
     @SubscribeEvent

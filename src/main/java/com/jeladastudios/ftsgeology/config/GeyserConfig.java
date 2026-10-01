@@ -211,6 +211,8 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue RIVER_SPILLS;            // a river runs out through a bank taken away
     public static final ForgeConfigSpec.BooleanValue STREAMS_DRY_UP;          // a well's cone dries the small streams over it
     public static final ForgeConfigSpec.BooleanValue RIVER_FLOODS;            // rivers over their banks in heavy rain on soaked ground
+    public static final ForgeConfigSpec.BooleanValue HOLLOW_PONDS;            // rain running off into closed hollows stands there as ponds
+    public static final ForgeConfigSpec.BooleanValue LAKE_LEVELS;             // lakes down a block in a long drought
     public static final ForgeConfigSpec.BooleanValue KARST;                  // rivers sink, caves, sinkholes
     public static final ForgeConfigSpec.BooleanValue WATER_TABLE_ENABLED;
     public static final ForgeConfigSpec.DoubleValue WATER_TABLE_SUBDUAL;      // relief it copies, 0..1
@@ -1205,6 +1207,16 @@ public final class GeyserConfig {
                         "some mud (with soilWaterChangesGround). In a narrow valley it comes as a flash flood and carries along",
                         "what stands in it. The ground is not moved. Needs soilWater.")
                 .define("riverFloods", true);
+        HOLLOW_PONDS = b
+                .comment("Rain the soaked ground cannot take in runs off; what runs into a closed hollow stands there as a pond,",
+                        "as deep as the hollow holds up to the lowest point of its rim and no deeper than the water that gathered,",
+                        "until it soaks in and dries up after the rain, a layer at a time, leaving some mud. Water is laid only",
+                        "there, never over the ground at large. Needs soilWater.")
+                .define("rainPondsInHollows", true);
+        LAKE_LEVELS = b
+                .comment("A lake goes down a block in a region's long drought, its shallow shore drying out, and comes back when the",
+                        "rains do, filling from the water still in it. Needs regionalRain for the region's wet and dry spells.")
+                .define("lakesFallInDroughts", true);
         DAMS = b
                 .comment("A river walled across fills up behind the wall, a layer at a time, as fast as the river brings water,",
                         "up to the top of the wall or the lowest gap in the valley; a wall too thin for the water it holds",

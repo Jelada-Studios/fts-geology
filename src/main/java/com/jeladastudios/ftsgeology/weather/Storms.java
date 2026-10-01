@@ -289,6 +289,11 @@ public final class Storms {
         return a + (b - a) * f;
     }
 
+    /** How wet the spell the region round a place is in, 0 (a drought) to 1 (a wet spell): for the lakes' levels. */
+    public static double spell(ServerLevel level, double x, double z) {
+        return wetness(level, x, z);
+    }
+
     /** The wind at a place, blocks a tick: round the highs and lows (see {@link Atmosphere#wind}). */
     static double[] wind(ServerLevel level, double x, double z) {
         return Atmosphere.wind(level, x, z);

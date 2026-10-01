@@ -155,6 +155,9 @@ public final class SoilWater {
         final long[] riseSince = new long[16];
         /** How likely a puddle is on each cell now, eased down as it dries (see Puddles). Not kept. */
         final float[] puddle = new float[16];
+        /** Millimetres run off the chunk's cells at the last look, all of them together, and the blocks of water gathered
+         * in its hollow from what ran off (see HollowPonds). Not kept. */
+        float runoff, gathered;
         /** How much each cell has settled, in blocks, and how many whole blocks each column has gone down (see Subsidence). */
         final float[] compacted = new float[16];
         final byte[] settled = new byte[256];
@@ -394,6 +397,8 @@ public final class SoilWater {
         loads(level, chunk, c);
         Subsidence.look(level, chunk, c, hours);
         Puddles.update(level, chunk, c, sky, first || away ? 0 : hours);
+        HollowPonds.look(level, chunk, c, first || away ? 0 : hours, c.runoff);
+        c.runoff = 0;
         // Away, the place had its average weather, rain and all: no drought or flood is carried over it.
         if (GeyserConfig.SOIL_WATER_GROUND.get()) showGround(level, chunk, c, first || away ? -1 : hours);
     }
@@ -1049,8 +1054,10 @@ public final class SoilWater {
         double stress = Mth.clamp(s.available(sat(root, s.root)) / 0.5, 0.0, 1.0);
         e = Math.min(root, want * plants * stress);
         root -= e;
-        // Standing water runs off towards the rivers.
-        pond *= Math.exp(-h / RUNOFF_HOURS);
+        // Standing water runs off towards the rivers, and into the hollows on its way (HollowPonds).
+        double off = pond * (1.0 - Math.exp(-h / RUNOFF_HOURS));
+        pond -= off;
+        c.runoff += (float) off;
         // The groundwater settles back to its level over weeks; near the surface it wets the roots from below.
         table *= Math.exp(-h / SETTLE_HOURS);
         if (c.depth >= 0) {
