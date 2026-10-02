@@ -90,7 +90,7 @@ public final class FissureEruptions {
 
     private static final String NAME = "fts_geology_fissures";
 
-    private static long begun, sunkColumns, cracked, laid, cooled, swarm;
+    private static long begun, sunkColumns, cracked, laid, cooled, swarm, swept;
     private static double largest, worstMs;
 
     // === One eruption ======================================================
@@ -123,6 +123,10 @@ public final class FissureEruptions {
         transient double owed;
         /** Where the lava field's thickening has got to in its cells. */
         transient int riseAt;
+        /** The last sweep of the field's box for lava left lying: the box, how far through, which pass, what it found. */
+        transient int[] box;
+        transient int sweepAt, sweepPass, sweepFound;
+        transient boolean swept;
         /** How far the trench has set, once the eruption has drawn into its vents. */
         transient int trenchAt = Integer.MAX_VALUE;
         /** Cones growing a block: by vent, the height, how far through its columns, and its breach in degrees. */
@@ -378,9 +382,16 @@ public final class FissureEruptions {
         long deadline = t0 + TickBudget.slice(0.15);
         PLAYER_BUILT.clear();
         for (Fissure f : st.all) {
+            long a = System.nanoTime();
             show(level, f, now);
+            long b = System.nanoTime();
             if (now % 20 == 0) step(level, f, now);
+            long c = System.nanoTime();
             work(level, f, deadline);
+            long e = System.nanoTime();
+            // A long tick of its own, told by part for the log.
+            if (e - a > 50_000_000L) Diagnostics.info("fissure eruption at {}, {}: a tick of {} ms in {} (show {}, step {}, work {})", f.cx, f.cz,
+                    (e - a) / 1_000_000, f.stage, (b - a) / 1_000_000, (c - b) / 1_000_000, (e - c) / 1_000_000);
         }
         if (st.all.removeIf(f -> f.done)) Diagnostics.info("fissure eruption over; {}", summary());
         st.setDirty();
@@ -466,7 +477,7 @@ public final class FissureEruptions {
         }
         if (p < 1.0) return;
         if (f.stage == Stage.COOL) {
-            if (f.cool2 >= f.cells.size() && f.cool1 >= f.cells.size()) {
+            if (f.cool2 >= f.cells.size() && f.cool1 >= f.cells.size() && f.swept) {
                 f.done = true;
                 VolcanoUnrest.settle(centre);
             }
@@ -524,7 +535,12 @@ public final class FissureEruptions {
             setTrench(level, f, deadline);
             heap(level, f, deadline);
         }
-        if (f.stage == Stage.COOL) cool(level, f, deadline);
+        if (f.stage == Stage.COOL) {
+            cool(level, f, deadline);
+            if (level.getGameTime() - f.stageAt >= COOL && f.cool1 >= f.cells.size() && f.cool2 >= f.cells.size() && !f.swept) {
+                sweep(level, f, deadline);
+            }
+        }
     }
 
     // === The swarm ========================================================
@@ -856,7 +872,7 @@ public final class FissureEruptions {
             BlockState s = level.getBlockState(p);
             if (!s.getFluidState().is(FluidTags.LAVA)) continue;
             boolean top = !level.getBlockState(p.above()).getFluidState().is(FluidTags.LAVA);
-            level.setBlock(p, top ? ModBlocks.COOLING_LAVA_CRUST.get().defaultBlockState() : Blocks.BASALT.defaultBlockState(), Block.UPDATE_ALL);
+            com.jeladastudios.ftsgeology.util.Freeze.set(level, p, top ? ModBlocks.COOLING_LAVA_CRUST.get().defaultBlockState() : Blocks.BASALT.defaultBlockState(), Block.UPDATE_ALL);
             // Spatter heaped a block high along its sides.
             if (top) {
                 for (int side = -1; side <= 1; side += 2) {
@@ -968,7 +984,7 @@ public final class FissureEruptions {
         for (int y = g + 1; y <= target; y++) {
             BlockState s = level.getBlockState(m.set(x, y, z));
             if (!takes(s) && !s.getFluidState().is(FluidTags.LAVA)) return;
-            level.setBlock(m, scoria(level, rim && y == target), Block.UPDATE_ALL);
+            com.jeladastudios.ftsgeology.util.Freeze.set(level, m.immutable(), scoria(level, rim && y == target), Block.UPDATE_ALL);
         }
     }
 
@@ -1002,7 +1018,7 @@ public final class FissureEruptions {
                 BlockState s = level.getBlockState(p);
                 if (!s.getFluidState().is(FluidTags.LAVA)) continue;
                 boolean top = !level.getBlockState(p.above()).getFluidState().is(FluidTags.LAVA);
-                level.setBlock(p, top ? ModBlocks.COOLING_LAVA_CRUST.get().defaultBlockState() : Blocks.BASALT.defaultBlockState(), Block.UPDATE_ALL);
+                com.jeladastudios.ftsgeology.util.Freeze.set(level, p, top ? ModBlocks.COOLING_LAVA_CRUST.get().defaultBlockState() : Blocks.BASALT.defaultBlockState(), Block.UPDATE_ALL);
                 cooled++;
             } else if (second && f.cool2 < f.cells.size()) {
                 BlockPos p = BlockPos.of(f.cells.getLong(f.cool2++));
@@ -1020,6 +1036,57 @@ public final class FissureEruptions {
                 return;
             }
         }
+    }
+
+    /**
+     * The last of the cooling: the box the field lies in, swept for any lava still lying there -- a mod that lets fluids
+     * flow as finite volumes (Flowing Fluids) moves lava off the blocks it was laid on, and that would lie molten for
+     * good. Lava standing full sets into rock; a thin film left running is gone. Gone over again while a pass still
+     * finds some, three passes at most, within the budget.
+     */
+    private static void sweep(ServerLevel level, Fissure f, long deadline) {
+        if (f.box == null) {
+            int x0 = Integer.MAX_VALUE, x1 = Integer.MIN_VALUE, z0 = Integer.MAX_VALUE, z1 = Integer.MIN_VALUE, y0 = Integer.MAX_VALUE, y1 = Integer.MIN_VALUE;
+            for (long k : f.cells) {
+                x0 = Math.min(x0, BlockPos.getX(k)); x1 = Math.max(x1, BlockPos.getX(k));
+                y0 = Math.min(y0, BlockPos.getY(k)); y1 = Math.max(y1, BlockPos.getY(k));
+                z0 = Math.min(z0, BlockPos.getZ(k)); z1 = Math.max(z1, BlockPos.getZ(k));
+            }
+            if (x0 > x1) {
+                f.swept = true;
+                return;
+            }
+            f.box = new int[]{x0 - 8, z0 - 8, x1 + 8, z1 + 8, y0 - 3, y1 + 4};
+        }
+        int[] b = f.box;
+        int w = b[2] - b[0] + 1, n = w * (b[3] - b[1] + 1);
+        while (f.sweepAt < n && System.nanoTime() < deadline) {
+            int i = f.sweepAt++, x = b[0] + i % w, z = b[1] + i / w;
+            if (!Loaded.around(level, new BlockPos(x, 0, z))) continue;
+            for (int y = b[5]; y >= b[4]; y--) {
+                BlockPos p = new BlockPos(x, y, z);
+                var fluid = level.getBlockState(p).getFluidState();
+                if (!fluid.is(FluidTags.LAVA)) continue;
+                f.sweepFound++;
+                if (!fluid.isSource()) {
+                    level.setBlock(p, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+                    continue;
+                }
+                boolean top = !level.getBlockState(p.above()).getFluidState().is(FluidTags.LAVA);
+                int r = level.random.nextInt(20);
+                BlockState rock = !top ? Blocks.BASALT.defaultBlockState() : r < 3 ? ModBlocks.COOLING_LAVA_CRUST.get().defaultBlockState()
+                        : (r < 13 ? Blocks.BASALT : r < 18 ? Blocks.SMOOTH_BASALT : Blocks.BLACKSTONE).defaultBlockState();
+                com.jeladastudios.ftsgeology.util.Freeze.set(level, p, rock, Block.UPDATE_ALL);
+                swept++;
+            }
+        }
+        if (f.sweepAt < n) return;
+        if (f.sweepFound > 0 && ++f.sweepPass < 3) {
+            f.sweepAt = 0;
+            f.sweepFound = 0;
+            return;
+        }
+        f.swept = true;
     }
 
     // === What is seen and heard ===========================================
@@ -1165,8 +1232,8 @@ public final class FissureEruptions {
     }
 
     public static String summary() {
-        return String.format(Locale.ROOT, "fissure eruptions: %d begun, %d swarm quakes (largest M%.1f), %d columns dropped, %d cracks, %d lava laid, %d set; worst tick %.1f ms",
-                begun, swarm, largest, sunkColumns, cracked, laid, cooled, worstMs);
+        return String.format(Locale.ROOT, "fissure eruptions: %d begun, %d swarm quakes (largest M%.1f), %d columns dropped, %d cracks, %d lava laid, %d set, %d more found lying and set; worst tick %.1f ms",
+                begun, swarm, largest, sunkColumns, cracked, laid, cooled, swept, worstMs);
     }
 
     public static boolean any() {
@@ -1174,7 +1241,7 @@ public final class FissureEruptions {
     }
 
     public static void clear() {
-        begun = sunkColumns = cracked = laid = cooled = swarm = 0;
+        begun = sunkColumns = cracked = laid = cooled = swarm = swept = 0;
         largest = worstMs = 0;
         PLAYER_BUILT.clear();
     }

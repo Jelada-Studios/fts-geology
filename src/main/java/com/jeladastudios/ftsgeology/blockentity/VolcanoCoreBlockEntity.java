@@ -98,7 +98,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
             BlockPos p = BlockPos.of(cell);
             BlockState s = level.getBlockState(p);
             if (s.isAir() || s.getFluidState().is(FluidTags.LAVA)) {
-                level.setBlock(p, com.jeladastudios.ftsgeology.registry.ModBlocks.COOLING_LAVA_CRUST.get()
+                com.jeladastudios.ftsgeology.util.Freeze.set(level, p, com.jeladastudios.ftsgeology.registry.ModBlocks.COOLING_LAVA_CRUST.get()
                         .defaultBlockState(), 3);
             }
         }

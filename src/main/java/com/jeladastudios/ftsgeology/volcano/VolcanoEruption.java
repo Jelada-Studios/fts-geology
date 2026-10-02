@@ -430,7 +430,7 @@ public final class VolcanoEruption {
             }
             // Lava that pooled in a hollow freezes where it lies.
             if (walledSides(level, p) >= 3) {
-                level.setBlock(p, TfcCompat.translate(level, p, (level.random.nextInt(3) == 0
+                com.jeladastudios.ftsgeology.util.Freeze.set(level, p, TfcCompat.translate(level, p, (level.random.nextInt(3) == 0
                         ? Blocks.TUFF : Blocks.BASALT).defaultBlockState()), 2);
                 continue;
             }
