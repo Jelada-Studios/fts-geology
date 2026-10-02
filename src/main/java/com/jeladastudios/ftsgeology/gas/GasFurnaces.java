@@ -94,11 +94,18 @@ public final class GasFurnaces {
         return heat;
     }
 
-    /** The furnace's fire kept going a few ticks more, its flame drawn full: no fuel item is burnt while it is. */
+    /**
+     * The furnace's fire kept going a little longer, its flame drawn full: no fuel item is burnt while it is. Kept a
+     * second ahead, not a few ticks: a gas line that missed a tick let the fire run out, and the furnace burnt the coal
+     * in its fuel slot -- and with Pollution of the Realms, that coal's smoke came out of a hydrogen furnace.
+     */
     private static void keepLit(AbstractFurnaceBlockEntity furnace) {
         AbstractFurnaceAccessor f = (AbstractFurnaceAccessor) furnace;
-        if (f.fts_geology$litTime() < 3) f.fts_geology$setLitTime(3);
-        f.fts_geology$setLitDuration(3);
+        if (f.fts_geology$litTime() < LIT_AHEAD) f.fts_geology$setLitTime(LIT_AHEAD);
+        f.fts_geology$setLitDuration(LIT_AHEAD);
         furnace.setChanged();
     }
+
+    /** How far ahead a furnace's fire is kept while gas heats it, ticks. */
+    private static final int LIT_AHEAD = 20;
 }
