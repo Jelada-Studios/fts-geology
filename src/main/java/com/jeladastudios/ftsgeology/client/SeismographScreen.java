@@ -211,15 +211,17 @@ public class SeismographScreen extends Screen {
         g.fill(x, y, x + w, y + h, PANEL);
         ListTag log = data.getList("Log", Tag.TAG_COMPOUND);
         ListTag extra = data.getList("Extra", Tag.TAG_STRING);
-        // The network's fix, the swarm and the blasts under the readings, each on up to two lines.
+        // The network's fix, the swarm and the blasts under the readings, each on up to three lines: a warning cut at two
+        // lost its end ("... may be close!").
         List<FormattedCharSequence> under = new ArrayList<>();
         for (int i = 0; i < extra.size(); i++) {
             Component c = Component.Serializer.fromJson(extra.getString(i));
             if (c == null) continue;
             List<FormattedCharSequence> wrapped = font.split(c, w - 8);
-            under.addAll(wrapped.subList(0, Math.min(2, wrapped.size())));
+            under.addAll(wrapped.subList(0, Math.min(3, wrapped.size())));
         }
-        int rows = (h - 14) / 10 - under.size();
+        // The line saying there is nothing yet takes a row of its own: the lines under began on it, one over the other.
+        int rows = (h - 14) / 10 - under.size() - (log.isEmpty() ? 1 : 0);
         // The last column, when, is set against the right edge; what is to its left is cut to fit.
         int whenX = x + w - 46;
         int[] cols = {x + 4, x + 40, x + 98, x + 150, x + 174, whenX};
@@ -228,11 +230,13 @@ public class SeismographScreen extends Screen {
             g.drawString(font, Component.translatable("gui.fts_geology.seismograph.head." + heads[i]), cols[i], y + 3, DIM, false);
         }
         g.fill(x + 2, y + 12, x + w - 2, y + 13, BORDER);
+        int ry = y + 16;
         if (log.isEmpty()) {
-            g.drawString(font, Component.translatable("message.fts_geology.seismograph.empty"), x + 4, y + 16, DIM, false);
+            g.drawString(font, font.plainSubstrByWidth(Component.translatable("message.fts_geology.seismograph.empty").getString(), w - 8),
+                    x + 4, ry, DIM, false);
+            ry += 10;
         }
         int first = Math.max(0, log.size() - Math.max(0, rows));
-        int ry = y + 16;
         for (int i = first; i < log.size(); i++) {
             CompoundTag r = log.getCompound(i);
             int color = r.getBoolean("Clip") ? WARN : TEXT;
@@ -249,6 +253,7 @@ public class SeismographScreen extends Screen {
             ry += 10;
         }
         for (FormattedCharSequence line : under) {
+            if (ry + 9 > y + h) break;
             g.drawString(font, line, x + 4, ry, DIM, false);
             ry += 10;
         }
