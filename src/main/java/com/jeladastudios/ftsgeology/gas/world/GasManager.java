@@ -77,10 +77,10 @@ public class GasManager {
     public static void unload(ServerLevel level) {
         GasManager m = MANAGERS.remove(level);
         if (m != null && m.ticks > 0) {
-            com.jeladastudios.ftsgeology.util.Diagnostics.info("gases in {}: {} cells, {} awake at the last sweep; {} ms a tick on average over {} ticks, the worst {} ms; {} firedamp pockets ({} cells), {} flames snuffed",
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("gases in {}: {} cells, {} awake at the last sweep; {} ms a tick on average over {} ticks, the worst {} ms; {} firedamp pockets ({} cells), {} karst caves with carbon dioxide, {} flames snuffed",
                     level.dimension().location(), m.activeCellCount(), m.awakeCount,
                     String.format(java.util.Locale.ROOT, "%.3f", m.nanos / 1e6 / m.ticks), m.ticks,
-                    String.format(java.util.Locale.ROOT, "%.2f", m.worstNanos / 1e6), GasWorldGen.pockets, GasWorldGen.pocketCells, m.snuffed);
+                    String.format(java.util.Locale.ROOT, "%.2f", m.worstNanos / 1e6), GasWorldGen.pockets, GasWorldGen.pocketCells, GasWorldGen.karstPockets, m.snuffed);
         }
     }
 

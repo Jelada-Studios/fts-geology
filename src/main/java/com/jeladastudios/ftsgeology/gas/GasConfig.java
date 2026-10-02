@@ -36,6 +36,7 @@ public final class GasConfig {
 
     // World
     public static final ForgeConfigSpec.DoubleValue FIREDAMP_CHANCE;
+    public static final ForgeConfigSpec.DoubleValue KARST_CO2_CHANCE;
     public static final ForgeConfigSpec.BooleanValue VOLCANO_GAS;
     public static final ForgeConfigSpec.BooleanValue COAL_RELEASES_METHANE;
     public static final ForgeConfigSpec.DoubleValue OUTBURST_CHANCE;
@@ -99,6 +100,9 @@ public final class GasConfig {
         FIREDAMP_CHANCE = b.comment("Chance, in a newly made chunk where a coal seam runs beside a cave deep enough, that the cave holds",
                         "firedamp (methane) under its roof, richer the deeper the seam.")
                 .defineInRange("firedampChance", 0.15, 0.0, 1.0);
+        KARST_CO2_CHANCE = b.comment("Chance, in a newly made chunk, that a closed cave hollow walled in calcite, marble or dripstone holds a few",
+                        "per cent of carbon dioxide on its floor, as limestone caves do.")
+                .defineInRange("karstCo2Chance", 0.3, 0.0, 1.0);
         VOLCANO_GAS = b.comment("A live volcano breathes its carbon dioxide, with a little sulphur dioxide and hydrogen sulphide, into",
                         "the air of its crater, vents and hollows, where it lies and spreads (with volcanicGas on in fts_geology.toml).")
                 .define("volcanoGas", true);
