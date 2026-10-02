@@ -422,6 +422,8 @@ public final class Storms {
         double wet = wetness(level, pos.getX(), pos.getZ());
         // The place's year of rain, from the lie of the land, and this part of the year's share of it (see RainClimate).
         double year = RainClimate.share(level, pos.getX(), pos.getZ()) * RainClimate.season(level, pos.getX(), pos.getZ());
+        // And by the water the air over it holds now: wrung out by a long rain, dried over a drought, fed by the sea (Moisture).
+        year *= Mth.clamp(Moisture.column(level, pos.getX(), pos.getZ()), 0.5, 1.5);
         // More under a low passing over, less under a high: taken over the land round the place, not its middle alone.
         double air = 0;
         for (int i = 0; i < 5; i++) {

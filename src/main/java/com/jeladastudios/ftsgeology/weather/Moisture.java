@@ -38,11 +38,16 @@ public final class Moisture {
     private static final int CELL = 512, REACH = 4, STEP = 100;
     /** Steps over which the sea brings air to saturation, and over which the air eases back to the land's climate. */
     private static final double SEA_STEPS = 120, CLIMATE_STEPS = 4320;
+    /** Steps over which the sea and the ground give the column back its water, and what a downpour takes a step. */
+    private static final double COLUMN_STEPS = 360, RAIN_TAKES = 0.004;
     /** Squares kept at most; the farthest from everyone go first. */
     private static final int MOST = 1500;
 
     private static final class Cell {
         double q, water, ground;
+        /** The water the column of air over the square holds against an ordinary day's: rain takes it, the sea and wet
+         *  ground give it back. */
+        double column = 1.0;
         long seen;
     }
 
@@ -138,16 +143,24 @@ public final class Moisture {
             double wet = c.water + (1 - c.water) * (0.15 + 0.6 * soil(level, at));
             q += wet / SEA_STEPS * Math.max(0.0, 0.85 * qs - q);
             // Past saturation it condenses; under rain the air is near saturation.
-            float rain = Storms.intensityAt(level, at.getX(), at.getZ());
+            // Rain only where it falls as rain or snow: a desert under a storm stays dry.
+            float rain = level.getBiome(at).value().hasPrecipitation() ? Storms.intensityAt(level, at.getX(), at.getZ()) : 0f;
             if (rain >= Storms.WET) q = Math.max(q, (0.85 + 0.12 * rain) * qs);
             q = Math.min(q, qs * 1.02);
             // Back towards the land's climate over days.
             q += (climate(level, at, c) - q) / CLIMATE_STEPS;
-            next.put(k, new double[]{q});
+            // The column's water: carried with the wind, given back by the sea and the wet ground towards what they keep
+            // in the air, taken by the rain that falls.
+            double col = sampleColumn(level, ux, uz);
+            double keeps = 1.2 * c.water + (1 - c.water) * (0.7 + 0.6 * soil(level, at));
+            col += (keeps - col) / COLUMN_STEPS;
+            col -= rain * RAIN_TAKES;
+            next.put(k, new double[]{q, Mth.clamp(col, 0.2, 1.6)});
         }
         for (var e : next.long2ObjectEntrySet()) {
             Cell c = CELLS.get(e.getLongKey());
             c.q = e.getValue()[0];
+            c.column = e.getValue()[1];
             c.seen = now;
         }
         if (CELLS.size() > MOST) CELLS.long2ObjectEntrySet().removeIf(e -> !live.contains(e.getLongKey()) && now - e.getValue().seen > 6000);
@@ -167,6 +180,25 @@ public final class Moisture {
         double tx = fx - x0, tz = fz - z0;
         double a = vapour(level, x0, z0), b = vapour(level, x0 + 1, z0), c = vapour(level, x0, z0 + 1), d = vapour(level, x0 + 1, z0 + 1);
         return Mth.lerp(tz, Mth.lerp(tx, a, b), Mth.lerp(tx, c, d));
+    }
+
+    /** The column's water at a place, blended between the squares round it. */
+    private static double sampleColumn(ServerLevel level, double x, double z) {
+        double fx = x / CELL - 0.5, fz = z / CELL - 0.5;
+        int x0 = Mth.floor(fx), z0 = Mth.floor(fz);
+        double tx = fx - x0, tz = fz - z0;
+        double a = cell(level, x0, z0).column, b = cell(level, x0 + 1, z0).column, c = cell(level, x0, z0 + 1).column,
+                d = cell(level, x0 + 1, z0 + 1).column;
+        return Mth.lerp(tz, Mth.lerp(tx, a, b), Mth.lerp(tx, c, d));
+    }
+
+    /**
+     * How much water the air over a place holds against an ordinary day's, 0.2 to 1.6: low after a long rain has wrung
+     * it out or over ground a drought has dried, high off a warm sea. 1 where it is not worked out. The storms form by it.
+     */
+    public static double column(ServerLevel level, int x, int z) {
+        if (!kept(level, new BlockPos(x, 0, z))) return 1.0;
+        return sampleColumn(level, x, z);
     }
 
     private static double vapour(ServerLevel level, int cx, int cz) {
@@ -259,8 +291,8 @@ public final class Moisture {
         double q = vapour(level, pos);
         if (Double.isNaN(q)) return "the air's water is not worked out here";
         double t = Atmosphere.temperature(level, pos);
-        return String.format(Locale.ROOT, "air: %.1f g/kg of vapour, %.0f%% humidity at %.1f C, dew point %.1f C, fog %.2f",
-                q, 100 * humidity(level, pos), t, dewPoint(q), fog(level, pos));
+        return String.format(Locale.ROOT, "air: %.1f g/kg of vapour, %.0f%% humidity at %.1f C, dew point %.1f C, fog %.2f; the column holds %.2f of its water",
+                q, 100 * humidity(level, pos), t, dewPoint(q), fog(level, pos), column(level, pos.getX(), pos.getZ()));
     }
 
     public static String summary() {
