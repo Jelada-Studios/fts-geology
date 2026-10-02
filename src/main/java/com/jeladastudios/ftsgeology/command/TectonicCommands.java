@@ -250,6 +250,34 @@ public final class TectonicCommands {
                                             return ok ? 1 : 0;
                                         })))))
                         // The storms round here, and the region's weather (see weather.Storms).
+                        // A fissure eruption: started at the nearest rift axis or hot spot (or right here), moved on a stage, read, stopped.
+                        .then(Commands.literal("fissure")
+                                .then(Commands.literal("start").executes(ctx -> fissure(ctx, false, -1))
+                                        .then(Commands.argument("unrest", com.mojang.brigadier.arguments.IntegerArgumentType.integer(200, 480000))
+                                                .executes(ctx -> fissure(ctx, false, com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "unrest")))))
+                                .then(Commands.literal("here").executes(ctx -> fissure(ctx, true, -1))
+                                        .then(Commands.argument("unrest", com.mojang.brigadier.arguments.IntegerArgumentType.integer(200, 480000))
+                                                .executes(ctx -> fissure(ctx, true, com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "unrest")))))
+                                .then(Commands.literal("next").executes(ctx -> {
+                                    String m = com.jeladastudios.ftsgeology.volcano.FissureEruptions.next(ctx.getSource().getLevel());
+                                    ctx.getSource().sendSuccess(() -> Component.literal(m), true);
+                                    return 1;
+                                }))
+                                .then(Commands.literal("tp").executes(ctx -> fissureWatch(ctx, 50, 30))
+                                        .then(Commands.argument("across", com.mojang.brigadier.arguments.IntegerArgumentType.integer(-400, 400))
+                                                .then(Commands.argument("up", com.mojang.brigadier.arguments.IntegerArgumentType.integer(-20, 200))
+                                                        .executes(ctx -> fissureWatch(ctx, com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "across"),
+                                                                com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "up"))))))
+                                .then(Commands.literal("info").executes(ctx -> {
+                                    String m = com.jeladastudios.ftsgeology.volcano.FissureEruptions.info(ctx.getSource().getLevel());
+                                    ctx.getSource().sendSuccess(() -> Component.literal(m), false);
+                                    return 1;
+                                }))
+                                .then(Commands.literal("stop").executes(ctx -> {
+                                    String m = com.jeladastudios.ftsgeology.volcano.FissureEruptions.stop(ctx.getSource().getLevel());
+                                    ctx.getSource().sendSuccess(() -> Component.literal(m), true);
+                                    return 1;
+                                })))
                         // The oil field under here set to have this share of its oil taken (for trying what a spent field does).
                         .then(Commands.literal("oil").then(Commands.literal("spend").then(Commands.argument("share", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(0.0, 1.0))
                                 .executes(ctx -> {
@@ -346,6 +374,23 @@ public final class TectonicCommands {
     }
 
     /** /geology water weather dry|wet &lt;days&gt; [chunkRadius]: what a drought or a wet spell does to the ground round here. */
+    /** Puts the player where they can watch the fissure eruption under way. */
+    private static int fissureWatch(com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx, int across, int up)
+            throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        String m = com.jeladastudios.ftsgeology.volcano.FissureEruptions.watch(ctx.getSource().getLevel(), ctx.getSource().getPlayerOrException(), across, up);
+        ctx.getSource().sendSuccess(() -> Component.literal(m), false);
+        return 1;
+    }
+
+    /** Starts a fissure eruption near the source (or right where it is), its unrest this many ticks or the configured. */
+    private static int fissure(com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx, boolean here, int unrest) {
+        var lv = ctx.getSource().getLevel();
+        long ticks = unrest > 0 ? unrest : GeyserConfig.FISSURE_UNREST_TICKS.get();
+        String m = com.jeladastudios.ftsgeology.volcano.FissureEruptions.start(lv, BlockPos.containing(ctx.getSource().getPosition()), here, ticks);
+        ctx.getSource().sendSuccess(() -> Component.literal(m), true);
+        return 1;
+    }
+
     private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> waterWeather(String name, boolean wet) {
         return Commands.literal(name).then(Commands.argument("days", IntegerArgumentType.integer(1, 60))
                 .executes(ctx -> waterWeather(ctx, wet, 2))

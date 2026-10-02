@@ -89,6 +89,10 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue ASHFALL_BURIES_CROPS;  // default ON
     public static final ForgeConfigSpec.BooleanValue VOLCANO_UNREST;        // swarm, warming springs before an eruption
     public static final ForgeConfigSpec.IntValue VOLCANO_UNREST_TICKS;
+    public static final ForgeConfigSpec.BooleanValue FISSURE_ERUPTIONS;     // Reykjanes-style events on rifts
+    public static final ForgeConfigSpec.DoubleValue FISSURE_ERUPTION_DAYS;
+    public static final ForgeConfigSpec.IntValue FISSURE_UNREST_TICKS;
+    public static final ForgeConfigSpec.IntValue FISSURE_LAVA;
     public static final ForgeConfigSpec.IntValue PYROCLASTIC_FLOWS;         // per eruption of an explosive volcano
     public static final ForgeConfigSpec.DoubleValue PYROCLASTIC_FLOW_REACH;
     public static final ForgeConfigSpec.BooleanValue VOLCANIC_GAS;          // CO2 in hollows while restless
@@ -459,6 +463,24 @@ public final class GeyserConfig {
                 .comment("How long before an eruption the unrest starts (3600 = 3 min). A dormant volcano, sealed",
                         "over, wakes twice as slowly.")
                 .defineInRange("volcanoUnrestTicks", 3600, 200, 72000);
+        FISSURE_ERUPTIONS = b
+                .comment("Fissure eruptions on the rifts between continents and over hot spots, as on Iceland's",
+                        "Reykjanes peninsula in 2023-24: for a day the ground swells and a swarm of small quakes",
+                        "thickens, then a dike of magma runs along the rift, the swarm racing with it, and a narrow",
+                        "graben drops a block or two over it, its edges cracking open. A few minutes later a fissure",
+                        "some hundreds of blocks long opens in a curtain of lava fountains and its lava spreads over",
+                        "the plain; the eruption then draws into a few vents that build small cinder cones, and it",
+                        "ends, leaving a field of young basalt. Only near players, and rare.")
+                .define("fissureEruptions", true);
+        FISSURE_ERUPTION_DAYS = b
+                .comment("Game days between fissure eruptions, on average, for a player who stays near a rift.")
+                .defineInRange("fissureEruptionDays", 30.0, 1.0, 10000.0);
+        FISSURE_UNREST_TICKS = b
+                .comment("How long the swelling and the swarm last before the dike runs (24000 = a game day).")
+                .defineInRange("fissureUnrestTicks", 24000, 200, 480000);
+        FISSURE_LAVA = b
+                .comment("The most blocks of lava one fissure eruption lays down.")
+                .defineInRange("fissureLava", 16000, 0, 200000);
         PYROCLASTIC_FLOWS = b
                 .comment("Pyroclastic flows an eruption of a stratovolcano or a caldera sends down its flanks: part",
                         "of the column falls back and runs down the valleys as a glowing avalanche of ash and gas,",

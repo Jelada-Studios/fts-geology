@@ -138,6 +138,8 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.hydrology.RiverSpill.clear();
         if (com.jeladastudios.ftsgeology.hydrology.RiverFloods.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.hydrology.RiverFloods.summary());
         com.jeladastudios.ftsgeology.hydrology.RiverFloods.clear();
+        if (com.jeladastudios.ftsgeology.volcano.FissureEruptions.any()) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", com.jeladastudios.ftsgeology.volcano.FissureEruptions.summary());
+        com.jeladastudios.ftsgeology.volcano.FissureEruptions.clear();
         com.jeladastudios.ftsgeology.command.SiteTeleport.clear();
         com.jeladastudios.ftsgeology.blockentity.GeothermalTurbineBlockEntity.clearAll();
         com.jeladastudios.ftsgeology.compat.CreateRivers.clear();

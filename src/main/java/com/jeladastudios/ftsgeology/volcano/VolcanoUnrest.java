@@ -75,6 +75,17 @@ public final class VolcanoUnrest {
         if (level.random.nextDouble() < rate) swarmQuake(level, summit, magnitude, progress);
     }
 
+    /**
+     * Holds a place's unrest for the instruments without a swarm of its own: an event that files its own quakes (a
+     * fissure eruption's dike) says here how swollen the ground is and whether it is erupting.
+     */
+    public static void hold(ServerLevel level, BlockPos summit, int magnitude, double progress, boolean erupting) {
+        if (!GeyserConfig.VOLCANO_UNREST.get()) return;
+        RESTLESS.put(summit.asLong(), new Restless(level.dimension(), summit.immutable(), magnitude,
+                REACH + REACH_PER_MAGNITUDE * magnitude, Math.max(0.0, Math.min(1.0, progress)), erupting,
+                level.getGameTime() + LAPSE));
+    }
+
     /** Forgets a volcano's unrest, as it goes quiet. */
     public static void settle(BlockPos summit) {
         RESTLESS.remove(summit.asLong());
