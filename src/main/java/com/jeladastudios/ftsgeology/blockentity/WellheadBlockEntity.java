@@ -152,6 +152,8 @@ public class WellheadBlockEntity extends BlockEntity {
         tank.fill(new FluidStack(ModFluids.CRUDE_OIL.get(), want), IFluidHandler.FluidAction.EXECUTE);
         owed -= want;
         store.take(field, want);
+        // The reservoir compacting as its oil is taken: now and then a small quake (Groningen).
+        com.jeladastudios.ftsgeology.quake.InducedQuakes.produced(level, worldPosition, field, want, 1.0 - store.left(field));
         if (com.jeladastudios.ftsgeology.gas.GasConfig.ENABLED.get()) {
             double mol = want * GAS_PER_MB, sour = Math.max(0, Math.min(0.2, field.sour()));
             com.jeladastudios.ftsgeology.gas.GasMix g = new com.jeladastudios.ftsgeology.gas.GasMix();

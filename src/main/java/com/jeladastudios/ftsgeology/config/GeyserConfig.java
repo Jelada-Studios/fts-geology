@@ -171,6 +171,8 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue QUAKE_AMBIENT_INTERVAL;   // ticks between ambient rolls
     public static final ForgeConfigSpec.DoubleValue QUAKE_RECURRENCE_DAYS; // mean interval between ruptures
     public static final ForgeConfigSpec.BooleanValue SMALL_QUAKES;         // magnitude 2.5 to 5 on the faults
+    public static final ForgeConfigSpec.BooleanValue INDUCED_QUAKES;       // small quakes under a producing oil field
+    public static final ForgeConfigSpec.DoubleValue INDUCED_QUAKE_RATE;
     public static final ForgeConfigSpec.DoubleValue SMALL_QUAKE_RATE;      // small quakes a day per stretch
     public static final ForgeConfigSpec.DoubleValue QUAKE_FELT_FLOOR;      // the faintest shaking felt
     public static final ForgeConfigSpec.BooleanValue QUAKE_INFO_NEEDS_INSTRUMENT; // size and place only off an instrument
@@ -954,6 +956,14 @@ public final class GeyserConfig {
                         "near the fault they are felt as a faint tremor and a low rumble, and the seismographs record",
                         "them.")
                 .define("smallQuakes", true);
+        INDUCED_QUAKES = b
+                .comment("An oil field's reservoir compacts as its oil is taken, and the faults through it slip: small quakes,",
+                        "magnitude 2 to 3.6, under a producing field, the likelier the more of its oil is gone (Groningen).",
+                        "Felt and recorded; the ground is left as it is.")
+                .define("inducedQuakes", true);
+        INDUCED_QUAKE_RATE = b
+                .comment("How often a producing oil field shakes, against the usual (1).")
+                .defineInRange("inducedQuakeRate", 1.0, 0.0, 100.0);
         SMALL_QUAKE_RATE = b
                 .comment("Small quakes a game day on each 256 blocks of a fully stressed boundary (a sleepier one has",
                         "fewer, by its stress); sizes follow Gutenberg-Richter, most of them small, felt only near the",

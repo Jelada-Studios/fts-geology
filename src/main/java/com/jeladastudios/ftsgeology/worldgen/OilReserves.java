@@ -38,6 +38,12 @@ public final class OilReserves extends SavedData {
         return all <= 0 ? 0 : Math.max(0, 1.0 - taken.get(f.id()) / all);
     }
 
+    /** For trying it out: a field set to have this share of its oil taken. */
+    public void spend(PetroleumFields.Field f, double share) {
+        taken.put(f.id(), Math.max(0, Math.min(1, share)) * recoverable(f));
+        setDirty();
+    }
+
     public void take(PetroleumFields.Field f, double millibuckets) {
         taken.addTo(f.id(), millibuckets);
         setDirty();

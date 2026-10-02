@@ -250,6 +250,22 @@ public final class TectonicCommands {
                                             return ok ? 1 : 0;
                                         })))))
                         // The storms round here, and the region's weather (see weather.Storms).
+                        // The oil field under here set to have this share of its oil taken (for trying what a spent field does).
+                        .then(Commands.literal("oil").then(Commands.literal("spend").then(Commands.argument("share", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(0.0, 1.0))
+                                .executes(ctx -> {
+                                    var lv = ctx.getSource().getLevel();
+                                    BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+                                    double share = com.mojang.brigadier.arguments.DoubleArgumentType.getDouble(ctx, "share");
+                                    for (int y = at.getY(); y > lv.getMinBuildHeight(); y--) {
+                                        var f = com.jeladastudios.ftsgeology.worldgen.PetroleumFields.at(lv, new BlockPos(at.getX(), y, at.getZ()));
+                                        if (f == null) continue;
+                                        com.jeladastudios.ftsgeology.worldgen.OilReserves.of(lv).spend(f.field(), share);
+                                        ctx.getSource().sendSuccess(() -> Component.literal("the oil field under here: " + share + " of its oil taken"), true);
+                                        return 1;
+                                    }
+                                    ctx.getSource().sendFailure(Component.literal("No oil field under here."));
+                                    return 0;
+                                }))))
                         .then(Commands.literal("storms")
                                 // The air round here given this much water, a share of what its mean warmth holds (for trying the fog).
                                 .then(Commands.literal("air").then(Commands.argument("humidity", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(0.0, 1.2))
