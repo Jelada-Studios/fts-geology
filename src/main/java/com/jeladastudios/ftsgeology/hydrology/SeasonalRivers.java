@@ -6,6 +6,7 @@ import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.fluid.RiverWaterFluid;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.weather.RainClimate;
+import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -44,25 +45,40 @@ public final class SeasonalRivers {
 
     private static long risen;
 
+    /** Chunks still to be looked at from the last round, a few each tick within the mod's budget. */
+    private static final LongArrayFIFOQueue PENDING = new LongArrayFIFOQueue();
+
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END || event.getServer() == null) return;
         ServerLevel level = event.getServer().overworld();
         if (level == null || !GeyserConfig.SEASONAL_RIVERS.get() || !SereneSeasons.active()) return;
         long now = level.getGameTime();
-        if (now % EVERY != 0) return;
-        double phase = SereneSeasons.phase(level);
-        if (Double.isNaN(phase)) return;
-        LongOpenHashSet seen = new LongOpenHashSet();
-        for (ServerPlayer p : level.players()) {
-            ChunkPos at = p.chunkPosition();
-            for (int dx = -REACH; dx <= REACH; dx++) {
-                for (int dz = -REACH; dz <= REACH; dz++) {
-                    int cx = at.x + dx, cz = at.z + dz;
-                    if (seen.add(ChunkPos.asLong(cx, cz))) look(level, cx, cz, phase);
+        if (now % EVERY == 0 && PENDING.isEmpty()) {
+            LongOpenHashSet seen = new LongOpenHashSet();
+            for (ServerPlayer p : level.players()) {
+                ChunkPos at = p.chunkPosition();
+                for (int dx = -REACH; dx <= REACH; dx++) {
+                    for (int dz = -REACH; dz <= REACH; dz++) {
+                        long k = ChunkPos.asLong(at.x + dx, at.z + dz);
+                        if (seen.add(k)) PENDING.enqueue(k);
+                    }
                 }
             }
         }
+        if (PENDING.isEmpty()) return;
+        double phase = SereneSeasons.phase(level);
+        if (Double.isNaN(phase)) {
+            PENDING.clear();
+            return;
+        }
+        // A rise lays a few thousand blocks: one look at least, then only while the tick's budget lasts.
+        com.jeladastudios.ftsgeology.util.TickBudget.open(event.getServer().getTickCount());
+        long deadline = System.nanoTime() + com.jeladastudios.ftsgeology.util.TickBudget.slice(0.1);
+        do {
+            long k = PENDING.dequeueLong();
+            look(level, ChunkPos.getX(k), ChunkPos.getZ(k), phase);
+        } while (!PENDING.isEmpty() && System.nanoTime() < deadline);
     }
 
     /**

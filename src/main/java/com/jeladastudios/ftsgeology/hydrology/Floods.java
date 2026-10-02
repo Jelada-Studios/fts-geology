@@ -184,6 +184,7 @@ public final class Floods {
 
     public static int surge(ServerLevel level, List<LongOpenHashSet> layers, int holdTicks, int everyTicks, String why, String key) {
         if (layers.isEmpty()) return 0;
+        long t0 = System.nanoTime();
         Surge s = new Surge();
         s.key = key;
         BlockState water = ModBlocks.RIVER_WATER.get().defaultBlockState();
@@ -208,7 +209,8 @@ public final class Floods {
         st.setDirty();
         laid += n;
         surges++;
-        com.jeladastudios.ftsgeology.util.Diagnostics.info("flood ({}): {} blocks of water in {} layers, going in {} s", why, n, s.layers.size(), holdTicks / 20);
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("flood ({}): {} blocks of water in {} layers, going in {} s ({} ms)", why, n, s.layers.size(), holdTicks / 20,
+                (System.nanoTime() - t0) / 1_000_000);
         return n;
     }
 
