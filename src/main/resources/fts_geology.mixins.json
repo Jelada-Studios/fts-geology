@@ -22,7 +22,9 @@
   "client": [
     "OculusBlockIdsMixin",
     "PuddleRainMixin",
-    "RiverMudMixin"
+    "RiverMudMixin",
+    "SoundManagerAccessor",
+    "SoundEngineAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
