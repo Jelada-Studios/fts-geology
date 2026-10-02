@@ -107,6 +107,8 @@ public final class FissureEruptions {
         Stage stage = Stage.UNREST;
         long stageAt, unrest;
         int lavaMost, lava;
+        /** Ticks it has been held, its ground not loaded, since it last went on. */
+        int held;
         /** Every block of lava laid, the fissure's own trench blocks, the vents, and how far the cooling has got. */
         LongArrayList cells = new LongArrayList(), trench = new LongArrayList(), vents = new LongArrayList();
         int cool1, cool2;
@@ -126,7 +128,7 @@ public final class FissureEruptions {
         /** Cones growing a block: by vent, the height, how far through its columns, and its breach in degrees. */
         transient it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<int[]> heaping = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
         /** How far through a chunk the graben has got, where it is part way. */
-        transient it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap grabenAt = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
+        it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap grabenAt = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
         /** The height each vent's cone was last heaped to. */
         transient it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap shaped = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
 
@@ -173,7 +175,9 @@ public final class FissureEruptions {
             t.putInt("cz", cz);
             t.putDouble("sx", sx);
             t.putDouble("sz", sz);
-            t.putIntArray("seg", new int[]{half, seg0, seg1, open0, open1, start, hw, magnitude, lavaMost, lava, cool1, cool2});
+            t.putIntArray("seg", new int[]{half, seg0, seg1, open0, open1, start, hw, magnitude, lavaMost, lava, cool1, cool2, held});
+            t.put("grabenKeys", new LongArrayTag(grabenAt.keySet().toLongArray()));
+            t.putIntArray("grabenAt", grabenAt.values().toIntArray());
             t.putBoolean("hotspot", hotspot);
             t.putBoolean("opened", opened);
             t.putBoolean("big", bigQuake);
@@ -200,6 +204,10 @@ public final class FissureEruptions {
                 f.half = s[0]; f.seg0 = s[1]; f.seg1 = s[2]; f.open0 = s[3]; f.open1 = s[4]; f.start = s[5];
                 f.hw = s[6]; f.magnitude = s[7]; f.lavaMost = s[8]; f.lava = s[9]; f.cool1 = s[10]; f.cool2 = s[11];
             }
+            if (s.length >= 13) f.held = s[12];
+            long[] gk = t.getLongArray("grabenKeys");
+            int[] gv = t.getIntArray("grabenAt");
+            for (int i = 0; i < Math.min(gk.length, gv.length); i++) f.grabenAt.put(gk[i], gv[i]);
             f.hotspot = t.getBoolean("hotspot");
             f.opened = t.getBoolean("opened");
             f.bigQuake = t.getBoolean("big");
@@ -215,6 +223,8 @@ public final class FissureEruptions {
             f.vents = new LongArrayList(t.getLongArray("vents"));
             f.band = t.getLongArray("band");
             f.sunk = new LongOpenHashSet(t.getLongArray("sunk"));
+            // Drawn into its vents already: the trench sets on from the start (what has set is passed over).
+            if (f.stage == Stage.FOCUS && !f.vents.isEmpty()) f.trenchAt = 0;
             return f;
         }
     }
@@ -360,7 +370,8 @@ public final class FissureEruptions {
         if (level == null) return;
         long now = level.getGameTime();
         Store st = level.getDataStorage().get(Store::load, NAME);
-        if (now % ROLL == 0 && GeyserConfig.FISSURE_ERUPTIONS.get() && (st == null || st.all.isEmpty())) roll(level);
+        // One at a time, but one left a day with nobody near does not keep the others off.
+        if (now % ROLL == 0 && GeyserConfig.FISSURE_ERUPTIONS.get() && (st == null || st.all.stream().allMatch(e -> e.held > 24000))) roll(level);
         if (st == null || st.all.isEmpty()) return;
         long t0 = System.nanoTime();
         TickBudget.open(event.getServer().getTickCount());
@@ -395,8 +406,10 @@ public final class FissureEruptions {
         // is loaded, as a volcano does: its clock held while nobody is near.
         if (f.stage != Stage.UNREST && !Loaded.at(level, f.x(f.start, 0), f.z(f.start, 0))) {
             f.stageAt += 20;
+            f.held += 20;
             return;
         }
+        f.held = 0;
         double p = Math.min(1.0, (now - f.stageAt) / (double) f.ticks(f.stage));
         BlockPos centre = f.centre();
         switch (f.stage) {
@@ -577,7 +590,8 @@ public final class FissureEruptions {
         }
         // Bottom up, so nothing is left hanging.
         for (int y = g - k; y <= g + cover; y++) {
-            level.setBlock(m.set(x, y, z), level.getBlockState(new BlockPos(x, y + k, z)), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+            BlockState from = y + k <= g + cover ? level.getBlockState(new BlockPos(x, y + k, z)) : Blocks.AIR.defaultBlockState();
+            level.setBlock(m.set(x, y, z), from, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
         }
         for (int y = g + cover + 1; y <= g + cover + k; y++) {
             level.setBlock(m.set(x, y, z), Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
@@ -615,12 +629,12 @@ public final class FissureEruptions {
 
     // === The lava =========================================================
 
-    /** The ground under a column's open air: down past lava, plants and snow; MIN where water stands on it. */
+    /** The ground under a column's open air: down past lava, plants, trees and snow; MIN where water stands on it. */
     private static int ground(ServerLevel level, int x, int z) {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1, z);
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 40; i++) {
             BlockState s = level.getBlockState(m);
-            if (s.getFluidState().is(FluidTags.LAVA) || s.isAir() || s.is(Blocks.SNOW)
+            if (s.getFluidState().is(FluidTags.LAVA) || s.isAir() || s.is(Blocks.SNOW) || TerrainProbe.isTreePart(s)
                     || s.canBeReplaced() && s.getFluidState().isEmpty()) {
                 m.move(0, -1, 0);
                 continue;
@@ -643,22 +657,36 @@ public final class FissureEruptions {
 
     /** The columns the lava could take next, rebuilt after a restart from what it has laid. */
     private static void front(ServerLevel level, Fissure f) {
+        if (f.lavaCols == null) {
+            f.lavaCols = new LongOpenHashSet();
+            for (long k : f.cells) f.lavaCols.add(column(BlockPos.getX(k), BlockPos.getZ(k)));
+        }
         if (f.front != null) return;
         f.front = new PriorityQueue<>();
-        f.lavaCols = new LongOpenHashSet();
-        for (long k : f.cells) f.lavaCols.add(column(BlockPos.getX(k), BlockPos.getZ(k)));
-        for (long k : f.cells) {
-            BlockPos p = BlockPos.of(k);
-            if (level.getBlockState(p).getFluidState().is(FluidTags.LAVA)) offer(level, f, p.getX(), p.getZ(), p.getY());
+        // From the newest of the flow only, where its ground is loaded: its edge is there.
+        for (int i = Math.max(0, f.cells.size() - REOFFER); i < f.cells.size(); i++) {
+            BlockPos p = BlockPos.of(f.cells.getLong(i));
+            if (Loaded.at(level, p) && level.getBlockState(p).getFluidState().is(FluidTags.LAVA)) offer(level, f, p.getX(), p.getZ(), p.getY());
         }
     }
+
+    /** The cells of the flow the front is offered again from, after a restart. */
+    private static final int REOFFER = 1500;
 
     /** Offers the four columns round one the lava stands in, with its surface at {@code surface}. */
     private static void offer(ServerLevel level, Fissure f, int x, int z, int surface) {
         for (int i = 0; i < 4; i++) {
             int nx = x + (i == 0 ? 1 : i == 1 ? -1 : 0), nz = z + (i == 2 ? 1 : i == 3 ? -1 : 0);
             long col = column(nx, nz);
-            if (f.lavaCols.contains(col) || !Loaded.at(level, nx, nz)) continue;
+            if (!Loaded.at(level, nx, nz)) continue;
+            if (f.lavaCols.contains(col)) {
+                // Lava already laid there: a flow from higher up runs on over it (see stack).
+                int top = lavaTop(level, nx, nz);
+                if (top != Integer.MIN_VALUE && top + 1 <= surface) {
+                    f.front.add(new Front((top + 1) * 16 + (int) (16 * unit(mix(nx * 73428767L ^ nz), 9)), col, surface));
+                }
+                continue;
+            }
             int g = ground(level, nx, nz);
             if (g == Integer.MIN_VALUE || g + 1 > surface) continue;
             f.front.add(new Front((g + 1) * 16 + (int) (16 * unit(mix(nx * 73428767L ^ nz), 9)), col, surface));
@@ -668,8 +696,8 @@ public final class FissureEruptions {
     /** Lays lava in the column a front names, if it still can; true if it did. */
     private static boolean spill(ServerLevel level, Fissure f, Front fr) {
         long col = fr.column();
-        if (f.lavaCols.contains(col)) return false;
         int x = (int) (col >> 32), z = (int) col;
+        if (f.lavaCols.contains(col)) return stack(level, f, x, z, fr.allowed());
         // A block set at a chunk's edge updates the next chunk: that must be in too, or the server waits for it.
         if (!Loaded.around(level, new BlockPos(x, 0, z))) return false;
         int g = ground(level, x, z);
@@ -724,6 +752,35 @@ public final class FissureEruptions {
         return false;
     }
 
+    /** The top of the lava standing in a column, or MIN where its top is not a block of lava. */
+    private static int lavaTop(ServerLevel level, int x, int z) {
+        int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+        var fluid = level.getBlockState(new BlockPos(x, y, z)).getFluidState();
+        return fluid.is(FluidTags.LAVA) && fluid.isSource() ? y : Integer.MIN_VALUE;
+    }
+
+    /**
+     * A block of lava on the lava already in a column, where a flow from higher up runs on over its own field -- the
+     * vents' lava over the curtain's -- no deeper than three; true if laid. The front takes the low ground first, so a
+     * flow spreads before it piles up.
+     */
+    private static boolean stack(ServerLevel level, Fissure f, int x, int z, int allowed) {
+        if (!Loaded.around(level, new BlockPos(x, 0, z))) return false;
+        int top = lavaTop(level, x, z);
+        if (top == Integer.MIN_VALUE || top + 1 > allowed) return false;
+        int deep = 0;
+        while (deep < 3 && level.getBlockState(new BlockPos(x, top - deep, z)).getFluidState().is(FluidTags.LAVA)) deep++;
+        if (deep >= 3) return false;
+        BlockPos p = new BlockPos(x, top + 1, z);
+        if (!takes(level.getBlockState(p))) return false;
+        level.setBlock(p, lava(level, p), Block.UPDATE_ALL);
+        f.cells.add(p.asLong());
+        f.lava++;
+        laid++;
+        offer(level, f, x, z, top + 1);
+        return true;
+    }
+
     /** Opens the fissure at a point along it: a trench of lava, which overflows on to the ground round it. */
     private static void carve(ServerLevel level, Fissure f, int a) {
         double c = f.wobble(a);
@@ -733,9 +790,13 @@ public final class FissureEruptions {
         int g = ground(level, x, z);
         if (g == Integer.MIN_VALUE) return;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        // Only into solid ground nobody built, with ground under it: not over a tunnel, not beside a cellar.
+        for (int y = g - 3; y <= g; y++) {
+            if (!natural(level, null, m.set(x, y, z))) return;
+        }
         boolean any = false;
         for (int y = g - 2; y <= g; y++) {
-            if (!natural(level, null, m.set(x, y, z))) continue;
+            m.set(x, y, z);
             BlockPos p = m.immutable();
             level.setBlock(p, lava(level, p), Block.UPDATE_ALL);
             f.cells.add(p.asLong());
@@ -766,12 +827,17 @@ public final class FissureEruptions {
         for (int a : picked) {
             int x = f.x(a, f.wobble(a)), z = f.z(a, f.wobble(a));
             if (!Loaded.at(level, x, z)) continue;
-            int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+            // On its own ground and the lava in its trench, never on a roof or in a tree.
+            int base = ground(level, x, z);
+            if (base == Integer.MIN_VALUE || !natural(level, null, new BlockPos(x, base, z))) continue;
+            int top = base;
+            while (top < base + 4 && level.getBlockState(new BlockPos(x, top + 1, z)).getFluidState().is(FluidTags.LAVA)) top++;
             f.vents.add(BlockPos.asLong(x, top, z));
         }
         // None of them where the ground is loaded: tried again a second on.
         if (f.vents.isEmpty()) return;
         // A fresh front: from now on the lava comes from the vents only. The trench away from them sets (see setTrench).
+        front(level, f);
         f.front = new PriorityQueue<>();
         f.trenchAt = 0;
         Diagnostics.info("fissure eruption at {}, {}: drawn into {} vents", f.cx, f.cz, f.vents.size());
@@ -828,6 +894,7 @@ public final class FissureEruptions {
                     if (Math.hypot(dx, dz) > CRATER + 0.5) continue;
                     int x = vx + dx, z = vz + dz;
                     BlockPos q = new BlockPos(x, vy, z);
+                    if (!Loaded.around(level, q)) continue;
                     BlockState s = level.getBlockState(q);
                     if (!s.getFluidState().isSource() && (takes(s) || natural(level, null, q)) && natural(level, null, q.below())
                             && Loaded.around(level, q)) {
