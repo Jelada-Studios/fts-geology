@@ -14,6 +14,7 @@ public final class ClientConfig {
     public static final ForgeConfigSpec.DoubleValue RAIN_VOLUME;
     public static final ForgeConfigSpec.DoubleValue WIND_VOLUME;
     public static final ForgeConfigSpec.BooleanValue STORM_CLOUDS;
+    public static final ForgeConfigSpec.BooleanValue SHADER_OVERCAST;
     public static final ForgeConfigSpec.DoubleValue RAIN_SLANT;
     public static final ForgeConfigSpec.BooleanValue RIVER_FOAM;
     public static final ForgeConfigSpec.BooleanValue RIVER_DEBRIS;
@@ -33,6 +34,12 @@ public final class ClientConfig {
                 .comment("Draw the weather's own clouds, which drift with the wind and gather into storms, in place of",
                         "vanilla's flat cloud layer. A shader pack that draws its own clouds keeps them, darkened by the rain.")
                 .define("stormClouds", true);
+        SHADER_OVERCAST = b
+                .comment("Under a shader pack, a sky that is overcast wherever it rains: the pack is told the rain is full as",
+                        "soon as it really rains where you stand, as vanilla's one weather tells it, and draws its cloud",
+                        "cover, darkness and wet ground from that. Off, it is told how hard it rains, and a steady rain",
+                        "is half a sky of cloud. The rain itself and its sound follow how hard it rains either way.")
+                .define("shaderOvercast", true);
         RAIN_SLANT = b
                 .comment("How far the wind may drive the rain aslant: the most a drop moves sideways for each block it falls",
                         "(0.35 is about 20 degrees, in a gale; 0 keeps it upright).")

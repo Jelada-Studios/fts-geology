@@ -94,9 +94,10 @@ public final class ClientSky {
                 rain = Math.max(rain, s * smooth((float) (1 - d / st[i + 2]) * 1.8f));
             }
         }
-        // Rain falls from a closed deck: wherever it rains the sky is all but shut, broken only past the rain's edge.
-        if (rain > 0.02f) cover = Math.max(cover, 0.88f + 0.09f * Math.min(1f, rain / 0.25f));
-        out[0] = Mth.clamp(cover, 0.04f, 0.97f);
+        // Rain falls from a closed deck: wherever it rains in earnest the sky is shut, broken only at the rain's edge,
+        // where a drizzle still lets a little through. Left at nine tenths or so, a steady rain fell through gaps.
+        if (rain > 0.02f) cover = Math.max(cover, 0.9f + 0.1f * Math.min(1f, rain / 0.25f));
+        out[0] = Mth.clamp(cover, 0.04f, rain > 0.2f ? 1f : 0.97f);
         out[1] = Mth.clamp(dark, 0f, 1f);
         out[2] = tower;
         if (out.length > 3) out[3] = rain;

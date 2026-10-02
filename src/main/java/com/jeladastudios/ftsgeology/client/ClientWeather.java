@@ -104,6 +104,16 @@ public final class ClientWeather {
         return rain * (level.getThunderLevel(1f) > 0.5f ? 1f : 0.45f);
     }
 
+    /**
+     * The rain a shader pack is told, from the rain where the player stands: vanilla's one weather tells a pack 1 for any
+     * rain at all, and a pack draws its overcast, its darkness and its wet ground from that. Told how hard the rain is, a
+     * steady rain of a half was half a sky of cloud. Full from a fifth of the heaviest rain, less only at a shower's edge.
+     */
+    public static float shaderRain(float told) {
+        if (!LocalWeather.active() || !com.jeladastudios.ftsgeology.config.ClientConfig.SHADER_OVERCAST.get()) return told;
+        return smooth((told - 0.01f) / 0.19f);
+    }
+
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;

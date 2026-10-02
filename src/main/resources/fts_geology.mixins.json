@@ -21,6 +21,7 @@
   ],
   "client": [
     "OculusBlockIdsMixin",
+    "OculusRainMixin",
     "PuddleRainMixin",
     "RiverMudMixin",
     "SoundManagerAccessor",
