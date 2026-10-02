@@ -26,7 +26,8 @@ public final class RiverLife {
 
     public static void animate(Level level, BlockPos pos, FluidState state, RandomSource rnd) {
         if (!level.isClientSide || alive >= MOST) return;
-        boolean foam = ClientConfig.RIVER_FOAM.get(), debris = ClientConfig.RIVER_DEBRIS.get();
+        // Foam drawn as a sheet on the water (client.RiverFoamMesh) is not thrown up as particles as well.
+        boolean foam = ClientConfig.RIVER_FOAM.get() && !ClientConfig.RIVER_FOAM_SHEET.get(), debris = ClientConfig.RIVER_DEBRIS.get();
         if (!foam && !debris) return;
         if (falling(state)) {
             if (!foam) return;

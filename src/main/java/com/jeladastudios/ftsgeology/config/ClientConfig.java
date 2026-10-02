@@ -17,6 +17,7 @@ public final class ClientConfig {
     public static final ForgeConfigSpec.BooleanValue SHADER_OVERCAST;
     public static final ForgeConfigSpec.DoubleValue RAIN_SLANT;
     public static final ForgeConfigSpec.BooleanValue RIVER_FOAM;
+    public static final ForgeConfigSpec.BooleanValue RIVER_FOAM_SHEET;
     public static final ForgeConfigSpec.BooleanValue RIVER_DEBRIS;
 
     static {
@@ -49,6 +50,10 @@ public final class ClientConfig {
         RIVER_FOAM = b
                 .comment("Foam on the rivers where they come down a step, and a little on fast water and in rain.")
                 .define("riverFoam", true);
+        RIVER_FOAM_SHEET = b
+                .comment("Draw the foam as a sheet lying on the water, thick at the foot of a fall and drawn out down the",
+                        "current, in place of foam particles. Off, the foam is particles, as before.")
+                .define("riverFoamSheet", true);
         RIVER_DEBRIS = b
                 .comment("Leaves and bits of twig drifting down the rivers, more under trees and in wind and rain.")
                 .define("riverDebris", true);
