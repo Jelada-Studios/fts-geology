@@ -302,6 +302,8 @@ public final class Storms {
     // === Every second ======================================================
 
     private static long formed;
+    /** Where storms formed against where they were tried, by the air's water; showers of a hot, humid afternoon. */
+    private static long bornMoist, bornDry, triedMoist, triedDry, tried, steamy;
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
@@ -472,7 +474,14 @@ public final class Storms {
             px[i] = x + Math.cos(a) * d;
             pz[i] = z + Math.sin(a) * d;
             double f = Atmosphere.rainFactor(level, px[i], pz[i]);
-            weight[i] = f * f;
+            // And as the water its air holds: a storm grows out of moist air, hardly out of dry.
+            double full = full(level, px[i], pz[i]);
+            weight[i] = f * f * (Double.isNaN(full) ? 1.0 : Mth.clamp((full - 0.3) / 0.45, 0.15, 1.4));
+            if (!Double.isNaN(full)) {
+                tried++;
+                if (full >= 0.7) triedMoist++;
+                else if (full < 0.5) triedDry++;
+            }
             total += weight[i];
         }
         double pick = rnd.nextDouble() * total;
@@ -482,10 +491,18 @@ public final class Storms {
             if ((pick -= weight[i]) <= 0) break;
         }
         double air = Atmosphere.rainFactor(level, mx, mz);
+        double here = full(level, mx, mz);
+        if (!Double.isNaN(here)) {
+            if (here >= 0.7) bornMoist++;
+            else if (here < 0.5) bornDry++;
+        }
+        // A hot, humid afternoon: the air near saturation rises off the warm ground and breaks into showers and thunder.
+        long day = level.getDayTime() % 24000;
+        boolean sultry = !Double.isNaN(here) && here >= 0.7 && temperature > 0.6 && day >= 5000 && day <= 10000;
         double roll = rnd.nextDouble();
         if (wet > 0.75 && air > 1.2 && roll < 0.35) s.kind = Kind.SPELL;
         else if (roll < (wet < 0.4 ? 0.7 : 0.35) * (temperature > 0.8 ? 1.2 : temperature < 0.3 ? 0.5 : 1.0)
-                * RainClimate.showery(level)) s.kind = Kind.SHOWER;
+                * RainClimate.showery(level) * (sultry ? 1.6 : 1.0)) s.kind = Kind.SHOWER;
         else s.kind = Kind.FRONT;
         // Under a high only a shower breaks out, from a hot afternoon's rising air.
         if (air < 0.6) s.kind = Kind.SHOWER;
@@ -499,7 +516,8 @@ public final class Storms {
                 s.radius = 250 + rnd.nextDouble() * 450;
                 s.peak = 0.5 + rnd.nextDouble() * 0.5;
                 s.dies = now + 720 + rnd.nextInt(4080);
-                s.thunder = s.peak > 0.78 && temperature > 0.3;
+                s.thunder = s.peak > (sultry ? 0.66 : 0.78) && temperature > 0.3;
+                if (sultry) steamy++;
                 s.vx = w[0] * 1.5;
                 s.vz = w[1] * 1.5;
             }
@@ -673,10 +691,17 @@ public final class Storms {
         SLOPE.clear();
         rainAt = Long.MIN_VALUE;
         formed = 0;
+        bornMoist = bornDry = triedMoist = triedDry = tried = steamy = 0;
     }
 
     public static String summary() {
-        return String.format(Locale.ROOT, "storms: %d formed", formed);
+        return String.format(Locale.ROOT, "storms: %d formed; where the air's water was worked out, %d in moist air and %d in dry, of places tried %d of %d moist and %d dry; %d showers of a hot, humid afternoon",
+                formed, bornMoist, bornDry, triedMoist, tried, triedDry, steamy);
+    }
+
+    /** How full of water the air over a place is (see Moisture); NaN where it is not worked out. */
+    private static double full(ServerLevel level, double x, double z) {
+        return Moisture.fullness(level, new BlockPos((int) Math.floor(x), level.getSeaLevel() + 1, (int) Math.floor(z)));
     }
 
     public static boolean any() {

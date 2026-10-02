@@ -234,7 +234,7 @@ public final class Moisture {
      * shore beside a warm sea -- and a share of saturation carries to a place where grams would not. NaN where not
      * worked out.
      */
-    private static double fullness(ServerLevel level, BlockPos pos) {
+    static double fullness(ServerLevel level, BlockPos pos) {
         if (!kept(level, pos)) return Double.NaN;
         int cx = Math.floorDiv(pos.getX(), CELL), cz = Math.floorDiv(pos.getZ(), CELL);
         Cell c = CELLS.get(key(cx, cz));
