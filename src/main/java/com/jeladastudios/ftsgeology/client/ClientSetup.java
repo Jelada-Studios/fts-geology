@@ -79,12 +79,19 @@ public final class ClientSetup {
                 TurbineRenderer::new);
         event.registerBlockEntityRenderer(com.jeladastudios.ftsgeology.registry.ModBlockEntities.INSTRUMENT.get(),
                 AnemometerRenderer::new);
+        // A running fan's blades and a running engine's flywheel turn.
+        event.registerBlockEntityRenderer(com.jeladastudios.ftsgeology.gas.registry.GasBlockEntities.VENTILATION_FAN.get(),
+                SpinningPartRenderer.fan());
+        event.registerBlockEntityRenderer(com.jeladastudios.ftsgeology.gas.registry.GasBlockEntities.GAS_ENGINE.get(),
+                SpinningPartRenderer.flywheel());
     }
 
     @SubscribeEvent
     public static void registerModels(net.minecraftforge.client.event.ModelEvent.RegisterAdditional event) {
         event.register(TurbineRenderer.ROTOR);
         event.register(AnemometerRenderer.CUPS);
+        event.register(SpinningPartRenderer.FAN_BLADES);
+        event.register(SpinningPartRenderer.FLYWHEEL);
     }
 
     @SubscribeEvent

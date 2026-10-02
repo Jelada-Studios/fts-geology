@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "minecraft:block/polished_blackstone",
+    "black": "minecraft:block/polished_blackstone",
+    "iron": "minecraft:block/iron_block"
+  },
+  "elements": [
+    { "from": [14.5, 3, 5], "to": [16, 12, 14], "faces": { "north": {"texture": "#black"}, "south": {"texture": "#black"}, "east": {"texture": "#black"}, "west": {"texture": "#black"}, "up": {"texture": "#black"}, "down": {"texture": "#black"} } },
+    { "from": [14.5, 7, 9], "to": [16.2, 8, 10], "faces": { "north": {"texture": "#iron"}, "south": {"texture": "#iron"}, "east": {"texture": "#iron"}, "west": {"texture": "#iron"}, "up": {"texture": "#iron"}, "down": {"texture": "#iron"} } }
+  ]
+}

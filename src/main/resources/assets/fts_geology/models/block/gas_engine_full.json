@@ -5,7 +5,7 @@
     "particle": "minecraft:block/polished_deepslate",
     "bars": "minecraft:block/iron_bars",
     "black": "minecraft:block/polished_blackstone",
-    "blaston": "minecraft:block/blast_furnace_front_on",
+    "blast": "minecraft:block/blast_furnace_front",
     "deep": "minecraft:block/polished_deepslate",
     "iron": "minecraft:block/iron_block",
     "stone": "minecraft:block/smooth_stone"
@@ -18,6 +18,8 @@
     { "from": [10, 14, 10], "to": [13, 16, 13], "faces": { "north": {"texture": "#black"}, "south": {"texture": "#black"}, "east": {"texture": "#black"}, "west": {"texture": "#black"}, "up": {"texture": "#black"}, "down": {"texture": "#black"} } },
     { "from": [14, 7, 9], "to": [14.5, 8, 10], "faces": { "north": {"texture": "#iron"}, "south": {"texture": "#iron"}, "east": {"texture": "#iron"}, "west": {"texture": "#iron"}, "up": {"texture": "#iron"}, "down": {"texture": "#iron"} } },
     { "from": [4, 4, 0.5], "to": [12, 10, 1.5], "faces": { "north": {"texture": "#bars"}, "south": {"texture": "#bars"}, "east": {"texture": "#bars"}, "west": {"texture": "#bars"}, "up": {"texture": "#bars"}, "down": {"texture": "#bars"} } },
-    { "from": [4, 4, 1.5], "to": [12, 10, 2], "faces": { "north": {"texture": "#blaston"}, "south": {"texture": "#blaston"}, "east": {"texture": "#blaston"}, "west": {"texture": "#blaston"}, "up": {"texture": "#blaston"}, "down": {"texture": "#blaston"} } }
+    { "from": [14.5, 3, 5], "to": [16, 12, 14], "faces": { "north": {"texture": "#black"}, "south": {"texture": "#black"}, "east": {"texture": "#black"}, "west": {"texture": "#black"}, "up": {"texture": "#black"}, "down": {"texture": "#black"} } },
+    { "from": [14.5, 7, 9], "to": [16.2, 8, 10], "faces": { "north": {"texture": "#iron"}, "south": {"texture": "#iron"}, "east": {"texture": "#iron"}, "west": {"texture": "#iron"}, "up": {"texture": "#iron"}, "down": {"texture": "#iron"} } },
+    { "from": [4, 4, 1.5], "to": [12, 10, 2], "faces": { "north": {"texture": "#blast"}, "south": {"texture": "#blast"}, "east": {"texture": "#blast"}, "west": {"texture": "#blast"}, "up": {"texture": "#blast"}, "down": {"texture": "#blast"} } }
   ]
 }
