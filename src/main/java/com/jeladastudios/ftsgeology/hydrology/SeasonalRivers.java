@@ -45,6 +45,9 @@ public final class SeasonalRivers {
 
     private static long risen;
 
+    /** A season with less than this share of the year's rain is a dry one, when the rivers are down a block. */
+    private static final double LOW = 0.45;
+
     /** Chunks still to be looked at from the last round, a few each tick within the mod's budget. */
     private static final LongArrayFIFOQueue PENDING = new LongArrayFIFOQueue();
 
@@ -82,8 +85,9 @@ public final class SeasonalRivers {
     }
 
     /**
-     * Blocks the rivers of a place stand over their summer level at a phase of the year: 0, 1 or 2. Snow-fed rivers (a
-     * cold winter) peak with the melt; the others with their regime's wet season.
+     * Blocks the rivers of a place stand over their summer level at a phase of the year: -1, 0, 1 or 2. Snow-fed rivers
+     * (a cold winter) peak with the melt; the others with their regime's wet season, and in its dry season (a
+     * Mediterranean summer, a monsoon winter, the tropics' dry months) they are down a block.
      */
     public static int stage(ServerLevel level, int x, int z, double phase) {
         RainClimate.Here h = RainClimate.at(level, x, z);
@@ -96,12 +100,25 @@ public final class SeasonalRivers {
         } else if (h.regime() == RainClimate.Regime.ARID || h.regime() == RainClimate.Regime.POLAR) {
             flow = 1.0;
         } else {
-            flow = 1.0 + 3.0 * Math.max(0.0, RainClimate.season(level, x, z) - 1.0);
+            double season = RainClimate.season(level, x, z);
+            if (season < LOW) return -1;
+            flow = 1.0 + 3.0 * Math.max(0.0, season - 1.0);
         }
         // Width goes as the square root of the flow: 2.25 times as wide at 5 times the water needs about two blocks of
         // rise on an ordinary bank; 1.5 times as wide about one.
         double wider = Math.sqrt(flow);
         return wider >= 2.0 ? 2 : wider >= 1.4 ? 1 : 0;
+    }
+
+    /**
+     * Whether the rivers round a place are down a block in their dry season. The river upkeep takes the top of their
+     * water as it goes by and does not lay it again till the season turns; where they were a block deep the bed shows,
+     * bars of gravel and sand along the banks.
+     */
+    public static boolean low(ServerLevel level, int x, int z) {
+        if (!GeyserConfig.SEASONAL_RIVERS.get() || !SereneSeasons.active()) return false;
+        double phase = SereneSeasons.phase(level);
+        return !Double.isNaN(phase) && stage(level, x, z, phase) < 0;
     }
 
     /** A smooth bump on the year's circle, 1 at {@code centre}, 0 past {@code half} either side. */

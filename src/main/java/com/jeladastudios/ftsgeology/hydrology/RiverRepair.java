@@ -238,6 +238,8 @@ public final class RiverRepair {
         LongSet placed = PlayerBuilt.inChunk(level, cp.x, cp.z);
         BlockState water = ModBlocks.RIVER_WATER.get().defaultBlockState();
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        // The rivers here in their dry season (read once for the chunk).
+        boolean seasonLow = SeasonalRivers.low(level, cp.getMiddleBlockX(), cp.getMiddleBlockZ());
         for (int lx = 0; lx < 16; lx++) {
             for (int lz = 0; lz < 16; lz++) {
                 int w = plan.waterAt(lx, lz);
@@ -247,9 +249,10 @@ public final class RiverRepair {
                 int g = ground(chunk, x, z, m);
                 if (g == Integer.MIN_VALUE) continue;
                 boolean lake = plan.lake()[Plan.index(lx, lz)];
-                // A lake in a long drought is down a block: its top water goes as the column is visited, and is not laid
-                // again till the rains come back, when it fills from the water still in it.
-                if (lake && low(level, x, z)) {
+                // A lake in a long drought, and the rivers in their dry season, are down a block: the top water goes as the
+                // column is visited, and is not laid again till the rains or the season come back, when it fills from the
+                // water still in it.
+                if (seasonLow || lake && low(level, x, z)) {
                     BlockState at = chunk.getBlockState(m.set(x, w, z));
                     if ((at.is(ModBlocks.RIVER_WATER.get()) || at.is(Blocks.ICE)) && chunk.getBlockState(m.set(x, w + 1, z)).getFluidState().isEmpty()) {
                         level.setBlock(m.set(x, w, z), Blocks.AIR.defaultBlockState(), FLAGS);
