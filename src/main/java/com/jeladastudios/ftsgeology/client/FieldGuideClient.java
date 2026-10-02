@@ -19,7 +19,7 @@ import java.util.List;
  */
 public class FieldGuideClient {
 
-    public static final int PAGE_COUNT = 44;
+    public static final int PAGE_COUNT = 51;
 
     /** What vanilla's book holds: lines this wide, this many to a page. */
     private static final int WIDTH = 114, LINES = 14;
