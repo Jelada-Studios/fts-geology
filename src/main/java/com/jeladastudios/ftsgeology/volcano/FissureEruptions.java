@@ -301,20 +301,90 @@ public final class FissureEruptions {
             if (ground <= level.getSeaLevel() + 1) continue;
             // A natural one does not break out within some fifty blocks of what people have built.
             if (!nearest && built(level, c[0], c[1], 3)) continue;
-            double sx, sz;
-            PlateSample s = TectonicMap.sampleCached(level, c[0], c[1]);
-            if (!hot && s != null && Math.hypot(s.faultStrikeX(), s.faultStrikeZ()) > 1e-3) {
-                double n = Math.hypot(s.faultStrikeX(), s.faultStrikeZ());
-                sx = s.faultStrikeX() / n;
-                sz = s.faultStrikeZ() / n;
-            } else {
-                double a = level.random.nextDouble() * Math.PI;
-                sx = Math.cos(a);
-                sz = Math.sin(a);
-            }
-            return new Site(c[0], c[1], sx, sz, hot);
+            // A rift's fissure opens on the valley's axis and runs down it; a hot spot's any way.
+            double[] along = hot ? null : axisStrike(seed, gp, c[0], c[1]);
+            if (along != null) return new Site((int) Math.round(along[2]), (int) Math.round(along[3]), along[0], along[1], false);
+            double a = level.random.nextDouble() * Math.PI;
+            return new Site(c[0], c[1], Math.cos(a), Math.sin(a), hot);
         }
         return null;
+    }
+
+    /** How far along a dike, either way, its line is fitted to the rift's axis, blocks, the step, and the directions tried. */
+    private static final int AXIS_LOOK = 96, AXIS_STEP = 16, AXIS_TURNS = 36;
+
+    /**
+     * Which way the axis of a rift runs near a point, as the valley itself is laid out, and the point on the axis nearest
+     * it: {sx, sz, x, z}. The point is moved onto the axis first, down the axis's distance; then the line through it is
+     * turned to stay nearest the axis over a dike's length, read off the same warped ground the graben is drawn on. The
+     * plate boundary's own strike is not it: the valley winds, and a dike laid along the boundary crossed it. Null where
+     * no rift's axis is near.
+     */
+    static double[] axisStrike(long seed, GeologyParams gp, int x, int z) {
+        double px = x, pz = z;
+        for (int i = 0; i < 4; i++) {
+            double d = axisOff(seed, gp, px, pz);
+            if (d >= AXIS_FAR) return null;
+            if (d < 1.5) break;
+            double gx = axisOff(seed, gp, px + 2, pz) - axisOff(seed, gp, px - 2, pz);
+            double gz = axisOff(seed, gp, px, pz + 2) - axisOff(seed, gp, px, pz - 2);
+            double n = Math.hypot(gx, gz);
+            if (n < 1e-6) break;
+            px -= d * gx / n;
+            pz -= d * gz / n;
+        }
+        double best = Double.MAX_VALUE, angle = 0;
+        for (int i = 0; i < AXIS_TURNS; i++) {
+            double a = Math.PI * i / AXIS_TURNS, off = 0;
+            for (int t = AXIS_STEP; t <= AXIS_LOOK; t += AXIS_STEP) {
+                off += axisOff(seed, gp, px + Math.cos(a) * t, pz + Math.sin(a) * t)
+                        + axisOff(seed, gp, px - Math.cos(a) * t, pz - Math.sin(a) * t);
+            }
+            if (off < best) {
+                best = off;
+                angle = a;
+            }
+        }
+        return new double[]{Math.cos(angle), Math.sin(angle), px, pz};
+    }
+
+    /** How far the rift's axis is from a point, blocks; {@link #AXIS_FAR} where it is further or there is none. */
+    private static double axisOff(long seed, GeologyParams gp, double x, double z) {
+        double d = TerrainFields.riftAxisDistance(seed, gp, (int) Math.floor(x), (int) Math.floor(z), AXIS_FAR);
+        return d < 0 ? AXIS_FAR : d;
+    }
+
+    private static final double AXIS_FAR = 64;
+
+    /**
+     * For testing: the nearest place for a rift's fissure, the way its dike runs and the way the plate boundary there
+     * runs, and how far each line strays from the valley's axis over the next 96 blocks either way (mean, blocks).
+     */
+    public static String strikeReport(ServerLevel level, BlockPos at) {
+        if (!GeologyWorld.isOwn(level)) return "not the mod's world type";
+        long seed = level.getSeed();
+        GeologyParams gp = GeologyParams.current();
+        // Right here where a rift's axis is near, on land or under the sea; else the nearest place on land for one.
+        double[] here = axisStrike(seed, gp, at.getX(), at.getZ());
+        Site s = here != null ? new Site((int) Math.round(here[2]), (int) Math.round(here[3]), here[0], here[1], false)
+                : site(level, at.getX(), at.getZ(), 0, 480, true);
+        if (s == null || s.hotspot()) return "no rift axis here or on land within 480 blocks";
+        PlateSample ps = TectonicMap.sampleCached(level, s.x(), s.z());
+        double n = ps == null ? 0 : Math.hypot(ps.faultStrikeX(), ps.faultStrikeZ());
+        double px = n > 1e-3 ? ps.faultStrikeX() / n : 1, pz = n > 1e-3 ? ps.faultStrikeZ() / n : 0;
+        double turn = Math.toDegrees(Math.acos(Math.min(1, Math.abs(px * s.sx() + pz * s.sz()))));
+        return String.format(Locale.ROOT, "fissure site %d, %d: dike along %.2f, %.2f, %.1f blocks off the axis; plate line along %.2f, %.2f, %.1f off; %.0f degrees apart",
+                s.x(), s.z(), s.sx(), s.sz(), stray(seed, gp, s.x(), s.z(), s.sx(), s.sz()), px, pz, stray(seed, gp, s.x(), s.z(), px, pz), turn);
+    }
+
+    private static double stray(long seed, GeologyParams gp, int x, int z, double sx, double sz) {
+        double sum = 0;
+        int n = 0;
+        for (int t = -96; t <= 96; t += 8) {
+            sum += axisOff(seed, gp, x + sx * t, z + sz * t);
+            n++;
+        }
+        return sum / n;
     }
 
     /** Whether any loaded chunk within {@code r} chunks of a point holds blocks a player placed. */
@@ -1155,10 +1225,12 @@ public final class FissureEruptions {
         if (!st.all.isEmpty()) return "a fissure eruption is already under way";
         Site s;
         if (here) {
+            double[] along = GeologyWorld.isOwn(level) ? axisStrike(level.getSeed(), GeologyParams.current(), at.getX(), at.getZ()) : null;
             PlateSample ps = TectonicMap.sampleCached(level, at.getX(), at.getZ());
             double n = ps == null ? 0 : Math.hypot(ps.faultStrikeX(), ps.faultStrikeZ());
             double a = level.random.nextDouble() * Math.PI;
-            s = n > 1e-3 ? new Site(at.getX(), at.getZ(), ps.faultStrikeX() / n, ps.faultStrikeZ() / n, false)
+            s = along != null ? new Site(at.getX(), at.getZ(), along[0], along[1], false)
+                    : n > 1e-3 ? new Site(at.getX(), at.getZ(), ps.faultStrikeX() / n, ps.faultStrikeZ() / n, false)
                     : new Site(at.getX(), at.getZ(), Math.cos(a), Math.sin(a), false);
         } else {
             s = site(level, at.getX(), at.getZ(), 24, 480, true);

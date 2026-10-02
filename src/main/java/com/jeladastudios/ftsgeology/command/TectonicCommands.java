@@ -258,6 +258,12 @@ public final class TectonicCommands {
                                 .then(Commands.literal("here").executes(ctx -> fissure(ctx, true, -1))
                                         .then(Commands.argument("unrest", com.mojang.brigadier.arguments.IntegerArgumentType.integer(200, 480000))
                                                 .executes(ctx -> fissure(ctx, true, com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "unrest")))))
+                                .then(Commands.literal("strike").executes(ctx -> {
+                                    String m = com.jeladastudios.ftsgeology.volcano.FissureEruptions.strikeReport(ctx.getSource().getLevel(),
+                                            BlockPos.containing(ctx.getSource().getPosition()));
+                                    ctx.getSource().sendSuccess(() -> Component.literal(m), false);
+                                    return 1;
+                                }))
                                 .then(Commands.literal("next").executes(ctx -> {
                                     String m = com.jeladastudios.ftsgeology.volcano.FissureEruptions.next(ctx.getSource().getLevel());
                                     ctx.getSource().sendSuccess(() -> Component.literal(m), true);
