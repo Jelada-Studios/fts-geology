@@ -42,4 +42,19 @@ public class HotSpringBlock extends BaseEntityBlock {
         return createTickerHelper(type, ModBlockEntities.HOT_SPRING.get(),
                 HotSpringBlockEntity::serverTick);
     }
+
+    /** The spring welling up through its bed: a stream of bubbles, and now and then its burble. */
+    @Override
+    public void animateTick(BlockState state, Level level, BlockPos pos, net.minecraft.util.RandomSource random) {
+        if (!level.getFluidState(pos.above()).is(net.minecraft.tags.FluidTags.WATER)) return;
+        if (random.nextInt(3) == 0) {
+            level.addParticle(net.minecraft.core.particles.ParticleTypes.BUBBLE, pos.getX() + 0.3 + random.nextDouble() * 0.4,
+                    pos.getY() + 1.05, pos.getZ() + 0.3 + random.nextDouble() * 0.4, 0.0, 0.06 + random.nextDouble() * 0.04, 0.0);
+        }
+        if (random.nextInt(40) == 0) {
+            level.playLocalSound(pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5,
+                    net.minecraft.sounds.SoundEvents.BUBBLE_COLUMN_UPWARDS_AMBIENT, net.minecraft.sounds.SoundSource.BLOCKS,
+                    0.25f + random.nextFloat() * 0.15f, 0.8f + random.nextFloat() * 0.3f, false);
+        }
+    }
 }

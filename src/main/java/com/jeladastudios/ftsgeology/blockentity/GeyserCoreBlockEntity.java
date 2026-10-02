@@ -646,6 +646,11 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         this.cooldownTimer = min + level.random.nextInt(Math.max(1, max - min));
         // A natural geyser refills from the water in the ground: drawn down by the wells round it, it takes the longer.
         if (!emergent) this.cooldownTimer = (int) Math.min(Integer.MAX_VALUE / 2, cooldownTimer * (1.0 + drawnDown(level)));
+        // And by how much water the ground has: sooner after a wet spell, slower in a drought (see SoilWater.springFlow).
+        if (!emergent) {
+            double q = com.jeladastudios.ftsgeology.hydrology.SoilWater.springFlow(level, worldPosition.getX(), worldPosition.getZ());
+            this.cooldownTimer = (int) Math.min(Integer.MAX_VALUE / 2, cooldownTimer * Math.max(0.6, Math.min(2.5, 1.0 / (0.35 + 0.65 * q))));
+        }
         // What a quake did to its plumbing, easing back over its eruptions.
         this.cooldownTimer = (int) Math.min(Integer.MAX_VALUE / 2, cooldownTimer * intervalFactor);
         intervalFactor = 1.0 + (intervalFactor - 1.0) * 0.97;

@@ -327,7 +327,9 @@ public final class Earthquake {
         Liquefaction.drain(event.getServer(),
                 com.jeladastudios.ftsgeology.util.TickBudget.slice(0.15));
 
-        // Steep slopes shedding their cover.
+        // Steep slopes shedding their cover: shaken, or soaked through in a downpour.
+        ServerLevel overworld = event.getServer().overworld();
+        if (overworld != null) Landslides.rain(overworld);
         Landslides.drain(event.getServer(),
                 com.jeladastudios.ftsgeology.util.TickBudget.slice(0.15));
 

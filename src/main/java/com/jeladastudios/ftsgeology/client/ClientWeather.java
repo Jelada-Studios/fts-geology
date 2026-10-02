@@ -121,6 +121,7 @@ public final class ClientWeather {
         if (fall != Biome.Precipitation.RAIN || !level.dimensionType().hasSkyLight()) rain = 0;
         wet = Math.max(wet * 0.9995f, rain);
         ClientRiverMud.tick(player, rain);
+        ClientGroundSteam.tick(player, rain);
         if (level.getGameTime() % 10 == 0) open = openness(level, player);
         sound(level, player, rain);
         drips(level, player);
@@ -375,6 +376,7 @@ public final class ClientWeather {
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         LocalWeather.reset();
         ClientRiverMud.reset();
+        ClientGroundSteam.reset();
         stop();
         wet = 0;
         recordings = null;

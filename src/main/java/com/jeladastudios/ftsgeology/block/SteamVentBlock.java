@@ -125,5 +125,10 @@ public class SteamVentBlock extends Block {
         if (random.nextInt(6) == 0) {
             level.addParticle(ParticleTypes.CAMPFIRE_SIGNAL_SMOKE, x, y, z, 0.0, 0.03, 0.0);
         }
+        // Its hiss, now and then: steam forced out through a narrow throat.
+        if (random.nextInt(8) == 0) {
+            level.playLocalSound(x, y, z, net.minecraft.sounds.SoundEvents.FIRE_EXTINGUISH, net.minecraft.sounds.SoundSource.BLOCKS,
+                    0.08f + random.nextFloat() * 0.06f, 1.5f + random.nextFloat() * 0.4f, false);
+        }
     }
 }

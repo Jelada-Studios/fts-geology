@@ -33,6 +33,9 @@ public class MudPotBlock extends Block {
         if (random.nextInt(6) != 0) return;
 
         double x = pos.getX() + 0.5, y = pos.getY() + 1.0, z = pos.getZ() + 0.5;
+        // The plop of a bubble bursting through the mud.
+        level.playLocalSound(x, y, z, net.minecraft.sounds.SoundEvents.LAVA_POP, net.minecraft.sounds.SoundSource.BLOCKS,
+                0.25f + random.nextFloat() * 0.15f, 0.55f + random.nextFloat() * 0.25f, false);
         int blobs = 1 + random.nextInt(3);
         for (int i = 0; i < blobs; i++) {
             level.addParticle(ModParticles.MUD_BLOB.get(),

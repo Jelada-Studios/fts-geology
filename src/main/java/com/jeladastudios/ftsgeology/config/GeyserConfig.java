@@ -162,6 +162,8 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue QUAKE_AFTERSHOCKS;
     public static final ForgeConfigSpec.BooleanValue QUAKE_LIQUEFACTION;
     public static final ForgeConfigSpec.BooleanValue QUAKE_LANDSLIDES;
+    public static final ForgeConfigSpec.BooleanValue RAIN_LANDSLIDES;
+    public static final ForgeConfigSpec.DoubleValue RAIN_LANDSLIDE_RATE;
     public static final ForgeConfigSpec.DoubleValue AFTERSHOCK_RATE;
     public static final ForgeConfigSpec.IntValue AFTERSHOCK_MAX;
     public static final ForgeConfigSpec.DoubleValue AFTERSHOCK_DAYS;
@@ -903,6 +905,14 @@ public final class GeyserConfig {
                         "soil, scree, sand and snow slide down as one mass, trees and all, heap up at the foot and leave",
                         "a scar. Never on a slope a player or a village built on, never beside water.")
                 .define("quakeLandslides", true);
+        RAIN_LANDSLIDES = b
+                .comment("Steep natural slopes whose ground days of rain have soaked through can come down in a downpour,",
+                        "with no quake: stones roll and the ground creaks first, then the slope goes, the wet soil as mud",
+                        "running on further. Seldom, only round players, never on built ground or beside water.")
+                .define("rainLandslides", true);
+        RAIN_LANDSLIDE_RATE = b
+                .comment("How often a soaked slope gives way in rain, against the usual (1).")
+                .defineInRange("rainLandslideRate", 1.0, 0.0, 20.0);
         QUAKE_AFTERSHOCKS = b
                 .comment("After a quake of magnitude 5.5 or more the fault goes on slipping for days: the few aftershocks",
                         "worth feeling, three to five for most quakes, sooner rather than later (Omori's law), the largest",

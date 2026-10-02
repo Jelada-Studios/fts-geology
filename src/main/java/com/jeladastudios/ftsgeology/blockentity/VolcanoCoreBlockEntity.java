@@ -400,6 +400,24 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                         (float) wind[0], (float) wind[1], GeyserConfig.VOLCANIC_ASHFALL.get(), fumaroles));
     }
 
+    /** How far a live volcano's deep rumble is heard, blocks. */
+    private static final double RUMBLE_REACH = 160.0;
+
+    /**
+     * Now and then, a live volcano's deep rumble under the feet of those near it -- magma and gas moving in the conduit,
+     * the long-period tremor of a restless mountain -- more often, and louder, as it wakes. Once a second, by chance.
+     */
+    private static void deepRumble(ServerLevel server, BlockPos summit, double unrest) {
+        if (server.random.nextDouble() > 1.0 / 45.0 + unrest / 8.0) return;
+        for (net.minecraft.server.level.ServerPlayer p : server.players()) {
+            double d = Math.sqrt(p.distanceToSqr(summit.getX() + 0.5, p.getY(), summit.getZ() + 0.5));
+            if (d > RUMBLE_REACH) continue;
+            float near = (float) (1.0 - d / RUMBLE_REACH);
+            p.playNotifySound(com.jeladastudios.ftsgeology.registry.ModSounds.QUAKE_RUMBLE.get(), net.minecraft.sounds.SoundSource.BLOCKS,
+                    (0.12f + 0.5f * (float) unrest) * near, 0.45f + server.random.nextFloat() * 0.1f);
+        }
+    }
+
     public static void serverTick(Level level, BlockPos pos, BlockState state, VolcanoCoreBlockEntity be) {
         if (!(level instanceof ServerLevel server)) return;
         // A marker world generation left for a large volcano. It is not a volcano yet: it finishes the
@@ -458,6 +476,7 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                     com.jeladastudios.ftsgeology.volcano.VolcanicGas.breatheQuietly(server, summit, be.craterR, be.magnitude,
                             be.surfaceVents);
                 }
+                if (!be.sealed || unrest > 0) deepRumble(server, summit, unrest);
                 be.idleSmoke(server, summit, (float) (0.4 + 0.6 * unrest), true); // lazy smoke, thickening as it wakes
                 if ((be.timer -= 20) <= 0) {
                     GeysersMod.LOGGER.debug("Volcano at {} begins to rumble", pos);

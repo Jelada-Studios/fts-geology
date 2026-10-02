@@ -250,12 +250,16 @@ public class SpringSourceBlockEntity extends BlockEntity {
     private boolean drawnDry(ServerLevel level) {
         if (!surfaced || stage <= 0 || datumY == Integer.MIN_VALUE) return false;
         double s = com.jeladastudios.ftsgeology.hydrology.Aquifer.drawdown(level, outletX + 0.5, outletZ + 0.5);
+        // A long drought takes its water as a well does: under a tenth of its usual flow it dries, past a third it flows.
+        double q = com.jeladastudios.ftsgeology.hydrology.SoilWater.springFlow(level, outletX, outletZ);
+        s += Math.max(0.0, 0.6 - q) * 4.0;
+        if (!dry && q > 1.2) gush(level, q);
         if (!dry) {
             if (s < DRY_AT) return false;
             drainPool(level);
             dry = true;
             setChanged();
-            com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring at {},{} drawn dry: the wells round it have its water {} blocks down",
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring at {},{} drawn dry: wells or a drought have its water {} blocks down",
                     siteX(), siteZ(), String.format(java.util.Locale.ROOT, "%.1f", s));
             return true;
         }
@@ -263,8 +267,23 @@ public class SpringSourceBlockEntity extends BlockEntity {
         dry = false;
         applyStage(level, stage);
         setChanged();
-        com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring at {},{} flows again: the cone has filled back in", siteX(), siteZ());
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("Spring at {},{} flows again: its water has come back up", siteX(), siteZ());
         return false;
+    }
+
+    /**
+     * A spring in spate after a wet spell: the water wells up hard through its vent, boiling the pool's face and
+     * splashing, with the louder burble of it. Every check while it lasts.
+     */
+    private void gush(ServerLevel level, double q) {
+        double x = outletX + 0.5, y = mouthY + 1.0, z = outletZ + 0.5;
+        int n = (int) Math.round((q - 1.0) * 14);
+        level.sendParticles(net.minecraft.core.particles.ParticleTypes.BUBBLE_COLUMN_UP, x, y - 0.6, z, n, 0.3, 0.2, 0.3, 0.05);
+        level.sendParticles(net.minecraft.core.particles.ParticleTypes.SPLASH, x, y, z, n * 2, 0.5, 0.05, 0.5, 0.1);
+        if (level.random.nextInt(3) == 0) {
+            level.playSound(null, x, y, z, net.minecraft.sounds.SoundEvents.BUBBLE_COLUMN_UPWARDS_AMBIENT,
+                    net.minecraft.sounds.SoundSource.BLOCKS, (float) (0.3 + 0.3 * (q - 1.0)), 0.9f);
+        }
     }
 
     /** How long the current stage lasts, in ticks. */

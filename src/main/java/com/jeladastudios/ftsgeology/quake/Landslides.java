@@ -61,13 +61,91 @@ public final class Landslides {
     /** How far down the slope a slide's debris runs before it heaps up, at most. */
     private static final int RUNOUT = 24;
 
-    private static final LongAdder SLIDES = new LongAdder(), MOVED = new LongAdder(), TREES = new LongAdder();
+    private static final LongAdder SLIDES = new LongAdder(), MOVED = new LongAdder(), TREES = new LongAdder(),
+            WET = new LongAdder(), WARNED = new LongAdder();
+
+    /** How often the slopes round each player are looked at in rain, ticks; how many columns, and how far. */
+    private static final int RAIN_EVERY = 200, RAIN_LOOKS = 8, RAIN_REACH = 96;
+    /** The chance that a soaked, steep, loose slope in a downpour gives way, a look, before the config's rate. */
+    private static final double RAIN_CHANCE = 0.03;
+
+    /**
+     * Slopes giving way in rain, with no quake: where days of rain have soaked the ground through -- the roots full and
+     * the deep soil too -- a steep slope's loose cover gets heavy and loses its grip, and in a downpour it goes (the
+     * Black Sea coast in every wet autumn; Rize, 2023). First stones roll down it and the ground creaks; the slope comes
+     * down some seconds later, the soaked soil as mud, running on further than a dry slide does. Only on natural
+     * ground, away from water, in loaded chunks round the players, and seldom.
+     */
+    static void rain(ServerLevel level) {
+        if (!GeyserConfig.RAIN_LANDSLIDES.get() || !Level.OVERWORLD.equals(level.dimension())) return;
+        long now = level.getGameTime();
+        if (now % RAIN_EVERY != 0 || DUE.size() > 8) return;
+        double rate = GeyserConfig.RAIN_LANDSLIDE_RATE.get();
+        for (net.minecraft.server.level.ServerPlayer p : level.players()) {
+            for (int i = 0; i < RAIN_LOOKS; i++) {
+                int x = p.getBlockX() + level.random.nextInt(2 * RAIN_REACH + 1) - RAIN_REACH;
+                int z = p.getBlockZ() + level.random.nextInt(2 * RAIN_REACH + 1) - RAIN_REACH;
+                if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(x, p.getBlockY(), z))) continue;
+                float rain = com.jeladastudios.ftsgeology.weather.Storms.intensityAt(level, x, z);
+                if (rain < 0.5f) continue;
+                com.jeladastudios.ftsgeology.hydrology.SoilWater.Reading r = com.jeladastudios.ftsgeology.hydrology.SoilWater.at(level, x, z);
+                if (r == null || r.rootSat() < 0.9 || r.deepSat() < 0.85) continue;
+                int top = TerrainProbe.groundY(level, x, z);
+                if (top == Integer.MIN_VALUE) continue;
+                Direction down = null;
+                int drop = 0;
+                for (Direction d : Direction.Plane.HORIZONTAL) {
+                    BlockPos n = new BlockPos(x + d.getStepX() * SPAN, top, z + d.getStepZ() * SPAN);
+                    if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, n)) continue;
+                    int g = TerrainProbe.groundY(level, n.getX(), n.getZ());
+                    if (g != Integer.MIN_VALUE && top - g > drop) {
+                        drop = top - g;
+                        down = d;
+                    }
+                }
+                if (down == null || drop < STEEP) continue;
+                if (cover(level, x, top, z) < 2 || nearWater(level, x, top, z)) continue;
+                LevelChunk chunk = level.getChunkSource().getChunkNow(x >> 4, z >> 4);
+                if (chunk == null || built(PlayerBuilt.inChunk(level, x >> 4, z >> 4),
+                        ShakingDamage.structureBoxes(level, chunk, level.getMinBuildHeight()), x, top, z)) continue;
+                double chance = RAIN_CHANCE * rate * rain * Math.min(3.0, drop / (double) STEEP);
+                if (level.random.nextDouble() >= chance) continue;
+                BlockPos seed = new BlockPos(x, top, z);
+                warn(level, seed, down);
+                int delay = 200 + level.random.nextInt(400);
+                DUE.add(new Slide(level.dimension(), seed, down, 3 + level.random.nextInt(3), now + delay, new int[2], true));
+                com.jeladastudios.ftsgeology.util.Diagnostics.info("a soaked slope at {} {} {} is moving: it comes down in {} s",
+                        x, top, z, delay / 20);
+                return;
+            }
+        }
+    }
+
+    /** A slope about to go: a few stones off it rolling down, and the creak of roots and soil giving. */
+    private static void warn(ServerLevel level, BlockPos seed, Direction down) {
+        WARNED.increment();
+        for (int i = 0; i < 3; i++) {
+            int x = seed.getX() + level.random.nextInt(5) - 2, z = seed.getZ() + level.random.nextInt(5) - 2;
+            int top = TerrainProbe.groundY(level, x, z);
+            if (top == Integer.MIN_VALUE) continue;
+            BlockPos p = new BlockPos(x, top, z);
+            BlockState s = level.getBlockState(p);
+            if (!loose(s) || !level.getBlockState(p.above()).canBeReplaced()) continue;
+            FallingBlockEntity f = FallingBlockEntity.fall(level, p, s.is(BlockTags.DIRT) ? Blocks.GRAVEL.defaultBlockState() : s);
+            f.setDeltaMovement(new Vec3(down.getStepX() * 0.35, 0.15, down.getStepZ() * 0.35));
+            f.dropItem = false;
+            f.hurtMarked = true;
+        }
+        level.playSound(null, seed, net.minecraft.sounds.SoundEvents.GRAVEL_FALL, net.minecraft.sounds.SoundSource.BLOCKS, 2.0f, 0.6f);
+        level.playSound(null, seed, net.minecraft.sounds.SoundEvents.WOOD_BREAK, net.minecraft.sounds.SoundSource.BLOCKS, 1.2f, 0.5f);
+    }
 
     private record Job(ResourceKey<Level> dimension, BlockPos epicentre, List<QuakePlanner.TracePoint> trace,
                        double magnitude, double depthMetres, long startAt, Deque<ChunkPos> chunks, int[] counts) {}
 
     /** A slope due to give way: where it starts, which way is down, how big, and when. */
-    private record Slide(ResourceKey<Level> dimension, BlockPos seed, Direction down, int radius, long at, int[] counts) {}
+    private record Slide(ResourceKey<Level> dimension, BlockPos seed, Direction down, int radius, long at, int[] counts,
+                         boolean wet) {}
 
     private static final Deque<Job> JOBS = new ArrayDeque<>();
     private static final PriorityQueue<Slide> DUE = new PriorityQueue<>(Comparator.comparingLong(Slide::at));
@@ -186,7 +264,7 @@ public final class Landslides {
                 if (job.counts()[0]++ >= MOST) return;
                 here++;
                 DUE.add(new Slide(level.dimension(), new BlockPos(x, top, z), down, radius,
-                        arrives + level.random.nextInt(lasts), job.counts()));
+                        arrives + level.random.nextInt(lasts), job.counts(), false));
             }
         }
     }
@@ -272,10 +350,15 @@ public final class Landslides {
                 for (int i = 0; i < k; i++) {
                     BlockPos p = new BlockPos(x, top - i, z);
                     BlockState block = level.getBlockState(p);
+                    // Soaked soil goes down as mud, and further: a debris flow.
+                    if (s.wet() && block.is(BlockTags.DIRT) && !block.is(Blocks.MUD)) {
+                        block = Blocks.MUD.defaultBlockState();
+                        level.setBlock(p, block, Block.UPDATE_CLIENTS);
+                    }
                     if (s.counts()[1] < SHOWN) {
                         s.counts()[1]++;
                         FallingBlockEntity f = FallingBlockEntity.fall(level, p, block);
-                        double push = 0.25 + level.random.nextDouble() * 0.3;
+                        double push = (0.25 + level.random.nextDouble() * 0.3) * (s.wet() ? 1.6 : 1.0);
                         f.setDeltaMovement(new Vec3(down.getStepX() * push + (level.random.nextDouble() - 0.5) * 0.1,
                                 0.05 + level.random.nextDouble() * 0.1,
                                 down.getStepZ() * push + (level.random.nextDouble() - 0.5) * 0.1));
@@ -285,7 +368,7 @@ public final class Landslides {
                         f.hurtMarked = true;
                     } else {
                         QuakeWrites.set(level, p, Blocks.AIR.defaultBlockState());
-                        deposit(level, x, z, down, block);
+                        deposit(level, x, z, down, block, s.wet() ? 2 * RUNOUT : RUNOUT);
                     }
                     emptied.add(new QuakePlanner.Edit(p, Blocks.AIR.defaultBlockState()));
                     moved++;
@@ -302,14 +385,15 @@ public final class Landslides {
                 seed.getX() + 0.5, seed.getY() + 1.0, seed.getZ() + 0.5, 60, s.radius(), 1.0, s.radius(), 0.1);
         // Trees left standing on air, and cover left hanging at the scar's edge, come down after.
         Weathering.enqueue(level, emptied);
+        if (s.wet()) WET.increment();
         com.jeladastudios.ftsgeology.util.Diagnostics.info("landslide at {} {} {}: {} blocks down the slope to the {}",
                 seed.getX(), seed.getY(), seed.getZ(), moved, down.getName());
     }
 
     /** Where debris that is not shown falling comes to rest: down the slope until it flattens out. */
-    private static void deposit(ServerLevel level, int x, int z, Direction down, BlockState block) {
+    private static void deposit(ServerLevel level, int x, int z, Direction down, BlockState block, int runout) {
         int y = TerrainProbe.groundY(level, x, z);
-        for (int i = 0; i < RUNOUT; i++) {
+        for (int i = 0; i < runout; i++) {
             int nx = x + down.getStepX(), nz = z + down.getStepZ();
             if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(nx, y, nz))) break;
             int g = TerrainProbe.groundY(level, nx, nz);
@@ -323,8 +407,8 @@ public final class Landslides {
     }
 
     public static String summary() {
-        return String.format(java.util.Locale.ROOT, "landslides: %d, %d blocks moved, %d trees felled",
-                SLIDES.sum(), MOVED.sum(), TREES.sum());
+        return String.format(java.util.Locale.ROOT, "landslides: %d (%d of them in rain, %d slopes warned), %d blocks moved, %d trees felled",
+                SLIDES.sum(), WET.sum(), WARNED.sum(), MOVED.sum(), TREES.sum());
     }
 
     public static void clear() {

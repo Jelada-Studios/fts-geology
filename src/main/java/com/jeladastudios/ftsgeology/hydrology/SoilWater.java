@@ -1192,6 +1192,27 @@ public final class SoilWater {
     }
 
     /**
+     * How strongly the water in the ground feeds a spring or a geyser here against its usual: 1 in an ordinary time, up to
+     * 2 after weeks of rain have raised the water in the ground and filled the deep soil, down towards 0 in a long
+     * drought, whose dry roots tell that no water has come down for weeks. 1 where nothing is kept.
+     */
+    public static double springFlow(ServerLevel level, int x, int z) {
+        // The water comes from the ground round the spring, not the rock of its own mound: the soil within some forty
+        // blocks of it, taken together.
+        double sum = 0;
+        int n = 0;
+        for (int i = 0; i < 9; i++) {
+            double a = i * Math.PI / 4;
+            int r = i == 8 ? 0 : 36;
+            Reading w = at(level, x + (int) (Math.cos(a) * r), z + (int) (Math.sin(a) * r));
+            if (w == null || !w.soil().ground() || w.soil().deep <= 0) continue;
+            sum += 1.0 + w.table() / 2.0 + (w.deepSat() - 0.7) * 1.5 + (w.rootSat() - 0.5) * 0.5;
+            n++;
+        }
+        return n == 0 ? 1.0 : Mth.clamp(sum / n, 0.0, 2.0);
+    }
+
+    /**
      * How far the ground of the cell at a column has settled over the clay the wells drew down (see Subsidence): {blocks
      * so far, whole blocks laid down, the deepest drawdown yet}; null where the cell is not kept.
      */
