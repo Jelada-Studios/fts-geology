@@ -121,6 +121,12 @@ public final class FissureEruptions {
         transient double owed;
         /** Where the lava field's thickening has got to in its cells. */
         transient int riseAt;
+        /** How far the trench has set, once the eruption has drawn into its vents. */
+        transient int trenchAt = Integer.MAX_VALUE;
+        /** Cones growing a block: by vent, the height, how far through its columns, and its breach in degrees. */
+        transient it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<int[]> heaping = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+        /** How far through a chunk the graben has got, where it is part way. */
+        transient it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap grabenAt = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
         /** The height each vent's cone was last heaped to. */
         transient it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap shaped = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
 
@@ -385,6 +391,12 @@ public final class FissureEruptions {
 
     /** Once a second: the stage's own business, and on to the next when its time is up. */
     private static void step(ServerLevel level, Fissure f, long now) {
+        // Past the unrest, which the instruments hear from afar, it goes on only while the ground where it breaks out
+        // is loaded, as a volcano does: its clock held while nobody is near.
+        if (f.stage != Stage.UNREST && !Loaded.at(level, f.x(f.start, 0), f.z(f.start, 0))) {
+            f.stageAt += 20;
+            return;
+        }
         double p = Math.min(1.0, (now - f.stageAt) / (double) f.ticks(f.stage));
         BlockPos centre = f.centre();
         switch (f.stage) {
@@ -457,16 +469,28 @@ public final class FissureEruptions {
 
     /** Every tick, within the mod's budget: the graben, the lava owed, the cooling. */
     private static void work(ServerLevel level, Fissure f, long deadline) {
-        // The graben drops where the dike has got to, a chunk at a time.
-        if (f.stage != Stage.UNREST && f.stage != Stage.COOL && f.sunk.size() < f.band.length && System.nanoTime() < deadline) {
+        if (f.stage != Stage.UNREST && !Loaded.at(level, f.x(f.start, 0), f.z(f.start, 0))) return;
+        // The graben drops where the dike has got to, a slice of a chunk at a time while the budget lasts: in a big pack
+        // a whole chunk's columns took some fifty milliseconds.
+        if (f.stage != Stage.UNREST && f.stage != Stage.COOL && f.sunk.size() < f.band.length) {
             double tip = f.stage == Stage.DIKE ? (level.getGameTime() - f.stageAt) / (double) DIKE * f.half : f.half;
             for (long k : f.band) {
+                if (System.nanoTime() >= deadline) break;
                 if (f.sunk.contains(k)) continue;
                 int ccx = (int) (k >> 32), ccz = (int) k;
                 double a = Math.abs(f.along(ccx * 16 + 8, ccz * 16 + 8)) - 11;
                 if (a > tip || !Loaded.chunk(level, ccx, ccz)) continue;
-                graben(level, f, ccx, ccz);
-                f.sunk.add(k);
+                int from = f.grabenAt.getOrDefault(k, 0);
+                while (from < 256 && System.nanoTime() < deadline) {
+                    graben(level, f, ccx, ccz, from, Math.min(256, from + SLICE));
+                    from += SLICE;
+                }
+                if (from >= 256) {
+                    f.sunk.add(k);
+                    f.grabenAt.remove(k);
+                } else {
+                    f.grabenAt.put(k, from);
+                }
                 break;
             }
         }
@@ -482,6 +506,10 @@ public final class FissureEruptions {
             }
             // Never more than a few seconds' lava owed: what could not be laid is lost.
             f.owed = f.lava >= f.lavaMost ? 0 : Math.min(f.owed, 200);
+        }
+        if (f.stage == Stage.FOCUS) {
+            setTrench(level, f, deadline);
+            heap(level, f, deadline);
         }
         if (f.stage == Stage.COOL) cool(level, f, deadline);
     }
@@ -503,26 +531,32 @@ public final class FissureEruptions {
 
     // === The graben =======================================================
 
-    /** Drops the graben in one chunk: a block (two in its middle), the edges cracked open in short steps. */
-    private static void graben(ServerLevel level, Fissure f, int ccx, int ccz) {
+    /** The columns of a chunk's graben dropped at a go. */
+    private static final int SLICE = 32;
+
+    /**
+     * Drops the graben over a slice of one chunk, its columns {@code from} to {@code to} (sixteen to a row): a block, two
+     * in its middle, the edges cracked open in short steps.
+     */
+    private static void graben(ServerLevel level, Fissure f, int ccx, int ccz, int from, int to) {
         LongSet built = PlayerBuilt.inChunk(level, ccx, ccz);
-        for (int lx = 0; lx < 16; lx++) {
-            for (int lz = 0; lz < 16; lz++) {
-                int x = ccx * 16 + lx, z = ccz * 16 + lz;
-                double a = f.along(x + 0.5, z + 0.5), c = Math.abs(f.across(x + 0.5, z + 0.5));
-                if (Math.abs(a) > f.half) continue;
-                double end = Math.abs(a) / f.half;
-                // Narrowing to nothing at the dike's ends, and its edges ragged by a block.
-                double w = f.hw * Math.sqrt(Math.max(0.0, 1.0 - end * end * end * end)) + (unit(mix(x * 31L + z), 7) - 0.5) * 1.4;
-                if (w < 1.0 || c > w + 0.5) continue;
-                if (c > w - 0.5) {
-                    // The bounding faults open as cracks, in steps, two of every three.
-                    if (Math.floorMod((int) Math.floor((a + (f.id & 15)) / 9.0), 3) != 2) crack(level, built, x, z, 2 + (int) (4 * unit(mix(x * 7L + z * 13L), 8)));
-                    continue;
+        for (int i = from; i < to; i++) {
+            int x = ccx * 16 + (i >> 4), z = ccz * 16 + (i & 15);
+            double a = f.along(x + 0.5, z + 0.5), c = Math.abs(f.across(x + 0.5, z + 0.5));
+            if (Math.abs(a) > f.half) continue;
+            double end = Math.abs(a) / f.half;
+            // Narrowing to nothing at the dike's ends, and its edges ragged by a block.
+            double w = f.hw * Math.sqrt(Math.max(0.0, 1.0 - end * end * end * end)) + (unit(mix(x * 31L + z), 7) - 0.5) * 1.4;
+            if (w < 1.0 || c > w + 0.5) continue;
+            if (c > w - 0.5) {
+                // The bounding faults open as cracks, in steps, two of every three.
+                if (Math.floorMod((int) Math.floor((a + (f.id & 15)) / 9.0), 3) != 2) {
+                    crack(level, built, x, z, 2 + (int) (4 * unit(mix(x * 7L + z * 13L), 8)));
                 }
-                int k = c < w - 3 && end < 0.5 ? 2 : 1;
-                if (sink(level, built, x, z, k)) sunkColumns++;
+                continue;
             }
+            int k = c < w - 3 && end < 0.5 ? 2 : 1;
+            if (sink(level, built, x, z, k)) sunkColumns++;
         }
     }
 
@@ -553,6 +587,7 @@ public final class FissureEruptions {
 
     /** Opens a crack a block wide and {@code depth} deep in natural ground. */
     private static void crack(ServerLevel level, LongSet built, int x, int z, int depth) {
+        if (!Loaded.around(level, new BlockPos(x, 0, z))) return;
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
@@ -635,7 +670,8 @@ public final class FissureEruptions {
         long col = fr.column();
         if (f.lavaCols.contains(col)) return false;
         int x = (int) (col >> 32), z = (int) col;
-        if (!Loaded.at(level, x, z)) return false;
+        // A block set at a chunk's edge updates the next chunk: that must be in too, or the server waits for it.
+        if (!Loaded.around(level, new BlockPos(x, 0, z))) return false;
         int g = ground(level, x, z);
         if (g == Integer.MIN_VALUE || g + 1 > fr.allowed()) return false;
         BlockPos p = new BlockPos(x, g + 1, z);
@@ -692,7 +728,7 @@ public final class FissureEruptions {
     private static void carve(ServerLevel level, Fissure f, int a) {
         double c = f.wobble(a);
         int x = f.x(a, c), z = f.z(a, c);
-        if (!Loaded.at(level, x, z)) return;
+        if (!Loaded.around(level, new BlockPos(x, 0, z))) return;
         front(level, f);
         int g = ground(level, x, z);
         if (g == Integer.MIN_VALUE) return;
@@ -729,12 +765,27 @@ public final class FissureEruptions {
         }
         for (int a : picked) {
             int x = f.x(a, f.wobble(a)), z = f.z(a, f.wobble(a));
+            if (!Loaded.at(level, x, z)) continue;
             int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
             f.vents.add(BlockPos.asLong(x, top, z));
         }
-        // The trench away from the vents sets, crust over basalt.
-        for (long k : f.trench) {
-            BlockPos p = BlockPos.of(k);
+        // None of them where the ground is loaded: tried again a second on.
+        if (f.vents.isEmpty()) return;
+        // A fresh front: from now on the lava comes from the vents only. The trench away from them sets (see setTrench).
+        f.front = new PriorityQueue<>();
+        f.trenchAt = 0;
+        Diagnostics.info("fissure eruption at {}, {}: drawn into {} vents", f.cx, f.cz, f.vents.size());
+    }
+
+    /** The trench away from the vents sets, crust over basalt, its rims heaped with spatter; a few blocks a tick. */
+    private static void setTrench(ServerLevel level, Fissure f, long deadline) {
+        while (f.trenchAt < f.trench.size() && System.nanoTime() < deadline) {
+            BlockPos p = BlockPos.of(f.trench.getLong(f.trenchAt++));
+            if (!Loaded.around(level, p)) {
+                // Waits for its ground.
+                f.trenchAt--;
+                return;
+            }
             if (nearVent(f, p.getX(), p.getZ(), 6)) continue;
             BlockState s = level.getBlockState(p);
             if (!s.getFluidState().is(FluidTags.LAVA)) continue;
@@ -744,17 +795,15 @@ public final class FissureEruptions {
             if (top) {
                 for (int side = -1; side <= 1; side += 2) {
                     int rx = p.getX() + (int) Math.round(-f.sz * side * 1.5), rz = p.getZ() + (int) Math.round(f.sx * side * 1.5);
+                    if (!Loaded.at(level, rx, rz)) continue;
                     int g = ground(level, rx, rz);
                     if (g == Integer.MIN_VALUE || g > p.getY() + 1) continue;
                     BlockPos r = new BlockPos(rx, g + 1, rz);
-                    if (takes(level.getBlockState(r)) && !level.getBlockState(r).getFluidState().is(FluidTags.LAVA)
+                    if (Loaded.around(level, r) && takes(level.getBlockState(r)) && !level.getBlockState(r).getFluidState().is(FluidTags.LAVA)
                             && natural(level, null, r.below())) level.setBlock(r, scoria(level, false), Block.UPDATE_ALL);
                 }
             }
         }
-        // A fresh front: from now on the lava comes from the vents only.
-        f.front = new PriorityQueue<>();
-        Diagnostics.info("fissure eruption at {}, {}: drawn into {} vents", f.cx, f.cz, f.vents.size());
     }
 
     private static boolean nearVent(Fissure f, int x, int z, int r) {
@@ -780,7 +829,8 @@ public final class FissureEruptions {
                     int x = vx + dx, z = vz + dz;
                     BlockPos q = new BlockPos(x, vy, z);
                     BlockState s = level.getBlockState(q);
-                    if (!s.getFluidState().isSource() && (takes(s) || natural(level, null, q)) && natural(level, null, q.below())) {
+                    if (!s.getFluidState().isSource() && (takes(s) || natural(level, null, q)) && natural(level, null, q.below())
+                            && Loaded.around(level, q)) {
                         level.setBlock(q, lava(level, q), Block.UPDATE_ALL);
                         f.cells.add(q.asLong());
                         f.lavaCols.add(column(x, z));
@@ -788,23 +838,38 @@ public final class FissureEruptions {
                     if (level.getBlockState(q).getFluidState().is(FluidTags.LAVA)) offer(level, f, x, z, vy + 2);
                 }
             }
-            // The cone, heaped a block higher each time it has grown one.
+            // The cone, heaped a block higher each time it has grown one: set going here, laid in work() a few
+            // columns at a time.
             int step = (int) Math.round(height);
-            if (step <= f.shaped.getOrDefault(v, 0)) continue;
-            f.shaped.put(v, step);
-            double breach = breach(level, vx, vz, vy);
-            int reach = CRATER + (int) Math.ceil(CONE_SLOPE * height) + 1;
-            for (int dx = -reach; dx <= reach; dx++) {
-                for (int dz = -reach; dz <= reach; dz++) {
-                    double d = Math.hypot(dx, dz);
-                    int x = vx + dx, z = vz + dz;
-                    if (d <= CRATER + 0.5) continue;
-                    double ang = Math.abs(Math.IEEEremainder(Math.atan2(dz, dx) - breach, 2 * Math.PI));
-                    if (ang < 0.45) continue;
-                    int target = vy + (int) Math.round(height - (d - CRATER) / CONE_SLOPE);
-                    if (target <= vy) continue;
-                    build(level, x, z, target, d <= CRATER + 1.6, h);
-                }
+            if (step <= f.shaped.getOrDefault(v, 0) || f.heaping.containsKey(v)) continue;
+            f.heaping.put(v, new int[]{step, 0, (int) Math.round(Math.toDegrees(breach(level, vx, vz, vy)))});
+        }
+    }
+
+    /** Lays the cones' growth set going in {@link #cones}, column by column while the budget lasts. */
+    private static void heap(ServerLevel level, Fissure f, long deadline) {
+        for (var it = f.heaping.long2ObjectEntrySet().iterator(); it.hasNext() && System.nanoTime() < deadline; ) {
+            var e = it.next();
+            long v = e.getLongKey();
+            int[] job = e.getValue();
+            int vx = BlockPos.getX(v), vy = BlockPos.getY(v), vz = BlockPos.getZ(v), step = job[0];
+            if (!Loaded.at(level, vx, vz)) continue;
+            double breach = Math.toRadians(job[2]);
+            int reach = CRATER + (int) Math.ceil(CONE_SLOPE * step) + 1, side = 2 * reach + 1;
+            long h = mix(v ^ f.id);
+            while (job[1] < side * side && System.nanoTime() < deadline) {
+                int i = job[1]++, dx = i / side - reach, dz = i % side - reach;
+                double d = Math.hypot(dx, dz);
+                if (d <= CRATER + 0.5) continue;
+                double ang = Math.abs(Math.IEEEremainder(Math.atan2(dz, dx) - breach, 2 * Math.PI));
+                if (ang < 0.45) continue;
+                int target = vy + (int) Math.round(step - (d - CRATER) / CONE_SLOPE);
+                if (target <= vy) continue;
+                build(level, vx + dx, vz + dz, target, d <= CRATER + 1.6, h);
+            }
+            if (job[1] >= side * side) {
+                f.shaped.put(v, step);
+                it.remove();
             }
         }
     }
@@ -828,6 +893,7 @@ public final class FissureEruptions {
 
     /** Heaps scoria on a column up to {@code target}, over its own lava, never on what was built. */
     private static void build(ServerLevel level, int x, int z, int target, boolean rim, long h) {
+        if (!Loaded.around(level, new BlockPos(x, 0, z))) return;
         int g = ground(level, x, z);
         if (g == Integer.MIN_VALUE || g >= target) return;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos(x, g, z);
@@ -855,10 +921,17 @@ public final class FissureEruptions {
      */
     private static void cool(ServerLevel level, Fissure f, long deadline) {
         boolean second = level.getGameTime() - f.stageAt >= COOL / 2;
+        // Once its time is up, lava where the ground is not loaded is left to lie.
+        boolean late = level.getGameTime() - f.stageAt >= COOL;
         while (System.nanoTime() < deadline) {
             if (f.cool1 < f.cells.size()) {
                 BlockPos p = BlockPos.of(f.cells.getLong(f.cool1++));
-                if (!Loaded.at(level, p)) continue;
+                if (!Loaded.around(level, p)) {
+                    if (late) continue;
+                    // Waits for its ground to be loaded.
+                    f.cool1--;
+                    return;
+                }
                 BlockState s = level.getBlockState(p);
                 if (!s.getFluidState().is(FluidTags.LAVA)) continue;
                 boolean top = !level.getBlockState(p.above()).getFluidState().is(FluidTags.LAVA);
@@ -866,7 +939,12 @@ public final class FissureEruptions {
                 cooled++;
             } else if (second && f.cool2 < f.cells.size()) {
                 BlockPos p = BlockPos.of(f.cells.getLong(f.cool2++));
-                if (!Loaded.at(level, p) || !level.getBlockState(p).is(ModBlocks.COOLING_LAVA_CRUST.get())) continue;
+                if (!Loaded.around(level, p)) {
+                    if (late) continue;
+                    f.cool2--;
+                    return;
+                }
+                if (!level.getBlockState(p).is(ModBlocks.COOLING_LAVA_CRUST.get())) continue;
                 int r = level.random.nextInt(20);
                 if (r < 3) continue;
                 level.setBlock(p, (r < 13 ? Blocks.BASALT : r < 18 ? Blocks.SMOOTH_BASALT : Blocks.BLACKSTONE).defaultBlockState(),
