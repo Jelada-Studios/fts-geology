@@ -15,18 +15,20 @@ import java.util.function.Supplier;
  * @param thunder 0 none, to 1 a thunderstorm overhead
  * @param windX   the wind towards +x, blocks a second
  * @param windZ   the wind towards +z, blocks a second
+ * @param fog     how thick a ground fog lies where the player stands, 0 to 1 (see {@code Moisture})
  */
-public record LocalWeatherPacket(float rain, float thunder, float windX, float windZ) {
+public record LocalWeatherPacket(float rain, float thunder, float windX, float windZ, float fog) {
 
     public static void encode(LocalWeatherPacket p, FriendlyByteBuf buf) {
         buf.writeFloat(p.rain);
         buf.writeFloat(p.thunder);
         buf.writeFloat(p.windX);
         buf.writeFloat(p.windZ);
+        buf.writeFloat(p.fog);
     }
 
     public static LocalWeatherPacket decode(FriendlyByteBuf buf) {
-        return new LocalWeatherPacket(buf.readFloat(), buf.readFloat(), buf.readFloat(), buf.readFloat());
+        return new LocalWeatherPacket(buf.readFloat(), buf.readFloat(), buf.readFloat(), buf.readFloat(), buf.readFloat());
     }
 
     public static void handle(LocalWeatherPacket p, Supplier<NetworkEvent.Context> ctx) {

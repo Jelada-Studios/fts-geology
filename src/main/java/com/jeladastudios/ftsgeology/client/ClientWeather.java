@@ -324,8 +324,20 @@ public final class ClientWeather {
     }
 
     /**
+     * The ground fog round the camera, 0 to 1: the server's fog where the player stands, lying in the lowest dozen-odd
+     * blocks over the ground under the camera, thinning above that; none indoors.
+     */
+    private static float groundFog(net.minecraft.client.multiplayer.ClientLevel level, net.minecraft.world.phys.Vec3 cam) {
+        float f = LocalWeather.fog();
+        if (f <= 0f || open < 0.3f) return 0f;
+        int g = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, Mth.floor(cam.x), Mth.floor(cam.z));
+        double above = cam.y - g;
+        return f * Mth.clamp((float) (1.0 - (above - 12.0) / 10.0), 0f, 1f);
+    }
+
+    /**
      * A downpour closes the view in: at the heaviest rain, by about a third, outdoors. Inside a cloud, on a mountain or
-     * flying, the mist closes it to some twenty blocks.
+     * flying, the mist closes it to some twenty blocks; a ground fog to under thirty.
      */
     @SubscribeEvent
     public static void onFog(ViewportEvent.RenderFog event) {
@@ -333,10 +345,15 @@ public final class ClientWeather {
         if (mc.level == null || event.getType() != FogType.NONE || mc.player == null) return;
         var cam = event.getCamera().getPosition();
         float mist = ClientSky.inCloud(mc.level, cam.x, cam.y, cam.z);
+        float ground = groundFog(mc.level, cam);
         float h = open < 0.3f ? 0f : smooth((intensity(mc.level) - 0.5f) / 0.5f);
-        if (h <= 0 && mist <= 0) return;
+        if (h <= 0 && mist <= 0 && ground <= 0) return;
         float k = 1f - 0.35f * h;
         float far = event.getFarPlaneDistance() * k, near = event.getNearPlaneDistance() * k;
+        if (ground > 0) {
+            far = Mth.lerp(ground, far, Math.min(far, 28f));
+            near = Mth.lerp(ground, near, 0f);
+        }
         if (mist > 0) {
             far = Mth.lerp(mist, far, Math.min(far, 20f));
             near = Mth.lerp(mist, near, 0f);
@@ -355,7 +372,7 @@ public final class ClientWeather {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null || !LocalWeather.active()) return;
         var cam = event.getCamera().getPosition();
-        float mist = ClientSky.inCloud(mc.level, cam.x, cam.y, cam.z);
+        float mist = Math.max(ClientSky.inCloud(mc.level, cam.x, cam.y, cam.z), 0.85f * groundFog(mc.level, cam));
         if (mist > 0) {
             float day = Mth.clamp(Mth.cos(mc.level.getTimeOfDay((float) event.getPartialTick()) * Mth.TWO_PI) * 2f + 0.5f, 0.1f, 1f);
             float pale = 0.78f * day;

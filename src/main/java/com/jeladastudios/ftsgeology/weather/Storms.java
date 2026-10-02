@@ -420,14 +420,15 @@ public final class Storms {
     /** The same at a time ahead, the highs and lows where they will be then: for a forecast. */
     static double wantedAt(ServerLevel level, BlockPos pos, long when) {
         double wet = wetness(level, pos.getX(), pos.getZ());
-        double downfall = Mth.clamp(level.getBiome(pos).value().getModifiedClimateSettings().downfall(), 0, 1);
+        // The place's year of rain, from the lie of the land, and this part of the year's share of it (see RainClimate).
+        double year = RainClimate.share(level, pos.getX(), pos.getZ()) * RainClimate.season(level, pos.getX(), pos.getZ());
         // More under a low passing over, less under a high: taken over the land round the place, not its middle alone.
         double air = 0;
         for (int i = 0; i < 5; i++) {
             double a = i * Math.PI / 2, d = i == 4 ? 0 : AROUND * 0.6;
             air += Atmosphere.rainFactor(level, pos.getX() + Math.cos(a) * d, pos.getZ() + Math.sin(a) * d, when) / 5;
         }
-        return Mth.clamp(GeyserConfig.RAIN_AMOUNT.get() * (0.1 + 0.9 * downfall) * (0.05 + 0.7 * wet * wet) * air, 0, 0.9);
+        return Mth.clamp(GeyserConfig.RAIN_AMOUNT.get() * year * (0.05 + 0.7 * wet * wet) * air, 0, 0.9);
     }
 
     /** Points spread evenly over the land round a place, on a sunflower's spiral: where its rain is reckoned. */
@@ -481,7 +482,8 @@ public final class Storms {
         double air = Atmosphere.rainFactor(level, mx, mz);
         double roll = rnd.nextDouble();
         if (wet > 0.75 && air > 1.2 && roll < 0.35) s.kind = Kind.SPELL;
-        else if (roll < (wet < 0.4 ? 0.7 : 0.35) * (temperature > 0.8 ? 1.2 : temperature < 0.3 ? 0.5 : 1.0)) s.kind = Kind.SHOWER;
+        else if (roll < (wet < 0.4 ? 0.7 : 0.35) * (temperature > 0.8 ? 1.2 : temperature < 0.3 ? 0.5 : 1.0)
+                * RainClimate.showery(level)) s.kind = Kind.SHOWER;
         else s.kind = Kind.FRONT;
         // Under a high only a shower breaks out, from a hot afternoon's rising air.
         if (air < 0.6) s.kind = Kind.SHOWER;
@@ -548,7 +550,7 @@ public final class Storms {
             float[] here = smoothAt(level, p.getX(), p.getZ());
             double[] w = wind(level, p.getX(), p.getZ());
             ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p),
-                    new LocalWeatherPacket(here[0], here[1], (float) (w[0] * 20), (float) (w[1] * 20)));
+                    new LocalWeatherPacket(here[0], here[1], (float) (w[0] * 20), (float) (w[1] * 20), Moisture.fog(level, p.blockPosition())));
         }
     }
 
@@ -693,6 +695,8 @@ public final class Storms {
         out.add(String.format(Locale.ROOT, "rain here %.2f (%s, %s), thunder %.2f; the region's weather %.2f (0 dry spell, 1 wet); wind %.1f blocks/s towards %.0f deg",
                 intensityAt(level, x, z), biome.unwrapKey().map(k -> k.location().toString()).orElse("?"), falls, thunderAt(level, x, z),
                 wetness(level, x, z), Math.hypot(w[0], w[1]) * 20, Math.toDegrees(Math.atan2(w[1], w[0]))));
+        out.add(Moisture.describe(level, at));
+        out.add(RainClimate.describe(level, x, z));
         out.addAll(Atmosphere.describe(level, x, z));
         Store st = level.getDataStorage().get(Store::load, "fts_geology_storms");
         if (st == null) return out;

@@ -220,6 +220,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue RIVER_SPILLS;            // a river runs out through a bank taken away
     public static final ForgeConfigSpec.BooleanValue STREAMS_DRY_UP;          // a well's cone dries the small streams over it
     public static final ForgeConfigSpec.BooleanValue RIVER_FLOODS;            // rivers over their banks in heavy rain on soaked ground
+    public static final ForgeConfigSpec.BooleanValue SEASONAL_RIVERS;         // the rivers' high water of their season (Serene Seasons)
     public static final ForgeConfigSpec.BooleanValue HOLLOW_PONDS;            // rain running off into closed hollows stands there as ponds
     public static final ForgeConfigSpec.BooleanValue LAKE_LEVELS;             // lakes down a block in a long drought
     public static final ForgeConfigSpec.BooleanValue KARST;                  // rivers sink, caves, sinkholes
@@ -1261,6 +1262,12 @@ public final class GeyserConfig {
                         "some mud (with soilWaterChangesGround). In a narrow valley it comes as a flash flood and carries along",
                         "what stands in it. The ground is not moved. Needs soilWater.")
                 .define("riverFloods", true);
+        SEASONAL_RIVERS = b
+                .comment("Where Serene Seasons keeps the seasons, the rivers run high in their season: a snow-fed river as the snow",
+                        "melts at the end of winter, a Mediterranean one in winter, a monsoon one in summer. The water comes up a",
+                        "block over its banks, two at the height of it (a 3-block river runs 6-7 across on a plain), and goes back",
+                        "down after. Without Serene Seasons nothing changes.")
+                .define("seasonalRivers", true);
         HOLLOW_PONDS = b
                 .comment("Rain the soaked ground cannot take in runs off; what runs into a closed hollow stands there as a pond,",
                         "as deep as the hollow holds up to the lowest point of its rim and no deeper than the water that gathered,",

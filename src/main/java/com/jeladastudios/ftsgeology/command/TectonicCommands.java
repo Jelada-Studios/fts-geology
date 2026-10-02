@@ -251,6 +251,25 @@ public final class TectonicCommands {
                                         })))))
                         // The storms round here, and the region's weather (see weather.Storms).
                         .then(Commands.literal("storms")
+                                // The air round here given this much water, a share of what its mean warmth holds (for trying the fog).
+                                .then(Commands.literal("air").then(Commands.argument("humidity", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(0.0, 1.2))
+                                        .executes(ctx -> {
+                                            var at = BlockPos.containing(ctx.getSource().getPosition());
+                                            double rh = com.mojang.brigadier.arguments.DoubleArgumentType.getDouble(ctx, "humidity");
+                                            int n = com.jeladastudios.ftsgeology.weather.Moisture.set(ctx.getSource().getLevel(), at, rh, 2);
+                                            ctx.getSource().sendSuccess(() -> Component.literal("the air of " + n + " squares round here at " + rh + " of its mean saturation"), true);
+                                            return n;
+                                        })))
+                                // The rain the land here has in a year, its regime, and this part of the year's share.
+                                .then(Commands.literal("climate").executes(ctx -> {
+                                    var at = ctx.getSource().getPosition();
+                                    var lv = ctx.getSource().getLevel();
+                                    double phase = com.jeladastudios.ftsgeology.compat.SereneSeasons.phase(lv);
+                                    String line = com.jeladastudios.ftsgeology.weather.RainClimate.describe(lv, (int) at.x, (int) at.z)
+                                            + (Double.isNaN(phase) ? "" : ", rivers +" + com.jeladastudios.ftsgeology.hydrology.SeasonalRivers.stage(lv, (int) at.x, (int) at.z, phase));
+                                    ctx.getSource().sendSuccess(() -> Component.literal(line), false);
+                                    return 1;
+                                }))
                                 // A storm of a given strength over here, for trying the weather out.
                                 .then(Commands.literal("spawn").then(Commands.argument("peak", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(0.0, 1.0))
                                         .executes(ctx -> spawnStorm(ctx, 800))

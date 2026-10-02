@@ -292,6 +292,9 @@ public final class Atmosphere {
      * at night and under rain, drier in a high's sun.
      */
     public static double humidity(ServerLevel level, BlockPos pos) {
+        // Worked out from the air's water where a player is near (see Moisture); read off the biome elsewhere.
+        double worked = Moisture.humidity(level, pos);
+        if (!Double.isNaN(worked)) return worked;
         var climate = level.getBiome(pos).value().getModifiedClimateSettings();
         double h = 0.3 + 0.4 * Mth.clamp(climate.downfall(), 0, 1) + 0.2 * (Storms.wetness(level, pos.getX(), pos.getZ()) - 0.5);
         double a = pressure(level, pos.getX(), pos.getZ()) - MEAN;

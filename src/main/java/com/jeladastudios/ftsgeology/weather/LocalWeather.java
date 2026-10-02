@@ -14,8 +14,8 @@ public final class LocalWeather {
 
     // === The client: the player's own weather ===================================
 
-    private static volatile float targetRain, targetThunder, targetWindX, targetWindZ;
-    private static float rain, thunder, oRain, oThunder, windX, windZ;
+    private static volatile float targetRain, targetThunder, targetWindX, targetWindZ, targetFog;
+    private static float rain, thunder, oRain, oThunder, windX, windZ, fog;
     private static volatile long heard;
     /**
      * How much of the storm's rain reaches the player where they stand against its cloud deck, eased: all of it under
@@ -34,6 +34,7 @@ public final class LocalWeather {
         targetThunder = p.thunder();
         targetWindX = p.windX();
         targetWindZ = p.windZ();
+        targetFog = p.fog();
         heard = System.currentTimeMillis();
     }
 
@@ -57,6 +58,8 @@ public final class LocalWeather {
         thunder += Mth.clamp(targetThunder - thunder, -0.003f, 0.004f);
         windX += (targetWindX - windX) * 0.01f;
         windZ += (targetWindZ - windZ) * 0.01f;
+        // A fog gathers over some ten seconds and lifts as slowly (the fog told is itself slow to come).
+        fog += Mth.clamp(targetFog - fog, -0.004f, 0.004f);
         oOverhead = overhead;
         overhead += Mth.clamp(targetOverhead - overhead, -0.02f, 0.02f);
     }
@@ -95,6 +98,12 @@ public final class LocalWeather {
         overhead = oOverhead = targetOverhead = 1f;
         rain = oRain = thunder = oThunder = targetRain = targetThunder = 0;
         windX = windZ = targetWindX = targetWindZ = 0;
+        fog = targetFog = 0;
+    }
+
+    /** How thick a ground fog lies round the player now, 0 to 1, eased; 0 without the server's weather. */
+    public static float fog() {
+        return active() ? fog : 0f;
     }
 
     // === The server: the chunk being ticked =====================================
