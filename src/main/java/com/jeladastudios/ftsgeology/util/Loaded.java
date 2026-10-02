@@ -29,4 +29,24 @@ public final class Loaded {
     public static boolean at(LevelReader level, int x, int z) {
         return chunk(level, x >> 4, z >> 4);
     }
+
+    /**
+     * Whether a block and the four beside it may be read: a block set at a chunk's edge updates its neighbours, and
+     * one of them in a chunk still on its way in would hold the server up.
+     */
+    public static boolean around(LevelReader level, BlockPos pos) {
+        int x = pos.getX(), z = pos.getZ();
+        return chunk(level, x >> 4, z >> 4) && chunk(level, (x + 1) >> 4, z >> 4) && chunk(level, (x - 1) >> 4, z >> 4)
+                && chunk(level, x >> 4, (z + 1) >> 4) && chunk(level, x >> 4, (z - 1) >> 4);
+    }
+
+    /**
+     * The biome at a place without waiting for its chunk: read off the chunk where it is in, worked out from the biome
+     * source where it is not. {@code Level.getBiome} on the server thread waits for a chunk that is on its way in.
+     */
+    public static net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome(net.minecraft.world.level.Level level, BlockPos pos) {
+        if (!(level instanceof ServerLevel server) || at(level, pos)) return level.getBiome(pos);
+        return server.getUncachedNoiseBiome(net.minecraft.core.QuartPos.fromBlock(pos.getX()), net.minecraft.core.QuartPos.fromBlock(pos.getY()),
+                net.minecraft.core.QuartPos.fromBlock(pos.getZ()));
+    }
 }

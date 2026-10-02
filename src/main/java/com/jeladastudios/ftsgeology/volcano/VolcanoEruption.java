@@ -92,7 +92,7 @@ public final class VolcanoEruption {
 
             // Thins out with distance as well: solid near the vent, patchy at the edge.
             if (level.random.nextDouble() > (1.0 - (d / reach) * 0.85) * lobe) continue;
-            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, new BlockPos(x, level.getSeaLevel(), z))) continue;
+            if (!com.jeladastudios.ftsgeology.util.Loaded.around(level, new BlockPos(x, level.getSeaLevel(), z))) continue;
             if (com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(level, x, z)) continue;
 
             // Not into the crater the column comes out of.

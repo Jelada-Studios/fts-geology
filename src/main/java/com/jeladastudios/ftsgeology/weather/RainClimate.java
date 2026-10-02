@@ -117,7 +117,7 @@ public final class RainClimate {
         double lift = Mth.clamp((h0 - lowest) / 150.0, 0.0, 1.5) * (offSea ? 1.0 : 0.5);
         double shadow = ridge - h0 > 40 ? Mth.clamp((ridge - h0) / 300.0, 0.0, 0.75) : 0.0;
         BlockPos at = new BlockPos(x, (int) Math.max(sea, h0) + 1, z);
-        Holder<Biome> biome = level.getBiome(at);
+        Holder<Biome> biome = com.jeladastudios.ftsgeology.util.Loaded.biome(level, at);
         var climate = biome.value().getModifiedClimateSettings();
         double d = Mth.clamp(climate.downfall(), 0, 1), t = climate.temperature();
         double hot = t > 0.9 && d > 0.75 ? 2.4 : 1.0;

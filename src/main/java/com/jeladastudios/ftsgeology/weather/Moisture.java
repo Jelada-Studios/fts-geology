@@ -45,6 +45,9 @@ public final class Moisture {
 
     private static final class Cell {
         double q, water, ground;
+        /** The biome at its middle: its warmth and wetness, and whether rain falls there. Read once. */
+        float warmth, downfall;
+        boolean precipitates;
         /** The water the column of air over the square holds against an ordinary day's: rain takes it, the sea and wet
          *  ground give it back. */
         double column = 1.0;
@@ -85,12 +88,16 @@ public final class Moisture {
     }
 
     /** The vapour the land's climate gives a square's air: drier air over dry land, wetter by water. */
-    private static double climate(ServerLevel level, BlockPos at, Cell c) {
-        var settings = level.getBiome(at).value().getModifiedClimateSettings();
-        double rh = 0.40 + 0.30 * Mth.clamp(settings.downfall(), 0, 1) + 0.20 * c.water;
+    private static double climate(ServerLevel level, BlockPos at, Cell c, double t) {
+        double rh = 0.40 + 0.30 * Mth.clamp(c.downfall, 0, 1) + 0.20 * c.water;
         // The day's mean warmth: the round taken out.
-        double mean = Atmosphere.temperature(level, at) - 4.5 * Math.cos((level.getDayTime() % 24000 - 8000) / 24000.0 * Math.PI * 2);
+        double mean = t - 4.5 * Math.cos((level.getDayTime() % 24000 - 8000) / 24000.0 * Math.PI * 2);
         return rh * saturation(mean);
+    }
+
+    /** The air's warmth over a square's middle, from its biome as read once. */
+    private static double warm(ServerLevel level, BlockPos at, Cell c) {
+        return Atmosphere.temperatureAt(level, at, 0, Storms.intensityAt(level, at.getX(), at.getZ()), c.warmth);
     }
 
     private static Cell cell(ServerLevel level, int cx, int cz) {
@@ -102,7 +109,12 @@ public final class Moisture {
         c.ground = ground(level, x, z);
         RainClimate.Here here = RainClimate.at(level, x, z);
         c.water = c.ground < level.getSeaLevel() - 2 ? 1.0 : 0.5 * here.coast();
-        c.q = climate(level, middle(level, cx, cz, c), c);
+        BlockPos mid = middle(level, cx, cz, c);
+        var biome = com.jeladastudios.ftsgeology.util.Loaded.biome(level, mid).value();
+        c.warmth = biome.getBaseTemperature();
+        c.downfall = biome.getModifiedClimateSettings().downfall();
+        c.precipitates = biome.hasPrecipitation();
+        c.q = climate(level, mid, c, warm(level, mid, c));
         c.seen = level.getGameTime();
         CELLS.put(k, c);
         return c;
@@ -133,7 +145,7 @@ public final class Moisture {
             int cx = (int) (k >> 32), cz = (int) k;
             Cell c = cell(level, cx, cz);
             BlockPos at = middle(level, cx, cz, c);
-            double t = Atmosphere.temperature(level, at);
+            double t = warm(level, at, c);
             double qs = saturation(t);
             // Carried: the air here now came from upwind.
             double[] w = Atmosphere.wind(level, at.getX(), at.getZ());
@@ -144,11 +156,11 @@ public final class Moisture {
             q += wet / SEA_STEPS * Math.max(0.0, 0.85 * qs - q);
             // Past saturation it condenses; under rain the air is near saturation.
             // Rain only where it falls as rain or snow: a desert under a storm stays dry.
-            float rain = level.getBiome(at).value().hasPrecipitation() ? Storms.intensityAt(level, at.getX(), at.getZ()) : 0f;
+            float rain = c.precipitates ? Storms.intensityAt(level, at.getX(), at.getZ()) : 0f;
             if (rain >= Storms.WET) q = Math.max(q, (0.85 + 0.12 * rain) * qs);
             q = Math.min(q, qs * 1.02);
             // Back towards the land's climate over days.
-            q += (climate(level, at, c) - q) / CLIMATE_STEPS;
+            q += (climate(level, at, c, t) - q) / CLIMATE_STEPS;
             // The column's water: carried with the wind, given back by the sea and the wet ground towards what they keep
             // in the air, taken by the rain that falls.
             double col = sampleColumn(level, ux, uz);

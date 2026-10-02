@@ -116,6 +116,7 @@ public class HotSpringBlockEntity extends BlockEntity {
     /** Top block of the water column over this spot, or null if there is no pool here. */
     private static BlockPos waterTop(ServerLevel level, BlockPos at) {
         BlockPos top = null;
+        if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, at)) return null;
         for (int dy = 1; dy <= 4; dy++) {
             BlockPos c = at.above(dy);
             if (!level.getBlockState(c).getFluidState().is(FluidTags.WATER)) break;
@@ -125,6 +126,12 @@ public class HotSpringBlockEntity extends BlockEntity {
     }
     /** Melts snow layers/blocks, ice, and powder snow within radius — a warm thawed patch. */
     private static void thawAround(ServerLevel level, BlockPos center, int r) {
+        // Not where the box (and the blocks round it that a melt updates) runs into ground still loading.
+        for (int sx = -1; sx <= 1; sx += 2) {
+            for (int sz = -1; sz <= 1; sz += 2) {
+                if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, center.getX() + sx * (r + 1), center.getZ() + sz * (r + 1))) return;
+            }
+        }
         for (BlockPos p : BlockPos.betweenClosed(center.offset(-r, -1, -r), center.offset(r, 2, r))) {
             BlockState s = level.getBlockState(p);
             if (s.is(Blocks.SNOW) || s.is(Blocks.SNOW_BLOCK) || s.is(Blocks.POWDER_SNOW) || com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.meltsToAir(s)) {

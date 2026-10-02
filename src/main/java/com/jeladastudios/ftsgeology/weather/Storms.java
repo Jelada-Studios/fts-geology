@@ -688,7 +688,7 @@ public final class Storms {
         List<String> out = new ArrayList<>();
         double[] w = wind(level, x, z);
         BlockPos at = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING, new BlockPos(x, 0, z));
-        var biome = level.getBiome(at);
+        var biome = com.jeladastudios.ftsgeology.util.Loaded.biome(level, at);
         String falls = switch (biome.value().getPrecipitationAt(at)) {
             case NONE -> "none falls";
             case SNOW -> "as snow";

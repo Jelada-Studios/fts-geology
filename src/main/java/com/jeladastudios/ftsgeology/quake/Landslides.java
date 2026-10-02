@@ -403,7 +403,7 @@ public final class Landslides {
             y = g;
         }
         BlockPos at = new BlockPos(x, y + 1, z);
-        if (com.jeladastudios.ftsgeology.util.Loaded.at(level, at) && level.getBlockState(at).canBeReplaced()) level.setBlock(at, block, Block.UPDATE_ALL);
+        if (com.jeladastudios.ftsgeology.util.Loaded.around(level, at) && level.getBlockState(at).canBeReplaced()) level.setBlock(at, block, Block.UPDATE_ALL);
     }
 
     public static String summary() {

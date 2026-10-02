@@ -75,7 +75,7 @@ public final class Meteorology {
     /** Rain falling into a gauge open to the sky, millimetres an hour; snow counts as the water it melts into. */
     public static double rainRate(ServerLevel level, BlockPos pos) {
         if (!level.canSeeSky(pos.above())) return 0;
-        if (level.getBiome(pos).value().getPrecipitationAt(pos) == Biome.Precipitation.NONE) return 0;
+        if (com.jeladastudios.ftsgeology.util.Loaded.biome(level, pos).value().getPrecipitationAt(pos) == Biome.Precipitation.NONE) return 0;
         float i = Storms.intensityAt(level, pos.getX(), pos.getZ());
         return i < Storms.WET ? 0 : rateOf(i);
     }

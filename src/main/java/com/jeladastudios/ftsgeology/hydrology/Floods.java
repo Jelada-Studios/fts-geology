@@ -249,7 +249,7 @@ public final class Floods {
         for (int j = 0; j < top.size(); j++) {
             long k = top.getLong(j);
             BlockPos p = BlockPos.of(k);
-            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, p)) {
+            if (!com.jeladastudios.ftsgeology.util.Loaded.around(level, p)) {
                 left.add(k);
                 continue;
             }

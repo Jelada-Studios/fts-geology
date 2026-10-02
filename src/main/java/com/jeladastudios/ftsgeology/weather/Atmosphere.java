@@ -274,7 +274,11 @@ public final class Atmosphere {
 
     /** The temperature at a place {@code ahead} ticks from now, with {@code rain} falling then: for a forecast. */
     public static double temperatureAt(ServerLevel level, BlockPos pos, long ahead, double rain) {
-        float t = level.getBiome(pos).value().getBaseTemperature();
+        return temperatureAt(level, pos, ahead, rain, com.jeladastudios.ftsgeology.util.Loaded.biome(level, pos).value().getBaseTemperature());
+    }
+
+    /** The same, with the biome's own warmth {@code t} already known. */
+    public static double temperatureAt(ServerLevel level, BlockPos pos, long ahead, double rain, float t) {
         double c = t <= 1 ? -5 + 25 * t : 20 + 10 * (t - 1);
         double metres = Math.max(0, Meteorology.altitude(level, pos));
         c -= 6.5 * metres / 1000.0;
@@ -295,7 +299,7 @@ public final class Atmosphere {
         // Worked out from the air's water where a player is near (see Moisture); read off the biome elsewhere.
         double worked = Moisture.humidity(level, pos);
         if (!Double.isNaN(worked)) return worked;
-        var climate = level.getBiome(pos).value().getModifiedClimateSettings();
+        var climate = com.jeladastudios.ftsgeology.util.Loaded.biome(level, pos).value().getModifiedClimateSettings();
         double h = 0.3 + 0.4 * Mth.clamp(climate.downfall(), 0, 1) + 0.2 * (Storms.wetness(level, pos.getX(), pos.getZ()) - 0.5);
         double a = pressure(level, pos.getX(), pos.getZ()) - MEAN;
         h -= Mth.clamp(a / 60.0, -0.15, 0.2);
