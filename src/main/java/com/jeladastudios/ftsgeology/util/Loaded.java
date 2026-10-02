@@ -41,6 +41,16 @@ public final class Loaded {
     }
 
     /**
+     * Whether the ground within {@code r} blocks of a column may be read (sixteen at most): other mods' blocks answer a
+     * neighbour's change by looking a few blocks further (a moss patch spreading), and a chunk still on its way in there
+     * would hold the server up.
+     */
+    public static boolean near(LevelReader level, int x, int z, int r) {
+        return chunk(level, x >> 4, z >> 4) && chunk(level, (x - r) >> 4, (z - r) >> 4) && chunk(level, (x + r) >> 4, (z - r) >> 4)
+                && chunk(level, (x - r) >> 4, (z + r) >> 4) && chunk(level, (x + r) >> 4, (z + r) >> 4);
+    }
+
+    /**
      * The biome at a place without waiting for its chunk: read off the chunk where it is in, worked out from the biome
      * source where it is not. {@code Level.getBiome} on the server thread waits for a chunk that is on its way in.
      */

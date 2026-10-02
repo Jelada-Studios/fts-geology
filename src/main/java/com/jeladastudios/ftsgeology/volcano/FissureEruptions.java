@@ -617,7 +617,7 @@ public final class FissureEruptions {
 
     /** Opens a crack a block wide and {@code depth} deep in natural ground. */
     private static void crack(ServerLevel level, LongSet built, int x, int z, int depth) {
-        if (!Loaded.around(level, new BlockPos(x, 0, z))) return;
+        if (!ready(level, x, z)) return;
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
@@ -715,7 +715,7 @@ public final class FissureEruptions {
         int x = (int) (col >> 32), z = (int) col;
         if (f.lavaCols.contains(col)) return stack(level, f, x, z, fr.allowed());
         // A block set at a chunk's edge updates the next chunk: that must be in too, or the server waits for it.
-        if (!Loaded.around(level, new BlockPos(x, 0, z))) return false;
+        if (!ready(level, x, z)) return false;
         int g = ground(level, x, z);
         if (g == Integer.MIN_VALUE || g + 1 > fr.allowed()) return false;
         BlockPos p = new BlockPos(x, g + 1, z);
@@ -739,7 +739,7 @@ public final class FissureEruptions {
         for (int tries = 0; tries < Math.min(64, n); tries++) {
             if (f.riseAt >= n) f.riseAt = 0;
             BlockPos p = BlockPos.of(f.cells.getLong(f.riseAt++));
-            if (!Loaded.around(level, p) || !level.getBlockState(p).getFluidState().isSource()
+            if (!ready(level, p.getX(), p.getZ()) || !level.getBlockState(p).getFluidState().isSource()
                     || !level.getBlockState(p).getFluidState().is(FluidTags.LAVA)) continue;
             BlockPos up = p.above();
             BlockState over = level.getBlockState(up);
@@ -781,7 +781,7 @@ public final class FissureEruptions {
      * flow spreads before it piles up.
      */
     private static boolean stack(ServerLevel level, Fissure f, int x, int z, int allowed) {
-        if (!Loaded.around(level, new BlockPos(x, 0, z))) return false;
+        if (!ready(level, x, z)) return false;
         int top = lavaTop(level, x, z);
         if (top == Integer.MIN_VALUE || top + 1 > allowed) return false;
         int deep = 0;
@@ -797,11 +797,19 @@ public final class FissureEruptions {
         return true;
     }
 
+    /**
+     * Whether a column's ground may be written: what a block set there sets going, in this mod or another, reads a few
+     * blocks round it, and none of that may be a chunk still loading.
+     */
+    private static boolean ready(ServerLevel level, int x, int z) {
+        return Loaded.near(level, x, z, 8);
+    }
+
     /** Opens the fissure at a point along it: a trench of lava, which overflows on to the ground round it. */
     private static void carve(ServerLevel level, Fissure f, int a) {
         double c = f.wobble(a);
         int x = f.x(a, c), z = f.z(a, c);
-        if (!Loaded.around(level, new BlockPos(x, 0, z))) return;
+        if (!ready(level, x, z)) return;
         front(level, f);
         int g = ground(level, x, z);
         if (g == Integer.MIN_VALUE) return;
@@ -863,7 +871,7 @@ public final class FissureEruptions {
     private static void setTrench(ServerLevel level, Fissure f, long deadline) {
         while (f.trenchAt < f.trench.size() && System.nanoTime() < deadline) {
             BlockPos p = BlockPos.of(f.trench.getLong(f.trenchAt++));
-            if (!Loaded.around(level, p)) {
+            if (!ready(level, p.getX(), p.getZ())) {
                 // Waits for its ground.
                 f.trenchAt--;
                 return;
@@ -881,7 +889,7 @@ public final class FissureEruptions {
                     int g = ground(level, rx, rz);
                     if (g == Integer.MIN_VALUE || g > p.getY() + 1) continue;
                     BlockPos r = new BlockPos(rx, g + 1, rz);
-                    if (Loaded.around(level, r) && takes(level.getBlockState(r)) && !level.getBlockState(r).getFluidState().is(FluidTags.LAVA)
+                    if (ready(level, r.getX(), r.getZ()) && takes(level.getBlockState(r)) && !level.getBlockState(r).getFluidState().is(FluidTags.LAVA)
                             && natural(level, null, r.below())) level.setBlock(r, scoria(level, false), Block.UPDATE_ALL);
                 }
             }
@@ -910,10 +918,10 @@ public final class FissureEruptions {
                     if (Math.hypot(dx, dz) > CRATER + 0.5) continue;
                     int x = vx + dx, z = vz + dz;
                     BlockPos q = new BlockPos(x, vy, z);
-                    if (!Loaded.around(level, q)) continue;
+                    if (!ready(level, q.getX(), q.getZ())) continue;
                     BlockState s = level.getBlockState(q);
                     if (!s.getFluidState().isSource() && (takes(s) || natural(level, null, q)) && natural(level, null, q.below())
-                            && Loaded.around(level, q)) {
+                            && ready(level, q.getX(), q.getZ())) {
                         level.setBlock(q, lava(level, q), Block.UPDATE_ALL);
                         f.cells.add(q.asLong());
                         f.lavaCols.add(column(x, z));
@@ -976,7 +984,7 @@ public final class FissureEruptions {
 
     /** Heaps scoria on a column up to {@code target}, over its own lava, never on what was built. */
     private static void build(ServerLevel level, int x, int z, int target, boolean rim, long h) {
-        if (!Loaded.around(level, new BlockPos(x, 0, z))) return;
+        if (!ready(level, x, z)) return;
         int g = ground(level, x, z);
         if (g == Integer.MIN_VALUE || g >= target) return;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos(x, g, z);
@@ -1009,7 +1017,7 @@ public final class FissureEruptions {
         while (System.nanoTime() < deadline) {
             if (f.cool1 < f.cells.size()) {
                 BlockPos p = BlockPos.of(f.cells.getLong(f.cool1++));
-                if (!Loaded.around(level, p)) {
+                if (!ready(level, p.getX(), p.getZ())) {
                     if (late) continue;
                     // Waits for its ground to be loaded.
                     f.cool1--;
@@ -1022,7 +1030,7 @@ public final class FissureEruptions {
                 cooled++;
             } else if (second && f.cool2 < f.cells.size()) {
                 BlockPos p = BlockPos.of(f.cells.getLong(f.cool2++));
-                if (!Loaded.around(level, p)) {
+                if (!ready(level, p.getX(), p.getZ())) {
                     if (late) continue;
                     f.cool2--;
                     return;
@@ -1062,7 +1070,7 @@ public final class FissureEruptions {
         int w = b[2] - b[0] + 1, n = w * (b[3] - b[1] + 1);
         while (f.sweepAt < n && System.nanoTime() < deadline) {
             int i = f.sweepAt++, x = b[0] + i % w, z = b[1] + i / w;
-            if (!Loaded.around(level, new BlockPos(x, 0, z))) continue;
+            if (!ready(level, x, z)) continue;
             for (int y = b[5]; y >= b[4]; y--) {
                 BlockPos p = new BlockPos(x, y, z);
                 var fluid = level.getBlockState(p).getFluidState();
