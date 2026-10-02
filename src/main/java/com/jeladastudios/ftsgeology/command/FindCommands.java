@@ -106,6 +106,12 @@ public final class FindCommands {
                     String.format(java.util.Locale.ROOT, "%.3f", f.sour()), String.format(java.util.Locale.ROOT, "%.2f", f.richness()));
             return f == null ? null : new Hit(f.x(), f.z(), (int) Math.round(Math.hypot(f.x() - at.getX(), f.z() - at.getZ())));
         }
+        // Natural hydrogen: a lens on a seeded grid, in an ophiolite's mantle rock only.
+        if (what.equals("hydrogen")) {
+            BlockPos h = com.jeladastudios.ftsgeology.gas.world.HydrogenTraps.nearest(level, at.getX(), at.getZ(), 8000);
+            if (h != null) GeysersMod.LOGGER.info("natural hydrogen at {} {} {}", h.getX(), h.getY(), h.getZ());
+            return h == null ? null : new Hit(h.getX(), h.getZ(), (int) Math.round(Math.hypot(h.getX() - at.getX(), h.getZ() - at.getZ())));
+        }
         // A bone bed (Jurassic Reborn's fossils, where the geology lays them) hangs off a seeded grid too.
         if (what.equals("fossils")) {
             var b = com.jeladastudios.ftsgeology.worldgen.OreGenesis.nearestBoneBed(level, at.getX(), at.getZ(), 3000);

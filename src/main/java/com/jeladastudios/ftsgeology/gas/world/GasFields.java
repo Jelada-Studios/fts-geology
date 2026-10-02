@@ -39,7 +39,7 @@ public final class GasFields {
     private static final double POROSITY = 0.2;
 
     /** An open hole into a cap: where, which field, the cap's pressure. */
-    private record Hole(long pos, long field, double atm, double sour) {}
+    private record Hole(long pos, long field, double atm, double sour, boolean hydrogen) {}
 
     private static final Long2ObjectLinkedOpenHashMap<Hole> HOLES = new Long2ObjectLinkedOpenHashMap<>();
     /** The mouths gas came out of at the last second's round: a flame there is fed (see VentFlames). */
@@ -54,6 +54,18 @@ public final class GasFields {
 
     /** A block of a field's rock broken: a hole into its gas cap, or a breath of the gas in its oil. */
     public static void broken(ServerLevel level, BlockPos pos, BlockState was) {
+        if (HydrogenTraps.host(was)) {
+            // Into a lens of the mantle rock's own hydrogen.
+            HydrogenTraps.Trap t = HydrogenTraps.at(level, pos);
+            if (t == null || HOLES.containsKey(pos.asLong())) return;
+            if (Fields.of(level).left(t.id(), t.capacity()) <= 0) return;
+            HOLES.put(pos.asLong(), new Hole(pos.asLong(), t.id(), t.atm(), 0.0, true));
+            while (HOLES.size() > MOST_HOLES) HOLES.removeFirst();
+            holes++;
+            level.playSound(null, pos, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 1.5f, 0.6f);
+            com.jeladastudios.ftsgeology.util.Diagnostics.info("a hole into natural hydrogen at {}", pos.toShortString());
+            return;
+        }
         if (!was.is(Blocks.SANDSTONE) && !was.is(ModBlocks.OIL_SANDSTONE.get())) return;
         PetroleumFields.At at = PetroleumFields.at(level, pos);
         if (at == null) return;
@@ -65,7 +77,7 @@ public final class GasFields {
         if (at.zone() != PetroleumFields.Zone.GAS || HOLES.containsKey(pos.asLong())) return;
         if (left(level, at.field()) <= 0) return;
         double atm = Math.min(MOST_ATM, 1.0 + ATM_PER_BLOCK * at.field().depth(level));
-        HOLES.put(pos.asLong(), new Hole(pos.asLong(), at.field().id(), atm, at.field().sour()));
+        HOLES.put(pos.asLong(), new Hole(pos.asLong(), at.field().id(), atm, at.field().sour(), false));
         while (HOLES.size() > MOST_HOLES) HOLES.removeFirst();
         holes++;
         level.playSound(null, pos, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 1.5f, 0.4f);
@@ -114,7 +126,7 @@ public final class GasFields {
             if (want <= 0.01 || !gas.simulated(m.getX(), m.getZ())) continue;
             double moles = Math.min(Math.min(MOST_FLOW, want), left);
             m.set(out);
-            if (gas.release(m, mix(moles, h.sour()))) {
+            if (gas.release(m, h.hydrogen() ? hydrogen(moles) : mix(moles, h.sour()))) {
                 store.take(h.field(), moles);
                 released += moles;
                 level.sendParticles(ParticleTypes.CLOUD, m.getX() + 0.5, m.getY() + 0.5, m.getZ() + 0.5,
@@ -143,6 +155,15 @@ public final class GasFields {
             p = p.above();
         }
         return null;
+    }
+
+    /** Natural hydrogen: nearly pure, with a little nitrogen and methane (Bourakebougou's is 98% hydrogen). */
+    private static GasMix hydrogen(double moles) {
+        GasMix g = new GasMix();
+        g.add(Gas.HYDROGEN, moles * 0.96);
+        g.add(Gas.NITROGEN, moles * 0.03);
+        g.add(Gas.METHANE, moles * 0.01);
+        return g;
     }
 
     /** Natural gas: methane, a little CO2, and hydrogen sulphide in a sour field. */
