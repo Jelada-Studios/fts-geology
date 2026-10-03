@@ -40,6 +40,12 @@ public class VentilationFanBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
+    public java.util.List<Port> ports() {
+        return java.util.List.of(new Port("draw", null, true, back(), null),
+                new Port("blow", null, false, front(), null));
+    }
+
+    @Override
     public void serverTick() {
         Direction f = facing();
         running = !level.hasNeighborSignal(worldPosition) && energy.getEnergyStored() >= FE_PER_TICK

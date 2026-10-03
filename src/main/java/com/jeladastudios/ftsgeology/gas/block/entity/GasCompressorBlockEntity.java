@@ -61,12 +61,27 @@ public class GasCompressorBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
+    public java.util.List<Port> ports() {
+        return java.util.List.of(new Port("intake", null, true, front(), null),
+                new Port("outlet", null, false, back(), null));
+    }
+
+    /** Why it stood still on its last tick, or null. */
+    private @Nullable String idleWhy = "no_outlet";
+
+    @Override
+    protected @Nullable String idle() {
+        return idleWhy;
+    }
+
+    @Override
     public void serverTick() {
         lastRate = 0;
         Direction front = facing();
         Direction back = front.getOpposite();
         GasTank out = neighbourTank(back);
         if (out == null || level.hasNeighborSignal(worldPosition)) {
+            idleWhy = out == null ? "no_outlet" : "redstone";
             setLit(false);
             return;
         }
@@ -83,9 +98,11 @@ public class GasCompressorBlockEntity extends GasMachineBlockEntity {
         double cost = costPerMole(pIn, Math.max(pOut, 1.0));
         moles = Math.min(moles, energy.getEnergyStored() / cost);
         if (moles < 1e-3) {
+            idleWhy = energy.getEnergyStored() < cost * 1e-3 ? "no_power" : out.roomUntil(MAX_OUTLET) < 1e-3 ? "full" : "no_input";
             setLit(false);
             return;
         }
+        idleWhy = null;
         GasMix m = in != null ? in.extract(moles) : gas().extract(worldPosition.relative(front), moles);
         double moved = out.insert(m);
         if (!m.isEmpty()) {

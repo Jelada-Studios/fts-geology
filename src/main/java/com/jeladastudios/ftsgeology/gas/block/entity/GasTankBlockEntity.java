@@ -45,7 +45,27 @@ public class GasTankBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
+    public java.util.List<Port> ports() {
+        return java.util.List.of(new Port("stored", null, true, java.util.List.of(Direction.values()), tank));
+    }
+
+    @Override
     public void serverTick() {
+        // Set straight against a machine, or another tank, it is joined to it as a pipe would be: gas flows through the
+        // face the machine takes it in by or gives it out of. Pipes see to their own ends.
+        for (Direction d : Direction.values()) {
+            com.jeladastudios.ftsgeology.gas.IGasHandler h = com.jeladastudios.ftsgeology.gas.registry.GasCapabilities
+                    .handlerAt(level, worldPosition.relative(d), d.getOpposite());
+            if (h == null || h.isPipe()) continue;
+            GasTank other = h.getTank(d.getOpposite());
+            if (other == null || other == tank) continue;
+            if (level.getBlockEntity(worldPosition.relative(d)) instanceof GasTankBlockEntity) {
+                // Each pair of tanks once, by the tank on the negative side.
+                if (d.getAxisDirection() == Direction.AxisDirection.POSITIVE) GasTank.equalize(tank, other, 0.45, 0.1);
+            } else {
+                GasTank.equalize(tank, other, 0.35, 0.05);
+            }
+        }
         if (level.getGameTime() % 10 != 0) return;
         int c = level.getBlockState(worldPosition).getAnalogOutputSignal(level, worldPosition);
         if (c != lastComparator) {

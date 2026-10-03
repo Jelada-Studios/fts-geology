@@ -63,14 +63,22 @@ public class GasPanelScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mx, int my, float partial) {
         renderBackground(g);
-        boolean power = data.contains("EnergyMax"), tank = data.contains("Atm"), refused = data.contains("Refused");
+        boolean power = data.contains("EnergyMax"), refused = data.contains("Refused");
+        ListTag ports = data.getList("Ports", Tag.TAG_COMPOUND);
+        // A machine with its openings listed shows each of them; one without, its one tank as before.
+        boolean tank = ports.isEmpty() && data.contains("Atm");
+        List<FormattedCharSequence> idle = data.contains("Idle")
+                ? font.split(Component.translatable("gui.fts_geology.gas_panel.idle." + data.getString("Idle")), W - 16) : List.of();
         List<FormattedCharSequence> lines = new ArrayList<>();
         for (Tag t : data.getList("Status", Tag.TAG_STRING)) {
             Component c = Component.Serializer.fromJson(t.getAsString());
             if (c != null) lines.addAll(font.split(c, W - 16));
         }
         ListTag controls = data.getList("Controls", Tag.TAG_COMPOUND);
-        int h = 22 + (power ? 24 : 0) + (refused ? 12 : 0) + (tank ? 65 : 0) + lines.size() * 10 + 8 + (controls.isEmpty() ? 0 : 22);
+        int portsH = 0;
+        for (int i = 0; i < ports.size(); i++) portsH += portHeight(ports.getCompound(i));
+        int h = 22 + idle.size() * 10 + (idle.isEmpty() ? 0 : 4) + (power ? 24 : 0) + (refused ? 12 : 0) + (tank ? 65 : 0)
+                + (ports.isEmpty() ? 0 : 12 + portsH) + lines.size() * 10 + 8 + (controls.isEmpty() ? 0 : 22);
         int left = (width - W) / 2, top = Math.max(4, (height - h) / 2);
         g.fill(left, top, left + W, top + h, BG);
         frame(g, left, top, W, h);
@@ -78,6 +86,11 @@ public class GasPanelScreen extends Screen {
         g.drawString(font, title, left + 8, top + 5, TEXT, false);
         int x = left + 8, w = W - 16, y = top + 22;
 
+        for (FormattedCharSequence line : idle) {
+            g.drawString(font, line, x, y, WARN, false);
+            y += 10;
+        }
+        if (!idle.isEmpty()) y += 4;
         if (power) {
             int e = data.getInt("Energy"), max = Math.max(1, data.getInt("EnergyMax"));
             g.drawString(font, Component.translatable("gui.fts_geology.gas_panel.energy"), x, y, DIM, false);
@@ -102,6 +115,15 @@ public class GasPanelScreen extends Screen {
             y += 11;
             mix(g, x, y, w);
             y += 32;
+        }
+        if (!ports.isEmpty()) {
+            g.drawString(font, Component.translatable("gui.fts_geology.gas_panel.ports"), x, y, DIM, false);
+            y += 12;
+            for (int i = 0; i < ports.size(); i++) {
+                CompoundTag p = ports.getCompound(i);
+                port(g, p, x, y, w);
+                y += portHeight(p);
+            }
         }
         for (FormattedCharSequence line : lines) {
             g.drawString(font, line, x, y, TEXT, false);
@@ -154,6 +176,86 @@ public class GasPanelScreen extends Screen {
             }
         }
         return super.mouseClicked(mx, my, button);
+    }
+
+    private static final int IN = 0xFF7BD389, OUT = 0xFFF4A261;
+
+    /**
+     * A port's faces, each with its compass direction where it has one and what it meets, as many to a line as fit; a
+     * face is never broken over two lines.
+     */
+    private List<FormattedCharSequence> faces(CompoundTag p, int width) {
+        List<FormattedCharSequence> lines = new ArrayList<>();
+        net.minecraft.network.chat.MutableComponent line = null;
+        ListTag faces = p.getList("Faces", Tag.TAG_COMPOUND);
+        for (int i = 0; i < faces.size(); i++) {
+            CompoundTag f = faces.getCompound(i);
+            String rel = f.getString("Rel"), dir = f.getString("Dir");
+            net.minecraft.network.chat.MutableComponent face = Component.translatable("gui.fts_geology.gas_panel.face." + rel);
+            if (!dir.equals("up") && !dir.equals("down")) {
+                face.append(" (").append(Component.translatable("gui.fts_geology.gas_panel.dir." + dir)).append(")");
+            }
+            face.append(": ").append(Component.translatable("gui.fts_geology.gas_panel.meets." + f.getString("Meets")));
+            if (line != null && font.width(line) + font.width("   ") + font.width(face) <= width) {
+                line.append("   ").append(face);
+                continue;
+            }
+            if (line != null) lines.addAll(font.split(line, width));
+            line = face;
+        }
+        if (line != null) lines.addAll(font.split(line, width));
+        return lines;
+    }
+
+    private int portHeight(CompoundTag p) {
+        int faceLines = faces(p, W - 24).size();
+        boolean mix = !p.getList("Mix", Tag.TAG_COMPOUND).isEmpty();
+        return 10 + faceLines * 10 + (mix ? 10 : 0) + 4;
+    }
+
+    /**
+     * One opening: an arrow in (green) or out (orange) and its name, the pressure behind it, then its faces and what each
+     * meets, then the gases behind it.
+     */
+    private void port(GuiGraphics g, CompoundTag p, int x, int y, int w) {
+        boolean in = p.getBoolean("In"), both = p.getString("Key").equals("stored");
+        String arrow = both ? "\u21C4 " : in ? "\u2192 " : "\u2190 ";
+        Component name = p.contains("Arg")
+                ? Component.translatable("gui.fts_geology.gas_panel.port." + p.getString("Key"), p.getString("Arg"))
+                : Component.translatable("gui.fts_geology.gas_panel.port." + p.getString("Key"));
+        g.drawString(font, arrow, x, y, both ? PRESSURE : in ? IN : OUT, false);
+        g.drawString(font, name, x + font.width(arrow), y, TEXT, false);
+        if (p.contains("Atm")) {
+            String v = String.format(Locale.ROOT, "%.2f / %.0f atm", p.getDouble("Atm"), Math.max(0.1, p.getDouble("MaxAtm")));
+            g.drawString(font, v, x + w - font.width(v), y, TEXT, false);
+        }
+        y += 10;
+        for (FormattedCharSequence line : faces(p, w - 8)) {
+            g.drawString(font, line, x + 8, y, DIM, false);
+            y += 10;
+        }
+        ListTag mix = p.getList("Mix", Tag.TAG_COMPOUND);
+        if (mix.isEmpty()) return;
+        record Part(Gas gas, double share) {}
+        List<Part> parts = new ArrayList<>();
+        for (Tag t : mix) {
+            CompoundTag c = (CompoundTag) t;
+            Gas gas = Gas.byId(c.getString("Id"));
+            if (gas != null) parts.add(new Part(gas, c.getDouble("F")));
+        }
+        parts.sort((a, b) -> Double.compare(b.share(), a.share()));
+        int lx = x + 8;
+        for (int i = 0; i < Math.min(3, parts.size()); i++) {
+            Part part = parts.get(i);
+            String share = part.share() >= 0.001 ? String.format(Locale.ROOT, " %.0f%%", part.share() * 100)
+                    : String.format(Locale.ROOT, " %.0f ppm", part.share() * 1e6);
+            Component label = Component.literal(part.gas().formula).append(share);
+            int lw = 8 + font.width(label) + 10;
+            if (lx + lw > x + w) break;
+            g.fill(lx, y + 1, lx + 6, y + 7, 0xFF000000 | part.gas().color);
+            g.drawString(font, label, lx + 8, y, TEXT, false);
+            lx += lw;
+        }
     }
 
     /** The tank's mix: one bar of the gases' shares in their colours, and the largest of them named under it. */

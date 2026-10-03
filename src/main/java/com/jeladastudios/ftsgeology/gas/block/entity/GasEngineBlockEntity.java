@@ -71,6 +71,23 @@ public class GasEngineBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
+    public java.util.List<Port> ports() {
+        return java.util.List.of(new Port("fuel", null, true, backSidesBottom(), fuel),
+                new Port("air", null, true, front(), null),
+                new Port("exhaust", null, false, java.util.List.of(Direction.UP), exhaust));
+    }
+
+    @Override
+    protected @Nullable String idle() {
+        return switch (stallReason) {
+            case "" -> null;
+            case "intake" -> "blocked";
+            case "full" -> "energy_full";
+            default -> stallReason;
+        };
+    }
+
+    @Override
     public void serverTick() {
         energy.pushTo(level, worldPosition, facing(), 1000);
         ventExhaust();

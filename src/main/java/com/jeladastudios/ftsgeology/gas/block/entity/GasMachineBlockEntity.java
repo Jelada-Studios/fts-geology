@@ -53,6 +53,40 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
     @Nullable
     public abstract GasTank tankFor(@Nullable Direction side);
 
+    /**
+     * One of a machine's openings, for the panel and for the marks drawn on its faces: what goes through it (a key under
+     * {@code gui.fts_geology.gas_panel.port.}, with an argument such as the gas a separator picks), in or out, the faces
+     * it is on, and the tank behind it, or null where it takes from or gives to the open air or a neighbour.
+     */
+    public record Port(String key, @Nullable String arg, boolean in, List<Direction> faces, @Nullable GasTank tank) {}
+
+    /** The machine's openings. Read on the client too, so worked out from its block state alone. */
+    public List<Port> ports() {
+        return List.of();
+    }
+
+    /** The faces round the machine, by where they lie against its front. */
+    protected List<Direction> back() {
+        return List.of(facing().getOpposite());
+    }
+
+    protected List<Direction> front() {
+        return List.of(facing());
+    }
+
+    protected List<Direction> backSidesBottom() {
+        Direction f = facing();
+        return List.of(f.getOpposite(), f.getClockWise(), f.getCounterClockWise(), Direction.DOWN);
+    }
+
+    /**
+     * Why the machine is not working, a key under {@code gui.fts_geology.gas_panel.idle.}, or null while it works. Shown
+     * on the panel over everything else.
+     */
+    protected @Nullable String idle() {
+        return null;
+    }
+
     public boolean isPipe() {
         return false;
     }
@@ -115,7 +149,58 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
         net.minecraft.nbt.ListTag buttons = new net.minecraft.nbt.ListTag();
         controls(buttons);
         if (!buttons.isEmpty()) t.put("Controls", buttons);
+        String idle = idle();
+        if (idle != null) t.putString("Idle", idle);
+        net.minecraft.nbt.ListTag ports = new net.minecraft.nbt.ListTag();
+        for (Port p : ports()) ports.add(portData(p));
+        if (!ports.isEmpty()) t.put("Ports", ports);
         return t;
+    }
+
+    /** One opening for the panel: its name, in or out, its faces and what each meets, and the gas behind it. */
+    private net.minecraft.nbt.CompoundTag portData(Port p) {
+        net.minecraft.nbt.CompoundTag c = new net.minecraft.nbt.CompoundTag();
+        c.putString("Key", p.key());
+        if (p.arg() != null) c.putString("Arg", p.arg());
+        c.putBoolean("In", p.in());
+        net.minecraft.nbt.ListTag faces = new net.minecraft.nbt.ListTag();
+        GasTank seen = p.tank();
+        for (Direction d : p.faces()) {
+            net.minecraft.nbt.CompoundTag f = new net.minecraft.nbt.CompoundTag();
+            f.putString("Rel", relative(d));
+            f.putString("Dir", d.getName());
+            IGasHandler h = GasCapabilities.handlerAt(level, worldPosition.relative(d), d.getOpposite());
+            GasTank there = h == null ? null : h.getTank(d.getOpposite());
+            f.putString("Meets", there != null ? (h.isPipe() ? "pipe" : "machine") : worldOpen(d) ? "air" : "closed");
+            if (seen == null && there != null) seen = there;
+            faces.add(f);
+        }
+        c.put("Faces", faces);
+        if (seen != null) {
+            c.putDouble("Atm", seen.pressure());
+            c.putDouble("MaxAtm", seen.maxPressure);
+            net.minecraft.nbt.ListTag mix = new net.minecraft.nbt.ListTag();
+            for (com.jeladastudios.ftsgeology.gas.Gas g : com.jeladastudios.ftsgeology.gas.Gas.VALUES) {
+                double share = seen.gas.fraction(g);
+                if (share < 1e-6) continue;
+                net.minecraft.nbt.CompoundTag m = new net.minecraft.nbt.CompoundTag();
+                m.putString("Id", g.id);
+                m.putDouble("F", share);
+                mix.add(m);
+            }
+            c.put("Mix", mix);
+        }
+        return c;
+    }
+
+    /** Where a face lies against the machine's front: front, back, top, bottom or side. */
+    protected String relative(Direction d) {
+        Direction f = facing();
+        if (d == f) return "front";
+        if (d == f.getOpposite()) return "back";
+        if (d == Direction.UP) return "top";
+        if (d == Direction.DOWN) return "bottom";
+        return "side";
     }
 
     /** The panel's buttons, in a row: each with the key {@link #control} answers to and its label. None by default. */

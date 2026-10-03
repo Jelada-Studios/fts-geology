@@ -76,11 +76,28 @@ public class ElectrolyzerBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
+    public java.util.List<Port> ports() {
+        Direction f = facing();
+        return java.util.List.of(new Port("water", null, true, java.util.List.of(f, f.getClockWise(), f.getCounterClockWise(), Direction.DOWN), null),
+                new Port("hydrogen", null, false, java.util.List.of(Direction.UP), h2),
+                new Port("oxygen", null, false, back(), o2));
+    }
+
+    /** Why it stood still on its last tick, or null. */
+    private @Nullable String idleWhy = "no_water";
+
+    @Override
+    protected @Nullable String idle() {
+        return idleWhy;
+    }
+
+    @Override
     public void serverTick() {
         ventIfUnconnected(h2, Direction.UP, 1.1);
         ventIfUnconnected(o2, facing().getOpposite(), 1.1);
         lastRate = 0;
         if (level.hasNeighborSignal(worldPosition)) {
+            idleWhy = "redstone";
             setLit(false);
             return;
         }
@@ -90,9 +107,11 @@ public class ElectrolyzerBlockEntity extends GasMachineBlockEntity {
         mol = Math.min(mol, o2.roomUntil(MAX_PRESSURE) * 2);
         mol = Math.min(mol, energy.getEnergyStored() / FE_PER_MOL);
         if (mol < 1e-3) {
+            idleWhy = water.getFluidAmount() - waterDebt < 1e-3 ? "no_water" : energy.getEnergyStored() < FE_PER_MOL * 1e-3 ? "no_power" : "full";
             setLit(false);
             return;
         }
+        idleWhy = null;
         h2.gas.add(Gas.HYDROGEN, mol);
         o2.gas.add(Gas.OXYGEN, mol / 2);
         h2.changed();

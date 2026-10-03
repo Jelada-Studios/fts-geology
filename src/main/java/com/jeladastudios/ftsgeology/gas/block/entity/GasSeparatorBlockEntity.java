@@ -90,16 +90,51 @@ public class GasSeparatorBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
+    public List<Port> ports() {
+        return List.of(new Port("mixture", null, true, back(), input),
+                new Port("selected", selected.formula, false, front(), target),
+                new Port("rest", null, false, List.of(Direction.UP), rest));
+    }
+
+    /** Why it stood still on its last tick, or null. */
+    private @Nullable String idleWhy = "no_input";
+
+    @Override
+    protected @Nullable String idle() {
+        return idleWhy;
+    }
+
+    @Override
     public void serverTick() {
         ventIfUnconnected(rest, Direction.UP, 1.1);
         lastRate = 0;
-        if (level.hasNeighborSignal(worldPosition) || input.gas.isEmpty()) return;
+        if (level.hasNeighborSignal(worldPosition)) {
+            idleWhy = "redstone";
+            return;
+        }
+        if (input.gas.isEmpty()) {
+            idleWhy = "no_input";
+            return;
+        }
         double mol = Math.min(RATE, input.total());
         double share = input.gas.fraction(selected);
-        mol = Math.min(mol, energy.getEnergyStored() / (FE_PER_MOL + FE_PER_MOL_TARGET * share));
+        if (share < 1e-6) {
+            idleWhy = "none_of_it";
+            return;
+        }
+        double powered = energy.getEnergyStored() / (FE_PER_MOL + FE_PER_MOL_TARGET * share);
+        if (powered < 1e-4) {
+            idleWhy = "no_power";
+            return;
+        }
+        mol = Math.min(mol, powered);
         mol = Math.min(mol, share > 0 ? target.room() / share : mol);
         mol = Math.min(mol, share < 1 ? rest.room() / (1 - share) : mol);
-        if (mol < 1e-4) return;
+        if (mol < 1e-4) {
+            idleWhy = "full";
+            return;
+        }
+        idleWhy = null;
         GasMix m = input.extract(mol);
         double t = m.takeSpecies(selected, m.get(selected));
         target.gas.add(selected, t);
@@ -115,9 +150,8 @@ public class GasSeparatorBlockEntity extends GasMachineBlockEntity {
         List<Component> o = super.status();
         o.add(Component.translatable("block.fts_geology.gas_separator").withStyle(ChatFormatting.GOLD)
                 .append(Component.literal(" \u2192 " + selected.formula).withStyle(s -> s.withColor(selected.color))));
-        o.add(Component.literal(String.format(Locale.ROOT, "  %d / %d FE   %.1f mol/s   in %s  out %s  rest %s",
-                energy.getEnergyStored(), energy.getMaxEnergyStored(), lastRate * 20,
-                GasText.atm(input.pressure()), GasText.atm(target.pressure()), GasText.atm(rest.pressure()))).withStyle(ChatFormatting.WHITE));
+        o.add(Component.translatable("block.fts_geology.gas_separator.rate",
+                String.format(Locale.ROOT, "%.2f", lastRate * 20)).withStyle(ChatFormatting.WHITE));
         o.add(Component.translatable("block.fts_geology.gas_separator.help").withStyle(ChatFormatting.DARK_GRAY));
         return o;
     }

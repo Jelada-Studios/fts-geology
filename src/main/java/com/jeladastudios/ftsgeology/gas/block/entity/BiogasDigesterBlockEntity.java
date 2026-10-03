@@ -90,6 +90,11 @@ public class BiogasDigesterBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
+    public java.util.List<Port> ports() {
+        return java.util.List.of(new Port("biogas", null, false, java.util.List.of(Direction.UP), out));
+    }
+
+    @Override
     public void serverTick() {
         ventIfUnconnected(out, Direction.UP, 1.15);
         if (pending < MOL_PER_ITEM && ++feedTimer >= TICKS_PER_ITEM) {

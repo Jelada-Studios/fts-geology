@@ -160,6 +160,12 @@ public class GasValveBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
+    public java.util.List<Port> ports() {
+        return java.util.List.of(new Port("gas", null, true, back(), null),
+                new Port("flame", null, false, front(), null));
+    }
+
+    @Override
     public void serverTick() {
         if (!isOpen()) {
             lastFlow = 0;
