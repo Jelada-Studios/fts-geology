@@ -533,10 +533,57 @@ public final class EruptionHandler {
                 || s.is(Blocks.MUD_BRICKS) || s.is(Blocks.PACKED_MUD) || s.is(Tags.Blocks.CHESTS)) {
             return true;
         }
-        String path = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(b).getPath();
+        if (s.is(BUILT)) return true;
+        net.minecraft.resources.ResourceLocation id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(b);
+        // A building mod's blocks are all made: its stone carved into patterns is named like the stone it came from.
+        if (buildingMod(id.getNamespace())) return true;
+        String path = id.getPath();
         // Smooth basalt is the lining of a geode and a volcano's own rock.
         if (path.equals("smooth_basalt")) return false;
         for (String mark : WORKED_MARKS) if (path.contains(mark)) return true;
+        return false;
+    }
+
+    /**
+     * Whether a block is plainly no ground, whatever it is called: one that holds contents or works (a block entity),
+     * or one that does not fill its space (a hook, a cable, a lamp) -- unless it is something the world lays down. Read
+     * as ground, a machine at the top of a column was lifted by a quake as the column's surface and left behind as well:
+     * two of it, the new one empty.
+     */
+    public static boolean isFixture(BlockState s, net.minecraft.world.level.BlockGetter level, BlockPos pos) {
+        if (s.isAir() || isNaturalMatrix(s)) return false;
+        return s.hasBlockEntity() || !s.isCollisionShapeFullBlock(level, pos);
+    }
+
+    /** Single blocks a pack names as made things, for what the building mods' list does not reach. */
+    public static final net.minecraft.tags.TagKey<Block> BUILT = net.minecraft.tags.TagKey.create(
+            net.minecraft.core.registries.Registries.BLOCK, new net.minecraft.resources.ResourceLocation(com.jeladastudios.ftsgeology.GeysersMod.MODID, "built"));
+
+    private static volatile java.util.List<? extends String> buildingModsRead;
+    private static volatile java.util.Set<String> buildingMods = java.util.Set.of();
+    private static volatile String[] buildingPrefixes = new String[0];
+
+    /** Whether every block of a mod is a made thing ({@code buildingMods}). Before the config is read, none. */
+    static boolean buildingMod(String namespace) {
+        java.util.List<? extends String> list;
+        try {
+            list = GeyserConfig.BUILDING_MODS.get();
+        } catch (IllegalStateException notYet) {
+            return false;
+        }
+        if (list != buildingModsRead) {
+            java.util.Set<String> mods = new java.util.HashSet<>();
+            java.util.List<String> prefixes = new java.util.ArrayList<>();
+            for (String m : list) {
+                if (m.endsWith("*")) prefixes.add(m.substring(0, m.length() - 1));
+                else mods.add(m);
+            }
+            buildingMods = mods;
+            buildingPrefixes = prefixes.toArray(new String[0]);
+            buildingModsRead = list;
+        }
+        if (buildingMods.contains(namespace)) return true;
+        for (String p : buildingPrefixes) if (namespace.startsWith(p)) return true;
         return false;
     }
 

@@ -31,9 +31,10 @@ import java.util.concurrent.atomic.LongAdder;
  *   tower stands through a moderate quake and not a violent one, and one with a sand course in its column falls at
  *   the first strong shaking. What fails comes down with everything over it.</li>
  *   <li><b>Shaking.</b> Past an intensity of its own a wall comes down whatever it carries, the weaker its material
- *   the sooner: sand at the onset, glass and wool soon after, wood and mud brick at about IX on the Mercalli scale,
- *   rubble a little later, dressed stone and brick later still, deepslate last; obsidian and metal never. A tall
- *   building goes a little sooner. Near the fault of a great quake, what is not built strong is flattened.</li>
+ *   the sooner, by the classes of EMS-98 ({@link Fabric}): sand at the onset, glass and wool soon after, rubble and mud
+ *   brick about Mercalli IX, stone and brick about X, concrete about XI, timber later still; obsidian and metal never.
+ *   The odds grow over a degree or two either side, as EMS-98's "few", "many" and "most" do. A tall building goes a
+ *   little sooner. Near the fault of a great quake, what is not built strong is flattened.</li>
  *   <li><b>Overhangs.</b> A block over open air holds only as far out from the nearest supported block as its
  *   material spans, less in strong shaking.</li>
  *   <li><b>Slender towers.</b> A column standing many times higher than what is round it sways over and falls
@@ -94,31 +95,88 @@ public final class Structural {
     }
 
     /**
-     * The intensity a wall of this is shaken down at, whatever it carries. Rubble goes before dressed stone although
-     * it is the harder block: it is loose stones in mortar.
+     * What a wall is built of, as the European Macroseismic Scale (EMS-98) sorts buildings by how they stand shaking:
+     * {@code A} rubble, earth and mud brick; {@code B} plain stone and brick masonry; {@code C} concrete; {@code D}
+     * timber, whose frames bend and stand; {@code E} metal; {@code F} what never comes down. Loose sand and gravel, and
+     * glass, wool and hay, are weaker than any building and kept apart.
+     */
+    enum Fabric { LOOSE, FRAIL, A, B, C, D, E, F }
+
+    static Fabric fabric(BlockState s) {
+        if (s.getBlock() instanceof FallingBlock) return Fabric.LOOSE;
+        float hard = s.getBlock().defaultDestroyTime();
+        if (strong(s) || hard < 0) return Fabric.F;
+        SoundType sound = s.getSoundType();
+        if (sound == SoundType.GLASS || s.is(BlockTags.ICE) || s.is(BlockTags.WOOL) || s.is(BlockTags.LEAVES)
+                || s.is(Blocks.HAY_BLOCK)) return Fabric.FRAIL;
+        String name = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath();
+        if (s.is(BlockTags.DIRT) || s.is(Blocks.CLAY) || s.is(Tags.Blocks.COBBLESTONE) || name.contains("cobble")
+                || name.contains("mud") || name.contains("rubble") || name.contains("adobe")) return Fabric.A;
+        if (s.is(BlockTags.PLANKS) || s.is(BlockTags.LOGS) || sound == SoundType.WOOD || sound == SoundType.BAMBOO_WOOD
+                || sound == SoundType.CHERRY_WOOD || sound == SoundType.NETHER_WOOD) return Fabric.D;
+        if (name.contains("concrete")) return Fabric.C;
+        if (sound == SoundType.METAL || sound == SoundType.NETHERITE_BLOCK || sound == SoundType.COPPER
+                || sound == SoundType.ANVIL || sound == SoundType.CHAIN || hard >= 5.0f) return Fabric.E;
+        return Fabric.B;
+    }
+
+    /**
+     * How many degrees of Mercalli later than rubble a class comes to the same damage: EMS-98's table moves a degree
+     * from one class to the next.
+     */
+    static double shift(Fabric f) {
+        return switch (f) {
+            case A -> 0.0;
+            case B -> 1.0;
+            case C -> 2.0;
+            case D -> 3.0;
+            case E -> 4.0;
+            default -> 99.0;
+        };
+    }
+
+    /** The intensity of this mod's shaking law at a degree of the Mercalli scale (see {@link FeltShaking#mercalli}). */
+    static double atMercalli(double mercalli) {
+        return (mercalli + 1.0) / 1.35;
+    }
+
+    /**
+     * The intensity a wall of this is shaken down at, whatever it carries: the middle of EMS-98's grade 5 (destruction)
+     * for its class -- rubble about Mercalli IX and a half, stone and brick a degree later, concrete two, timber three.
+     * Rubble goes before dressed stone although it is the harder block: it is loose stones in mortar. Wood goes last of
+     * the walls, as timber frames do; a tall stone house on a weak storey goes first of all, by its load.
      */
     static double standsTo(BlockState s) {
-        if (s.getBlock() instanceof FallingBlock) return 4.4;
-        if (strong(s) || s.getBlock().defaultDestroyTime() < 0) return 99.0;
-        if (s.getSoundType() == SoundType.GLASS || s.is(BlockTags.ICE) || s.is(BlockTags.WOOL) || s.is(BlockTags.LEAVES)
-                || s.is(Blocks.HAY_BLOCK) || s.is(BlockTags.DIRT)) return 6.0;
-        if (s.is(BlockTags.PLANKS) || s.is(BlockTags.LOGS) || s.getSoundType() == SoundType.WOOD
-                || s.is(Blocks.MUD_BRICKS) || s.is(Blocks.PACKED_MUD)) return 7.2;
-        String name = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath();
-        if (name.contains("cobble")) return 7.6;
-        if (s.getBlock().defaultDestroyTime() >= 3.0f) return 8.8;
-        return 8.2;
+        Fabric f = fabric(s);
+        return switch (f) {
+            case LOOSE -> 4.4;
+            case FRAIL -> 6.0;
+            case F -> 99.0;
+            default -> atMercalli(9.4 + shift(f));
+        };
+    }
+
+    /** Whether a block makes a footing: stone, brick, concrete or metal, set in the ground; not rubble, earth or wood. */
+    static boolean footing(BlockState s) {
+        Fabric f = fabric(s);
+        return f == Fabric.B || f == Fabric.C || f == Fabric.E || f == Fabric.F;
     }
 
     /** How much sooner a tall building is shaken down, per block over six. */
     private static final double TALL = 0.02;
+    /**
+     * Over how much intensity the odds of a column coming down go from none to all, centred on what its walls stand to:
+     * about three degrees of Mercalli, a tenth of a class's buildings down a degree before its middle, nine in ten a degree
+     * after, as EMS-98 has "few", "many" and "most".
+     */
+    private static final double SPREAD = 2.0;
 
     /**
      * Reads the buildings in one chunk shaken at {@code intensity}; what fails is brought down at a moment of the
      * shaking by {@link Collapse}.
      */
     static void chunk(ServerLevel level, LevelChunk chunk, double intensity, LongSet placed, List<BoundingBox> pieces,
-                      long from, int spread) {
+                      LongSet made, long from, int spread) {
         if (intensity < LOOSE_ONSET || !GeyserConfig.SHAKING_LOOSENS_BUILDS.get()) return;
         ChunkPos cp = chunk.getPos();
         double left = left(intensity);
@@ -127,6 +185,8 @@ public final class Structural {
         // The columns with anything built in them.
         LongSet columns = new LongOpenHashSet();
         for (long p : placed) columns.add(BlockPos.asLong(BlockPos.getX(p), 0, BlockPos.getZ(p)));
+        // And those with blocks of a building no one was seen placing, as the shaking found them.
+        columns.addAll(made);
         if (!pieces.isEmpty()) {
             for (int lx = 0; lx < 16; lx++) {
                 for (int lz = 0; lz < 16; lz++) {
@@ -200,7 +260,7 @@ public final class Structural {
             java.util.Arrays.sort(stands, 0, n);
             if (looseOnly && stands[n / 2] >= ONSET) return;
             double at = stands[n / 2] - TALL * Math.max(0, top - ground - 6);
-            double chance = Math.max(0.0, Math.min(1.0, 0.5 + (intensity - at) / 0.8));
+            double chance = Math.max(0.0, Math.min(1.0, 0.5 + (intensity - at) / SPREAD));
             if (chance > 0 && level.random.nextDouble() < chance) {
                 bringDown(level, x, lowest, top, z, from, spread, 0, 0, failing, m, placed, pieces);
                 SHAKEN.increment();
@@ -264,7 +324,7 @@ public final class Structural {
         int footing = 0, y = ground + 1;
         for (; y <= ground + FOOTING_MOST * 2; y++) {
             BlockState s = chunk.getBlockState(m.set(x, y, z));
-            if (s.isAir() || !Collapse.built(level, s, m, placed, pieces) || standsTo(s) < 8.0 || !buried(level, x, y, z, placed, pieces)) break;
+            if (s.isAir() || !Collapse.built(level, s, m, placed, pieces) || !footing(s) || !buried(level, x, y, z, placed, pieces)) break;
             footing++;
         }
         if (footing > 0) {
@@ -299,7 +359,7 @@ public final class Structural {
             BlockState s = level.getBlockState(n);
             // A neighbour of the footing itself counts: a slab of footing is buried at its edges only.
             if (s.isAir() || !s.getFluidState().isEmpty()) return false;
-            if (Collapse.built(level, s, n, placed, pieces) && standsTo(s) < 8.0) return false;
+            if (Collapse.built(level, s, n, placed, pieces) && !footing(s)) return false;
         }
         return true;
     }

@@ -105,8 +105,9 @@ public final class TectonicCommands {
                                             .withStyle(ChatFormatting.YELLOW), true);
                                     return 1;
                                 }))
-                                // A small quake right here that breaks nothing: felt and recorded, as the faults' small ones.
-                                .then(Commands.literal("tremor").then(Commands.argument("magnitude", DoubleArgumentType.doubleArg(1.0, 6.0))
+                                // A quake right here that moves no ground: felt, recorded and shaken, as the faults' small
+                                // ones are; a strong one tries what is built round it.
+                                .then(Commands.literal("tremor").then(Commands.argument("magnitude", DoubleArgumentType.doubleArg(1.0, 9.5))
                                         .executes(ctx -> {
                                             ServerLevel level = ctx.getSource().getLevel();
                                             BlockPos at = BlockPos.containing(ctx.getSource().getPosition());

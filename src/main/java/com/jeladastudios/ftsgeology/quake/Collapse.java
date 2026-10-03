@@ -148,7 +148,10 @@ public final class Collapse {
                 && (!TerrainProbe.isTreePart(s) || ShakingDamage.builtLog(level, s, p.getX(), p.getY(), p.getZ()))) {
             return true;
         }
-        return EruptionHandler.isWorked(s) && !TerrainProbe.isVegetation(s);
+        if ((EruptionHandler.isWorked(s) || EruptionHandler.isFixture(s, level, p)) && !TerrainProbe.isVegetation(s)) return true;
+        // A wall of the ground's own stone or earth no one was seen building (see ShakingDamage#wallLike).
+        return level instanceof ServerLevel server
+                && ShakingDamage.plainWall((bx, by, bz) -> ShakingDamage.peek(server, bx, by, bz), p.getX(), p.getY(), p.getZ(), s);
     }
 
     /** A block came away here some other way (shaken off): the column is swept with the others once all is down. */

@@ -237,6 +237,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_HUMID;
     public static final ForgeConfigSpec.BooleanValue SPRING_RENEWAL_ENABLED;
     public static final ForgeConfigSpec.BooleanValue QUAKES_BREAK_STRUCTURES;
+    public static final ForgeConfigSpec.ConfigValue<java.util.List<? extends String>> BUILDING_MODS;
     public static final ForgeConfigSpec.BooleanValue SHAKING_LOOSENS_BUILDS;
     public static final ForgeConfigSpec.DoubleValue SHAKING_DAMAGE;
     public static final ForgeConfigSpec.BooleanValue SHAKING_FELLS_TREES;
@@ -838,6 +839,15 @@ public final class GeyserConfig {
                         "into a village and make one of its houses yours and the quake will still",
                         "take it, because as far as the world is concerned it is still the village.")
                 .define("quakesBreakStructures", true);
+        BUILDING_MODS = b
+                .comment("Mods whose blocks are all made things, never ground: what a quake carries, shakes and brings down",
+                        "as part of a building wherever it stands, placed by whoever. A name ending in * takes every mod",
+                        "whose id starts so. Single blocks can be added with the block tag fts_geology:built. Blocks that hold",
+                        "contents or machinery, and blocks that do not fill their space, count as made already.")
+                .defineListAllowEmpty(java.util.List.of("buildingMods"), () -> java.util.List.of("rechiseled", "rechiseledcreate",
+                        "chipped", "chisel", "chiselsandbits", "buildersdelight", "createdeco", "framedblocks", "createframed",
+                        "mcw*", "refurbished_furniture", "handcrafted", "decorative_blocks", "another_furniture",
+                        "architects_palette", "blockus", "everycomp", "domum_ornamentum"), o -> o instanceof String);
         SHAKING_LOOSENS_BUILDS = b
                 .comment("Let the shaking knock loose blocks off buildings: what players built and the villages and",
                         "other structures the world made, never the ground or a tree. A block with a face in the open",

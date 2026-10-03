@@ -378,8 +378,27 @@ public final class ShakingDamage {
         if (!builds()) return;
         LongSet placed = PlayerBuilt.inChunk(level, cp.x, cp.z);
         List<BoundingBox> built = structureBoxes(level, chunk, floor);
-        // Whether the buildings here stand up to it at all: load, overhangs, slender towers.
-        Structural.chunk(level, chunk, intensity, placed, built, now + job.delay, job.spread);
+        // The chance each kind of wall sheds a block with a face in the open, at this chunk's shaking.
+        double[] shed = new double[Structural.Fabric.values().length];
+        for (Structural.Fabric f : Structural.Fabric.values()) shed[f.ordinal()] = shedding(f, intensity, shaking);
+        // Walls of the ground's own stone and earth that no one was seen building are looked for where the shaking can harm
+        // a building at all, and only near the top of each column, where houses stand.
+        boolean plainWalls = intensity >= Structural.ONSET;
+        int[] surface = new int[256];
+        int lowTop = Integer.MAX_VALUE, highTop = Integer.MIN_VALUE;
+        if (plainWalls) {
+            for (int lx = 0; lx < 16; lx++) {
+                for (int lz = 0; lz < 16; lz++) {
+                    int t = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, lx, lz);
+                    surface[lx * 16 + lz] = t;
+                    lowTop = Math.min(lowTop, t);
+                    highTop = Math.max(highTop, t);
+                }
+            }
+        }
+        BlockAt read = (bx, by, bz) -> peek(chunk, bx, by, bz);
+        // The columns with something built in them the mod did not see placed, for the structural reading after.
+        LongSet madeColumns = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
         boolean[] placedIn = new boolean[chunk.getSectionsCount()];
         for (long p : placed) {
             int i = chunk.getSectionIndex(BlockPos.getY(p));
@@ -388,6 +407,7 @@ public final class ShakingDamage {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap groundwork = new it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap();
         LevelChunkSection[] sections = chunk.getSections();
+        sections:
         for (int i = 0; i < sections.length; i++) {
             LevelChunkSection section = sections[i];
             int y0 = chunk.getSectionYFromSectionIndex(i) << 4;
@@ -399,7 +419,8 @@ public final class ShakingDamage {
                     break;
                 }
             }
-            if (!placedIn[i] && !inBox && !section.getStates().maybeHas(ShakingDamage::fitting)) continue;
+            boolean plainHere = plainWalls && y0 + 15 >= lowTop - PLAIN_DEPTH && y0 <= highTop;
+            if (!placedIn[i] && !inBox && !plainHere && !section.getStates().maybeHas(ShakingDamage::fitting)) continue;
             for (int ly = 0; ly < 16; ly++) {
                 int y = y0 + ly;
                 if (y < floor) continue;
@@ -414,19 +435,22 @@ public final class ShakingDamage {
                             m.set(x, y, z);
                             if (!(placed.contains(m.asLong()) || EruptionHandler.isPlayerPlaced(s)
                                     || (inBox && inside(built, x, y, z)))) continue;
-                            if (job.loosened++ >= MOST) return;
+                            if (job.loosened++ >= MOST) break sections;
                             DUE.add(new Loose(level.dimension(), m.immutable(), s, now + job.delay + level.random.nextInt(job.spread)));
                             continue;
                         }
-                        double weak = weakness(s);
-                        if (weak <= 0) continue;
-                        // The roll first: it is cheap, and only the few blocks that come up are looked at closely.
-                        if (level.random.nextDouble() >= Math.min(CAP, weak * shaking)) continue;
                         int x = cp.getMinBlockX() + lx, z = cp.getMinBlockZ() + lz;
+                        // A plain wall: the ground's own material standing as a wall of a house does.
+                        boolean plain = plainHere && y >= surface[lx * 16 + lz] - PLAIN_DEPTH && plainWall(read, x, y, z, s);
+                        if (plain || worked(s)) madeColumns.add(BlockPos.asLong(x, 0, z));
+                        double chance = shed[Structural.fabric(s).ordinal()];
+                        if (chance <= 0) continue;
+                        // The roll first: it is cheap, and only the few blocks that come up are looked at closely.
+                        if (level.random.nextDouble() >= chance) continue;
                         m.set(x, y, z);
                         if (!s.getFluidState().isEmpty() || s.hasBlockEntity() || QuakePlanner.machinery(s)) continue;
                         if (!s.isCollisionShapeFullBlock(level, m)) continue;
-                        boolean byHand = placed.contains(m.asLong()) || worked(s);
+                        boolean byHand = placed.contains(m.asLong()) || worked(s) || plain;
                         boolean made = !byHand && inBox && inside(built, x, y, z) && !ground(s);
                         if (!(byHand || made) || openSide(level, chunk, m) == null) continue;
                         if (s.is(BlockTags.LOGS) && trunk(level, m)) continue;
@@ -439,12 +463,14 @@ public final class ShakingDamage {
                         if (work < 0 && level.random.nextDouble() >= Math.pow(10.0, PER_INTENSITY * work)) continue;
                         m.set(x, y, z);
                         if (made) OF_STRUCTURES.increment();
-                        if (job.loosened++ >= MOST) return;
+                        if (job.loosened++ >= MOST) break sections;
                         DUE.add(new Loose(level.dimension(), m.immutable(), s, now + job.delay + level.random.nextInt(job.spread)));
                     }
                 }
             }
         }
+        // Whether the buildings here stand up to it at all: load, overhangs, slender towers.
+        Structural.chunk(level, chunk, intensity, placed, built, madeColumns, now + job.delay, job.spread);
         // Paintings and item frames: only players and structures hang them, so every one is a building's.
         net.minecraft.world.phys.AABB area = new net.minecraft.world.phys.AABB(cp.getMinBlockX(), floor,
                 cp.getMinBlockZ(), cp.getMaxBlockX() + 1, level.getMaxBuildHeight(), cp.getMaxBlockZ() + 1);
@@ -541,21 +567,134 @@ public final class ShakingDamage {
     }
 
     /**
-     * How readily a block is shaken off, 0 to 1: loose material that falls anyway is the weakest, glass next, and
-     * then by how hard it is to break -- wool, planks, bricks, stone -- with anything as hard as obsidian or a metal
-     * block holding outright.
+     * How readily a block is shaken off, for what is not a wall of a building class: loose material that falls anyway,
+     * glass, then wool and hay by how soft they are; 0 for what never comes off, and a nominal 1 for the building
+     * classes, whose odds are {@link #shedding}'s.
      */
     static double weakness(BlockState s) {
         float hard = s.getBlock().defaultDestroyTime();
-        if (hard < 0) return 0;                                  // bedrock and the like
-        if (s.getBlock() instanceof FallingBlock) return 1.0;    // sand, gravel, concrete powder
-        if (s.getSoundType() == SoundType.GLASS) return 0.8;
-        return Math.max(0.0, Math.min(0.9, 1.0 - hard / 3.0));
+        return switch (Structural.fabric(s)) {
+            case LOOSE -> 1.0;                                   // sand, gravel, concrete powder
+            case FRAIL -> s.getSoundType() == SoundType.GLASS ? 0.8 : Math.max(0.0, Math.min(0.9, 1.0 - hard / 3.0));
+            case F -> 0.0;
+            default -> 1.0;
+        };
+    }
+
+    /**
+     * The most of a wall's open blocks the shaking takes off before the wall comes down whole, the Mercalli degree past
+     * its class's start at which half that goes, and how sharply it rises: EMS-98's damage grades read as blocks lost.
+     * For rubble (class A) that is a tenth at VII, a quarter at VIII and a third from IX, where a third of its buildings
+     * are down besides ({@link Structural#standsTo}); each class after it comes to the same a degree later.
+     */
+    private static final double SHED_MOST = 0.33, SHED_MIDDLE = 7.4, SHED_WIDTH = 0.55;
+
+    /** The chance a block of a wall of this kind with a face in the open is shaken off at this intensity. */
+    static double shedding(Structural.Fabric f, double intensity, double shaking) {
+        double scale = GeyserConfig.SHAKING_DAMAGE.get();
+        return switch (f) {
+            case LOOSE -> Math.min(CAP, shaking);
+            case FRAIL -> Math.min(CAP, 0.8 * shaking);
+            case F -> 0.0;
+            default -> {
+                double d = 1.35 * intensity - 1.0 - Structural.shift(f);
+                yield Math.min(CAP, scale * SHED_MOST / (1.0 + Math.exp(-(d - SHED_MIDDLE) / SHED_WIDTH)));
+            }
+        };
     }
 
     /** Made of something the ground is not: a build, whatever it stands in. */
     private static boolean worked(BlockState s) {
-        return !s.isAir() && weakness(s) > 0 && EruptionHandler.isWorked(s);
+        return (kind(s) & WORKED) != 0;
+    }
+
+    /** How far under the top of its column a plain wall is looked for: a house's height and its cellar. */
+    private static final int PLAIN_DEPTH = 24;
+
+    private static final int WORKED = 1, PLAIN = 2, KNOWN = 4;
+    /** What each block is, worked out once: worked, the ground's own material a wall can be built of. Server thread only. */
+    private static final java.util.IdentityHashMap<BlockState, Integer> KINDS = new java.util.IdentityHashMap<>();
+
+    private static int kind(BlockState s) {
+        Integer k = KINDS.get(s);
+        if (k != null) return k;
+        int bits = KNOWN;
+        if (!s.isAir() && weakness(s) > 0 && EruptionHandler.isWorked(s)) bits |= WORKED;
+        Structural.Fabric f = Structural.fabric(s);
+        if ((f == Structural.Fabric.A || f == Structural.Fabric.B) && (bits & WORKED) == 0 && !s.hasBlockEntity()
+                && s.getFluidState().isEmpty() && EruptionHandler.isNaturalTerrain(s) && !TerrainProbe.isVegetation(s)
+                && !TerrainProbe.isTreePart(s) && !s.is(BlockTags.LOGS) && !s.is(BlockTags.SNOW)
+                && s.isCollisionShapeFullBlock(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, BlockPos.ZERO)) {
+            bits |= PLAIN;
+        }
+        KINDS.put(s, bits);
+        return bits;
+    }
+
+    /** The tags behind what a block is may change with a data pack reload. */
+    @SubscribeEvent
+    public static void onTagsUpdated(net.minecraftforge.event.TagsUpdatedEvent event) {
+        KINDS.clear();
+    }
+
+    /** Stone, earth or rubble the world lays down, that a wall can be built of: what a plain wall is made of. */
+    static boolean plainMaterial(BlockState s) {
+        return (kind(s) & PLAIN) != 0;
+    }
+
+    /** A block at a place, or null where its chunk is not in memory. */
+    interface BlockAt {
+        BlockState at(int x, int y, int z);
+    }
+
+    /** A block at a place, read from a chunk or, past its edge, from the one beside it if that is in memory. */
+    static BlockState peek(LevelChunk home, int x, int y, int z) {
+        BlockPos p = new BlockPos(x, y, z);
+        if (x >> 4 == home.getPos().x && z >> 4 == home.getPos().z) return home.getBlockState(p);
+        if (!(home.getLevel() instanceof ServerLevel server)) return null;
+        LevelChunk c = server.getChunkSource().getChunkNow(x >> 4, z >> 4);
+        return c == null ? null : c.getBlockState(p);
+    }
+
+    /** A block at a place in a level, or null where its chunk is not in memory; never loads one. */
+    static BlockState peek(ServerLevel level, int x, int y, int z) {
+        LevelChunk c = level.getChunkSource().getChunkNow(x >> 4, z >> 4);
+        return c == null ? null : c.getBlockState(new BlockPos(x, y, z));
+    }
+
+    /**
+     * Whether a block stands as the wall of a house does: one block thick, open on two opposite sides, with more of the
+     * wall over or under it. A cobblestone or stone house built before the mod saw who placed what is ground by its blocks;
+     * shaken, it stood untouched, and under a rising fault it was lifted with the ground. A thin fin of rock reads the same,
+     * and is shaken down as a loose crag would be.
+     */
+    static boolean wallLike(BlockAt read, int x, int y, int z) {
+        BlockState n = read.at(x, y, z - 1), s = read.at(x, y, z + 1), w = read.at(x - 1, y, z), e = read.at(x + 1, y, z);
+        BlockState up = read.at(x, y + 1, z), down = read.at(x, y - 1, z);
+        if (open(n) && open(s) || open(w) && open(e)) return solid(up) || solid(down);
+        // A roof or a floor laid across, one block thick: open over and under, held between two sides. A natural arch or
+        // a thin ledge reads the same, and comes down as it would.
+        return open(up) && open(down) && (solid(n) && solid(s) || solid(w) && solid(e));
+    }
+
+    /**
+     * Whether a block of the ground's own material is part of a plain wall: one itself ({@link #wallLike}), or the
+     * course laid over one -- the roof's edge and the top of the wall, which have a wall, not air, under them.
+     */
+    static boolean plainWall(BlockAt read, int x, int y, int z, BlockState s) {
+        if (!plainMaterial(s)) return false;
+        if (wallLike(read, x, y, z)) return true;
+        BlockState under = read.at(x, y - 1, z);
+        return under != null && plainMaterial(under) && wallLike(read, x, y - 1, z);
+    }
+
+    private static boolean open(BlockState s) {
+        return s != null && s.getFluidState().isEmpty()
+                && (s.isAir() || !s.isCollisionShapeFullBlock(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, BlockPos.ZERO));
+    }
+
+    private static boolean solid(BlockState s) {
+        return s != null && !s.isAir() && s.getFluidState().isEmpty() && !TerrainProbe.isVegetation(s);
     }
 
     /**

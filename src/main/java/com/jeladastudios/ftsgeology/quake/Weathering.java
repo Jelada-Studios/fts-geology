@@ -95,6 +95,9 @@ public final class Weathering {
         /** Blocks known to be joined to ground, and the loose pieces of buildings brought down. */
         final LongOpenHashSet builtHeld = new LongOpenHashSet();
         int debris;
+        /** Ground and wood known to hold, and the pieces of ground and trees left in the air brought down. */
+        final LongOpenHashSet groundHeld = new LongOpenHashSet(), treeHeld = new LongOpenHashSet(), crownHeld = new LongOpenHashSet();
+        int afloat, trees;
         /** When the last pass may start: the buildings still coming down have landed by then. */
         long lastPassAt;
         /** Only a sweep for pieces of buildings left in the air ({@link #sweep}): the ground is not touched. */
@@ -250,11 +253,11 @@ public final class Weathering {
                 if (++job.pass >= PASSES) {
                     QUEUE.poll();
                     if (job.sweep) {
-                        if (job.debris + job.loose + job.felledBase.size() > 0) com.jeladastudios.ftsgeology.util.Diagnostics.info("debris swept: {} loose pieces of buildings, {} loose branches and {} trees standing on nothing taken down over {} columns", job.debris, job.loose, job.felledBase.size(), job.columns.length);
+                        if (job.debris + job.loose + job.felledBase.size() + job.afloat + job.trees > 0) com.jeladastudios.ftsgeology.util.Diagnostics.info("debris swept: {} loose pieces of buildings, {} loose branches and {} trees standing on nothing taken down, {} pieces of ground and {} trees left in the air brought down over {} columns", job.debris, job.loose, job.felledBase.size(), job.afloat, job.trees, job.columns.length);
                         return;
                     }
-                    com.jeladastudios.ftsgeology.util.Diagnostics.info("weathering finished: {} blocks moved over {} columns, {} trees felled, {} loose branches and {} loose pieces of buildings taken down, {} ms, longest tick {} ms",
-                            job.moved, job.columns.length, job.felledBase.size(), job.loose, job.debris,
+                    com.jeladastudios.ftsgeology.util.Diagnostics.info("weathering finished: {} blocks moved over {} columns, {} trees felled, {} loose branches and {} loose pieces of buildings taken down, {} pieces of ground and {} trees left in the air brought down, {} ms, longest tick {} ms",
+                            job.moved, job.columns.length, job.felledBase.size(), job.loose, job.debris, job.afloat, job.trees,
                             job.nanos / 1_000_000, job.worstNanos / 1_000_000);
                     // The ground has settled: the rivers and lakes on it are laid again.
                     com.jeladastudios.ftsgeology.hydrology.RiverRepair.afterQuake(level, job.columns);
@@ -287,12 +290,23 @@ public final class Weathering {
             boolean moved;
             if (job.sweep) {
                 moved = looseWood(level, cx, cz, job);
-                if (GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get()) moved |= looseDebris(level, cx, cz, job);
+                if (GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get()) {
+                    moved |= looseDebris(level, cx, cz, job);
+                    moved |= afloat(level, cx, cz, job);
+                    moved |= treesAfloat(level, cx, cz, job);
+                    moved |= leavesAfloat(level, cx, cz, job);
+                }
             } else if (job.pass >= FINISH) {
                 moved = finish(level, cx, cz);
+                // Ground left in the air comes down first, and the trees that stood on it are looked at a pass later.
+                if (job.pass == FINISH && GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get()) moved |= afloat(level, cx, cz, job);
                 if (job.pass == PASSES - 1) {
                     moved |= looseWood(level, cx, cz, job);
-                    if (GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get()) moved |= looseDebris(level, cx, cz, job);
+                    if (GeyserConfig.UNSUPPORTED_BLOCKS_FALL.get()) {
+                        moved |= looseDebris(level, cx, cz, job);
+                        moved |= treesAfloat(level, cx, cz, job);
+                        moved |= leavesAfloat(level, cx, cz, job);
+                    }
                 }
             } else if (fallPass) {
                 moved = reseat(level, cx, cz, job.excavated.get(k), job);
@@ -407,14 +421,20 @@ public final class Weathering {
             }
         }
 
-        // The whole stack comes down together, in order, so it lands the same way up.
+        // The whole stack comes down together, in order, so it lands the same way up, what anything in it holds with it.
         BlockState[] stack = new BlockState[height];
-        for (int i = 0; i < height; i++) stack[i] = level.getBlockState(m.set(x, base + i, z));
+        net.minecraft.nbt.CompoundTag[] held = new net.minecraft.nbt.CompoundTag[height];
+        for (int i = 0; i < height; i++) {
+            stack[i] = level.getBlockState(m.set(x, base + i, z));
+            if (stack[i].hasBlockEntity()) held[i] = QuakeWrites.lift(level, m.immutable());
+        }
         for (int i = 0; i < height; i++) {
             QuakeWrites.set(level, new BlockPos(x, base + i, z), Blocks.AIR.defaultBlockState());
         }
         for (int i = 0; i < height; i++) {
-            QuakeWrites.set(level, new BlockPos(x, g + 1 + i, z), stack[i]);
+            BlockPos to = new BlockPos(x, g + 1 + i, z);
+            QuakeWrites.set(level, to, stack[i]);
+            QuakeWrites.lay(level, to, held[i]);
         }
         // A puff of dust where a stack lands, for a drop worth seeing and only sometimes.
         if (drop >= 2 && level.random.nextInt(24) == 0) {
@@ -458,7 +478,7 @@ public final class Weathering {
         boolean mayMoveBuilds = GeyserConfig.FALLING_INCLUDES_BUILDS.get();
         for (int y = around + 1; y <= g; y++) {
             BlockState s = level.getBlockState(m.set(x, y, z));
-            if (s.isAir() || !s.getFluidState().isEmpty() || s.is(Blocks.BEDROCK) || isPlant(s)) return false;
+            if (s.isAir() || !s.getFluidState().isEmpty() || s.is(Blocks.BEDROCK) || isPlant(s) || s.hasBlockEntity()) return false;
             if (!mayMoveBuilds && EruptionHandler.isPlayerPlaced(s)) return false;
         }
 
@@ -711,7 +731,9 @@ public final class Weathering {
      * {@link #LOOSE_MOST}); null where it reaches roots or ground, or wood already known to hold, or is bigger than a
      * tree walk goes. What was walked of a piece that holds is remembered as held: a
      * later walk that meets it holds too, where treating it as already seen and going round it took a block of a
-     * standing trunk, whose neighbours had all been walked, for a piece on its own.
+     * standing trunk, whose neighbours had all been walked, for a piece on its own. Wood joins face to face, as Dynamic
+     * Trees joins its branches: a branch the quake left touching its tree only at an edge is cut off from it there too,
+     * and walked by edges it was held up by the tree beside it.
      */
     private static java.util.List<BlockPos> woodPiece(ServerLevel level, BlockPos start, LongOpenHashSet held) {
         java.util.List<BlockPos> piece = new java.util.ArrayList<>();
@@ -736,26 +758,22 @@ public final class Weathering {
                 holds = true;
                 break;
             }
-            for (int dx = -1; dx <= 1 && !holds; dx++) {
-                for (int dy = -1; dy <= 1 && !holds; dy++) {
-                    for (int dz = -1; dz <= 1 && !holds; dz++) {
-                        m.set(p.getX() + dx, p.getY() + dy, p.getZ() + dz);
-                        long k = m.asLong();
-                        if (seen.contains(k)) continue;
-                        if (held.contains(k) || !com.jeladastudios.ftsgeology.util.Loaded.at(level, m)) {
-                            holds = true;
-                            continue;
-                        }
-                        BlockState s = level.getBlockState(m);
-                        if (com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isRooty(s)) {
-                            holds = true;
-                            continue;
-                        }
-                        if (!isLooseWood(s)) continue;
-                        seen.add(k);
-                        queue.add(m.immutable());
-                    }
+            for (Direction d : Direction.values()) {
+                m.setWithOffset(p, d);
+                long k = m.asLong();
+                if (seen.contains(k)) continue;
+                if (held.contains(k) || !com.jeladastudios.ftsgeology.util.Loaded.at(level, m)) {
+                    holds = true;
+                    break;
                 }
+                BlockState s = level.getBlockState(m);
+                if (com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isRooty(s)) {
+                    holds = true;
+                    break;
+                }
+                if (!isLooseWood(s)) continue;
+                seen.add(k);
+                queue.add(m.immutable());
             }
         }
         if (!holds) return piece;
@@ -798,12 +816,18 @@ public final class Weathering {
 
     /** The most blocks a loose piece of a building has; a bigger piece is left standing, the way a shell stands. */
     private static final int DEBRIS_MOST = 48;
+    /**
+     * The most a piece hanging just over the ground has, and how far over it that is: a house whose ground the quake took
+     * from under it, its walls a few blocks up in the air and nothing under them, comes down whole.
+     */
+    private static final int DEBRIS_LOW_MOST = 512, LOW_GAP = 12;
 
     /**
      * Brings down the pieces of buildings the quake left in the air over a column: a village house's beam and the
      * trapdoor on it, whose posts went down with the ground under them. A piece is what touches it, face, edge or corner;
-     * it is loose when none of it reaches the ground, a tree or a machine, and it is small. A piece with a block a
-     * player placed is left: a build may hang on purpose.
+     * it is loose when none of it reaches the ground, a tree's wood or a machine, and it is small, or hangs just over the
+     * ground. Leaves neither hold a piece nor go with it: a house's wall against a tree's crown is not held up by it. A
+     * piece with a block a player placed is left: a build may hang on purpose.
      */
     private static boolean looseDebris(ServerLevel level, int x, int z, Job job) {
         int g = TerrainProbe.groundY(level, x, z);
@@ -813,8 +837,7 @@ public final class Weathering {
         // the walk goes on down past what was built, and whatever hangs in the air it passed.
         for (int steps = 0; steps < STACK_LIMIT && g > level.getMinBuildHeight(); steps++) {
             BlockState s = level.getBlockState(m.set(x, g, z));
-            if (!(s.isAir() || !s.getFluidState().isEmpty() && !EruptionHandler.isWorked(s) || EruptionHandler.isWorked(s)
-                    || s.is(BlockTags.LOGS) && !com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(s)
+            if (!(s.isAir() || !s.getFluidState().isEmpty() && !EruptionHandler.isWorked(s) || built(s)
                     || TerrainProbe.isVegetation(s))) {
                 break;
             }
@@ -827,12 +850,13 @@ public final class Weathering {
         for (int y = g + 1; y <= roof; y++) {
             BlockState s = level.getBlockState(m.set(x, y, z));
             if (s.isAir() || job.builtHeld.contains(m.asLong())) continue;
-            if (!EruptionHandler.isWorked(s) && !(s.is(BlockTags.LOGS)
-                    && !com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(s))) continue;
+            if (!built(s)) continue;
             // A piece hangs from its lowest block: start only where there is nothing under.
             BlockState under = level.getBlockState(m.set(x, y - 1, z));
             if (!under.isAir() && !(under.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock)) continue;
-            List<BlockPos> piece = debrisPiece(level, new BlockPos(x, y, z), job.builtHeld, placed);
+            BlockPos at = new BlockPos(x, y, z);
+            List<BlockPos> piece = lone(level, at, placed) ? new java.util.ArrayList<>(List.of(at))
+                    : debrisPiece(level, at, job.builtHeld, placed, y - g <= LOW_GAP ? DEBRIS_LOW_MOST : DEBRIS_MOST);
             if (piece == null) continue;
             Collapse.loose(level, piece);
             job.debris++;
@@ -841,9 +865,48 @@ public final class Weathering {
         return took;
     }
 
+    /**
+     * Whether a block of a building hangs on nothing but an edge or a corner: no block against any of its faces, and not
+     * resting across a gap on the blocks under it at both sides, as a roof's ridge rests on the courses under it. A beam
+     * whose house went down round it stood touching only the corner of the post that was left, and the post held it up.
+     * A block a player placed, a machine or a tree's wood is not.
+     */
+    private static boolean lone(ServerLevel level, BlockPos p,
+                                it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<it.unimi.dsi.fastutil.longs.LongSet> placed) {
+        BlockState s = level.getBlockState(p);
+        if (QuakePlanner.machinery(s) || com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(s)) return false;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (Direction d : Direction.values()) {
+            if (solid(level.getBlockState(m.setWithOffset(p, d)))) return false;
+        }
+        if (solid(level.getBlockState(m.set(p.getX() - 1, p.getY() - 1, p.getZ())))
+                && solid(level.getBlockState(m.set(p.getX() + 1, p.getY() - 1, p.getZ())))) return false;
+        if (solid(level.getBlockState(m.set(p.getX(), p.getY() - 1, p.getZ() - 1)))
+                && solid(level.getBlockState(m.set(p.getX(), p.getY() - 1, p.getZ() + 1)))) return false;
+        LongSet mine = placed.computeIfAbsent(ChunkPos.asLong(p.getX() >> 4, p.getZ() >> 4),
+                c -> PlayerBuilt.inChunk(level, ChunkPos.getX(c), ChunkPos.getZ(c)));
+        return !mine.contains(p.asLong());
+    }
+
+    /** Something a block can rest on or hang from: not air, not a liquid. */
+    private static boolean solid(BlockState s) {
+        return !s.isAir() && !(s.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock);
+    }
+
+    /**
+     * What a building's loose piece can hang from: a worked block, a log not of Dynamic Trees, or plain cobble or stone
+     * that is not the ground -- a village house's footing, left a block or two up when the ground dropped from under it.
+     */
+    private static boolean built(BlockState s) {
+        return EruptionHandler.isWorked(s)
+                || s.is(BlockTags.LOGS) && !com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(s)
+                || ShakingDamage.plainMaterial(s) && !ShakingDamage.ground(s);
+    }
+
     /** The blocks touching a place, and touching them, if they are a loose piece; null where they hold. */
     private static List<BlockPos> debrisPiece(ServerLevel level, BlockPos start, LongOpenHashSet held,
-                                              it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<it.unimi.dsi.fastutil.longs.LongSet> placed) {
+                                              it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<it.unimi.dsi.fastutil.longs.LongSet> placed,
+                                              int most) {
         List<BlockPos> piece = new java.util.ArrayList<>();
         LongOpenHashSet seen = new LongOpenHashSet();
         ArrayDeque<BlockPos> queue = new ArrayDeque<>();
@@ -862,7 +925,7 @@ public final class Weathering {
                 break;
             }
             piece.add(p);
-            if (piece.size() > DEBRIS_MOST) {
+            if (piece.size() > most) {
                 holds = true;
                 break;
             }
@@ -880,7 +943,7 @@ public final class Weathering {
                             continue;
                         }
                         BlockState n = level.getBlockState(m);
-                        if (n.isAir() || n.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock) continue;
+                        if (n.isAir() || n.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock || n.is(BlockTags.LEAVES)) continue;
                         if (ShakingDamage.ground(n)) {
                             holds = true;
                             continue;
@@ -894,6 +957,352 @@ public final class Weathering {
         if (!holds) return piece;
         held.addAll(seen);
         return null;
+    }
+
+    // === What was left in the air ===========================================
+
+    /** The most blocks a piece of ground left in the air has; a bigger one is taken to be joined to the ground somewhere. */
+    private static final int AFLOAT_MOST = 1024;
+    /** How far under a column's ground the underside of such a piece is looked for: the overhung edge of a dropped floor. */
+    private static final int AFLOAT_BELOW = 16;
+    /** How many blocks of ground straight under a block make it ground itself. */
+    private static final int FOOTED = 3;
+    /** The most wood a tree left in the air has; more is taken to be a tree that stands. */
+    private static final int TREE_MOST = 512;
+    /** How far out from its wood a tree's leaves are taken with it. */
+    private static final int LEAF_REACH = 4;
+
+    /**
+     * Brings down the pieces of ground the quake left in the air over a column: turf and soil, rock, sand -- blocks joined
+     * face to face, none of which stands on ground. A rift's floor dropped away beside them, or the ground they hung from
+     * came down, and the falling passes did not see them because nothing was dug under them. They come down as they hang,
+     * and their grass and flowers go. A piece resting on water floats, as a raft of ice does; one with any part of a
+     * building in it is left to the buildings' own rule; a tree on one is seen to a pass later.
+     */
+    private static boolean afloat(ServerLevel level, int x, int z, Job job) {
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE) return false;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int lo = Math.max(level.getMinBuildHeight() + 1, g - AFLOAT_BELOW);
+        boolean took = false;
+        for (int y = lo; y <= g; y++) {
+            BlockState s = level.getBlockState(m.set(x, y, z));
+            if (!groundPiece(s) || job.groundHeld.contains(m.asLong())) continue;
+            if (!level.getBlockState(m.set(x, y - 1, z)).isAir()) continue;
+            List<BlockPos> piece = groundAfloat(level, new BlockPos(x, y, z), job.groundHeld);
+            if (piece == null) continue;
+            List<BlockPos> fall = new java.util.ArrayList<>();
+            for (BlockPos p : piece) {
+                BlockState ps = level.getBlockState(p);
+                if (TerrainProbe.isVegetation(ps)) QuakeWrites.set(level, p, Blocks.AIR.defaultBlockState());
+                else fall.add(p);
+            }
+            Collapse.loose(level, fall);
+            job.afloat++;
+            took = true;
+        }
+        return took;
+    }
+
+    /** Ground a piece left in the air can be made of: what the world laid down, not a tree, a plant or a building. */
+    private static boolean groundPiece(BlockState s) {
+        // Dynamic Trees' rooted soil is ground: a tree whose soil hung in the air stood there with it, held by its roots.
+        if (com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isRooty(s)) return true;
+        return !s.isAir() && s.getFluidState().isEmpty() && !isPlant(s) && !s.is(Blocks.MANGROVE_ROOTS)
+                && !com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(s) && !EruptionHandler.isPlayerPlaced(s);
+    }
+
+    /**
+     * The ground joined face to face to a place, with what grows on it, if none of it stands on ground; null where it does,
+     * or reaches a building, a tree's wood, water under it, or more blocks than a piece left in the air has.
+     */
+    private static List<BlockPos> groundAfloat(ServerLevel level, BlockPos start, LongOpenHashSet held) {
+        List<BlockPos> piece = new java.util.ArrayList<>();
+        LongOpenHashSet seen = new LongOpenHashSet();
+        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+        queue.add(start);
+        seen.add(start.asLong());
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        boolean holds = false;
+        while (!queue.isEmpty() && !holds) {
+            BlockPos p = queue.poll();
+            piece.add(p);
+            if (piece.size() > AFLOAT_MOST || footed(level, p, m)) {
+                holds = true;
+                break;
+            }
+            for (Direction d : Direction.values()) {
+                m.setWithOffset(p, d);
+                long k = m.asLong();
+                if (seen.contains(k)) continue;
+                if (held.contains(k) || m.getY() <= level.getMinBuildHeight() || m.getY() >= level.getMaxBuildHeight()
+                        || !com.jeladastudios.ftsgeology.util.Loaded.at(level, m)) {
+                    holds = true;
+                    break;
+                }
+                BlockState n = level.getBlockState(m);
+                if (n.isAir()) continue;
+                if (!n.getFluidState().isEmpty()) {
+                    // Resting on water it floats; water beside it holds nothing up.
+                    if (d == Direction.DOWN) {
+                        holds = true;
+                        break;
+                    }
+                    continue;
+                }
+                // What grows on it goes with it; a tree's wood and leaves neither hold it up nor go with it.
+                boolean rooty = com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isRooty(n);
+                if (!rooty && !TerrainProbe.isVegetation(n) && (isPlant(n) || n.is(Blocks.MANGROVE_ROOTS)
+                        || com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(n))) continue;
+                if (!rooty && !TerrainProbe.isVegetation(n) && EruptionHandler.isPlayerPlaced(n)) {
+                    holds = true;
+                    break;
+                }
+                seen.add(k);
+                queue.add(m.immutable());
+            }
+        }
+        if (!holds) return piece;
+        held.addAll(seen);
+        return null;
+    }
+
+    /** Whether ground stands straight under a block: {@link #FOOTED} blocks of it, with no tree, plant or fluid among them. */
+    private static boolean footed(ServerLevel level, BlockPos p, BlockPos.MutableBlockPos m) {
+        for (int i = 1; i <= FOOTED; i++) {
+            BlockState s = level.getBlockState(m.set(p.getX(), p.getY() - i, p.getZ()));
+            if (s.isAir() || !s.getFluidState().isEmpty() || isPlant(s)) return false;
+        }
+        return true;
+    }
+
+    /**
+     * Takes down the trees the quake left in the air over a column: wood joined edge or corner to edge, none of which stands
+     * on ground or runs into it, with the leaves round it. A tree moves with the ground its trunk stands on, and a wide
+     * one's far branches over ground that moved otherwise could be left behind; a trunk on ground that came down was left
+     * standing on nothing. Dynamic Trees' wood is {@link #looseWood}'s.
+     */
+    private static boolean treesAfloat(ServerLevel level, int x, int z, Job job) {
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE) return false;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int lo = Math.max(level.getMinBuildHeight() + 1, g - AFLOAT_BELOW);
+        int roof = Math.min(g + GAP_SEARCH + STACK_LIMIT, level.getMaxBuildHeight() - 2);
+        boolean took = false;
+        for (int y = lo; y <= roof; y++) {
+            BlockState s = level.getBlockState(m.set(x, y, z));
+            if (!wood(s) || job.treeHeld.contains(m.asLong())) continue;
+            BlockState under = level.getBlockState(m.set(x, y - 1, z));
+            if (!(under.isAir() || under.is(BlockTags.LEAVES) || TerrainProbe.isVegetation(under))) continue;
+            List<BlockPos> body = treeAfloat(level, new BlockPos(x, y, z), job.treeHeld);
+            if (body == null) continue;
+            if (!fellBody(level, body)) {
+                for (BlockPos p : body) job.treeHeld.add(p.asLong());
+                continue;
+            }
+            job.trees++;
+            took = true;
+        }
+        return took;
+    }
+
+    /** A tree's wood, as this pass reads it: vanilla's and other mods' logs, not Dynamic Trees', not a building's. */
+    private static boolean wood(BlockState s) {
+        return isTrunk(s) && !com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(s) && !ShakingDamage.stripped(s);
+    }
+
+    /**
+     * The wood joined to a place, edge and corner too, if none of it stands on ground or runs into it; null where it does,
+     * or reaches a building or more wood than a tree left in the air has.
+     */
+    private static List<BlockPos> treeAfloat(ServerLevel level, BlockPos start, LongOpenHashSet held) {
+        List<BlockPos> body = new java.util.ArrayList<>();
+        LongOpenHashSet seen = new LongOpenHashSet();
+        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+        queue.add(start);
+        seen.add(start.asLong());
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        boolean holds = false;
+        while (!queue.isEmpty() && !holds) {
+            BlockPos p = queue.poll();
+            body.add(p);
+            if (body.size() > TREE_MOST) {
+                holds = true;
+                break;
+            }
+            for (int dx = -1; dx <= 1 && !holds; dx++) {
+                for (int dy = -1; dy <= 1 && !holds; dy++) {
+                    for (int dz = -1; dz <= 1 && !holds; dz++) {
+                        if (dx == 0 && dy == 0 && dz == 0) continue;
+                        m.set(p.getX() + dx, p.getY() + dy, p.getZ() + dz);
+                        long k = m.asLong();
+                        if (seen.contains(k)) continue;
+                        if (held.contains(k) || m.getY() <= level.getMinBuildHeight() || m.getY() >= level.getMaxBuildHeight()
+                                || !com.jeladastudios.ftsgeology.util.Loaded.at(level, m)) {
+                            holds = true;
+                            continue;
+                        }
+                        BlockState n = level.getBlockState(m);
+                        if (wood(n)) {
+                            seen.add(k);
+                            queue.add(m.immutable());
+                            continue;
+                        }
+                        // Ground under the wood, or against it face to face, holds the tree: its foot, a root, a branch
+                        // grown into a bank. Leaves, plants, air and water do not.
+                        boolean face = Math.abs(dx) + Math.abs(dy) + Math.abs(dz) == 1;
+                        if (face && !n.isAir() && n.getFluidState().isEmpty() && !n.is(BlockTags.LEAVES)
+                                && !TerrainProbe.isVegetation(n)) {
+                            holds = true;
+                        }
+                    }
+                }
+            }
+        }
+        if (!holds) return body;
+        held.addAll(seen);
+        return null;
+    }
+
+    /**
+     * A tree left in the air goes, its wood and the leaves round it that no other wood holds; nothing is dropped. Wood with
+     * no leaves on it is no tree but a building's beam, and wood a player placed is theirs: both are left, false.
+     */
+    private static boolean fellBody(ServerLevel level, List<BlockPos> body) {
+        it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<LongSet> placed = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+        for (BlockPos p : body) {
+            LongSet mine = placed.computeIfAbsent(ChunkPos.asLong(p.getX() >> 4, p.getZ() >> 4),
+                    c -> PlayerBuilt.inChunk(level, ChunkPos.getX(c), ChunkPos.getZ(c)));
+            if (mine.contains(p.asLong())) return false;
+        }
+        LongOpenHashSet wood = new LongOpenHashSet();
+        for (BlockPos p : body) wood.add(p.asLong());
+        LongOpenHashSet seen = new LongOpenHashSet(wood);
+        ArrayDeque<long[]> queue = new ArrayDeque<>();
+        for (BlockPos p : body) queue.add(new long[]{p.asLong(), 0});
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        // A tree's wood has leaves on it, its own or a crown it shared: wood with none near is a building's beam.
+        boolean leafy = false;
+        for (BlockPos p : body) {
+            for (Direction d : Direction.values()) {
+                if (level.getBlockState(m.setWithOffset(p, d)).is(BlockTags.LEAVES)) {
+                    leafy = true;
+                    break;
+                }
+            }
+            if (leafy) break;
+        }
+        if (!leafy) return false;
+        List<BlockPos> leaves = new java.util.ArrayList<>();
+        while (!queue.isEmpty()) {
+            long[] e = queue.poll();
+            if (e[1] >= LEAF_REACH) continue;
+            BlockPos p = BlockPos.of(e[0]);
+            for (Direction d : Direction.values()) {
+                m.setWithOffset(p, d);
+                long k = m.asLong();
+                if (seen.contains(k) || !com.jeladastudios.ftsgeology.util.Loaded.at(level, m)) continue;
+                seen.add(k);
+                BlockState n = level.getBlockState(m);
+                if (!n.is(BlockTags.LEAVES) || nearOtherWood(level, m, wood)) continue;
+                leaves.add(m.immutable());
+                queue.add(new long[]{k, e[1] + 1});
+            }
+        }
+        for (BlockPos p : body) QuakeWrites.set(level, p, Blocks.AIR.defaultBlockState());
+        for (BlockPos p : leaves) QuakeWrites.set(level, p, Blocks.AIR.defaultBlockState());
+        return true;
+    }
+
+    /** The most leaves a crown left in the air has; a bigger mass is taken to belong to a tree out of sight. */
+    private static final int CROWN_MOST = 400;
+
+    /**
+     * Takes the leaves the quake left in the air over a column with no wood to hold them: the far side of a crown whose
+     * tree moved off, or what was left of a tree felled. Leaves joined edge and corner, none of them touching wood or
+     * ground, go; nothing is dropped. Left be, they hung on, and rotted into saplings in the air.
+     */
+    private static boolean leavesAfloat(ServerLevel level, int x, int z, Job job) {
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE) return false;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        int lo = Math.max(level.getMinBuildHeight() + 1, g - AFLOAT_BELOW);
+        int roof = Math.min(g + GAP_SEARCH + STACK_LIMIT, level.getMaxBuildHeight() - 2);
+        boolean took = false;
+        for (int y = lo; y <= roof; y++) {
+            BlockState s = level.getBlockState(m.set(x, y, z));
+            if (!s.is(BlockTags.LEAVES) || placedLeaves(s) || job.crownHeld.contains(m.asLong())) continue;
+            if (!level.getBlockState(m.set(x, y - 1, z)).isAir()) continue;
+            List<BlockPos> crown = new java.util.ArrayList<>();
+            LongOpenHashSet seen = new LongOpenHashSet();
+            ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+            BlockPos start = new BlockPos(x, y, z);
+            queue.add(start);
+            seen.add(start.asLong());
+            boolean holds = false;
+            while (!queue.isEmpty() && !holds) {
+                BlockPos p = queue.poll();
+                crown.add(p);
+                if (crown.size() > CROWN_MOST) {
+                    holds = true;
+                    break;
+                }
+                for (int dx = -1; dx <= 1 && !holds; dx++) {
+                    for (int dy = -1; dy <= 1 && !holds; dy++) {
+                        for (int dz = -1; dz <= 1 && !holds; dz++) {
+                            if (dx == 0 && dy == 0 && dz == 0) continue;
+                            BlockPos.MutableBlockPos q = new BlockPos.MutableBlockPos(p.getX() + dx, p.getY() + dy, p.getZ() + dz);
+                            long k = q.asLong();
+                            if (seen.contains(k)) continue;
+                            if (job.crownHeld.contains(k) || !com.jeladastudios.ftsgeology.util.Loaded.at(level, q)) {
+                                holds = true;
+                                continue;
+                            }
+                            BlockState n = level.getBlockState(q);
+                            if (n.is(BlockTags.LEAVES) && !placedLeaves(n)) {
+                                seen.add(k);
+                                queue.add(q.immutable());
+                                continue;
+                            }
+                            // Wood holds a crown, and so does ground under or beside it: a bush on a bank.
+                            boolean face = Math.abs(dx) + Math.abs(dy) + Math.abs(dz) == 1;
+                            if (isTrunk(n) || com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(n)
+                                    || face && !n.isAir() && n.getFluidState().isEmpty() && !TerrainProbe.isVegetation(n)) {
+                                holds = true;
+                            }
+                        }
+                    }
+                }
+            }
+            if (holds) {
+                job.crownHeld.addAll(seen);
+                continue;
+            }
+            for (BlockPos p : crown) QuakeWrites.set(level, p, Blocks.AIR.defaultBlockState());
+            took = true;
+        }
+        return took;
+    }
+
+    /** Leaves a player set, which stay where they are put, a hedge or a hanging garden: never taken as left in the air. */
+    private static boolean placedLeaves(BlockState s) {
+        return s.hasProperty(net.minecraft.world.level.block.LeavesBlock.PERSISTENT) && s.getValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT);
+    }
+
+    /** Whether wood not of this tree is within two blocks of a leaf: the leaf is that tree's as much as this one's. */
+    private static boolean nearOtherWood(ServerLevel level, BlockPos leaf, LongOpenHashSet wood) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dy = -2; dy <= 2; dy++) {
+                for (int dz = -2; dz <= 2; dz++) {
+                    m.set(leaf.getX() + dx, leaf.getY() + dy, leaf.getZ() + dz);
+                    if (wood.contains(m.asLong()) || !com.jeladastudios.ftsgeology.util.Loaded.at(level, m)) continue;
+                    BlockState s = level.getBlockState(m);
+                    if (isTrunk(s) || com.jeladastudios.ftsgeology.compat.DynamicTreesFelling.isTreeBlock(s)) return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** What holds a tree or a huge mushroom up. */

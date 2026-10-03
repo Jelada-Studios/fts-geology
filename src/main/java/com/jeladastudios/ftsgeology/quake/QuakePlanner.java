@@ -560,7 +560,8 @@ public final class QuakePlanner {
      * are trees, not the village. Plants, trees and water are passed over, and so is anything built -- what a player
      * placed, a structure's pieces other than its ground, and worked blocks -- so a quake moves the land, not a roof.
      * The ground used to be the first solid block from the top: a village's roof, or the lantern on a post, and an
-     * uplift stacked copies of it, beds and torches in towers.
+     * uplift stacked copies of it, beds and torches in towers. A machine, a cable or a hook no one was seen placing
+     * went the same way while only worked materials were known for builds.
      */
     static int[] naturalGround(net.minecraft.world.level.chunk.LevelChunk chunk, int x, int z,
                                it.unimi.dsi.fastutil.longs.LongSet placed,
@@ -584,7 +585,8 @@ public final class QuakePlanner {
                     && com.jeladastudios.ftsgeology.worldgen.RiftSteps.isStep(s, chunk.getBlockState(new BlockPos(x, y - 1, z)))) {
                 return new int[]{y, builtTop, player, 1};
             }
-            boolean byPlayer = mine || (!inStructure && EruptionHandler.isWorked(s));
+            boolean byPlayer = mine || (!inStructure && (EruptionHandler.isWorked(s) || EruptionHandler.isFixture(s, chunk, m)
+                    || ShakingDamage.plainWall((bx, by, bz) -> ShakingDamage.peek(chunk, bx, by, bz), x, y, z, s)));
             if (byPlayer || (inStructure && !ShakingDamage.ground(s))) {
                 if (builtTop == Integer.MIN_VALUE) builtTop = y;
                 if (byPlayer) player = 1;
@@ -987,7 +989,7 @@ public final class QuakePlanner {
         int top = snap.groundAt(x, z);
         if (delta > 0) {
             BlockState surface = snap.stateAt(x, z, 0);
-            if (!liftable(surface, mayBreakBuilds, snap.generatedAt(x, z))) return null;
+            if (!liftable(surface, mayBreakBuilds, snap.generatedAt(x, z)) || !copyable(surface)) return null;
             return new ColumnPlan(x, z, top, delta, surface, deeper(snap, x, z, rng), snap.aboveAt(x, z));
         }
         int cut = carvableDepth(snap, x, z, -delta, mayBreakBuilds);
@@ -1249,7 +1251,7 @@ public final class QuakePlanner {
         if (!snap.has(fx, fz)) return null;
 
         BlockState carried = snap.stateAt(fx, fz, 0);
-        if (!liftable(carried, mayBreakBuilds, snap.generatedAt(fx, fz))) return null;
+        if (!liftable(carried, mayBreakBuilds, snap.generatedAt(fx, fz)) || !copyable(carried)) return null;
         if (!liftable(snap.stateAt(x, z, 0), mayBreakBuilds, snap.generatedAt(x, z))) return null;
 
         int from = snap.groundAt(fx, fz);
@@ -1292,7 +1294,18 @@ public final class QuakePlanner {
     private static BlockState deeper(Snapshot snap, int x, int z, RandomGenerator rng) {
         BlockState s = snap.stateAt(x, z, 1 + rng.nextInt(2));
         BlockState surface = snap.stateAt(x, z, 0);
-        return s != null && !s.isAir() ? s : (surface != null ? surface : Blocks.STONE.defaultBlockState());
+        return copyable(s) ? s : copyable(surface) ? surface : Blocks.STONE.defaultBlockState();
+    }
+
+    /**
+     * Whether a block may be laid again somewhere else as ground: rock or soil the world made, nothing that holds
+     * contents or works, nothing made -- but for a rift's step, which is the ground's own slab. A copy of a machine is a
+     * second machine, empty.
+     */
+    private static boolean copyable(BlockState s) {
+        return s != null && !s.isAir() && s.getFluidState().isEmpty() && !machinery(s)
+                && (!s.hasBlockEntity() || EruptionHandler.isNaturalTerrain(s))
+                && (!EruptionHandler.isWorked(s) || s.getBlock() instanceof net.minecraft.world.level.block.SlabBlock);
     }
 
     /** Is this column in a structure the world generated? Server thread only; see {@link Snapshot#generatedAt}. */

@@ -32,6 +32,11 @@ public final class QuakeWrites {
         if (old == state) return true;
         boolean branch = DynamicTreesFelling.isBranch(old);
         if (branch && !around(level, pos)) return false;
+        // A block that holds contents or works, written over: it is given back as what it drops, its contents with it,
+        // not lost. One being moved has had its block entity taken out first (see #move), and drops nothing here.
+        net.minecraft.world.level.block.entity.BlockEntity be = old.hasBlockEntity() && !state.is(old.getBlock())
+                && !com.jeladastudios.ftsgeology.eruption.EruptionHandler.isNaturalTerrain(old) ? chunk.getBlockEntity(pos) : null;
+        if (be != null) Block.dropResources(old, level, pos.immutable(), be);
         // Over a Dynamic Trees branch, without its tree tearing itself down: the quake moves trees, it does not fell them.
         BlockState was = branch ? DynamicTreesFelling.quietly(() -> chunk.setBlockState(pos, state, false))
                 : chunk.setBlockState(pos, state, false);
@@ -40,6 +45,29 @@ public final class QuakeWrites {
         level.sendBlockUpdated(at, was, state, Block.UPDATE_CLIENTS);
         level.onBlockStateChange(at, was, state);
         return true;
+    }
+
+    /**
+     * Takes a block's contents and settings out of the world, to be laid again with {@link #lay} where its block is
+     * moved; null for a block without them. Its block entity is gone after, so writing over the block drops nothing.
+     */
+    public static net.minecraft.nbt.CompoundTag lift(ServerLevel level, BlockPos pos) {
+        LevelChunk chunk = level.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4);
+        if (chunk == null) return null;
+        net.minecraft.world.level.block.entity.BlockEntity be = chunk.getBlockEntity(pos);
+        if (be == null) return null;
+        net.minecraft.nbt.CompoundTag tag = be.saveWithoutMetadata();
+        chunk.removeBlockEntity(pos);
+        return tag;
+    }
+
+    /** Lays what {@link #lift} took into the block now at {@code pos}. */
+    public static void lay(ServerLevel level, BlockPos pos, net.minecraft.nbt.CompoundTag tag) {
+        if (tag == null) return;
+        net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(pos);
+        if (be == null) return;
+        be.load(tag);
+        be.setChanged();
     }
 
     /** Whether every chunk within a tree's reach of a position is in memory. */
