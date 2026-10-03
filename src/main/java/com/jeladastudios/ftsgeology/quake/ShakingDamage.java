@@ -170,7 +170,10 @@ public final class ShakingDamage {
     public static void drain(MinecraftServer server, long nanos) {
         if (JOBS.isEmpty() && DUE.isEmpty() && HANGING.isEmpty() && ROCKFALL.isEmpty()) return;
         long deadline = System.nanoTime() + nanos;
-        long now = server.getTickCount();
+        // The world's own clock, as the quake's start, the waves felt and the buildings brought down (Collapse) all
+        // keep it. On the server's count since it started, the shaking of a world older than the session came that much
+        // late, and the buildings it brought down came at whatever time the two clocks' difference made of it.
+        long now = server.overworld().getGameTime();
         while (!DUE.isEmpty() && DUE.peek().due() <= now && System.nanoTime() < deadline) {
             Loose l = DUE.poll();
             ServerLevel level = server.getLevel(l.dimension());
@@ -346,9 +349,13 @@ public final class ShakingDamage {
         double intensity = FeltShaking.intensity(job.magnitude, d, job.depthMetres)
                 + SiteResponse.ground(level, cp.getMiddleBlockX(), cp.getMiddleBlockZ())
                 + SiteResponse.directivity(job.epicentre, at, job.trace);
-        job.delay = (int) Math.max(0L, job.startAt - now) + FeltShaking.ruptureDelay(job.epicentre, at)
+        // When the S wave reaches the chunk, from the quake's start, as a player there feels it (FeltShaking); a chunk
+        // looked at late, in a long queue, has its share come off in what is left of its shaking, not after it.
+        long sAt = job.startAt + FeltShaking.ruptureDelay(job.epicentre, at)
                 + FeltShaking.travelTicks(d, job.depthMetres, com.jeladastudios.ftsgeology.instrument.SeismicWave.VS);
-        job.spread = Math.max(20, FeltShaking.durationTicks(job.magnitude, d));
+        int lasts = Math.max(20, FeltShaking.durationTicks(job.magnitude, d));
+        job.delay = (int) Math.max(0L, sAt - now);
+        job.spread = (int) Math.max(20L, lasts - Math.max(0L, now - sAt));
         if (intensity >= FLEE) flee(level, chunk, job.epicentre);
         // A geyser's plumbing shifts in the shaking (see GeyserCoreBlockEntity#shaken).
         for (net.minecraft.world.level.block.entity.BlockEntity be : chunk.getBlockEntities().values()) {
