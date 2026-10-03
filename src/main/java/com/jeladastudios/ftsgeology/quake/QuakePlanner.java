@@ -978,7 +978,7 @@ public final class QuakePlanner {
             return strikeSlipPlan(snap, x, z, across, sx, sz, slip, magnitude, rng, mayBreakBuilds);
         }
         int delta = switch (type) {
-            case DIVERGENT -> riftDelta(across, slip, magnitude, rng);
+            case DIVERGENT -> riftDelta(across, x * sx + z * sz, slip, magnitude, rng);
             case CONVERGENT_SUBDUCTION -> subductionDelta(across, slip, magnitude);
             case CONVERGENT_COLLISION -> collisionDelta(across, slip, magnitude);
             default -> 0;
@@ -1002,7 +1002,7 @@ public final class QuakePlanner {
             floor = freshCrust(rng);
         }
         // A rift's fissure swallows what stood on it, which is felled after; the rest of the floor lowers it.
-        boolean fissure = type == FaultType.DIVERGENT && Math.abs(across) <= 1.2;
+        boolean fissure = type == FaultType.DIVERGENT && Math.abs(across) <= 0.6 + riftOpening(magnitude, slip) / 2.0;
         BlockState[] above = fissure ? null : snap.aboveAt(x, z);
         return new ColumnPlan(x, z, top, -cut, floor != null ? floor : above != null ? snap.stateAt(x, z, 0) : null, null,
                 above);
@@ -1104,34 +1104,65 @@ public final class QuakePlanner {
     // Each answers the same question for a single column: how far does this piece of ground move?
     // Positive lifts it, negative digs it out, zero leaves it alone.
 
-    /** Normal faulting: a graben floor easing up to raised shoulders, with an open fissure on the axis. */
-    private static int riftDelta(double across, double slip, double magnitude, RandomGenerator rng) {
+    /**
+     * Normal faulting where the plates pull apart, as in the rifting episodes of Krafla, Afar and Grindavik. The graben
+     * between its two bounding faults drops as a block, tilted down toward the master fault (the side across the
+     * strike is positive), with a scarp at either fault a block wide rather than a slope easing into the countryside:
+     * the ground has broken. Its floor is split by open cracks running along the rift in short overlapping stretches,
+     * and the axis has opened, blocks wide where the two sides have moved apart, into a deep fissure. Raised shoulders
+     * beyond, as before. The first graben eased into the land round it and had a single crack on its axis: from above,
+     * a rift quake was a shallow dip with a line along it.
+     */
+    private static int riftDelta(double across, double along, double slip, double magnitude, RandomGenerator rng) {
         if (slip <= 0.02) return 0;
         int halfFloor = grabenHalfFloor(magnitude, slip);
         int shoulder = riftShoulderReach(halfFloor);
         double d = Math.abs(across);
-        if (d > halfFloor + shoulder) return 0;
+        if (d > halfFloor + 1 + shoulder) return 0;
 
         int drop = Mth.clamp((int) Math.round(slip * magnitudeAmplitude(magnitude, 9.0) * 1.4), 1, 8);
 
-        if (d > halfFloor) {
+        if (d > halfFloor + 1) {
             // The shoulder: a half sine, zero at the valley rim and at its outer edge.
-            double u = (d - halfFloor) / (double) shoulder;
-            int lift = (int) Math.round(drop * RIFT_SHOULDER_FRACTION * Math.sin(Math.PI * u));
-            return lift;
+            double u = (d - halfFloor - 1) / (double) shoulder;
+            return (int) Math.round(drop * RIFT_SHOULDER_FRACTION * Math.sin(Math.PI * u));
         }
 
-        // The floor eases out with a smoothstep, so the valley runs into the countryside without a step.
-        double t = smoothstep(1.0 - d / (halfFloor + 1.0));
-        int cut = (int) Math.round(drop * t);
+        // The floor, tilted: the full drop at the master fault, three fifths of it at the other.
+        double side = Mth.clamp(across / halfFloor, -1.0, 1.0);
+        int cut = (int) Math.round(drop * (0.8 + 0.2 * side));
+        // The scarp itself, a block wide: half way down.
+        if (d > halfFloor) return -Math.max(1, cut / 2);
 
-        // The fissure itself: a narrow, much deeper opening right on the axis.
-        if (d <= 1.2) {
-            int depth = (int) Math.round(GeyserConfig.QUAKE_MAX_FISSURE_DEPTH.get() * slip
-                    * (0.55 + 0.45 * rng.nextDouble()));
-            cut = Math.max(cut, depth);
+        double open = riftOpening(magnitude, slip);
+        if (d <= 0.6 + open / 2.0) {
+            // The axis: as wide as the sides have moved apart, and deep.
+            int depth = (int) Math.round(GeyserConfig.QUAKE_MAX_FISSURE_DEPTH.get() * slip * (0.55 + 0.45 * rng.nextDouble()));
+            return -Math.max(cut, depth);
+        }
+        // Open cracks along the floor, a block wide, every few blocks across it, each in stretches that overlap the next
+        // one's, en echelon.
+        int spacing = Math.max(4, halfFloor / 3);
+        int line = (int) Math.floor(d / spacing);
+        if (line >= 1 && d - line * spacing < 1.0 && d < halfFloor - 1) {
+            int stretch = 14 + 4 * (line % 3);
+            long h = mix((long) Math.floor((along + line * 7.0) / stretch) * 0x9E3779B97F4A7C15L ^ line * 31L ^ (across > 0 ? 1 : 0));
+            if ((h >>> 11) / (double) (1L << 53) < 0.6) cut += 2 + (int) ((h >>> 3) % 5);
         }
         return cut <= 0 ? 0 : -cut;
+    }
+
+    /** How far the two sides of a rift move apart in a quake, in blocks: the width its axis opens to. */
+    private static double riftOpening(double magnitude, double slip) {
+        return Mth.clamp(Math.round(slip * magnitudeAmplitude(magnitude, 6.0)), 1, 4);
+    }
+
+    private static long mix(long h) {
+        h ^= h >>> 33;
+        h *= 0xFF51AFD7ED558CCDL;
+        h ^= h >>> 33;
+        h *= 0xC4CEB9FE1A85EC53L;
+        return h ^ h >>> 33;
     }
 
     /**

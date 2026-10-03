@@ -442,7 +442,7 @@ public final class Earthquake {
             case CONVERGENT_SUBDUCTION -> { lo = 6.5; hi = 9.2; }
             case CONVERGENT_COLLISION -> { lo = 6.0; hi = 8.0; }
             case TRANSFORM -> { lo = 5.2; hi = 7.5; }
-            case DIVERGENT -> { lo = 4.5; hi = 6.2; }
+            case DIVERGENT -> { lo = 4.5; hi = 7.0; }
             default -> { return 0.0; }
         }
         double span = hi - lo;

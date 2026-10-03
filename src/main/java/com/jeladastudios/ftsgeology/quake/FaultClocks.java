@@ -414,7 +414,7 @@ public final class FaultClocks {
             case CONVERGENT_SUBDUCTION -> 9.2;
             case CONVERGENT_COLLISION -> 8.0;
             case TRANSFORM -> 7.5;
-            case DIVERGENT -> 6.2;
+            case DIVERGENT -> 7.0;
             case INTERIOR -> SMALLEST;
         };
     }

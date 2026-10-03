@@ -912,7 +912,7 @@ public final class Weathering {
         ArrayDeque<BlockPos> queue = new ArrayDeque<>();
         queue.add(start);
         seen.add(start.asLong());
-        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos(), under = new BlockPos.MutableBlockPos();
         boolean holds = false;
         while (!queue.isEmpty() && !holds) {
             BlockPos p = queue.poll();
@@ -944,7 +944,9 @@ public final class Weathering {
                         }
                         BlockState n = level.getBlockState(m);
                         if (n.isAir() || n.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock || n.is(BlockTags.LEAVES)) continue;
-                        if (ShakingDamage.ground(n)) {
+                        // Ground holds a piece where it stands on ground. A village house's floor of soil, laid over a
+                        // cave and left hanging with the house when the ground at its edge dropped, goes down with it.
+                        if (ShakingDamage.ground(n) && footed(level, m, under)) {
                             holds = true;
                             continue;
                         }
