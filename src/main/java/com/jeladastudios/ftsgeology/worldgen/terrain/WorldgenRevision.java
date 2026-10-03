@@ -37,8 +37,10 @@ public final class WorldgenRevision {
     public static final int CLIMATE_BELTS = 3;
     /** No alluvial plain where only the ragging of its border put one, away from the body of a plain (round 129). */
     public static final int PLAIN_BODIES = 4;
+    /** A river cut through a deposit another mod laid under its bed, as through any ground (round 129). */
+    public static final int RIVER_DEPOSITS = 5;
     /** What a world made now gets. */
-    public static final int CURRENT = 4;
+    public static final int CURRENT = 5;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;

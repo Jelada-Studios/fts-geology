@@ -10,6 +10,7 @@ import com.jeladastudios.ftsgeology.util.SeedHash;
 import com.jeladastudios.ftsgeology.util.ValueNoise;
 import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyChunkGenerator;
 import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld;
+import com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
@@ -387,7 +388,7 @@ public final class RiverWater {
                     continue;
                 }
                 BlockState top = level.getBlockState(at.set(x, g, z));
-                if (EruptionHandler.isPlayerPlaced(top) || !top.isSolidRender(level, at)) continue;
+                if (built(top) || !top.isSolidRender(level, at)) continue;
                 // Grass stays on top; what is under it is the soil it grows in.
                 boolean turf = top.is(BlockTags.DIRT) && !top.is(Blocks.DIRT);
                 BlockState body = turf ? Blocks.DIRT.defaultBlockState() : top;
@@ -450,7 +451,7 @@ public final class RiverWater {
                     }
                     if (low == Integer.MAX_VALUE || g <= low + 1) continue;
                     int x = cp.getMinBlockX() + i - 1, z = cp.getMinBlockZ() + j - 1;
-                    if (EruptionHandler.isPlayerPlaced(level.getBlockState(at.set(x, g, z)))) continue;
+                    if (built(level.getBlockState(at.set(x, g, z)))) continue;
                     BlockState under = level.getBlockState(at.set(x, g - 1, z));
                     if (!under.isSolidRender(level, at)) continue;  // never open the floor onto a cave
                     level.setBlock(at.set(x, g, z), water, FLAGS);
@@ -508,7 +509,7 @@ public final class RiverWater {
             return Integer.MIN_VALUE;
         }
         for (int y = bedY + 1; y <= g; y++) {
-            if (EruptionHandler.isPlayerPlaced(level.getBlockState(at.set(x, y, z)))) return Integer.MIN_VALUE;
+            if (built(level.getBlockState(at.set(x, y, z)))) return Integer.MIN_VALUE;
         }
         // A plant on the ground being taken away would be left standing in the air over the water.
         clearPlants(level, at, x, g + 1, z);
@@ -626,9 +627,9 @@ public final class RiverWater {
         int least = Math.max(level.getMinBuildHeight() + 1, y - PLUG_DEEP);
         while (bottom > least && !level.getBlockState(at.set(x, bottom, z)).isSolidRender(level, at)) bottom--;
         BlockState under = level.getBlockState(at.set(x, bottom, z));
-        if (!under.isSolidRender(level, at) || EruptionHandler.isPlayerPlaced(under)) return false;
+        if (!under.isSolidRender(level, at) || built(under)) return false;
         for (int k = bottom + 1; k <= y; k++) {
-            if (EruptionHandler.isPlayerPlaced(level.getBlockState(at.set(x, k, z)))) return false;
+            if (built(level.getBlockState(at.set(x, k, z)))) return false;
         }
         BlockState fill = under.is(BlockTags.BASE_STONE_OVERWORLD) ? under : Blocks.STONE.defaultBlockState();
         for (int k = bottom + 1; k <= y; k++) level.setBlock(at.set(x, k, z), fill, FLAGS);
@@ -670,12 +671,24 @@ public final class RiverWater {
         if (g - deepest < SPRING_LEAST) return 0;
         int placed = 0;
         for (int y = g; y >= deepest; y--) {
-            if (EruptionHandler.isPlayerPlaced(level.getBlockState(at.set(x, y, z)))) break;
+            if (built(level.getBlockState(at.set(x, y, z)))) break;
             level.setBlock(at.set(x, y, z), water, FLAGS);
             placed++;
         }
         if (placed > 0) SPRINGS.increment();
         return placed;
+    }
+
+    /**
+     * Whether a block where a channel is being cut was put there by people: a structure's planks, bricks, doors and the
+     * like, or anything holding contents. At generation nothing is a player's, and the rest is ground to be cut: a rock
+     * or a raw deposit another mod laid down under the river, which no list here names. Read as anything not known
+     * for ground, a deposit under the bed kept its whole column out of the shave: a pillar of grass up to the water's
+     * level in the middle of the river. Worlds made before keep the old reading.
+     */
+    private static boolean built(BlockState s) {
+        if (!WorldgenRevision.has(WorldgenRevision.RIVER_DEPOSITS)) return EruptionHandler.isPlayerPlaced(s);
+        return EruptionHandler.isWorked(s) || s.hasBlockEntity();
     }
 
     /** Whether a block of the bore can hold water: solid itself, and solid under it and on every side. */
