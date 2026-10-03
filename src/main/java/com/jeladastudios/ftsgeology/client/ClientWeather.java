@@ -78,6 +78,8 @@ public final class ClientWeather {
         LocalWeather.tick();
         if (level == null || player == null) return;
         if (mc.isPaused()) return;
+        LocalWeather.quietTick();
+        CloudRenderer.local(player.getX(), player.getZ(), LocalWeather.active() ? LocalWeather.storm(1f) : 0f);
         float rain = intensity(level);
         BlockPos at = player.blockPosition();
         Biome.Precipitation fall = level.getBiome(at).value().getPrecipitationAt(at);

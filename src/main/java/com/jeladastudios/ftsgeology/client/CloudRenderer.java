@@ -113,14 +113,47 @@ final class CloudRenderer {
      * One cell of the field: {@code out[0]} its underside and {@code out[1]} its top over the cloud height (NaN where the
      * sky is clear), {@code out[2]} how dark.
      */
+    /** Where the player stands and the storm's rain on their ground, set each tick (see {@link #local}). */
+    private static volatile double localX, localZ;
+    private static volatile float localRain;
+    /** How far round the player their rain closes the sky, in full and then thinning out, in blocks. */
+    private static final double LOCAL_FULL = 64, LOCAL_REACH = 160;
+
+    /** The player's place and the storm's rain over it, for the sky drawn round them. */
+    static void local(double x, double z, float rain) {
+        localX = x;
+        localZ = z;
+        localRain = rain;
+    }
+
+    /** The player's rain as it closes the sky at a place: all of it near them, none past {@link #LOCAL_REACH}. */
+    private static float localRain(double x, double z) {
+        float r = localRain;
+        if (r <= 0.02f) return 0f;
+        double d = Math.hypot(x - localX, z - localZ);
+        if (d <= LOCAL_FULL) return r;
+        if (d >= LOCAL_REACH) return 0f;
+        double t = 1.0 - (d - LOCAL_FULL) / (LOCAL_REACH - LOCAL_FULL);
+        return (float) (r * t * t * (3 - 2 * t));
+    }
+
     private static void cell(int fi, int fj, long now, double dx, double dz, float[] sample, float[] out) {
-        ClientSky.sample(fi * CELL + CELL / 2.0 + dx, fj * CELL + CELL / 2.0 + dz, now, sample);
+        double x = fi * CELL + CELL / 2.0 + dx, z = fj * CELL + CELL / 2.0 + dz;
+        ClientSky.sample(x, z, now, sample);
         float cover = sample[0], d = sample[1], tower = sample[2];
+        // The rain falling on the player closes the sky over them, whatever the storms' outline says: the server rains
+        // more on a mountain's windward side than in a storm's middle, and on a ridge at a storm's edge it rained
+        // through a broken sky.
+        float local = localRain(x, z);
+        if (local > 0.02f) {
+            cover = Math.max(cover, Math.min(1f, 0.9f + 0.1f * Math.min(1f, local / 0.25f)));
+            d = Math.max(d, Math.min(1f, local / 0.7f));
+        }
         float n = noise(fi, fj);
         // The noise's spread is about 0.15 round a half: this share of the cells falls under the line.
         float line = 0.5f + 0.088f * (float) Math.log(cover / (1f - cover));
         // Over the rain there is no gap: a cell the noise would leave open is still a thin cloud there.
-        boolean raining = sample[3] > 0.02f;
+        boolean raining = sample[3] > 0.02f || local > 0.02f;
         if (n >= line && !raining) {
             out[0] = out[1] = Float.NaN;
             out[2] = 0;

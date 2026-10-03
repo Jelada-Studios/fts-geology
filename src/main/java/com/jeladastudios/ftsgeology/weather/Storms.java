@@ -564,6 +564,20 @@ public final class Storms {
         data.setClearWeatherTime(rain ? 0 : 12000);
     }
 
+    /**
+     * A player's weather at once on joining, or on coming back to the overworld: until the first word, every two seconds,
+     * their client drew the world's one weather, rain if a storm was out anywhere.
+     */
+    @SubscribeEvent
+    public static void onLoggedIn(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer p && p.level() instanceof ServerLevel level && on(level)) tell(level, List.of(p));
+    }
+
+    @SubscribeEvent
+    public static void onChangedDimension(net.minecraftforge.event.entity.player.PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (event.getEntity() instanceof ServerPlayer p && p.level() instanceof ServerLevel level && on(level)) tell(level, List.of(p));
+    }
+
     /** Each player's own weather, to draw. */
     private static void tell(ServerLevel level, List<ServerPlayer> players) {
         for (ServerPlayer p : players) {

@@ -16,7 +16,9 @@ public final class LocalWeather {
 
     private static volatile float targetRain, targetThunder, targetWindX, targetWindZ, targetFog;
     private static float rain, thunder, oRain, oThunder, windX, windZ, fog;
-    private static volatile long heard;
+    /** Whether the server has told its weather since this world was joined, and the game ticks since it last did. */
+    private static volatile boolean told;
+    private static volatile int quiet;
     /**
      * How much of the storm's rain reaches the player where they stand against its cloud deck, eased: all of it under
      * the deck, some in the mist inside it, none above it, where the sky is clear (the client tells it each tick).
@@ -24,7 +26,7 @@ public final class LocalWeather {
     private static float overhead = 1f, oOverhead = 1f, targetOverhead = 1f;
 
     public static void set(LocalWeatherPacket p) {
-        if (heard == 0) {
+        if (!told) {
             rain = oRain = p.rain();
             thunder = oThunder = p.thunder();
             windX = p.windX();
@@ -35,15 +37,27 @@ public final class LocalWeather {
         targetWindX = p.windX();
         targetWindZ = p.windZ();
         targetFog = p.fog();
-        heard = System.currentTimeMillis();
+        quiet = 0;
+        told = true;
     }
 
     /**
      * Whether the server tells this client its own weather: a server with regional rain, heard from lately. Half a
-     * minute's grace: a server stalled for a few seconds let the rain fall back to the world's one weather and back.
+     * minute's grace: a server stalled for a few seconds let the rain fall back to the world's one weather and back. The
+     * half minute is of the game running, not of the clock: a game paused (in the menu, or tabbed out of on one's own
+     * world) hears nothing, and on coming back it showed the world's one weather -- rain, if a storm was out anywhere --
+     * until the next word, a flash of rain and a darkened sky and then clear again.
      */
     public static boolean active() {
-        return heard != 0 && System.currentTimeMillis() - heard < 30000;
+        return told && quiet < GRACE;
+    }
+
+    /** The game ticks without word from the server before its weather is given up: half a minute. */
+    private static final int GRACE = 600;
+
+    /** A tick of the game running with no word from the server; not counted while it is paused. */
+    public static void quietTick() {
+        if (told && quiet < GRACE) quiet++;
     }
 
     /**
@@ -83,6 +97,14 @@ public final class LocalWeather {
         return windZ;
     }
 
+    /**
+     * The storm's rain over the player's ground, eased, before how much of it reaches them against its cloud deck: what the
+     * sky over them has to be closed for.
+     */
+    public static float storm(float partial) {
+        return Mth.lerp(partial, oRain, rain);
+    }
+
     /** The rain where the player is: the storm's, as much of it as reaches them under, in or over its cloud deck. */
     public static float rain(float partial) {
         return Mth.lerp(partial, oRain, rain) * Mth.lerp(partial, oOverhead, overhead);
@@ -94,7 +116,8 @@ public final class LocalWeather {
 
     /** Forgets the server's weather: a new world, or a server without it. */
     public static void reset() {
-        heard = 0;
+        told = false;
+        quiet = 0;
         overhead = oOverhead = targetOverhead = 1f;
         rain = oRain = thunder = oThunder = targetRain = targetThunder = 0;
         windX = windZ = targetWindX = targetWindZ = 0;
