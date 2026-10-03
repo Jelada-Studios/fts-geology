@@ -86,7 +86,7 @@ public final class VolcanoBuilder {
             if (type == VolcanoType.FISSURE) c.coneBaseR = c.fissureHalf;
         }
 
-        VolcanoJob job = new VolcanoJob(level, "rebuild " + type + " @ " + c.x + "," + c.z);
+        VolcanoJob job = new VolcanoJob(level, "rebuild " + type + " @ " + c.x + "," + c.z).area(c.x, c.z, c.clearReach + 1);
         // No ramparts: they are added on top of whatever stands, so a second pass would stack them.
         queueEdifice(job, c, false);
         addSummit(job, c);
@@ -120,7 +120,7 @@ public final class VolcanoBuilder {
         if (c == null) return false;
         c.natural = natural;
 
-        VolcanoJob job = new VolcanoJob(level, size + " " + type + " @ " + c.x + "," + c.z);
+        VolcanoJob job = new VolcanoJob(level, size + " " + type + " @ " + c.x + "," + c.z).area(c.x, c.z, c.clearReach + 1);
 
         // 1-4. Canopy, edifice, caldera and apron.
         queueEdifice(job, c, true);
@@ -358,7 +358,7 @@ public final class VolcanoBuilder {
         if (!loaded(level, c.x, c.z, area)) return;
         if (com.jeladastudios.ftsgeology.quake.QuakeQuiet.isQuiet(level, marker)) return;
 
-        VolcanoJob job = new VolcanoJob(level, "large " + c.type + " summit @ " + c.x + "," + c.z);
+        VolcanoJob job = new VolcanoJob(level, "large " + c.type + " summit @ " + c.x + "," + c.z).area(c.x, c.z, area);
         if (c.type.excavates()) job.add(lvl -> collectCalderaLake(lvl, c));
         addSummit(job, c);
         addCraterClearing(job, c);
