@@ -24,7 +24,9 @@
     "OculusRainMixin",
     "PuddleRainMixin",
     "RiverMudMixin",
-    "SoundStreamsMixin"
+    "SoundStreamsMixin",
+    "RiverFlowRenderMixin",
+    "EmbeddiumRiverFlowMixin"
   ],
   "injectors": {
     "defaultRequire": 1
