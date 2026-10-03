@@ -333,10 +333,13 @@ public final class RiverFoamMesh {
         drawMs = 0.95 * drawMs + 0.05 * (System.nanoTime() - t0) / 1e6;
     }
 
-    /** How many blocks of the river carry foam round the player now, on the debug screen (F3). */
+    /**
+     * How many blocks of the river carry foam round the player now, on the debug screen (F3). Forge asks for the debug
+     * screen's lines every frame, open or not, and draws what it is given: only while it is open.
+     */
     @SubscribeEvent
     public static void onDebugText(net.minecraftforge.client.event.CustomizeGuiOverlayEvent.DebugText event) {
-        if (Minecraft.getInstance().level == null || !on()) return;
+        if (Minecraft.getInstance().level == null || !Minecraft.getInstance().options.renderDebug || !on()) return;
         int cold = 0;
         for (Spot s : spots) if (s.cold()) cold++;
         event.getLeft().add("River foam: " + spots.size() + " blocks (" + cold + " cold), " + drawn
