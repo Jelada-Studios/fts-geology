@@ -231,6 +231,8 @@ public final class VolcanoEruption {
             if (ticks < 0) continue;
             double push = d / ((1 - Math.pow(0.98, ticks)) / 0.02);
             if (!clears(from.getY(), rise, push, Math.max(1, craterR - 4), craterR + 6, rim + 2)) continue;
+            // Thrown where nothing moves, it would hang in the air over the crater: none is thrown there.
+            if (!level.isPositionEntityTicking(from)) return;
             FallingBlockEntity bomb = FallingBlockEntity.fall(level, from, Blocks.BASALT.defaultBlockState());
             bomb.setDeltaMovement(new Vec3(dx * push, rise, dz * push));
             bomb.setHurtsEntities(3.0f, 12);

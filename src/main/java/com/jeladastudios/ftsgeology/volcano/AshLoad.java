@@ -131,10 +131,10 @@ public final class AshLoad {
     }
 
     private static void fall(ServerLevel level, BlockPos p, BlockState s) {
-        FallingBlockEntity f = FallingBlockEntity.fall(level, p, s);
+        FallingBlockEntity f = com.jeladastudios.ftsgeology.util.Falls.fall(level, p, s, true);
+        if (f == null) return;
         f.setDeltaMovement(new Vec3(0, -0.05, 0));
         f.setHurtsEntities(1.5f, 10);
-        f.dropItem = true;
         f.hurtMarked = true;
     }
 

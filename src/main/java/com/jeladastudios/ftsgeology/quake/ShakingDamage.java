@@ -238,9 +238,9 @@ public final class ShakingDamage {
         if (side == null) return;                    // closed in since it was shaken loose
         level.levelEvent(2001, pos, Block.getId(state));   // the crack and dust of it coming away
         level.setBlock(pos, state.getFluidState().createLegacyBlock(), Block.UPDATE_ALL);
-        FallingBlockEntity knocked = FallingBlockEntity.fall(level, pos.relative(side), state);
         // A player's block that cannot land comes back as an item; a village's is lost in the rubble.
-        knocked.dropItem = PlayerBuilt.inChunk(level, pos.getX() >> 4, pos.getZ() >> 4).contains(pos.asLong());
+        com.jeladastudios.ftsgeology.util.Falls.fall(level, pos.relative(side), state,
+                PlayerBuilt.inChunk(level, pos.getX() >> 4, pos.getZ() >> 4).contains(pos.asLong()));
         Collapse.touched(level, pos);
         KNOCKED.increment();
     }
@@ -305,10 +305,11 @@ public final class ShakingDamage {
         if (TerrainProbe.isVegetation(level.getBlockState(above))) level.destroyBlock(above, false);
         level.levelEvent(2001, r.pos(), Block.getId(r.state()));   // the crack and dust of it coming away
         level.setBlock(r.pos(), Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
-        FallingBlockEntity rock = FallingBlockEntity.fall(level, free, r.state());
-        rock.setDeltaMovement(r.out().getStepX() * 0.25, 0.05, r.out().getStepZ() * 0.25);
-        rock.setHurtsEntities(2.0F, 20);
-        rock.dropItem = false;
+        FallingBlockEntity rock = com.jeladastudios.ftsgeology.util.Falls.fall(level, free, r.state(), false);
+        if (rock != null) {
+            rock.setDeltaMovement(r.out().getStepX() * 0.25, 0.05, r.out().getStepZ() * 0.25);
+            rock.setHurtsEntities(2.0F, 20);
+        }
         ROCKS.increment();
     }
 

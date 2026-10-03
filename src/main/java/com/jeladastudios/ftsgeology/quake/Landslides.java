@@ -131,10 +131,12 @@ public final class Landslides {
             BlockPos p = new BlockPos(x, top, z);
             BlockState s = level.getBlockState(p);
             if (!loose(s) || !level.getBlockState(p.above()).canBeReplaced()) continue;
-            FallingBlockEntity f = FallingBlockEntity.fall(level, p, s.is(BlockTags.DIRT) ? Blocks.GRAVEL.defaultBlockState() : s);
-            f.setDeltaMovement(new Vec3(down.getStepX() * 0.35, 0.15, down.getStepZ() * 0.35));
-            f.dropItem = false;
-            f.hurtMarked = true;
+            FallingBlockEntity f = com.jeladastudios.ftsgeology.util.Falls.fall(level, p,
+                    s.is(BlockTags.DIRT) ? Blocks.GRAVEL.defaultBlockState() : s, false);
+            if (f != null) {
+                f.setDeltaMovement(new Vec3(down.getStepX() * 0.35, 0.15, down.getStepZ() * 0.35));
+                f.hurtMarked = true;
+            }
         }
         level.playSound(null, seed, net.minecraft.sounds.SoundEvents.GRAVEL_FALL, net.minecraft.sounds.SoundSource.BLOCKS, 2.0f, 0.6f);
         level.playSound(null, seed, net.minecraft.sounds.SoundEvents.WOOD_BREAK, net.minecraft.sounds.SoundSource.BLOCKS, 1.2f, 0.5f);
@@ -341,15 +343,16 @@ public final class Landslides {
                     }
                     if (s.counts()[1] < SHOWN) {
                         s.counts()[1]++;
-                        FallingBlockEntity f = FallingBlockEntity.fall(level, p, block);
-                        double push = (0.25 + level.random.nextDouble() * 0.3) * (s.wet() ? 1.6 : 1.0);
-                        f.setDeltaMovement(new Vec3(down.getStepX() * push + (level.random.nextDouble() - 0.5) * 0.1,
-                                0.05 + level.random.nextDouble() * 0.1,
-                                down.getStepZ() * push + (level.random.nextDouble() - 0.5) * 0.1));
-                        f.setHurtsEntities(1.0f, 10);
                         // Earth that lands on a flower or a fence is lost in the heap, not left lying as an item.
-                        f.dropItem = false;
-                        f.hurtMarked = true;
+                        FallingBlockEntity f = com.jeladastudios.ftsgeology.util.Falls.fall(level, p, block, false);
+                        if (f != null) {
+                            double push = (0.25 + level.random.nextDouble() * 0.3) * (s.wet() ? 1.6 : 1.0);
+                            f.setDeltaMovement(new Vec3(down.getStepX() * push + (level.random.nextDouble() - 0.5) * 0.1,
+                                    0.05 + level.random.nextDouble() * 0.1,
+                                    down.getStepZ() * push + (level.random.nextDouble() - 0.5) * 0.1));
+                            f.setHurtsEntities(1.0f, 10);
+                            f.hurtMarked = true;
+                        }
                     } else {
                         QuakeWrites.set(level, p, Blocks.AIR.defaultBlockState());
                         deposit(level, x, z, down, block, s.wet() ? 2 * RUNOUT : RUNOUT);

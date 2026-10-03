@@ -916,6 +916,8 @@ public final class FissureEruptions {
     private static void guardShores(ServerLevel level, Fissure f, long deadline) {
         if (f.water.isEmpty()) return;
         if (f.guardKeys == null || f.guardAt >= f.guardKeys.length) {
+            // A round of it a second is watch enough: lava does not run far in that.
+            if (level.getGameTime() % 20 != 0) return;
             f.guardKeys = f.water.keySet().toLongArray();
             f.guardAt = 0;
         }

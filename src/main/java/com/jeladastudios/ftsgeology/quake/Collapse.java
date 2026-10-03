@@ -189,11 +189,12 @@ public final class Collapse {
         }
         shownThisTick++;
         shownThisEvent++;
-        FallingBlockEntity f = FallingBlockEntity.fall(level, p, s);
-        f.setDeltaMovement(new Vec3(pushX * 0.3, 0.05, pushZ * 0.3));
-        f.setHurtsEntities(2.0f, 20);
-        f.dropItem = own;
-        f.hurtMarked = true;
+        FallingBlockEntity f = com.jeladastudios.ftsgeology.util.Falls.fall(level, p, s, own);
+        if (f != null) {
+            f.setDeltaMovement(new Vec3(pushX * 0.3, 0.05, pushZ * 0.3));
+            f.setHurtsEntities(2.0f, 20);
+            f.hurtMarked = true;
+        }
         if (level.random.nextInt(6) == 0) {
             level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, s), p.getX() + 0.5, p.getY() + 0.5,
                     p.getZ() + 0.5, 8, 0.4, 0.4, 0.4, 0.05);
