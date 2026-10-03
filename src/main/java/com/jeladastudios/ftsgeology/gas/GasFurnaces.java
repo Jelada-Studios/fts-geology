@@ -90,7 +90,10 @@ public final class GasFurnaces {
         }
         if (flue == null) return 0;
         if (!fuel.isEmpty()) gm.release(flue, fuel);
-        if (heat >= demand(furnace) * 0.5) keepLit(furnace);
+        if (heat >= demand(furnace) * 0.5) {
+            keepLit(furnace);
+            GasFiredFurnaces.mark(level, pos);
+        }
         return heat;
     }
 
@@ -104,6 +107,14 @@ public final class GasFurnaces {
         if (f.fts_geology$litTime() < LIT_AHEAD) f.fts_geology$setLitTime(LIT_AHEAD);
         f.fts_geology$setLitDuration(LIT_AHEAD);
         furnace.setChanged();
+        // The furnace shows its fire only where it sees it start, and with the fire kept ahead it never does: shown here.
+        // It goes out of itself, as on coal, once the gas stops.
+        Level level = furnace.getLevel();
+        net.minecraft.world.level.block.state.BlockState state = furnace.getBlockState();
+        if (level != null && state.hasProperty(net.minecraft.world.level.block.AbstractFurnaceBlock.LIT)
+                && !state.getValue(net.minecraft.world.level.block.AbstractFurnaceBlock.LIT)) {
+            level.setBlock(furnace.getBlockPos(), state.setValue(net.minecraft.world.level.block.AbstractFurnaceBlock.LIT, true), 3);
+        }
     }
 
     /** How far ahead a furnace's fire is kept while gas heats it, ticks. */
