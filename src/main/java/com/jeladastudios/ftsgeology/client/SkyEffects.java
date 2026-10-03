@@ -20,6 +20,8 @@ import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.biome.Biome;
@@ -251,14 +253,21 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
         }
     }
 
+    /** Vanilla's count of rain ticks since its rain sound last played, kept here as vanilla keeps it. */
+    private static int rainSoundTime;
+
+    /**
+     * The rain's splashes where the streaks land, aslant in the wind, and vanilla's own rain sound from where the rain was
+     * last seen landing, as vanilla plays it (an addon that sounds the rain itself, Feel the Nature, silences it).
+     */
     @Override
     public boolean tickRain(ClientLevel level, int ticks, Camera camera) {
-        // Without the recordings, or while the sound engine has no stream for them, vanilla's own rain sound is kept, and
-        // vanilla plays it here.
-        if (!LocalWeather.active() || !ClientWeather.recordingsHeard()) return false;
+        if (!LocalWeather.active()) return false;
         Minecraft mc = Minecraft.getInstance();
         float f = level.getRainLevel(1f) / (Minecraft.useFancyGraphics() ? 1f : 2f);
-        if (f <= 0f || mc.options.particles().get() == ParticleStatus.MINIMAL) return true;
+        if (f <= 0f) return true;
+        boolean minimal = mc.options.particles().get() == ParticleStatus.MINIMAL;
+        BlockPos heard = null;
         RandomSource rnd = RandomSource.create((long) ticks * 312987231L);
         BlockPos at = BlockPos.containing(camera.getPosition());
         // More splashes the harder it rains, and some even in a drizzle; a downpour throws up big ones as well.
@@ -291,6 +300,8 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
             if (top.getY() <= level.getMinBuildHeight() || top.getY() > at.getY() + 10 || top.getY() < at.getY() - 10) continue;
             if (level.getBiome(top).value().getPrecipitationAt(top) != Biome.Precipitation.RAIN) continue;
             BlockPos on = top.below();
+            heard = on;
+            if (minimal) break;
             BlockState state = level.getBlockState(on);
             FluidState fluid = level.getFluidState(on);
             double h = Math.max(state.getCollisionShape(level, on).max(Direction.Axis.Y, px, pz), fluid.getHeight(level, on));
@@ -298,6 +309,14 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
                     ? ParticleTypes.SMOKE
                     : f > 0.6f && rnd.nextInt(6) == 0 ? ParticleTypes.SPLASH : ParticleTypes.RAIN;
             level.addParticle(p, on.getX() + px, on.getY() + h, on.getZ() + pz, 0, 0, 0);
+        }
+        if (heard != null && rnd.nextInt(3) < rainSoundTime++) {
+            rainSoundTime = 0;
+            if (heard.getY() > at.getY() + 1 && level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING, at).getY() > at.getY()) {
+                level.playLocalSound(heard, SoundEvents.WEATHER_RAIN_ABOVE, SoundSource.WEATHER, 0.1f, 0.5f, false);
+            } else {
+                level.playLocalSound(heard, SoundEvents.WEATHER_RAIN, SoundSource.WEATHER, 0.2f, 1.0f, false);
+            }
         }
         return true;
     }

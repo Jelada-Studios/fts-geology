@@ -44,6 +44,3 @@ docs/
 
 # Local copies of optional mods' APIs, compiled against and never shipped (see build.gradle)
 libs/
-
-# Rain recordings of unknown licence: built into the jar the user plays with, never in the public repo.
-src/main/resources/assets/fts_geology_rain/

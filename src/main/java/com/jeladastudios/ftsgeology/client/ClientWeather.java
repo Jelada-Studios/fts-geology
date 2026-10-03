@@ -6,13 +6,8 @@ import com.jeladastudios.ftsgeology.weather.LocalWeather;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance;
-import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
@@ -22,76 +17,32 @@ import net.minecraft.world.level.material.FogType;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.ViewportEvent;
-import net.minecraftforge.client.event.sound.PlaySoundEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
  * The player's own weather on the client: what the server says of the storm over them, eased in and out a tick at a
- * time (see {@link LocalWeather}), which the sky, the rain and the shaders then read; and how the rain sounds and looks
- * where they stand.
+ * time (see {@link LocalWeather}), which the sky, the rain and the shaders then read; and how the rain looks where they
+ * stand: water dripping from leaves and from the edges of roofs while it rains and for a minute or two after, and a
+ * downpour closing the view in a little.
  *
- * <p>The rain is heard in three strengths, light, steady and heavy, from recordings of real rain in place of vanilla's,
- * one fading into the next as the rain grows; a rain after a dry while begins with its recording's own beginning.
- * Indoors it is quieter, under water nearly gone, and in snow or a dry biome not there at all; in the open a breath of
- * wind is heard, more of it high up and in a strong wind. Water drips from leaves and from the edges of roofs while it
- * rains and for a minute or two after, and a downpour closes the view in a little. The recordings are not part of the
- * public source (their licence is not known); a build without them keeps vanilla's rain sound.</p>
+ * <p>The rain and the wind are not heard from here. Where the weather is the server's, vanilla's own rain sound plays
+ * from where the rain lands (see {@link SkyEffects#tickRain}); the sound of rain and wind on what they fall on and blow
+ * through is the Feel the Nature addon's, which reads this weather.</p>
  */
 @Mod.EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
 public final class ClientWeather {
 
     private ClientWeather() {}
 
-    private static final ResourceLocation LIGHT = new ResourceLocation("fts_geology_rain", "rain_light");
-    private static final ResourceLocation MEDIUM = new ResourceLocation("fts_geology_rain", "rain_medium");
-    private static final ResourceLocation HEAVY = new ResourceLocation("fts_geology_rain", "rain_heavy");
-    private static final ResourceLocation LIGHT_START = new ResourceLocation("fts_geology_rain", "rain_light_start");
-    private static final ResourceLocation HEAVY_START = new ResourceLocation("fts_geology_rain", "rain_heavy_start");
-    private static final ResourceLocation WIND = new ResourceLocation("fts_geology_rain", "wind");
-
-    private static Boolean recordings;
-    private static final java.util.Map<ResourceLocation, Boolean> HAS = new java.util.HashMap<>();
-    private static Track light, medium, heavy, wind, intro;
-    /**
-     * The last game tick a recording was heard playing while it rained, and whether vanilla's own rain stands in for them
-     * now: when the sound engine has no stream left for them (other mods' music and ambience use streams too) the rain
-     * is not left silent.
-     */
-    private static long heardAt;
-    private static boolean standIn;
-    /** Ticks since the rain was last heard: a rain after a dry while begins with its recording's own beginning. */
-    private static int dryTicks = Integer.MAX_VALUE / 2;
     /** How wet the world round the player still is: the rain, and after it a while of dripping. */
     private static float wet;
     /** How open to the sky the player stands, 0 indoors to 1 in the open, worked out every half second. */
     private static float open = 1f;
-    /** The rain told for where the player stands and what falls there, for the debug screen. */
-    private static float told;
-    private static Biome.Precipitation fell = Biome.Precipitation.NONE;
-    /** When a recording last had to be started again because it held its channel silent, for the log. */
-    private static long restartedAt = Long.MIN_VALUE / 2;
 
     public static void set(LocalWeatherPacket p) {
         LocalWeather.set(p);
-    }
-
-    /** Whether the jar carries the rain recordings. */
-    static boolean recordings() {
-        if (recordings == null) recordings = has(LIGHT) && has(HEAVY);
-        return recordings;
-    }
-
-    /** Whether the recordings play the rain now: they are in the jar and the sound engine is playing them. */
-    static boolean recordingsHeard() {
-        return recordings() && !standIn;
-    }
-
-    /** Whether one recording is there: the middle strength, the beginnings and the wind may be missing. */
-    private static boolean has(ResourceLocation id) {
-        return HAS.computeIfAbsent(id, k -> Minecraft.getInstance().getResourceManager()
-                .getResource(new ResourceLocation(k.getNamespace(), "sounds/" + k.getPath() + ".ogg")).isPresent());
     }
 
     /**
@@ -120,189 +71,22 @@ public final class ClientWeather {
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
         LocalPlayer player = mc.player;
-        // Under, in or over the storm's cloud: the rain reaching the player, and so the sky, the sound and the drops.
+        // Under, in or over the storm's cloud: the rain reaching the player, and so the sky and the drops.
         if (level != null && player != null && LocalWeather.active()) {
             LocalWeather.overhead(ClientSky.overhead(level, player.getX(), player.getEyeY(), player.getZ()));
         }
         LocalWeather.tick();
-        if (level == null || player == null) {
-            stop();
-            return;
-        }
+        if (level == null || player == null) return;
         if (mc.isPaused()) return;
         float rain = intensity(level);
         BlockPos at = player.blockPosition();
         Biome.Precipitation fall = level.getBiome(at).value().getPrecipitationAt(at);
-        told = rain;
-        fell = fall;
         if (fall != Biome.Precipitation.RAIN || !level.dimensionType().hasSkyLight()) rain = 0;
         wet = Math.max(wet * 0.9995f, rain);
         ClientRiverMud.tick(player, rain);
         ClientGroundSteam.tick(player, rain);
         if (level.getGameTime() % 10 == 0) open = openness(level, player);
-        sound(level, player, rain);
         drips(level, player);
-    }
-
-    // === Sound ================================================================
-
-    /** Vanilla's rain is not played where the recordings play instead. */
-    @SubscribeEvent
-    public static void onPlaySound(PlaySoundEvent event) {
-        if (event.getSound() == null || !recordingsHeard()) return;
-        ResourceLocation id = event.getSound().getLocation();
-        if (id.getNamespace().equals("minecraft") && (id.getPath().equals("weather.rain") || id.getPath().equals("weather.rain.above"))) {
-            event.setSound(null);
-        }
-    }
-
-    /** How loud each recording plays at full strength, before the game's weather slider. */
-    private static final float LIGHT_LEVEL = 0.5f, MEDIUM_LEVEL = 0.75f, HEAVY_LEVEL = 1.0f, WIND_LEVEL = 0.35f;
-    /** A beginning's length, and from when the loop takes over from it: its last seconds fade out as the loop comes in. */
-    private static final int INTRO_TICKS = 500, HANDOVER_FROM = 340;
-    /** How long it must have been dry for a rain to begin with its recording's beginning again. */
-    private static final int DRY_FOR_INTRO = 600;
-
-    private static void sound(ClientLevel level, LocalPlayer player, float rain) {
-        if (!recordings()) return;
-        float cover = (0.25f + 0.75f * open) * com.jeladastudios.ftsgeology.config.ClientConfig.RAIN_VOLUME.get().floatValue();
-        if (player.isUnderWater()) cover *= 0.2f;
-        // The strengths hand over as the rain grows: a drizzle, a steady rain, a downpour.
-        float l, m, h;
-        // A drizzle is heard as soon as it is seen: the light recording comes in from the first drops.
-        if (has(MEDIUM)) {
-            l = smooth((rain - 0.01f) / 0.07f) * (1f - smooth((rain - 0.3f) / 0.2f));
-            m = smooth((rain - 0.25f) / 0.15f) * (1f - smooth((rain - 0.6f) / 0.2f));
-            h = smooth((rain - 0.55f) / 0.2f);
-        } else {
-            l = smooth((rain - 0.01f) / 0.08f) * (1f - smooth((rain - 0.45f) / 0.25f));
-            m = 0;
-            h = smooth((rain - 0.4f) / 0.3f);
-        }
-        // A rain after a dry while begins with its recording's own beginning, the drops coming in one by one; the
-        // loops come in over its last seconds. A downpour arriving at once has the heavy recording's beginning.
-        boolean heard = light != null || medium != null || heavy != null || intro != null;
-        if (rain > 0.02f && !heard && dryTicks > DRY_FOR_INTRO) {
-            boolean hard = LocalWeather.rainComing() >= 0.5f && has(HEAVY_START);
-            if (hard || has(LIGHT_START)) {
-                intro = new Track(SoundEvent.createVariableRangeEvent(hard ? HEAVY_START : LIGHT_START), false);
-                intro.level = hard ? HEAVY_LEVEL : LIGHT_LEVEL;
-                intro.startAt(cover * intro.level);
-                Minecraft.getInstance().getSoundManager().play(intro);
-            }
-        }
-        dryTicks = rain > 0.02f ? 0 : dryTicks + 1;
-        float hold = 1f;
-        if (intro != null) {
-            intro.age++;
-            if (intro.isStopped() || intro.age > INTRO_TICKS + 40 || !heard(intro) && intro.age > 40) {
-                intro = null;
-            } else {
-                hold = smooth((intro.age - HANDOVER_FROM) / (float) (INTRO_TICKS - HANDOVER_FROM));
-                intro.target = rain < 0.015f ? 0f : cover * intro.level;
-            }
-        }
-        light = track(light, LIGHT, LIGHT_LEVEL * l * cover * hold);
-        medium = has(MEDIUM) ? track(medium, MEDIUM, MEDIUM_LEVEL * m * cover * hold) : null;
-        heavy = track(heavy, HEAVY, HEAVY_LEVEL * h * cover * hold);
-        // A breath of wind in the open, more of it high up and in a strong wind; none indoors or under water.
-        if (has(WIND)) {
-            float speed = Mth.sqrt(LocalWeather.windX() * LocalWeather.windX() + LocalWeather.windZ() * LocalWeather.windZ());
-            float height = 0.4f + 0.6f * smooth((float) (player.getY() - 70) / 90f);
-            float w = smooth((speed - 0.3f) / 3f) * height * open * open;
-            if (player.isUnderWater()) w = 0;
-            wind = track(wind, WIND, WIND_LEVEL * w * com.jeladastudios.ftsgeology.config.ClientConfig.WIND_VOLUME.get().floatValue());
-        }
-        // Heard, or not: with no stream to play on, or one that holds its channel and never sounds, vanilla's rain stands
-        // in until the recordings are heard again.
-        boolean playing = false;
-        for (Track t : new Track[]{light, medium, heavy, intro}) if (t != null && heard(t)) playing = true;
-        long now = level.getGameTime();
-        if (playing || rain * cover < 0.02f || now < heardAt) heardAt = now;
-        boolean was = standIn;
-        standIn = now - heardAt > 100;
-        if (standIn != was) {
-            GeysersMod.LOGGER.info(standIn ? "Rain recordings are not playing (no free sound stream): vanilla's rain stands in"
-                    : "Rain recordings are playing again");
-        }
-    }
-
-    /**
-     * Keeps one recording playing at this volume: started when it is wanted, and started again when the sound engine has
-     * dropped it or never began it (no free stream, or the engine was reloaded), a try every two seconds.
-     */
-    private static Track track(Track t, ResourceLocation id, float volume) {
-        if (t != null && !t.isStopped()) {
-            if (heard(t)) {
-                t.unheard = 0;
-            } else if (++t.unheard > 40) {
-                // In the engine's list and silent all the same: a stream that never began. Started afresh.
-                if (Minecraft.getInstance().getSoundManager().isActive(t)) {
-                    Minecraft.getInstance().getSoundManager().stop(t);
-                    long now = System.currentTimeMillis();
-                    if (now - restartedAt > 60_000) {
-                        restartedAt = now;
-                        GeysersMod.LOGGER.info("Rain recording {} held its channel without sounding: started again", id.getPath());
-                    }
-                }
-                t.end();
-            }
-        }
-        if (t != null && t.isStopped()) t = null;
-        if (t == null) {
-            if (volume < 0.01f) return null;
-            t = new Track(SoundEvent.createVariableRangeEvent(id), true);
-            Minecraft.getInstance().getSoundManager().play(t);
-        }
-        t.target = volume;
-        return t;
-    }
-
-    /** How often a track's channel is asked whether it sounds, in ticks. */
-    private static final int PROBE = 10;
-
-    /**
-     * Whether the sound engine is really playing a track: in its list, and its channel's source playing. The engine keeps a
-     * sound in its list from the moment it hands it a channel, and a stream that never began -- its decoder failed, or never
-     * answered -- holds that channel in silence; the rain was not heard, and vanilla's rain was kept quiet for it. The
-     * channel is asked every {@link #PROBE} ticks on the sound thread, and its answer read here.
-     */
-    private static boolean heard(Track t) {
-        var sounds = Minecraft.getInstance().getSoundManager();
-        if (!sounds.isActive(t)) return false;
-        if (t.ticks - t.probedAt >= PROBE || t.probedAt < 0) {
-            t.probedAt = t.ticks;
-            var engine = ((com.jeladastudios.ftsgeology.mixin.SoundManagerAccessor) sounds).fts_geology$soundEngine();
-            var handle = ((com.jeladastudios.ftsgeology.mixin.SoundEngineAccessor) engine).fts_geology$channels().get(t);
-            if (handle == null) t.sounding = false;
-            else handle.execute(channel -> t.sounding = channel.playing());
-        }
-        return t.sounding;
-    }
-
-    /** The state of one track for the debug screen: its volume, and whether it sounds, holds its channel silent, or is off. */
-    private static String state(Track t) {
-        if (t == null) return "-";
-        boolean active = Minecraft.getInstance().getSoundManager().isActive(t);
-        return String.format(java.util.Locale.ROOT, "%.2f%s", t.loudness(), !active ? " off" : t.sounding ? "" : " silent");
-    }
-
-    /** One line on the rain's sound in the debug screen (F3): what is told, and what each recording is doing. */
-    @SubscribeEvent
-    public static void onDebugText(net.minecraftforge.client.event.CustomizeGuiOverlayEvent.DebugText event) {
-        if (Minecraft.getInstance().level == null) return;
-        event.getLeft().add(String.format(java.util.Locale.ROOT, "Rain sound: %.2f %s, %s, open %.2f%s",
-                told, LocalWeather.active() ? "from the server" : "vanilla", fell.name().toLowerCase(java.util.Locale.ROOT), open,
-                !recordings() ? ", no recordings" : standIn ? ", vanilla stands in" : ""));
-        if (recordings()) {
-            event.getLeft().add("light " + state(light) + "  medium " + state(medium) + "  heavy " + state(heavy)
-                    + "  start " + state(intro) + "  wind " + state(wind));
-        }
-    }
-
-    private static void stop() {
-        for (Track t : new Track[]{light, medium, heavy, wind, intro}) if (t != null) t.end();
-        light = medium = heavy = wind = intro = null;
     }
 
     private static float smooth(float t) {
@@ -320,58 +104,6 @@ public final class ClientWeather {
             }
         }
         return seen / 9f;
-    }
-
-    /**
-     * One recording, not placed anywhere: a loop, or a rain's beginning played once; its volume eased towards what the
-     * rain calls for. Indoors it is only quieter: lowered in pitch as well, the rain sounded dull and boomy.
-     */
-    static final class Track extends AbstractTickableSoundInstance {
-        float target, level = 1f;
-        int age;
-        /** Ticks the sound engine has not been playing it since it was asked to. */
-        int unheard;
-        private int silent;
-        /** Ticks it has been ticked, when its channel was last asked whether it sounds, and the channel's answer. */
-        int ticks, probedAt = -1;
-        volatile boolean sounding;
-
-        Track(SoundEvent event, boolean loop) {
-            super(event, SoundSource.WEATHER, SoundInstance.createUnseededRandom());
-            this.looping = loop;
-            this.delay = 0;
-            this.relative = true;
-            this.attenuation = SoundInstance.Attenuation.NONE;
-            this.volume = 0.001f;
-        }
-
-        @Override
-        public void tick() {
-            ticks++;
-            volume += Mth.clamp(target - volume, -0.01f, 0.01f);
-            silent = target < 0.01f && volume < 0.02f ? silent + 1 : 0;
-            if (silent > 40) stop();
-        }
-
-        /** Starts at once at this volume: a beginning fades itself in. */
-        void startAt(float v) {
-            volume = v;
-            target = v;
-        }
-
-        void end() {
-            stop();
-        }
-
-        /** How loud it plays now, before the game's weather slider. */
-        float loudness() {
-            return volume;
-        }
-
-        @Override
-        public boolean canStartSilent() {
-            return true;
-        }
     }
 
     // === Drips and the downpour's haze ============================================
@@ -473,10 +205,6 @@ public final class ClientWeather {
         LocalWeather.reset();
         ClientRiverMud.reset();
         ClientGroundSteam.reset();
-        stop();
         wet = 0;
-        recordings = null;
-        HAS.clear();
-        dryTicks = Integer.MAX_VALUE / 2;
     }
 }

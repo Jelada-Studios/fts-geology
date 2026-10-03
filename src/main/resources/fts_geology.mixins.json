@@ -23,9 +23,7 @@
     "OculusBlockIdsMixin",
     "OculusRainMixin",
     "PuddleRainMixin",
-    "RiverMudMixin",
-    "SoundManagerAccessor",
-    "SoundEngineAccessor"
+    "RiverMudMixin"
   ],
   "injectors": {
     "defaultRequire": 1
