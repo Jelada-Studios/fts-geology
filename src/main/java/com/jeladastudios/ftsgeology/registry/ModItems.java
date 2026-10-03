@@ -94,6 +94,8 @@ public final class ModItems {
     public static final RegistryObject<Item> CHERT = ITEMS.register("chert",
             () -> new BlockItem(ModBlocks.CHERT.get(), new Item.Properties()));
 
+    public static final RegistryObject<Item> BASALT_LAYER = ITEMS.register("basalt_layer",
+            () -> new BlockItem(ModBlocks.BASALT_LAYER.get(), new Item.Properties()));
     public static final RegistryObject<Item> COOLING_LAVA_CRUST = ITEMS.register("cooling_lava_crust",
             () -> new BlockItem(ModBlocks.COOLING_LAVA_CRUST.get(), new Item.Properties()));
 

@@ -639,6 +639,7 @@ public final class EruptionHandler {
                 || s.is(ModBlocks.VOLCANIC_ASH.get())
                 || s.is(ModBlocks.NATIVE_SULFUR.get())
                 || s.is(ModBlocks.COOLING_LAVA_CRUST.get())
+                || s.is(ModBlocks.BASALT_LAYER.get())
                 || s.is(ModBlocks.MICROBIAL_MAT_ORANGE.get())
                 || s.is(ModBlocks.MICROBIAL_MAT_YELLOW.get())
                 || s.is(ModBlocks.MICROBIAL_MAT_BROWN.get())

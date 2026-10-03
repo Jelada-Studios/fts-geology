@@ -223,6 +223,7 @@ public class GeysersMod {
             event.accept(ModItems.OIL_SANDSTONE.get());
             event.accept(ModItems.CHERT.get());
             event.accept(ModItems.COOLING_LAVA_CRUST.get());
+            event.accept(ModItems.BASALT_LAYER.get());
             event.accept(ModItems.PYRITE.get());
             event.accept(ModItems.CHALCOPYRITE.get());
             event.accept(ModItems.MALACHITE.get());

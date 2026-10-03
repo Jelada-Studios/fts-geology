@@ -1,6 +1,7 @@
 package com.jeladastudios.ftsgeology.volcano;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
+import com.jeladastudios.ftsgeology.block.BasaltLayerBlock;
 import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
@@ -28,6 +29,7 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -43,6 +45,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.material.FlowingFluid;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -90,7 +94,7 @@ public final class FissureEruptions {
 
     private static final String NAME = "fts_geology_fissures";
 
-    private static long begun, sunkColumns, cracked, laid, cooled, swarm, swept;
+    private static long begun, sunkColumns, cracked, laid, cooled, swarm, swept, sheets, sheetLayers, films, quenched, hissed, reopened, blasts, ringBlocks;
     private static double largest, worstMs;
 
     // === One eruption ======================================================
@@ -116,6 +120,23 @@ public final class FissureEruptions {
         long[] band = new long[0];
         LongOpenHashSet sunk = new LongOpenHashSet();
         boolean done;
+        /** Where the fissure ran under water (at the water's top): steam blasts there, not lava. */
+        LongArrayList wet = new LongArrayList();
+        /** Where the lava met water at its edge and was chilled into a crust. */
+        LongArrayList shore = new LongArrayList();
+        /** The water the flow came up against, by column: its top, its bed and what it was, to be opened again. */
+        it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap water = new it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap();
+        /** Whether the tuff rings round the steam blasts are built. */
+        boolean ringed;
+        /** How far the water has been opened again, once the lava has all set. */
+        transient int restoreAt;
+        transient boolean restored;
+        /** The chunks round the eruptive segment whose water is noted before the lava comes, and how far that has got. */
+        transient long[] shoreBand;
+        transient int shoreAt;
+        /** The noted water's columns as the watch on them last took them, and how far through it is. */
+        transient long[] guardKeys;
+        transient int guardAt;
 
         // Not saved: rebuilt from the cells.
         transient PriorityQueue<Front> front;
@@ -126,6 +147,9 @@ public final class FissureEruptions {
         /** The last sweep of the field's box for lava left lying: the box, how far through, which pass, what it found. */
         transient int[] box;
         transient int sweepAt, sweepPass, sweepFound;
+        /** Lava found running on out of the box, still to be followed and set; how much of it has been. */
+        transient it.unimi.dsi.fastutil.longs.LongArrayList beyond = new it.unimi.dsi.fastutil.longs.LongArrayList();
+        transient int beyondSet;
         transient boolean swept;
         /** How far the trench has set, once the eruption has drawn into its vents. */
         transient int trenchAt = Integer.MAX_VALUE;
@@ -193,6 +217,11 @@ public final class FissureEruptions {
             t.put("vents", new LongArrayTag(vents.toLongArray()));
             t.put("band", new LongArrayTag(band));
             t.put("sunk", new LongArrayTag(sunk.toLongArray()));
+            t.put("wet", new LongArrayTag(wet.toLongArray()));
+            t.put("shore", new LongArrayTag(shore.toLongArray()));
+            t.put("waterKeys", new LongArrayTag(water.keySet().toLongArray()));
+            t.put("waterAt", new LongArrayTag(water.values().toLongArray()));
+            t.putBoolean("ringed", ringed);
             return t;
         }
 
@@ -227,13 +256,18 @@ public final class FissureEruptions {
             f.vents = new LongArrayList(t.getLongArray("vents"));
             f.band = t.getLongArray("band");
             f.sunk = new LongOpenHashSet(t.getLongArray("sunk"));
+            f.wet = new LongArrayList(t.getLongArray("wet"));
+            f.shore = new LongArrayList(t.getLongArray("shore"));
+            long[] wk = t.getLongArray("waterKeys"), wv = t.getLongArray("waterAt");
+            for (int i = 0; i < Math.min(wk.length, wv.length); i++) f.water.put(wk[i], wv[i]);
+            f.ringed = t.getBoolean("ringed");
             // Drawn into its vents already: the trench sets on from the start (what has set is passed over).
             if (f.stage == Stage.FOCUS && !f.vents.isEmpty()) f.trenchAt = 0;
             return f;
         }
     }
 
-    /** A column the lava could run into next: lowest ground first, so it runs downhill and pools before it climbs. */
+    /** A column the lava could run into next, in the order {@link #priority} gives: it runs downhill and pools before it climbs. */
     record Front(int priority, long column, int allowed) implements Comparable<Front> {
         @Override
         public int compareTo(Front o) {
@@ -540,6 +574,7 @@ public final class FissureEruptions {
             case FOCUS -> {
                 VolcanoUnrest.hold(level, centre, f.magnitude, 0.8, true);
                 if (f.vents.isEmpty()) focus(level, f);
+                if (!f.ringed) tuffRings(level, f);
                 f.owed += f.lavaMost * (1.0 - CURTAIN_SHARE) * 2.0 * (1.0 - p) / (FOCUS / 20.0);
                 cones(level, f, p);
             }
@@ -547,7 +582,7 @@ public final class FissureEruptions {
         }
         if (p < 1.0) return;
         if (f.stage == Stage.COOL) {
-            if (f.cool2 >= f.cells.size() && f.cool1 >= f.cells.size() && f.swept) {
+            if (f.cool2 >= f.cells.size() && f.cool1 >= f.cells.size() && f.swept && f.restored) {
                 f.done = true;
                 VolcanoUnrest.settle(centre);
             }
@@ -588,6 +623,10 @@ public final class FissureEruptions {
                 break;
             }
         }
+        // The water round where the lava will come out, noted as it stands before any reaches it (see restore).
+        if (f.stage == Stage.DIKE || f.stage == Stage.PAUSE || f.stage == Stage.CURTAIN) noteShores(level, f, deadline);
+        // Lava come to the water, whatever brought it there: chilled at the edge, gone in a hiss over it.
+        if ((f.stage == Stage.CURTAIN || f.stage == Stage.FOCUS || f.stage == Stage.COOL) && !f.swept) guardShores(level, f, deadline);
         if (f.owed >= 1 && (f.stage == Stage.CURTAIN || f.stage == Stage.FOCUS)) {
             front(level, f);
             while (f.owed >= 1 && f.lava < f.lavaMost && System.nanoTime() < deadline) {
@@ -610,6 +649,7 @@ public final class FissureEruptions {
             if (level.getGameTime() - f.stageAt >= COOL && f.cool1 >= f.cells.size() && f.cool2 >= f.cells.size() && !f.swept) {
                 sweep(level, f, deadline);
             }
+            if (f.swept && !f.restored) restore(level, f, deadline);
         }
     }
 
@@ -647,6 +687,10 @@ public final class FissureEruptions {
             // Narrowing to nothing at the dike's ends, and its edges ragged by a block.
             double w = f.hw * Math.sqrt(Math.max(0.0, 1.0 - end * end * end * end)) + (unit(mix(x * 31L + z), 7) - 0.5) * 1.4;
             if (w < 1.0 || c > w + 0.5) continue;
+            // Water the graben drops under is noted as it was, before anything runs out of it: a mod that lets water
+            // run as finite volumes drained a lake into the cracks and the lava then covered its bed. The lava keeps
+            // off it, and once the flow has set it is opened again to the height it stood at (see restore).
+            noteWater(level, f, x, z);
             if (c > w - 0.5) {
                 // The bounding faults open as cracks, in steps, two of every three.
                 if (Math.floorMod((int) Math.floor((a + (f.id & 15)) / 9.0), 3) != 2) {
@@ -659,7 +703,11 @@ public final class FissureEruptions {
         }
     }
 
-    /** Lowers a column of natural ground by {@code k} blocks, with what grows on it; false where it is built on or wet. */
+    /**
+     * Lowers a column of natural ground by {@code k} blocks, with what grows on it; false where it is built on. Under a
+     * lake or a river the bed drops all the same and the water it stood under fills the room: the lake deepens, the
+     * river runs on.
+     */
     private static boolean sink(ServerLevel level, LongSet built, int x, int z, int k) {
         int g = TerrainProbe.groundY(level, x, z);
         if (g == Integer.MIN_VALUE) return false;
@@ -668,24 +716,71 @@ public final class FissureEruptions {
             if (!natural(level, built, m.set(x, y, z))) return false;
         }
         int cover = 0;
+        BlockState over = Blocks.AIR.defaultBlockState();
         for (int y = g + 1; y <= g + 3; y++) {
             BlockState s = level.getBlockState(m.set(x, y, z));
             if (s.isAir()) break;
+            if (openWater(s)) {
+                over = s;
+                break;
+            }
             if (!TerrainProbe.isVegetation(s) || TerrainProbe.isTreePart(s) || y == g + 3) return false;
             cover++;
         }
         // Bottom up, so nothing is left hanging.
         for (int y = g - k; y <= g + cover; y++) {
-            BlockState from = y + k <= g + cover ? level.getBlockState(new BlockPos(x, y + k, z)) : Blocks.AIR.defaultBlockState();
+            BlockState from = y + k <= g + cover ? level.getBlockState(new BlockPos(x, y + k, z)) : over;
             level.setBlock(m.set(x, y, z), from, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
         }
         for (int y = g + cover + 1; y <= g + cover + k; y++) {
-            level.setBlock(m.set(x, y, z), Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+            level.setBlock(m.set(x, y, z), over, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+        }
+        if (over.isAir()) {
+            // Dry ground on a shore dropped under the water beside it: the lake comes in over it, as high as it stands,
+            // rather than running out of itself into the hollow.
+            BlockPos beside = waterBeside(level, x, z, g - k + 1, g);
+            if (beside != null) {
+                BlockState water = level.getBlockState(beside);
+                for (int y = g - k + 1; y <= beside.getY(); y++) {
+                    BlockState s = level.getBlockState(m.set(x, y, z));
+                    if (s.isAir() || TerrainProbe.isVegetation(s) && !TerrainProbe.isTreePart(s)) {
+                        level.setBlock(m, water, Block.UPDATE_ALL);
+                    }
+                }
+            }
         }
         return true;
     }
 
-    /** Opens a crack a block wide and {@code depth} deep in natural ground. */
+    /** A block of water itself (a lake's, a river's), not a plant or a block standing in water. */
+    private static boolean openWater(BlockState s) {
+        return s.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock && s.getFluidState().is(FluidTags.WATER);
+    }
+
+    /**
+     * The highest block of open water beside a column, on its four sides, from {@code lo} to {@code hi}; null if none.
+     * Never loads a chunk.
+     */
+    private static BlockPos waterBeside(ServerLevel level, int x, int z, int lo, int hi) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        BlockPos best = null;
+        for (int i = 0; i < 4; i++) {
+            int nx = x + (i == 0 ? 1 : i == 1 ? -1 : 0), nz = z + (i == 2 ? 1 : i == 3 ? -1 : 0);
+            if (!Loaded.at(level, nx, nz)) continue;
+            for (int y = hi; y >= lo && (best == null || y > best.getY()); y--) {
+                if (openWater(level.getBlockState(m.set(nx, y, nz)))) {
+                    best = m.immutable();
+                    break;
+                }
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Opens a crack a block wide and {@code depth} deep in natural ground; under water, or on a shore beside it, the
+     * water fills it as high as it stands, rather than running into it out of a lake.
+     */
     private static void crack(ServerLevel level, LongSet built, int x, int z, int depth) {
         if (!ready(level, x, z)) return;
         int g = TerrainProbe.groundY(level, x, z);
@@ -695,9 +790,21 @@ public final class FissureEruptions {
             if (!natural(level, built, m.set(x, y, z))) return;
         }
         BlockState over = level.getBlockState(m.set(x, g + 1, z));
-        if (!over.isAir() && !(TerrainProbe.isVegetation(over) && !TerrainProbe.isTreePart(over))) return;
-        if (!over.isAir()) level.setBlock(m, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
-        for (int y = g; y > g - depth; y--) level.setBlock(m.set(x, y, z), Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        boolean wet = openWater(over);
+        if (!wet && !over.isAir() && !(TerrainProbe.isVegetation(over) && !TerrainProbe.isTreePart(over))) return;
+        if (!wet && !over.isAir()) level.setBlock(m, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        BlockState fill = wet ? over : Blocks.AIR.defaultBlockState();
+        int wetTo = wet ? g : Integer.MIN_VALUE;
+        if (!wet) {
+            BlockPos beside = waterBeside(level, x, z, g - depth + 1, g);
+            if (beside != null) {
+                fill = level.getBlockState(beside);
+                wetTo = beside.getY();
+            }
+        }
+        for (int y = g; y > g - depth; y--) {
+            level.setBlock(m.set(x, y, z), y <= wetTo ? fill : Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        }
         cracked++;
     }
 
@@ -728,6 +835,180 @@ public final class FissureEruptions {
             return s.getFluidState().isEmpty() ? m.getY() : Integer.MIN_VALUE;
         }
         return Integer.MIN_VALUE;
+    }
+
+    // === Lava and water ===================================================
+
+    /** The top of the water standing in a column, or MIN where its top is not water. */
+    private static int waterTop(ServerLevel level, int x, int z) {
+        int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+        return level.getBlockState(new BlockPos(x, y, z)).getFluidState().is(FluidTags.WATER) ? y : Integer.MIN_VALUE;
+    }
+
+    /**
+     * Notes the water standing in a column the flow has come up against: its top, the bed under it and what it is, so
+     * that once the lava has set it is opened again as it was (see {@link #restore}). Whatever the lava did to it in
+     * the meantime -- a mod that lets fluids run as finite volumes pushes lava into water, and water on to lava, and
+     * where they meet they set into stone -- a river is not dammed and a lake not filled in.
+     */
+    private static void noteWater(ServerLevel level, Fissure f, int x, int z) {
+        long col = column(x, z);
+        if (f.water.containsKey(col)) return;
+        int top = waterTop(level, x, z);
+        if (top == Integer.MIN_VALUE) return;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos(x, top, z);
+        BlockState what = level.getBlockState(m);
+        int bed = top;
+        while (bed > top - 64 && level.getBlockState(m.set(x, bed, z)).getFluidState().is(FluidTags.WATER)) bed--;
+        f.water.put(col, (long) Block.getId(what) << 32 | (long) (top + 32768) << 16 | (bed + 32768));
+    }
+
+    /**
+     * Whether water stands beside {@code p}, on any of its four sides, level with it or a block lower -- lava a block
+     * over a lake's top beside it runs out on to the water -- or stood there when it was noted and has run off since;
+     * the water is noted as met.
+     */
+    private static boolean wetBeside(ServerLevel level, Fissure f, BlockPos p) {
+        boolean wet = false;
+        for (int i = 0; i < 4; i++) {
+            int nx = p.getX() + (i == 0 ? 1 : i == 1 ? -1 : 0), nz = p.getZ() + (i == 2 ? 1 : i == 3 ? -1 : 0);
+            if (wasWater(f, nx, p.getY(), nz) || wasWater(f, nx, p.getY() - 1, nz)) {
+                wet = true;
+                continue;
+            }
+            if (!level.getBlockState(new BlockPos(nx, p.getY(), nz)).getFluidState().is(FluidTags.WATER)
+                    && !level.getBlockState(new BlockPos(nx, p.getY() - 1, nz)).getFluidState().is(FluidTags.WATER)) continue;
+            noteWater(level, f, nx, nz);
+            wet = true;
+        }
+        return wet;
+    }
+
+    /** How far round the eruptive segment the water is noted before the lava comes out: as far as a flow runs. */
+    private static final int SHORE_REACH = 64;
+
+    /**
+     * Notes the water standing round where the lava will come out, a chunk at a time, before any of it gets there: a
+     * mod that runs fluids as finite volumes carries the lava on past where this mod lays it, down on to a lake's top,
+     * and only water noted as it was can be opened again as it was.
+     */
+    private static void noteShores(ServerLevel level, Fissure f, long deadline) {
+        if (f.shoreBand == null) {
+            LongOpenHashSet band = new LongOpenHashSet();
+            for (int a = f.seg0 - SHORE_REACH; a <= f.seg1 + SHORE_REACH; a += 8) {
+                for (int c = -SHORE_REACH; c <= SHORE_REACH; c += 8) band.add(chunkKey(f.x(a, c) >> 4, f.z(a, c) >> 4));
+            }
+            f.shoreBand = band.toLongArray();
+        }
+        while (f.shoreAt < f.shoreBand.length && System.nanoTime() < deadline) {
+            long k = f.shoreBand[f.shoreAt++];
+            int ccx = (int) (k >> 32), ccz = (int) k;
+            if (!Loaded.chunk(level, ccx, ccz)) continue;
+            for (int i = 0; i < 256; i++) noteWater(level, f, ccx * 16 + (i >> 4), ccz * 16 + (i & 15));
+        }
+    }
+
+    /**
+     * Watches the noted water while the lava runs, a slice of it a tick: lava that has got on to it or into it -- carried
+     * there by a mod that runs fluids as finite volumes, or fallen from a cliff -- goes in a hiss of steam, the water
+     * back where it was; lava standing at its edge is chilled into the shore's crust.
+     */
+    private static void guardShores(ServerLevel level, Fissure f, long deadline) {
+        if (f.water.isEmpty()) return;
+        if (f.guardKeys == null || f.guardAt >= f.guardKeys.length) {
+            f.guardKeys = f.water.keySet().toLongArray();
+            f.guardAt = 0;
+        }
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        while (f.guardAt < f.guardKeys.length && System.nanoTime() < deadline) {
+            long col = f.guardKeys[f.guardAt++];
+            int x = (int) (col >> 32), z = (int) col;
+            if (!ready(level, x, z)) continue;
+            long v = f.water.get(col);
+            BlockState what = Block.stateById((int) (v >>> 32));
+            int top = (int) (v >>> 16 & 0xFFFF) - 32768;
+            for (int y = top - 1; y <= top + 1; y++) {
+                if (!level.getBlockState(m.set(x, y, z)).getFluidState().is(FluidTags.LAVA)) continue;
+                com.jeladastudios.ftsgeology.util.Freeze.set(level, m.immutable(), y <= top && openWater(what) ? what
+                        : Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+                hissed++;
+                if (level.random.nextInt(4) == 0) {
+                    level.sendParticles(ParticleTypes.CLOUD, x + 0.5, y + 1.0, z + 0.5, 4, 0.4, 0.3, 0.4, 0.02);
+                    level.playSound(null, m, SoundEvents.LAVA_EXTINGUISH, SoundSource.BLOCKS, 1.0f, 0.6f + 0.4f * level.random.nextFloat());
+                }
+            }
+            for (int i = 0; i < 4; i++) {
+                int nx = x + (i == 0 ? 1 : i == 1 ? -1 : 0), nz = z + (i == 2 ? 1 : i == 3 ? -1 : 0);
+                for (int y = top; y <= top + 1; y++) {
+                    if (wasWater(f, nx, y, nz) || !level.getBlockState(m.set(nx, y, nz)).getFluidState().is(FluidTags.LAVA)) continue;
+                    quench(level, f, m.immutable());
+                }
+            }
+        }
+    }
+
+    /** Whether a place was under the water noted in its column, or in the room the graben's drop opened under it. */
+    private static boolean wasWater(Fissure f, int x, int y, int z) {
+        long col = column(x, z);
+        if (!f.water.containsKey(col)) return false;
+        long v = f.water.get(col);
+        int top = (int) (v >>> 16 & 0xFFFF) - 32768, bed = (int) (v & 0xFFFF) - 32768;
+        return y > bed - 2 && y <= top;
+    }
+
+    /**
+     * Lava come to the water's edge: it does not run in but is chilled where it stands, glassy at the skin -- a crust of
+     * basalt and obsidian along the shore -- in a hiss of steam, and the flow goes no further that way.
+     */
+    private static void quench(ServerLevel level, Fissure f, BlockPos p) {
+        BlockState rock = level.random.nextInt(4) == 0 ? Blocks.OBSIDIAN.defaultBlockState() : Blocks.BASALT.defaultBlockState();
+        com.jeladastudios.ftsgeology.util.Freeze.set(level, p, TfcCompat.translate(level, p, rock), Block.UPDATE_ALL);
+        f.shore.add(p.asLong());
+        quenched++;
+        level.sendParticles(ParticleTypes.CLOUD, p.getX() + 0.5, p.getY() + 1.0, p.getZ() + 0.5, 6, 0.4, 0.3, 0.4, 0.02);
+        if (level.random.nextInt(3) == 0) {
+            level.playSound(null, p, SoundEvents.LAVA_EXTINGUISH, SoundSource.BLOCKS, 1.5f, 0.6f + 0.4f * level.random.nextFloat());
+        }
+    }
+
+    /**
+     * The water the flow met, opened again once its lava has all set: from its bed to its top, whatever stone, rock or
+     * lava now stands there gives way to the water it was. A player's blocks are left.
+     */
+    private static void restore(ServerLevel level, Fissure f, long deadline) {
+        long[] cols = f.water.keySet().toLongArray();
+        while (f.restoreAt < cols.length && System.nanoTime() < deadline) {
+            long col = cols[f.restoreAt++];
+            int x = (int) (col >> 32), z = (int) col;
+            if (!ready(level, x, z)) continue;
+            long v = f.water.get(col);
+            BlockState what = Block.stateById((int) (v >>> 32));
+            int top = (int) (v >>> 16 & 0xFFFF) - 32768, bed = (int) (v & 0xFFFF) - 32768;
+            if (!openWater(what)) continue;
+            LongSet built = PLAYER_BUILT.computeIfAbsent(chunkKey(x >> 4, z >> 4), k -> PlayerBuilt.inChunk(level, x >> 4, z >> 4));
+            BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+            for (int y = bed + 1; y <= top; y++) {
+                BlockState s = level.getBlockState(m.set(x, y, z));
+                if (s.getFluidState().is(FluidTags.WATER) || built.contains(m.asLong()) || !setByLava(s)) continue;
+                level.setBlock(m, what, Block.UPDATE_ALL);
+                reopened++;
+            }
+            // Over it, open air before: the rock of lava that ran out on to the water's top is taken off it.
+            for (int y = top + 1; y <= top + DEEPEST + 1; y++) {
+                BlockState s = level.getBlockState(m.set(x, y, z));
+                if (s.isAir() || built.contains(m.asLong()) || !setByLava(s)) continue;
+                level.setBlock(m, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+                reopened++;
+            }
+        }
+        if (f.restoreAt >= cols.length) f.restored = true;
+    }
+
+    /** What lava leaves where it met water, or lava itself, or nothing: what the water may have back. */
+    private static boolean setByLava(BlockState s) {
+        return s.isAir() || s.getFluidState().is(FluidTags.LAVA) || s.is(Blocks.STONE) || s.is(Blocks.COBBLESTONE)
+                || s.is(Blocks.OBSIDIAN) || s.is(Blocks.BASALT) || s.is(Blocks.SMOOTH_BASALT) || s.is(Blocks.BLACKSTONE)
+                || s.is(Blocks.MAGMA_BLOCK) || s.is(ModBlocks.COOLING_LAVA_CRUST.get()) || s.is(ModBlocks.BASALT_LAYER.get());
     }
 
     /** Whether lava may take a block's place: open air, a plant, snow, or lava running loose. */
@@ -768,15 +1049,40 @@ public final class FissureEruptions {
             if (f.lavaCols.contains(col)) {
                 // Lava already laid there: a flow from higher up runs on over it (see stack).
                 int top = lavaTop(level, nx, nz);
-                if (top != Integer.MIN_VALUE && top + 1 <= surface) {
-                    f.front.add(new Front((top + 1) * 16 + (int) (16 * unit(mix(nx * 73428767L ^ nz), 9)), col, surface));
-                }
+                if (top != Integer.MIN_VALUE && top + 1 <= surface) f.front.add(new Front(priority(f, nx, nz, top + 1, surface), col, surface));
                 continue;
             }
             int g = ground(level, nx, nz);
-            if (g == Integer.MIN_VALUE || g + 1 > surface) continue;
-            f.front.add(new Front((g + 1) * 16 + (int) (16 * unit(mix(nx * 73428767L ^ nz), 9)), col, surface));
+            if (g == Integer.MIN_VALUE) {
+                // Water, as like as not: noted, to be opened again whatever comes of it.
+                noteWater(level, f, nx, nz);
+                continue;
+            }
+            if (g + 1 > surface) continue;
+            f.front.add(new Front(priority(f, nx, nz, g + 1, surface), col, surface));
         }
+    }
+
+    /**
+     * The most blocks of lava a flow stands deep. Three made a lake of rock where it pooled; a real flow is a few metres
+     * thick, and with less of it piled up where it lies it runs on further.
+     */
+    private static final int DEEPEST = 2;
+
+    /** What running on downhill counts for against filling lower ground elsewhere, and the lobes' spread, in blocks. */
+    private static final double DOWNHILL = 2.5, LOBES = 1.5;
+
+    /**
+     * The order the lava takes the columns round its edge in, lowest first, in sixteenths of a block. A flow running on
+     * downhill from where it got to is taken a few blocks ahead of the lowest ground elsewhere: a lava flow is thick
+     * and slow and keeps to the way it is going, a long tongue down a slope before it ponds where the ground levels
+     * out. On the level, broad lobes, not a spreading disc.
+     */
+    private static int priority(Fissure f, int x, int z, int at, int surface) {
+        double key = at + unit(mix(x * 73428767L ^ z), 9)
+                + LOBES * com.jeladastudios.ftsgeology.util.ValueNoise.noise(x + f.cx * 7, z - f.cz * 3, 9.0);
+        if (at < surface) key -= DOWNHILL;
+        return (int) Math.round(16 * key);
     }
 
     /** Lays lava in the column a front names, if it still can; true if it did. */
@@ -789,7 +1095,16 @@ public final class FissureEruptions {
         int g = ground(level, x, z);
         if (g == Integer.MIN_VALUE || g + 1 > fr.allowed()) return false;
         BlockPos p = new BlockPos(x, g + 1, z);
+        // The bed of water that ran off under the flow is the water's still: the lava does not take it.
+        if (wasWater(f, x, p.getY(), z)) return false;
         if (!takes(level.getBlockState(p)) || !natural(level, null, p.below())) return false;
+        if (wetBeside(level, f, p)) {
+            // The water's edge: chilled where it stands, and no further.
+            quench(level, f, p);
+            f.lavaCols.add(col);
+            f.lava++;
+            return true;
+        }
         level.setBlock(p, lava(level, p), Block.UPDATE_ALL);
         f.cells.add(p.asLong());
         f.lavaCols.add(col);
@@ -801,7 +1116,7 @@ public final class FissureEruptions {
 
     /**
      * Thickens the flow by a block where it is thinnest, the oldest of it first (it lies nearest the fissure): a block
-     * of lava on a block of lava no more than three deep, its neighbours then offered at the new height. False if none
+     * of lava on a block of lava, never more than two deep, its neighbours then offered at the new height. False if none
      * of the next few dozen can.
      */
     private static boolean rise(ServerLevel level, Fissure f) {
@@ -813,10 +1128,10 @@ public final class FissureEruptions {
                     || !level.getBlockState(p).getFluidState().is(FluidTags.LAVA)) continue;
             BlockPos up = p.above();
             BlockState over = level.getBlockState(up);
-            if (!takes(over)) continue;
+            if (!takes(over) || wetBeside(level, f, up)) continue;
             int deep = 1;
-            while (deep < 4 && level.getBlockState(p.below(deep)).getFluidState().is(FluidTags.LAVA)) deep++;
-            if (deep >= 3 || lowerBeside(level, p)) continue;
+            while (deep < DEEPEST && level.getBlockState(p.below(deep)).getFluidState().is(FluidTags.LAVA)) deep++;
+            if (deep >= DEEPEST || lowerBeside(level, p)) continue;
             level.setBlock(up, lava(level, up), Block.UPDATE_ALL);
             f.cells.add(up.asLong());
             f.lava++;
@@ -847,7 +1162,7 @@ public final class FissureEruptions {
 
     /**
      * A block of lava on the lava already in a column, where a flow from higher up runs on over its own field -- the
-     * vents' lava over the curtain's -- no deeper than three; true if laid. The front takes the low ground first, so a
+     * vents' lava over the curtain's -- no deeper than two; true if laid. The front takes the low ground first, so a
      * flow spreads before it piles up.
      */
     private static boolean stack(ServerLevel level, Fissure f, int x, int z, int allowed) {
@@ -855,10 +1170,10 @@ public final class FissureEruptions {
         int top = lavaTop(level, x, z);
         if (top == Integer.MIN_VALUE || top + 1 > allowed) return false;
         int deep = 0;
-        while (deep < 3 && level.getBlockState(new BlockPos(x, top - deep, z)).getFluidState().is(FluidTags.LAVA)) deep++;
-        if (deep >= 3) return false;
+        while (deep < DEEPEST && level.getBlockState(new BlockPos(x, top - deep, z)).getFluidState().is(FluidTags.LAVA)) deep++;
+        if (deep >= DEEPEST) return false;
         BlockPos p = new BlockPos(x, top + 1, z);
-        if (!takes(level.getBlockState(p))) return false;
+        if (!takes(level.getBlockState(p)) || wetBeside(level, f, p)) return false;
         level.setBlock(p, lava(level, p), Block.UPDATE_ALL);
         f.cells.add(p.asLong());
         f.lava++;
@@ -881,12 +1196,26 @@ public final class FissureEruptions {
         int x = f.x(a, c), z = f.z(a, c);
         if (!ready(level, x, z)) return;
         front(level, f);
+        // Under a lake or a river, or where the trench would open beside one, the magma meets water: no fountains of lava
+        // there but blasts of steam and shattered rock (see show), which heap a ring of tuff on the shore (see tuffRings).
+        int wetTop = waterTop(level, x, z);
+        if (wetTop != Integer.MIN_VALUE) {
+            f.wet.add(BlockPos.asLong(x, wetTop, z));
+            noteWater(level, f, x, z);
+            return;
+        }
         int g = ground(level, x, z);
         if (g == Integer.MIN_VALUE) return;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         // Only into solid ground nobody built, with ground under it: not over a tunnel, not beside a cellar.
         for (int y = g - 3; y <= g; y++) {
             if (!natural(level, null, m.set(x, y, z))) return;
+        }
+        for (int y = g - 2; y <= g + 1; y++) {
+            if (wetBeside(level, f, m.set(x, y, z))) {
+                f.wet.add(BlockPos.asLong(x, g, z));
+                return;
+            }
         }
         boolean any = false;
         for (int y = g - 2; y <= g; y++) {
@@ -923,7 +1252,7 @@ public final class FissureEruptions {
             if (!Loaded.at(level, x, z)) continue;
             // On its own ground and the lava in its trench, never on a roof or in a tree.
             int base = ground(level, x, z);
-            if (base == Integer.MIN_VALUE || !natural(level, null, new BlockPos(x, base, z))) continue;
+            if (base == Integer.MIN_VALUE || !natural(level, null, new BlockPos(x, base, z)) || nearWet(f, x, z, 5)) continue;
             int top = base;
             while (top < base + 4 && level.getBlockState(new BlockPos(x, top + 1, z)).getFluidState().is(FluidTags.LAVA)) top++;
             f.vents.add(BlockPos.asLong(x, top, z));
@@ -961,6 +1290,72 @@ public final class FissureEruptions {
                     BlockPos r = new BlockPos(rx, g + 1, rz);
                     if (ready(level, r.getX(), r.getZ()) && takes(level.getBlockState(r)) && !level.getBlockState(r).getFluidState().is(FluidTags.LAVA)
                             && natural(level, null, r.below())) level.setBlock(r, scoria(level, false), Block.UPDATE_ALL);
+                }
+            }
+        }
+    }
+
+    /** Whether the fissure met water within {@code r} blocks of a column. */
+    private static boolean nearWet(Fissure f, int x, int z, int r) {
+        for (long w : f.wet) {
+            if (Math.abs(BlockPos.getX(w) - x) <= r && Math.abs(BlockPos.getZ(w) - z) <= r) return true;
+        }
+        return false;
+    }
+
+    /** How far out from where the fissure met water its tuff ring stands, and how far its ash falls. */
+    private static final int RING_IN = 2, RING_OUT = 7, ASH_OUT = 14;
+
+    /**
+     * Rings of tuff round where the fissure met water. Magma meeting water does not pour out but shatters: blast after
+     * blast of steam throws out ash and broken rock, which falls in a low ring round the vent -- a tuff ring, as on
+     * the shores of Myvatn and at Laki. Here each stretch of the fissure under water heaps one on the land round it, a
+     * block or two of tuff on the shore within a few blocks, a dusting of ash further out. Once, as the eruption draws
+     * into its vents.
+     */
+    private static void tuffRings(ServerLevel level, Fissure f) {
+        f.ringed = true;
+        if (f.wet.isEmpty()) return;
+        // The points by 16-block cell, so each column looks only at those near it.
+        Long2ObjectOpenHashMap<LongArrayList> cells = new Long2ObjectOpenHashMap<>();
+        for (long w : f.wet) cells.computeIfAbsent(chunkKey(BlockPos.getX(w) >> 4, BlockPos.getZ(w) >> 4), k -> new LongArrayList()).add(w);
+        LongOpenHashSet seen = new LongOpenHashSet();
+        BlockState ash = ModBlocks.VOLCANIC_ASH.get().defaultBlockState();
+        for (long from : f.wet) for (int x = BlockPos.getX(from) - ASH_OUT; x <= BlockPos.getX(from) + ASH_OUT; x++) {
+            for (int z = BlockPos.getZ(from) - ASH_OUT; z <= BlockPos.getZ(from) + ASH_OUT; z++) {
+                if (!seen.add(column(x, z))) continue;
+                double d = Double.MAX_VALUE;
+                int top = Integer.MIN_VALUE;
+                for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) {
+                    LongArrayList near = cells.get(chunkKey((x >> 4) + i, (z >> 4) + j));
+                    if (near == null) continue;
+                    for (long w : near) {
+                        double e = Math.hypot(BlockPos.getX(w) - x, BlockPos.getZ(w) - z);
+                        if (e < d) {
+                            d = e;
+                            top = BlockPos.getY(w);
+                        }
+                    }
+                }
+                if (d < RING_IN || d > ASH_OUT || !ready(level, x, z)) continue;
+                int g = ground(level, x, z);
+                // Land only, on the shore: not far up a slope over the water.
+                if (g == Integer.MIN_VALUE || g > top + 3 || !natural(level, null, new BlockPos(x, g, z))) continue;
+                long h = mix(x * 341873128712L ^ z * 132897987541L ^ f.id);
+                if (d <= RING_OUT) {
+                    // Highest a little inside its outer edge, two blocks there, one at its feet.
+                    int high = d >= 3 && d <= RING_OUT - 2 && unit(h, 3) < 0.7 ? 2 : 1;
+                    for (int i = 1; i <= high; i++) {
+                        BlockPos p = new BlockPos(x, g + i, z);
+                        if (!takes(level.getBlockState(p)) || level.getBlockState(p).getFluidState().is(FluidTags.LAVA)) break;
+                        level.setBlock(p, TfcCompat.translate(level, p, Blocks.TUFF.defaultBlockState()), Block.UPDATE_ALL);
+                        ringBlocks++;
+                    }
+                } else if (unit(h, 4) < 0.6 * (ASH_OUT - d) / (ASH_OUT - RING_OUT)) {
+                    BlockPos p = new BlockPos(x, g + 1, z);
+                    if (!level.getBlockState(p).isAir() || !ash.canSurvive(level, p)) continue;
+                    level.setBlock(p, ash.setValue(com.jeladastudios.ftsgeology.block.VolcanicAshBlock.LAYERS, 1 + (int) (2 * unit(h, 5))),
+                            Block.UPDATE_ALL);
                 }
             }
         }
@@ -1076,9 +1471,40 @@ public final class FissureEruptions {
 
     // === Cooling ==========================================================
 
+    /** Lava this thin or thinner, in eighths of a block, is a film that leaves nothing when it sets. */
+    private static final int FILM = 1;
+
     /**
-     * The lava sets: first all of it into a crust (glowing still, over basalt where it lies deep), then most of the
-     * crust on into young basalt.
+     * Sets the lava standing at {@code p} into rock by how much of it there is: a full block into {@code full}, lava
+     * that ran out thin (Flowing Fluids keeps it as eighths of a block) into a sheet of as many layers on firm ground,
+     * a film or a stream falling through the air into nothing. Lava falling on to more lava or on to the ground stands
+     * full. True if a full block was set.
+     */
+    private static boolean set(ServerLevel level, BlockPos p, FluidState fluid, BlockState full) {
+        boolean falling = !fluid.isSource() && fluid.hasProperty(FlowingFluid.FALLING) && fluid.getValue(FlowingFluid.FALLING);
+        int amount = fluid.isSource() ? 8 : fluid.getAmount();
+        if (falling) amount = level.getBlockState(p.below()).isAir() ? 0 : 8;
+        if (amount >= 8) {
+            com.jeladastudios.ftsgeology.util.Freeze.set(level, p, full, Block.UPDATE_ALL);
+            return true;
+        }
+        // Quietly, the neighbours not told: a mod that runs fluids as finite volumes answers every lava block's
+        // neighbour being told by moving lava about, which is all being set.
+        if (amount <= FILM || !BasaltLayerBlock.firmUnder(level, p)) {
+            level.setBlock(p, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+            films++;
+            return false;
+        }
+        com.jeladastudios.ftsgeology.util.Freeze.set(level, p,
+                ModBlocks.BASALT_LAYER.get().defaultBlockState().setValue(BasaltLayerBlock.LAYERS, amount), Block.UPDATE_CLIENTS);
+        sheets++;
+        sheetLayers += amount;
+        return false;
+    }
+
+    /**
+     * The lava sets: first all of it into a crust (glowing still, over basalt where it lies deep) or, where it ran out
+     * thin, a sheet of basalt as thick as it was; then most of the crust on into young basalt.
      */
     private static void cool(ServerLevel level, Fissure f, long deadline) {
         boolean second = level.getGameTime() - f.stageAt >= COOL / 2;
@@ -1093,11 +1519,10 @@ public final class FissureEruptions {
                     f.cool1--;
                     return;
                 }
-                BlockState s = level.getBlockState(p);
-                if (!s.getFluidState().is(FluidTags.LAVA)) continue;
+                FluidState fluid = level.getBlockState(p).getFluidState();
+                if (!fluid.is(FluidTags.LAVA)) continue;
                 boolean top = !level.getBlockState(p.above()).getFluidState().is(FluidTags.LAVA);
-                com.jeladastudios.ftsgeology.util.Freeze.set(level, p, top ? ModBlocks.COOLING_LAVA_CRUST.get().defaultBlockState() : Blocks.BASALT.defaultBlockState(), Block.UPDATE_ALL);
-                cooled++;
+                if (set(level, p, fluid, top ? ModBlocks.COOLING_LAVA_CRUST.get().defaultBlockState() : Blocks.BASALT.defaultBlockState())) cooled++;
             } else if (second && f.cool2 < f.cells.size()) {
                 BlockPos p = BlockPos.of(f.cells.getLong(f.cool2++));
                 if (!ready(level, p.getX(), p.getZ())) {
@@ -1119,9 +1544,24 @@ public final class FissureEruptions {
     /**
      * The last of the cooling: the box the field lies in, swept for any lava still lying there -- a mod that lets fluids
      * flow as finite volumes (Flowing Fluids) moves lava off the blocks it was laid on, and that would lie molten for
-     * good. Lava standing full sets into rock; a thin film left running is gone. Gone over again while a pass still
-     * finds some, three passes at most, within the budget.
+     * good. It sets as the rest of the flow did (see {@link #set}): full lava into rock, thin lava into a sheet, a film
+     * into nothing. Gone over again while a pass still finds some, three passes at most, within the budget.
      */
+    /** The most lava followed out of the box and set, over the whole sweep, and how far out of the box it is followed. */
+    private static final int BEYOND_MOST = 4096, BEYOND_REACH = 32;
+
+    private static boolean outside(int[] b, BlockPos q) {
+        return q.getX() < b[0] || q.getX() > b[2] || q.getZ() < b[1] || q.getZ() > b[3] || q.getY() < b[4];
+    }
+
+    /** What lava left lying sets into: basalt under more lava, a skin of crust, basalt or blackstone on top. */
+    private static BlockState sweptRock(ServerLevel level, BlockPos p) {
+        boolean top = !level.getBlockState(p.above()).getFluidState().is(FluidTags.LAVA);
+        int r = level.random.nextInt(20);
+        return !top ? Blocks.BASALT.defaultBlockState() : r < 3 ? ModBlocks.COOLING_LAVA_CRUST.get().defaultBlockState()
+                : (r < 13 ? Blocks.BASALT : r < 18 ? Blocks.SMOOTH_BASALT : Blocks.BLACKSTONE).defaultBlockState();
+    }
+
     private static void sweep(ServerLevel level, Fissure f, long deadline) {
         if (f.box == null) {
             int x0 = Integer.MAX_VALUE, x1 = Integer.MIN_VALUE, z0 = Integer.MAX_VALUE, z1 = Integer.MIN_VALUE, y0 = Integer.MAX_VALUE, y1 = Integer.MIN_VALUE;
@@ -1141,24 +1581,43 @@ public final class FissureEruptions {
         while (f.sweepAt < n && System.nanoTime() < deadline) {
             int i = f.sweepAt++, x = b[0] + i % w, z = b[1] + i / w;
             if (!ready(level, x, z)) continue;
-            for (int y = b[5]; y >= b[4]; y--) {
+            // From the bottom up, so thin lava lying on more lava finds rock under it.
+            for (int y = b[4]; y <= b[5]; y++) {
                 BlockPos p = new BlockPos(x, y, z);
-                var fluid = level.getBlockState(p).getFluidState();
+                FluidState fluid = level.getBlockState(p).getFluidState();
                 if (!fluid.is(FluidTags.LAVA)) continue;
                 f.sweepFound++;
-                if (!fluid.isSource()) {
-                    level.setBlock(p, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
-                    continue;
+                // At the box's edge, lava running on out of it: followed once the box is done.
+                if (x == b[0] || x == b[2] || z == b[1] || z == b[3] || y == b[4]) {
+                    for (Direction d : Direction.values()) {
+                        if (d == Direction.UP) continue;
+                        BlockPos q = p.relative(d);
+                        if (outside(b, q) && level.getBlockState(q).getFluidState().is(FluidTags.LAVA)) f.beyond.add(q.asLong());
+                    }
                 }
-                boolean top = !level.getBlockState(p.above()).getFluidState().is(FluidTags.LAVA);
-                int r = level.random.nextInt(20);
-                BlockState rock = !top ? Blocks.BASALT.defaultBlockState() : r < 3 ? ModBlocks.COOLING_LAVA_CRUST.get().defaultBlockState()
-                        : (r < 13 ? Blocks.BASALT : r < 18 ? Blocks.SMOOTH_BASALT : Blocks.BLACKSTONE).defaultBlockState();
-                com.jeladastudios.ftsgeology.util.Freeze.set(level, p, rock, Block.UPDATE_ALL);
-                swept++;
+                if (set(level, p, fluid, sweptRock(level, p))) swept++;
             }
         }
         if (f.sweepAt < n) return;
+        // Lava a mod that lets it run as finite volumes carried on out of the box -- down a slope, into a hollow -- is
+        // followed through the lava joined to it and set as well, up to a few thousand blocks of it.
+        while (!f.beyond.isEmpty() && System.nanoTime() < deadline) {
+            BlockPos p = BlockPos.of(f.beyond.removeLong(f.beyond.size() - 1));
+            if (f.beyondSet >= BEYOND_MOST || !ready(level, p.getX(), p.getZ())) continue;
+            FluidState fluid = level.getBlockState(p).getFluidState();
+            if (!fluid.is(FluidTags.LAVA)) continue;
+            for (Direction d : Direction.values()) {
+                BlockPos q = p.relative(d);
+                // Not far off into lava of the world's own, a cave's lava lake the flow ran down into.
+                if (q.getX() < b[0] - BEYOND_REACH || q.getX() > b[2] + BEYOND_REACH || q.getZ() < b[1] - BEYOND_REACH
+                        || q.getZ() > b[3] + BEYOND_REACH || q.getY() < b[4] - BEYOND_REACH) continue;
+                if (level.getBlockState(q).getFluidState().is(FluidTags.LAVA)) f.beyond.add(q.asLong());
+            }
+            if (set(level, p, fluid, sweptRock(level, p))) swept++;
+            f.beyondSet++;
+            f.sweepFound++;
+        }
+        if (!f.beyond.isEmpty()) return;
         if (f.sweepFound > 0 && ++f.sweepPass < 3) {
             f.sweepAt = 0;
             f.sweepFound = 0;
@@ -1184,6 +1643,7 @@ public final class FissureEruptions {
                 double c = f.wobble(a);
                 int x = f.x(a, c), z = f.z(a, c);
                 if (!Loaded.at(level, x, z)) continue;
+                if (nearWet(f, x, z, 1)) continue;
                 int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
                 double tall = 4 + 7 * level.random.nextDouble();
                 // A wall of fire: thick flame up the fountain, spatter flung out of it.
@@ -1195,9 +1655,11 @@ public final class FissureEruptions {
                 if (i == 0 && now % 20 == 0) level.playSound(null, x, y, z, SoundEvents.LAVA_AMBIENT, SoundSource.BLOCKS, 4.0f, 0.5f);
                 if (i == 1 && now % 40 == 0) level.playSound(null, x, y, z, SoundEvents.FIRE_AMBIENT, SoundSource.BLOCKS, 4.0f, 0.4f);
             }
+            steam(level, f, near, now, 1.0);
             return;
         }
         double p = Math.min(1.0, (now - f.stageAt) / (double) FOCUS);
+        steam(level, f, near, now, 1.0 - p);
         for (long v : f.vents) {
             int x = BlockPos.getX(v), y = BlockPos.getY(v), z = BlockPos.getZ(v);
             if (!Loaded.at(level, x, z)) continue;
@@ -1209,6 +1671,42 @@ public final class FissureEruptions {
             }
             if (now % 6 == 0) send(level, near, ParticleTypes.LARGE_SMOKE, x + 0.5, y + tall + 3, z + 0.5, 3, 1.0, 1.0, 1.0, 0.02);
             if (now % 5 == 0) send(level, near, ParticleTypes.CAMPFIRE_SIGNAL_SMOKE, x + 0.5, y + tall + 1, z + 0.5, 1, 0.8, 0.5, 0.8, 0.01);
+        }
+    }
+
+    /**
+     * Where the fissure runs under water: no fountains of fire but the water boiling over the dike, a white column of
+     * steam with dark ash in it, and every so often a blast that throws spray and shattered rock (a phreatomagmatic
+     * eruption, as in the lakes of Iceland's rift). Along the shore where the lava was chilled, steam goes on rising.
+     * {@code strength} dies away as the eruption draws into its vents.
+     */
+    private static void steam(ServerLevel level, Fissure f, List<ServerPlayer> near, long now, double strength) {
+        if (!f.wet.isEmpty() && level.random.nextDouble() < strength) {
+            for (int i = 0; i < 3; i++) {
+                long w = f.wet.getLong(level.random.nextInt(f.wet.size()));
+                int x = BlockPos.getX(w), y = BlockPos.getY(w), z = BlockPos.getZ(w);
+                if (!Loaded.at(level, x, z)) continue;
+                double tall = (6 + 10 * level.random.nextDouble()) * (0.4 + 0.6 * strength);
+                send(level, near, ParticleTypes.BUBBLE_COLUMN_UP, x + 0.5, y - 0.5, z + 0.5, 6, 0.6, 0.6, 0.6, 0.1);
+                send(level, near, ParticleTypes.CLOUD, x + 0.5, y + 1 + tall * 0.5, z + 0.5, 14, 0.9, tall * 0.4, 0.9, 0.04);
+                if (i == 0 && now % 3 == 0) send(level, near, ParticleTypes.CAMPFIRE_SIGNAL_SMOKE, x + 0.5, y + tall, z + 0.5, 2, 1.5, 1.0, 1.5, 0.02);
+                if (i == 0 && now % 5 == 0) send(level, near, ParticleTypes.LARGE_SMOKE, x + 0.5, y + 2 + tall * 0.6, z + 0.5, 5, 1.2, 1.5, 1.2, 0.03);
+                if (i == 1 && level.random.nextInt(50) == 0) {
+                    // A blast: spray and rock flung up, a crack heard far off.
+                    send(level, near, ParticleTypes.EXPLOSION, x + 0.5, y + 1.5, z + 0.5, 3, 1.0, 1.0, 1.0, 0.0);
+                    send(level, near, ParticleTypes.SPLASH, x + 0.5, y + 1.2, z + 0.5, 60, 2.0, 0.6, 2.0, 0.4);
+                    send(level, near, ParticleTypes.ASH, x + 0.5, y + 4, z + 0.5, 40, 4.0, 3.0, 4.0, 0.02);
+                    level.playSound(null, x, y, z, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 5.0f, 0.5f + 0.2f * level.random.nextFloat());
+                    blasts++;
+                }
+                if (i == 2 && now % 10 == 0) level.playSound(null, x, y, z, SoundEvents.LAVA_EXTINGUISH, SoundSource.BLOCKS, 3.0f, 0.5f);
+            }
+        }
+        if (!f.shore.isEmpty() && now % 2 == 0) {
+            long s = f.shore.getLong(level.random.nextInt(f.shore.size()));
+            if (Loaded.at(level, BlockPos.getX(s), BlockPos.getZ(s))) {
+                send(level, near, ParticleTypes.CLOUD, BlockPos.getX(s) + 0.5, BlockPos.getY(s) + 1.2, BlockPos.getZ(s) + 0.5, 3, 0.4, 0.4, 0.4, 0.02);
+            }
         }
     }
 
@@ -1312,8 +1810,8 @@ public final class FissureEruptions {
     }
 
     public static String summary() {
-        return String.format(Locale.ROOT, "fissure eruptions: %d begun, %d swarm quakes (largest M%.1f), %d columns dropped, %d cracks, %d lava laid, %d set, %d more found lying and set; worst tick %.1f ms",
-                begun, swarm, largest, sunkColumns, cracked, laid, cooled, swept, worstMs);
+        return String.format(Locale.ROOT, "fissure eruptions: %d begun, %d swarm quakes (largest M%.1f), %d columns dropped, %d cracks, %d lava laid, %d set, %d more found lying and set, %d sheets (%d layers), %d films gone; at the water %d chilled, %d hissed away, %d steam blasts, %d tuff, %d reopened; worst tick %.1f ms",
+                begun, swarm, largest, sunkColumns, cracked, laid, cooled, swept, sheets, sheetLayers, films, quenched, hissed, blasts, ringBlocks, reopened, worstMs);
     }
 
     public static boolean any() {
@@ -1321,7 +1819,7 @@ public final class FissureEruptions {
     }
 
     public static void clear() {
-        begun = sunkColumns = cracked = laid = cooled = swarm = swept = 0;
+        begun = sunkColumns = cracked = laid = cooled = swarm = swept = sheets = sheetLayers = films = quenched = hissed = reopened = blasts = ringBlocks = 0;
         largest = worstMs = 0;
         PLAYER_BUILT.clear();
     }

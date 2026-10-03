@@ -290,6 +290,13 @@ public final class ModBlocks {
                     .strength(2.0F, 6.0F)
                     .requiresCorrectToolForDrops()));
 
+    /** A thin sheet of basalt, one to eight layers: lava that ran out thin and set where it lay. */
+    public static final RegistryObject<Block> BASALT_LAYER = BLOCKS.register("basalt_layer",
+            () -> new com.jeladastudios.ftsgeology.block.BasaltLayerBlock(BlockBehaviour.Properties.copy(Blocks.BASALT)
+                    .mapColor(MapColor.COLOR_BLACK)
+                    .forceSolidOn()
+                    .isViewBlocking((s, l, p) -> s.getValue(com.jeladastudios.ftsgeology.block.BasaltLayerBlock.LAYERS) >= 8)));
+
     /** Volcanic black sand: basalt shattered by the sea and ground down by waves, as on Hawaiian beaches. */
     public static final RegistryObject<Block> VOLCANIC_BLACK_SAND = BLOCKS.register("volcanic_black_sand",
             () -> new SandBlock(0x141414, BlockBehaviour.Properties.copy(Blocks.SAND)

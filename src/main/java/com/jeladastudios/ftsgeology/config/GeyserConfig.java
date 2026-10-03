@@ -481,7 +481,7 @@ public final class GeyserConfig {
                 .defineInRange("fissureUnrestTicks", 24000, 200, 480000);
         FISSURE_LAVA = b
                 .comment("The most blocks of lava one fissure eruption lays down.")
-                .defineInRange("fissureLava", 16000, 0, 200000);
+                .defineInRange("fissureLava", 8000, 0, 200000);
         PYROCLASTIC_FLOWS = b
                 .comment("Pyroclastic flows an eruption of a stratovolcano or a caldera sends down its flanks: part",
                         "of the column falls back and runs down the valleys as a glowing avalanche of ash and gas,",

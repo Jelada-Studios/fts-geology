@@ -70,7 +70,8 @@ public final class RockTypes {
                 || s.is(Blocks.BLACKSTONE) || s.is(Blocks.POLISHED_BLACKSTONE)
                 || s.is(Blocks.TUFF) || s.is(Blocks.OBSIDIAN) || s.is(Blocks.CRYING_OBSIDIAN)
                 || s.is(Blocks.MAGMA_BLOCK) || s.is(Blocks.NETHERRACK)
-                || isRhyolite(s) || s.is(ModBlocks.COOLING_LAVA_CRUST.get()) || s.is(ModBlocks.VOLCANIC_ASH.get())) {
+                || isRhyolite(s) || s.is(ModBlocks.COOLING_LAVA_CRUST.get()) || s.is(ModBlocks.BASALT_LAYER.get())
+                || s.is(ModBlocks.VOLCANIC_ASH.get())) {
             return Rock.VOLCANIC;
         }
 
