@@ -1,6 +1,8 @@
 {
   "replace": false,
   "values": [
-    "fts_geology:orogenic_highland"
+    "fts_geology:orogenic_highland",
+    "fts_geology:alpine_meadow",
+    "fts_geology:alpine_scree"
   ]
 }

@@ -3,6 +3,8 @@
   "values": [
     "fts_geology:everest",
     "fts_geology:k2",
-    "fts_geology:matterhorn"
+    "fts_geology:matterhorn",
+    "fts_geology:alpine_scree",
+    "fts_geology:snowfield"
   ]
 }

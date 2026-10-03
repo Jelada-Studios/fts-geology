@@ -9,6 +9,12 @@
     "fts_geology:matterhorn",
     "fts_geology:orogenic_highland",
     "fts_geology:alluvial_plain",
-    "fts_geology:oceanic_ridge"
+    "fts_geology:oceanic_ridge",
+    "fts_geology:montane_forest",
+    "fts_geology:subalpine_forest",
+    "fts_geology:treeline",
+    "fts_geology:alpine_meadow",
+    "fts_geology:alpine_scree",
+    "fts_geology:snowfield"
   ]
 }

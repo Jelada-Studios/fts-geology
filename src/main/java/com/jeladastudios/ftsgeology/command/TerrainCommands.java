@@ -379,6 +379,23 @@ public final class TerrainCommands {
         source.sendSuccess(() -> Component.literal(edges).withStyle(ChatFormatting.GRAY), false);
         String made = com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.describe(level);
         source.sendSuccess(() -> Component.literal(made).withStyle(ChatFormatting.GRAY), false);
+        // The climate the mountains here are belted by: the sea-level temperature and the heights the lines lie at.
+        var climate = level.getChunkSource().randomState().sampler()
+                .sample(net.minecraft.core.QuartPos.fromBlock(at.getX()), 0, net.minecraft.core.QuartPos.fromBlock(at.getZ()));
+        double t = net.minecraft.world.level.biome.Climate.unquantizeCoord(climate.temperature());
+        double yearC = com.jeladastudios.ftsgeology.worldgen.terrain.AltitudeBelts.seaLevel(t);
+        double seaC = com.jeladastudios.ftsgeology.worldgen.terrain.AltitudeBelts.summer(yearC)
+                + com.jeladastudios.ftsgeology.worldgen.terrain.AltitudeBelts.waver(at.getX(), at.getZ());
+        double metres = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.METRES_PER_BLOCK
+                / com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params().horizontal();
+        String belts = String.format(Locale.ROOT, "belts: climate temperature %.2f, at the sea %.1f C a year, %.1f C in summer, %.0f m a block; tree line y %d, snow line y %d; here (y %d) %.1f C in summer, %s",
+                t, yearC, seaC, metres, com.jeladastudios.ftsgeology.worldgen.terrain.AltitudeBelts.treeLine(seaC, level.getSeaLevel(), metres),
+                com.jeladastudios.ftsgeology.worldgen.terrain.AltitudeBelts.snowLine(seaC, level.getSeaLevel(), metres), base,
+                com.jeladastudios.ftsgeology.worldgen.terrain.AltitudeBelts.at(seaC, base, level.getSeaLevel(), metres),
+                com.jeladastudios.ftsgeology.worldgen.terrain.AltitudeBelts.belt(
+                        com.jeladastudios.ftsgeology.worldgen.terrain.AltitudeBelts.at(seaC, base, level.getSeaLevel(), metres)));
+        source.sendSuccess(() -> Component.literal(belts).withStyle(ChatFormatting.GRAY), false);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", belts);
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("edges: {}", edges);
         return 1;
@@ -659,6 +676,137 @@ public final class TerrainCommands {
         com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(out);
         ctx.getSource().sendSuccess(() -> Component.literal(out), false);
         return 1;
+    }
+
+    /**
+     * What the ground round here is like as a mountain range is measured: its height over its own valleys, the slopes
+     * (median, nine-tenths and ninety-nine hundredths, in degrees, and the share over 30, 45 and 60), the relief within
+     * one and five kilometres (the median over windows of the highest less the lowest), and the hypsometry (the share of
+     * the ground in each fifth of its height). The same numbers as were taken off the real ranges the mod carries, so the
+     * two can be laid side by side. From the generator's own heights, nothing generated, off the server thread; a shaded
+     * relief written beside the server as {@code fts_relief_<x>_<z>.png}.
+     */
+    public static int terrainRelief(CommandContext<CommandSourceStack> ctx, int half, int step) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        int n = 2 * (half / step) + 1;
+        if ((long) n * n > 360_000) {
+            source.sendFailure(Component.literal("Too many samples: " + (long) n * n + ", keep it under 360000"));
+            return 0;
+        }
+        var generator = level.getChunkSource().getGenerator();
+        var state = level.getChunkSource().randomState();
+        double mpb = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.METRES_PER_BLOCK
+                / com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().horizontal();
+        int sea = level.getSeaLevel();
+        final int cx = at.getX(), cz = at.getZ();
+        java.io.File out = level.getServer().getServerDirectory().toPath().resolve("fts_relief_" + cx + "_" + cz + ".png").toFile();
+        CompletableFuture.supplyAsync(() -> {
+            int[] h = new int[n * n];
+            java.util.stream.IntStream.range(0, n).parallel().forEach(i -> {
+                for (int j = 0; j < n; j++) {
+                    h[i * n + j] = generator.getBaseHeight(cx + (i - n / 2) * step, cz + (j - n / 2) * step,
+                            net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG, level, state);
+                }
+            });
+            return reliefReport(h, n, step, mpb, sea, cx, cz, out);
+        }, Util.backgroundExecutor()).thenAcceptAsync(msg -> {
+            com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(msg);
+            source.sendSuccess(() -> Component.literal(msg), false);
+        }, level.getServer()).exceptionally(t -> {
+            source.sendFailure(Component.literal("Relief failed: " + t));
+            return null;
+        });
+        return 1;
+    }
+
+    private static String reliefReport(int[] h, int n, int step, double mpb, int sea, int cx, int cz, java.io.File out) {
+        int[] sorted = h.clone();
+        java.util.Arrays.sort(sorted);
+        int floor = sorted[(int) (0.01 * sorted.length)], top = sorted[sorted.length - 1];
+        // Slopes from the central differences, on land only.
+        double[] slopes = new double[n * n];
+        int k = 0;
+        for (int i = 1; i < n - 1; i++) {
+            for (int j = 1; j < n - 1; j++) {
+                if (h[i * n + j] <= sea) continue;
+                double gx = (h[(i + 1) * n + j] - h[(i - 1) * n + j]) / (2.0 * step);
+                double gz = (h[i * n + j + 1] - h[i * n + j - 1]) / (2.0 * step);
+                slopes[k++] = Math.toDegrees(Math.atan(Math.hypot(gx, gz)));
+            }
+        }
+        java.util.Arrays.sort(slopes, 0, k);
+        double over30 = 0, over45 = 0, over60 = 0;
+        for (int i = 0; i < k; i++) {
+            if (slopes[i] > 30) over30++;
+            if (slopes[i] > 45) over45++;
+            if (slopes[i] > 60) over60++;
+        }
+        String relief = String.format(Locale.ROOT, "%.0f m within 1 km, %.0f m within 5 km",
+                reliefWithin(h, n, (int) Math.max(2, Math.round(1000 / (mpb * step)))) * mpb,
+                reliefWithin(h, n, (int) Math.max(2, Math.round(5000 / (mpb * step)))) * mpb);
+        int[] fifths = new int[5];
+        for (int v : h) fifths[Math.max(0, Math.min(4, (int) (5.0 * (v - floor) / Math.max(1, top - floor))))]++;
+        StringBuilder hyps = new StringBuilder();
+        for (int f : fifths) hyps.append(String.format(Locale.ROOT, " %.0f%%", 100.0 * f / h.length));
+        try {
+            reliefPicture(h, n, step, sea, floor, top, out);
+        } catch (java.io.IOException e) {
+            return "Relief picture failed: " + e;
+        }
+        return String.format(Locale.ROOT,
+                "relief at %d,%d, %d by %d every %d (%.0f m a block): ground %d..%d, over its floor %.0f m (median %.0f, nine-tenths %.0f); "
+                        + "slopes on land %d samples, median %.1f, nine-tenths %.1f, 99%% %.1f deg, over 30 %.0f%%, 45 %.0f%%, 60 %.0f%%; %s; hypsometry%s; picture %s",
+                cx, cz, n, n, step, mpb, floor, top, (top - floor) * mpb, (sorted[sorted.length / 2] - floor) * mpb,
+                (sorted[(int) (0.9 * sorted.length)] - floor) * mpb, k,
+                k == 0 ? 0 : slopes[k / 2], k == 0 ? 0 : slopes[(int) (0.9 * k)], k == 0 ? 0 : slopes[(int) (0.99 * k)],
+                k == 0 ? 0 : 100 * over30 / k, k == 0 ? 0 : 100 * over45 / k, k == 0 ? 0 : 100 * over60 / k, relief, hyps, out.getName());
+    }
+
+    /** The median over windows {@code w} samples wide, half overlapping, of the highest less the lowest, in blocks. */
+    private static double reliefWithin(int[] h, int n, int w) {
+        List<Integer> r = new ArrayList<>();
+        for (int i = 0; i + w <= n; i += Math.max(1, w / 2)) {
+            for (int j = 0; j + w <= n; j += Math.max(1, w / 2)) {
+                int lo = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
+                for (int a = i; a < i + w; a++) for (int b = j; b < j + w; b++) {
+                    lo = Math.min(lo, h[a * n + b]);
+                    hi = Math.max(hi, h[a * n + b]);
+                }
+                r.add(hi - lo);
+            }
+        }
+        if (r.isEmpty()) return 0;
+        java.util.Collections.sort(r);
+        return r.get(r.size() / 2);
+    }
+
+    /** Shaded relief: lit from the north-west, tinted by height (green low, brown, grey, white high), the sea blue. */
+    private static void reliefPicture(int[] h, int n, int step, int sea, int floor, int top, java.io.File out) throws java.io.IOException {
+        java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(n, n, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        double lx = -0.5, lz = -0.5, ly = 0.707;
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                int v = h[i * n + j];
+                int rgb;
+                if (v <= sea) {
+                    rgb = 0x2050a0;
+                } else {
+                    double gx = (h[Math.min(n - 1, i + 1) * n + j] - h[Math.max(0, i - 1) * n + j]) / (2.0 * step);
+                    double gz = (h[i * n + Math.min(n - 1, j + 1)] - h[i * n + Math.max(0, j - 1)]) / (2.0 * step);
+                    double len = Math.sqrt(gx * gx + gz * gz + 1);
+                    double shade = Math.max(0.15, (-gx * lx - gz * lz + ly) / len / 1.1);
+                    double t = Math.max(0, Math.min(1, (v - sea) / (double) Math.max(1, top - sea)));
+                    int r = (int) (t < 0.4 ? 90 + 200 * t : t < 0.75 ? 170 : 170 + 340 * (t - 0.75));
+                    int g = (int) (t < 0.4 ? 150 : t < 0.75 ? 150 - 60 * (t - 0.4) : 129 + 500 * (t - 0.75));
+                    int b = (int) (t < 0.4 ? 70 : t < 0.75 ? 90 : 90 + 660 * (t - 0.75));
+                    rgb = (int) Math.min(255, r * shade) << 16 | (int) Math.min(255, g * shade) << 8 | (int) Math.min(255, b * shade);
+                }
+                img.setRGB(i, j, rgb);
+            }
+        }
+        javax.imageio.ImageIO.write(img, "png", out);
     }
 
     /**

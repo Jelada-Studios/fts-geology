@@ -16,6 +16,12 @@
             "rift_valley": "fts_geology:rift_valley",
             "volcanic_highland": "fts_geology:volcanic_highland",
             "orogenic_highland": "fts_geology:orogenic_highland",
+            "montane_forest": "fts_geology:montane_forest",
+            "subalpine_forest": "fts_geology:subalpine_forest",
+            "treeline": "fts_geology:treeline",
+            "alpine_meadow": "fts_geology:alpine_meadow",
+            "alpine_scree": "fts_geology:alpine_scree",
+            "snowfield": "fts_geology:snowfield",
             "alluvial_plain": "fts_geology:alluvial_plain",
             "oceanic_ridge": "fts_geology:oceanic_ridge"
           }

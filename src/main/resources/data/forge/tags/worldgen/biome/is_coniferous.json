@@ -1,6 +1,8 @@
 {
   "replace": false,
   "values": [
-    "fts_geology:volcanic_highland"
+    "fts_geology:volcanic_highland",
+    "fts_geology:subalpine_forest",
+    "fts_geology:treeline"
   ]
 }

@@ -1,6 +1,7 @@
 {
   "type": "fts_geology:optional_spawns",
-  "biomes": ["fts_geology:orogenic_highland"],
+  "biomes": ["fts_geology:orogenic_highland", "fts_geology:montane_forest", "fts_geology:subalpine_forest", "fts_geology:treeline",
+    "fts_geology:alpine_meadow", "fts_geology:alpine_scree", "fts_geology:snowfield"],
   "spawns": [
     { "entity": "alexsmobs:bald_eagle", "weight": 8, "min": 1, "max": 2 },
     { "entity": "alexsmobs:snow_leopard", "weight": 4, "min": 1, "max": 1 },

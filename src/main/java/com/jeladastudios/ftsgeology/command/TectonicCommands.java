@@ -162,6 +162,13 @@ public final class TectonicCommands {
                                         .then(Commands.argument("half", IntegerArgumentType.integer(8, 256))
                                                 .executes(ctx -> TerrainCommands.terrainFish(ctx,
                                                         IntegerArgumentType.getInteger(ctx, "half")))))
+                                // The ground round here measured as a mountain range, and a shaded relief of it.
+                                .then(Commands.literal("relief")
+                                        .then(Commands.argument("half", IntegerArgumentType.integer(256, 12000))
+                                                .then(Commands.argument("step", IntegerArgumentType.integer(2, 64))
+                                                        .executes(ctx -> TerrainCommands.terrainRelief(ctx,
+                                                                IntegerArgumentType.getInteger(ctx, "half"),
+                                                                IntegerArgumentType.getInteger(ctx, "step"))))))
                                 .then(Commands.literal("grid")
                                         .then(Commands.argument("half", IntegerArgumentType.integer(8, 2000))
                                                 .then(Commands.argument("step", IntegerArgumentType.integer(1, 64))

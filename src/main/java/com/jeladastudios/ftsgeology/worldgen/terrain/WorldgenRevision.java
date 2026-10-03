@@ -33,8 +33,10 @@ public final class WorldgenRevision {
     public static final int LAND_COASTS = 1;
     /** A rift's axis sunk in its floor, deeper where it opens fast (round 118). */
     public static final int DEEP_RIFTS = 2;
+    /** The mountains belted by height from the climate round them, forest to snow (round 128). */
+    public static final int CLIMATE_BELTS = 3;
     /** What a world made now gets. */
-    public static final int CURRENT = 2;
+    public static final int CURRENT = 3;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;

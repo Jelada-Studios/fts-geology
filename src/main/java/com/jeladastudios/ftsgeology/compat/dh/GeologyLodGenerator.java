@@ -178,12 +178,17 @@ final class GeologyLodGenerator implements IDhApiWorldGenerator {
 
         String surface, soil = "minecraft:dirt";
         int snowLine = SnowCover.line();
+        // A belted world's snow is where its snowfields are, as the ground's own is; an older one's over its snow line.
+        boolean belted = com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.has(
+                com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.CLIMATE_BELTS);
+        String belt = biome.unwrapKey().filter(k -> k.location().getNamespace().equals("fts_geology"))
+                .map(k -> k.location().getPath()).orElse("");
         if (wet) {
             surface = water - top > 6 ? "minecraft:gravel" : "minecraft:sand";
             soil = surface;
-        } else if (top >= snowLine || biome.value().coldEnoughToSnow(new BlockPos(x, top + 1, z))) {
+        } else if (!belted && top >= snowLine || biome.value().coldEnoughToSnow(new BlockPos(x, top + 1, z))) {
             surface = slope > BARE_SLOPE * 1.5 ? "minecraft:stone" : "minecraft:snow_block";
-        } else if (slope > BARE_SLOPE) {
+        } else if (slope > BARE_SLOPE || belt.equals("alpine_scree")) {
             surface = "minecraft:stone";
             soil = "minecraft:stone";
         } else if (biome.is(BiomeTags.IS_BEACH) || biome.is(Tags.Biomes.IS_DESERT) || biome.is(Tags.Biomes.IS_SANDY)) {
@@ -203,7 +208,7 @@ final class GeologyLodGenerator implements IDhApiWorldGenerator {
         if (wet) {
             y = span(out, y, clamp(water), waterBlock, biomeWrapper, SKY);
         } else if (surface.equals("minecraft:grass_block")) {
-            String leaves = canopy(biome, x, z);
+            String leaves = belt.isEmpty() ? canopy(biome, x, z) : beltCanopy(belt, x, z);
             if (leaves != null) {
                 y = span(out, y, clamp(top + 1 + CANOPY_FROM), "minecraft:air", biomeWrapper, SKY);
                 y = span(out, y, clamp(top + 1 + CANOPY_FROM + CANOPY_THICK), leaves, biomeWrapper, SKY);
@@ -222,6 +227,30 @@ final class GeologyLodGenerator implements IDhApiWorldGenerator {
         if (to <= from) return from;
         out.add(DhApiTerrainDataPoint.create((byte) 0, 0, sky, from - minY, to - minY, block(block), biome));
         return to;
+    }
+
+    /** The leaves over a column of a mountain's forest belts (see AltitudeBelts), or null; none in any other of ours. */
+    private static String beltCanopy(String belt, int x, int z) {
+        double cover;
+        String leaves;
+        switch (belt) {
+            case "montane_forest" -> {
+                cover = 0.7;
+                leaves = SeedHash.rand01(SeedHash.hash(0L, x >> 2, z >> 2, 0xB17L)) < 0.3 ? "minecraft:spruce_leaves" : "minecraft:oak_leaves";
+            }
+            case "subalpine_forest" -> {
+                cover = 0.6;
+                leaves = "minecraft:spruce_leaves";
+            }
+            case "treeline" -> {
+                cover = 0.15;
+                leaves = "minecraft:spruce_leaves";
+            }
+            default -> {
+                return null;
+            }
+        }
+        return SeedHash.rand01(SeedHash.hash(0L, x >> 2, z >> 2, 0xD1ADL)) < cover ? leaves : null;
     }
 
     /** The leaves over a column of forest, or null where the trees stand too thin to close over it. */

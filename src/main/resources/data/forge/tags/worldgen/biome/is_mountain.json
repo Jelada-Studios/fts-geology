@@ -5,6 +5,12 @@
     "fts_geology:volcanic_highland",
     "fts_geology:everest",
     "fts_geology:k2",
-    "fts_geology:matterhorn"
+    "fts_geology:matterhorn",
+    "fts_geology:montane_forest",
+    "fts_geology:subalpine_forest",
+    "fts_geology:treeline",
+    "fts_geology:alpine_meadow",
+    "fts_geology:alpine_scree",
+    "fts_geology:snowfield"
   ]
 }

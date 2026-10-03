@@ -36,6 +36,8 @@ public class GeologyBiomeSource extends BiomeSource {
     private final Holder<Biome> river;
     /** Everest, K2 and the Matterhorn, in the order {@link DemLibrary#LANDMARKS} counts them. */
     private final Holder<Biome>[] landmarks;
+    /** The altitude belts, foot to top ({@link AltitudeBelts}); null where the world's preset names none, as an old one. */
+    private final Holder<Biome>[] belts;
 
     @SuppressWarnings("unchecked")
     public GeologyBiomeSource(BiomeSource parent, Map<String, Holder<Biome>> byRole) {
@@ -48,6 +50,14 @@ public class GeologyBiomeSource extends BiomeSource {
         Holder<Biome>[] marks = new Holder[DemLibrary.LANDMARKS.length];
         for (int i = 0; i < marks.length; i++) marks[i] = byRole.get(DemLibrary.LANDMARKS[i]);
         this.landmarks = marks;
+        @SuppressWarnings("unchecked")
+        Holder<Biome>[] b = new Holder[AltitudeBelts.Belt.values().length];
+        boolean all = true;
+        for (AltitudeBelts.Belt belt : AltitudeBelts.Belt.values()) {
+            b[belt.ordinal()] = byRole.get(belt.key);
+            if (b[belt.ordinal()] == null) all = false;
+        }
+        this.belts = all ? b : null;
     }
 
     /** The same roles over another parent's biomes: a terrain mod's overworld list, when it brings one. */
@@ -129,6 +139,12 @@ public class GeologyBiomeSource extends BiomeSource {
                 double share = TerrainFields.landmarkShare(TerrainContext.seed(), TerrainContext.params(), bx, bz);
                 if (sea ? share > 0.0 && RawGround.ready() && RawGround.heightAt(bx, bz) > SEA_LEVEL
                         : share > ON_LANDMARK) {
+                    // Its forests, meadows and scree are the belts' as any range's; the mountain's name is on its snow.
+                    // Its own biome is a cold one, and on the scree under the snow line it laid snow all the same.
+                    if (beltsOn()) {
+                        AltitudeBelts.Belt belt = beltAt(qx, qy, qz, sampler);
+                        if (belt.ordinal() <= AltitudeBelts.Belt.SCREE.ordinal()) return belts[belt.ordinal()];
+                    }
                     return landmarks[site.which()];
                 }
             }
@@ -151,7 +167,10 @@ public class GeologyBiomeSource extends BiomeSource {
         }
         Role role = GeologyRoles.roleAt(bx, bz);
         Holder<Biome> ours = roles[role.ordinal()];
-        if (ours == null) return base;
+        // Vanilla's own mountains, where the plates have none to say: belted as the ranges are.
+        if (ours == null) {
+            return beltsOn() && mountain(base) && !sea ? belts[beltAt(qx, qy, qz, sampler).ordinal()] : base;
+        }
         // Every one of ours is a biome of the surface. The same column underground is a cave biome, and putting
         // a mountainside over it would take the moss out of a lush cave and the city out of the deep dark.
         if (underground(base)) return base;
@@ -161,7 +180,29 @@ public class GeologyBiomeSource extends BiomeSource {
         if (role == Role.OCEANIC_RIDGE) return sea ? ours : base;
         // The coast is still the parent's to place; only the rivers were taken over, above.
         if (sea || TfcCompat.beach(base)) return base;
+        if (role == Role.OROGENIC_HIGHLAND && beltsOn()) return belts[beltAt(qx, qy, qz, sampler).ordinal()];
         return ours;
+    }
+
+    /** Whether the mountains are belted: a world made since the belts came, with them named in its preset. */
+    private boolean beltsOn() {
+        return belts != null && WorldgenRevision.has(WorldgenRevision.CLIMATE_BELTS);
+    }
+
+    /** The summer temperature at the sea under each column, with its wavering, once worked out. */
+    private final com.jeladastudios.ftsgeology.util.ColumnCache<Double> seaLevel = new com.jeladastudios.ftsgeology.util.ColumnCache<>(14);
+
+    /** The belt a quart of a mountain is in, from the climate round it and its height. See {@link AltitudeBelts}. */
+    private AltitudeBelts.Belt beltAt(int qx, int qy, int qz, Climate.Sampler sampler) {
+        long key = com.jeladastudios.ftsgeology.util.ColumnCache.key(qx, qz);
+        Double c = seaLevel.get(key);
+        if (c == null) {
+            double t = Climate.unquantizeCoord(sampler.sample(qx, 0, qz).temperature());
+            c = AltitudeBelts.summer(AltitudeBelts.seaLevel(t)) + AltitudeBelts.waver(QuartPos.toBlock(qx), QuartPos.toBlock(qz));
+            seaLevel.put(key, c);
+        }
+        double metres = TerrainFields.METRES_PER_BLOCK / TerrainContext.params().horizontal();
+        return AltitudeBelts.belt(AltitudeBelts.at(c, QuartPos.toBlock(qy) + 2, (int) SEA_LEVEL, metres));
     }
 
     /**
@@ -247,7 +288,12 @@ public class GeologyBiomeSource extends BiomeSource {
         return (kindOf(biome) & FROZEN) != 0;
     }
 
-    private static final int UNDERGROUND = 1, FROZEN = 2;
+    private static final int UNDERGROUND = 1, FROZEN = 2, MOUNTAIN = 4;
+
+    /** Whether a biome is one of vanilla's mountain ones, from the meadow up to the peaks. */
+    private boolean mountain(Holder<Biome> biome) {
+        return (kindOf(biome) & MOUNTAIN) != 0;
+    }
 
     /** What each biome the parent hands back is, worked out once per biome rather than for every quarter-block. */
     private final java.util.Map<Holder<Biome>, Integer> kinds = new java.util.concurrent.ConcurrentHashMap<>();
@@ -263,6 +309,8 @@ public class GeologyBiomeSource extends BiomeSource {
             String p = k.location().getPath();
             int bits = 0;
             if (p.contains("cave") || p.contains("deep_dark")) bits |= UNDERGROUND;
+            if (k.location().getNamespace().equals("minecraft") && (p.equals("meadow") || p.equals("grove")
+                    || p.equals("snowy_slopes") || p.endsWith("_peaks"))) bits |= MOUNTAIN;
             if (p.startsWith("snowy") || p.startsWith("frozen") || p.startsWith("ice")
                     || p.equals("grove") || p.equals("jagged_peaks")) bits |= FROZEN;
             return bits;
