@@ -4,8 +4,8 @@ import net.minecraftforge.common.ForgeConfigSpec;
 
 /**
  * The player's own settings, kept on their machine (config/fts_geology-client.toml): how the sky and the rain are drawn,
- * and what is shown on the rivers. The world's weather itself is the server's (see {@link GeyserConfig}). The rain and
- * the wind are heard through the Feel the Nature addon, which has settings of its own.
+ * what is shown on the rivers, and how many sounds the game may stream. The world's weather itself is the server's (see
+ * {@link GeyserConfig}). The rain and the wind are heard through the Feel the Nature addon, which has settings of its own.
  */
 public final class ClientConfig {
 
@@ -18,6 +18,7 @@ public final class ClientConfig {
     public static final ForgeConfigSpec.BooleanValue RIVER_FOAM;
     public static final ForgeConfigSpec.BooleanValue RIVER_FOAM_SHEET;
     public static final ForgeConfigSpec.BooleanValue RIVER_DEBRIS;
+    public static final ForgeConfigSpec.IntValue SOUND_STREAMS;
 
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -48,6 +49,14 @@ public final class ClientConfig {
         RIVER_DEBRIS = b
                 .comment("Leaves and bits of twig drifting down the rivers, more under trees and in wind and rain.")
                 .define("riverDebris", true);
+        b.pop();
+        b.push("sound");
+        SOUND_STREAMS = b
+                .comment("How many sounds the game may stream at once: long loops, music and records. Vanilla keeps eight, and",
+                        "a pack with ambience, music and weather mods fills them, after which a new loop -- the rain's, the",
+                        "wind's -- is not heard at all. Taken from the plain sounds, of which there are some 240. 8 is vanilla.",
+                        "Takes effect when the sound engine starts (on launch, or F3+T).")
+                .defineInRange("soundStreams", 16, 8, 32);
         b.pop();
         SPEC = b.build();
     }
