@@ -1,0 +1,12 @@
+{
+  "variants": {
+    "facing=north,lit=false": {"model": "fts_geology:block/gas_heater"},
+    "facing=north,lit=true": {"model": "fts_geology:block/gas_heater_on"},
+    "facing=south,lit=false": {"model": "fts_geology:block/gas_heater", "y": 180},
+    "facing=south,lit=true": {"model": "fts_geology:block/gas_heater_on", "y": 180},
+    "facing=east,lit=false": {"model": "fts_geology:block/gas_heater", "y": 90},
+    "facing=east,lit=true": {"model": "fts_geology:block/gas_heater_on", "y": 90},
+    "facing=west,lit=false": {"model": "fts_geology:block/gas_heater", "y": 270},
+    "facing=west,lit=true": {"model": "fts_geology:block/gas_heater_on", "y": 270}
+  }
+}

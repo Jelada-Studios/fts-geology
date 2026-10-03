@@ -53,6 +53,9 @@ public final class GasBlocks {
             () -> new OrientedMachineBlock(metal(), GasBlockEntities.BIOGAS_DIGESTER, false));
     public static final RegistryObject<Block> GAS_SEPARATOR = register("gas_separator",
             () -> new OrientedMachineBlock(metal(), GasBlockEntities.GAS_SEPARATOR, false));
+    /** A room heater burning gas, warm while it burns. */
+    public static final RegistryObject<Block> GAS_HEATER = register("gas_heater",
+            () -> new OrientedMachineBlock(glowing(9), GasBlockEntities.GAS_HEATER, false));
     public static final RegistryObject<Block> GAS_SENSOR = register("gas_sensor",
             () -> new GasSensorBlock(metal().strength(2.0f, 4.0f)));
     public static final RegistryObject<Block> VENTILATION_FAN = register("ventilation_fan",

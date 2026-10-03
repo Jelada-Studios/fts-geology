@@ -1,0 +1,22 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "particle": "minecraft:block/polished_deepslate",
+    "body": "minecraft:block/polished_deepslate",
+    "trim": "minecraft:block/iron_block",
+    "plinth": "minecraft:block/smooth_stone",
+    "window": "minecraft:block/magma",
+    "grille": "minecraft:block/iron_bars",
+    "inlet": "minecraft:block/cut_copper"
+  },
+  "elements": [
+    { "from": [1, 0, 3], "to": [15, 1, 13], "faces": { "north": {"texture": "#plinth"}, "south": {"texture": "#plinth"}, "east": {"texture": "#plinth"}, "west": {"texture": "#plinth"}, "up": {"texture": "#plinth"}, "down": {"texture": "#plinth"} } },
+    { "from": [2, 1, 4], "to": [14, 12, 12], "faces": { "north": {"texture": "#body"}, "south": {"texture": "#body"}, "east": {"texture": "#body"}, "west": {"texture": "#body"}, "up": {"texture": "#body"}, "down": {"texture": "#body"} } },
+    { "from": [4, 3, 3.5], "to": [12, 9, 4], "faces": { "north": {"texture": "#window"}, "east": {"texture": "#window"}, "west": {"texture": "#window"}, "up": {"texture": "#window"}, "down": {"texture": "#window"} } },
+    { "from": [3.5, 2.5, 3], "to": [12.5, 9.5, 3.25], "faces": { "north": {"texture": "#grille"}, "south": {"texture": "#grille"} } },
+    { "from": [1.5, 12, 3.5], "to": [14.5, 13, 12.5], "faces": { "north": {"texture": "#trim"}, "south": {"texture": "#trim"}, "east": {"texture": "#trim"}, "west": {"texture": "#trim"}, "up": {"texture": "#trim"}, "down": {"texture": "#trim"} } },
+    { "from": [6, 13, 6], "to": [10, 16, 10], "faces": { "north": {"texture": "#trim"}, "south": {"texture": "#trim"}, "east": {"texture": "#trim"}, "west": {"texture": "#trim"}, "up": {"texture": "#trim"} } },
+    { "from": [6, 2, 12], "to": [10, 6, 16], "faces": { "north": {"texture": "#inlet"}, "south": {"texture": "#inlet"}, "east": {"texture": "#inlet"}, "west": {"texture": "#inlet"}, "up": {"texture": "#inlet"}, "down": {"texture": "#inlet"} } }
+  ]
+}

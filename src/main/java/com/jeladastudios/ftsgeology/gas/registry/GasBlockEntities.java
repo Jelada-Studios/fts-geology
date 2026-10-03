@@ -5,6 +5,7 @@ import com.jeladastudios.ftsgeology.gas.block.entity.BiogasDigesterBlockEntity;
 import com.jeladastudios.ftsgeology.gas.block.entity.ElectrolyzerBlockEntity;
 import com.jeladastudios.ftsgeology.gas.block.entity.GasCompressorBlockEntity;
 import com.jeladastudios.ftsgeology.gas.block.entity.GasEngineBlockEntity;
+import com.jeladastudios.ftsgeology.gas.block.entity.GasHeaterBlockEntity;
 import com.jeladastudios.ftsgeology.gas.block.entity.GasPipeBlockEntity;
 import com.jeladastudios.ftsgeology.gas.block.entity.GasSensorBlockEntity;
 import com.jeladastudios.ftsgeology.gas.block.entity.GasSeparatorBlockEntity;
@@ -40,6 +41,8 @@ public final class GasBlockEntities {
             register("biogas_digester", BiogasDigesterBlockEntity::new, GasBlocks.BIOGAS_DIGESTER);
     public static final RegistryObject<BlockEntityType<GasSeparatorBlockEntity>> GAS_SEPARATOR =
             register("gas_separator", GasSeparatorBlockEntity::new, GasBlocks.GAS_SEPARATOR);
+    public static final RegistryObject<BlockEntityType<GasHeaterBlockEntity>> GAS_HEATER =
+            register("gas_heater", GasHeaterBlockEntity::new, GasBlocks.GAS_HEATER);
     public static final RegistryObject<BlockEntityType<GasSensorBlockEntity>> GAS_SENSOR =
             register("gas_sensor", GasSensorBlockEntity::new, GasBlocks.GAS_SENSOR);
     public static final RegistryObject<BlockEntityType<VentilationFanBlockEntity>> VENTILATION_FAN =

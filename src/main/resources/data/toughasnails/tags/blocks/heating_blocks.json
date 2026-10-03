@@ -1,0 +1,6 @@
+{
+  "replace": false,
+  "values": [
+    {"id": "fts_geology:gas_heater", "required": false}
+  ]
+}
