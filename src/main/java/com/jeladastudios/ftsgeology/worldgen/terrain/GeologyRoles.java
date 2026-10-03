@@ -78,6 +78,11 @@ public final class GeologyRoles {
 
     /** The rule itself, a pure function of the seed and the column. */
     public static Role decide(long seed, GeologyParams p, int x, int z) {
+        return decide(seed, p, x, z, WorldgenRevision.has(WorldgenRevision.PLAIN_BODIES));
+    }
+
+    /** The rule, with or without the plains' bodies (see {@link #alluvial}), for a tool to set the two side by side. */
+    public static Role decide(long seed, GeologyParams p, int x, int z, boolean bodies) {
         PlateSample s = TerrainFields.sampleAt(seed, p, x, z);
         FaultType k = s.boundaryType();
         double a = TerrainFields.across(s, p);
@@ -104,10 +109,44 @@ public final class GeologyRoles {
         if (k == FaultType.CONVERGENT_COLLISION && (TerrainFields.belt(s, p) > BELT_CORE + j
                 || TerrainFields.field(Field.RELIEF, seed, p, x, z)
                         + TerrainFields.field(Field.DEM, seed, p, x, z) > HIGH_RELIEF + j)) return Role.OROGENIC_HIGHLAND;
-        // The apron of sediment a belt sheds beyond its mountains: flat, low, and the coal country. Its border wanders
-        // in and out over a few hundred blocks as well as ragging: at one depth of apron it ran parallel to the belt.
-        if (TerrainFields.apronAt(seed, p, x, z) > APRON_CORE + 2 * j
-                + TerrainFields.APRON_WANDER * TerrainFields.jitterWide(seed, p, x, z)) return Role.ALLUVIAL_PLAIN;
+        if (alluvial(seed, p, x, z, j, bodies)) return Role.ALLUVIAL_PLAIN;
         return Role.NONE;
+    }
+
+    /**
+     * How far into a plain, in apron depth, its body has to reach somewhere near a column ragged out beyond its edge.
+     * Where the apron only just came up to the plain's border, the ragging alone made it one: a lone pocket some fifty
+     * blocks across, a green square in a snowy forest, with no plain round it.
+     */
+    private static final double PLAIN_BODY = 0.05;
+    /** How far from such a column the body is looked for, in blocks before the world's widening: two rings of eight. */
+    private static final double[] PLAIN_LOOK = {24.0, 48.0};
+
+    /**
+     * Whether a column is in the apron of sediment a belt sheds beyond its mountains: flat, low, and the coal country.
+     * Its border wanders in and out over a few hundred blocks as well as ragging: at one depth of apron it ran parallel
+     * to the belt. With {@code bodies}, as in the worlds made since round 129, ground the ragging alone puts in a plain
+     * is in it only beside the body of one.
+     */
+    private static boolean alluvial(long seed, GeologyParams p, int x, int z, double j, boolean bodies) {
+        double apron = TerrainFields.apronAt(seed, p, x, z);
+        double wander = TerrainFields.APRON_WANDER * TerrainFields.jitterWide(seed, p, x, z);
+        if (!(apron > APRON_CORE + 2 * j + wander)) return false;
+        if (!bodies || apron - APRON_CORE - wander > PLAIN_BODY) return true;
+        for (double reach : PLAIN_LOOK) {
+            double r = reach * p.horizontal();
+            for (int k = 0; k < 8; k++) {
+                double a = k * Math.PI / 4;
+                int sx = x + (int) Math.round(Math.cos(a) * r), sz = z + (int) Math.round(Math.sin(a) * r);
+                if (plainDepth(seed, p, sx, sz) > PLAIN_BODY) return true;
+            }
+        }
+        return false;
+    }
+
+    /** How far into a plain a column lies, in apron depth, before its border is ragged: below 0 outside it. */
+    private static double plainDepth(long seed, GeologyParams p, int x, int z) {
+        return TerrainFields.apronAt(seed, p, x, z) - APRON_CORE
+                - TerrainFields.APRON_WANDER * TerrainFields.jitterWide(seed, p, x, z);
     }
 }

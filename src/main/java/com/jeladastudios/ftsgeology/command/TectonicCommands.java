@@ -175,6 +175,13 @@ public final class TectonicCommands {
                                                         .executes(ctx -> TerrainCommands.terrainGrid(ctx,
                                                                 IntegerArgumentType.getInteger(ctx, "half"),
                                                                 IntegerArgumentType.getInteger(ctx, "step"))))))
+                                // The alluvial plains as bodies of ground, by the old rule and today's.
+                                .then(Commands.literal("plains")
+                                        .then(Commands.argument("half", IntegerArgumentType.integer(64, 16000))
+                                                .then(Commands.argument("step", IntegerArgumentType.integer(4, 256))
+                                                        .executes(ctx -> TerrainCommands.terrainPlains(ctx,
+                                                                IntegerArgumentType.getInteger(ctx, "half"),
+                                                                IntegerArgumentType.getInteger(ctx, "step"))))))
                                 .then(Commands.literal("biomes")
                                         .then(Commands.argument("half", IntegerArgumentType.integer(64, 16000))
                                                 .then(Commands.argument("step", IntegerArgumentType.integer(16, 1024))

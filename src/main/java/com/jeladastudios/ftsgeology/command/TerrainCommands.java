@@ -219,6 +219,72 @@ public final class TerrainCommands {
      * answers: each biome's share of the samples, and how far a biome runs along the grid's rows and columns before
      * the next one starts, on average, which is how large the patches are. Loads no chunk.
      */
+    /**
+     * The alluvial plains round here, counted as bodies of ground, by the rule the worlds made before round 129 use and
+     * by today's: how many there are, how many of them are small pockets, and how much ground they cover.
+     */
+    static int terrainPlains(CommandContext<CommandSourceStack> ctx, int half, int step) {
+        CommandSourceStack source = ctx.getSource();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        int n = 2 * (half / step) + 1;
+        if ((long) n * n > 250_000) {
+            source.sendFailure(Component.literal("Too many samples: " + (long) n * n + ", keep it under 250000"));
+            return 0;
+        }
+        long seed = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed();
+        var params = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params();
+        for (boolean bodies : new boolean[]{false, true}) {
+            boolean[][] plain = new boolean[n][n];
+            long started = System.nanoTime();
+            for (int i = 0; i < n; i++) {
+                for (int j = 0; j < n; j++) {
+                    int x = at.getX() + (i - n / 2) * step, z = at.getZ() + (j - n / 2) * step;
+                    plain[i][j] = com.jeladastudios.ftsgeology.worldgen.terrain.GeologyRoles.decide(seed, params, x, z, bodies)
+                            == com.jeladastudios.ftsgeology.worldgen.terrain.GeologyRoles.Role.ALLUVIAL_PLAIN;
+                }
+            }
+            double micros = (System.nanoTime() - started) / 1000.0 / ((double) n * n);
+            List<Integer> sizes = new ArrayList<>();
+            boolean[][] seen = new boolean[n][n];
+            int[] queue = new int[n * n];
+            for (int i = 0; i < n; i++) {
+                for (int j = 0; j < n; j++) {
+                    if (!plain[i][j] || seen[i][j]) continue;
+                    int head = 0, tail = 0;
+                    queue[tail++] = i * n + j;
+                    seen[i][j] = true;
+                    while (head < tail) {
+                        int c = queue[head++], ci = c / n, cj = c % n;
+                        int[][] ways = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+                        for (int[] w : ways) {
+                            int ni = ci + w[0], nj = cj + w[1];
+                            if (ni < 0 || nj < 0 || ni >= n || nj >= n || seen[ni][nj] || !plain[ni][nj]) continue;
+                            seen[ni][nj] = true;
+                            queue[tail++] = ni * n + nj;
+                        }
+                    }
+                    sizes.add(tail);
+                }
+            }
+            sizes.sort(null);
+            long area = 0;
+            int under128 = 0, under256 = 0;
+            for (int s : sizes) {
+                long blocks = (long) s * step * step;
+                area += blocks;
+                if (blocks < 128L * 128) under128++;
+                if (blocks < 256L * 256) under256++;
+            }
+            String line = String.format(Locale.ROOT,
+                    "%s: %d plains, %d under 128x128 blocks, %d under 256x256, %.1f%% of the ground, largest %d blocks2, %.1f us a column",
+                    bodies ? "since 129" : "before 129", sizes.size(), under128, under256, 100.0 * area / ((double) n * n * step * step),
+                    sizes.isEmpty() ? 0L : (long) sizes.get(sizes.size() - 1) * step * step, micros);
+            com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("[terrain plains] {}", line);
+            source.sendSuccess(() -> Component.literal(line), false);
+        }
+        return 1;
+    }
+
     static int terrainBiomes(CommandContext<CommandSourceStack> ctx, int half, int step) {
         CommandSourceStack source = ctx.getSource();
         ServerLevel level = source.getLevel();

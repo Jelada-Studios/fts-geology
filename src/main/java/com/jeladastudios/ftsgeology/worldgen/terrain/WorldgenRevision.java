@@ -35,8 +35,10 @@ public final class WorldgenRevision {
     public static final int DEEP_RIFTS = 2;
     /** The mountains belted by height from the climate round them, forest to snow (round 128). */
     public static final int CLIMATE_BELTS = 3;
+    /** No alluvial plain where only the ragging of its border put one, away from the body of a plain (round 129). */
+    public static final int PLAIN_BODIES = 4;
     /** What a world made now gets. */
-    public static final int CURRENT = 3;
+    public static final int CURRENT = 4;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;
