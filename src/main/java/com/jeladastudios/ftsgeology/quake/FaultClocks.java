@@ -148,10 +148,17 @@ public final class FaultClocks {
         return ChunkPos.asLong(cx, cz);
     }
 
-    /** Game ticks of a stretch's mean recurrence: the configured days over its stress. */
+    /**
+     * Game ticks of a stretch's mean recurrence: sixteen times the configured days, over its stress. Shaking is felt as
+     * far as a real quake's is (see FeltShaking): a magnitude 5 seventy kilometres off, where it used to be ten. At the
+     * old pace every boundary within reach was felt breaking ten times an hour, and did damage every day or two.
+     */
     private static double meanTicks(Segment s) {
-        return GeyserConfig.QUAKE_RECURRENCE_DAYS.get() * 24000.0 / Math.max(0.15, s.stress());
+        return GeyserConfig.QUAKE_RECURRENCE_DAYS.get() * RECURRENCE * 24000.0 / Math.max(0.15, s.stress());
     }
+
+    /** How much less often the stretches break, and have their small quakes, than the config's numbers say. */
+    private static final double RECURRENCE = 16.0, SMALL_SHARE = 0.125;
 
     // === Every tick ==========================================================
 
@@ -270,7 +277,7 @@ public final class FaultClocks {
      */
     private static void smallQuakes(ServerLevel level, LongOpenHashSet near, Long2ObjectOpenHashMap<Segment> cells, int ticks,
                                     List<ServerPlayer> players) {
-        double rate = GeyserConfig.SMALL_QUAKE_RATE.get() * ticks / 24000.0;
+        double rate = GeyserConfig.SMALL_QUAKE_RATE.get() * SMALL_SHARE * ticks / 24000.0;
         if (rate <= 0) return;
         for (long k : near) {
             Segment s = cells.get(k);
@@ -290,11 +297,12 @@ public final class FaultClocks {
         double along = (level.random.nextDouble() - 0.5) * SEG;
         int x = (int) Math.round(s.x() + s.strikeX() * along), z = (int) Math.round(s.z() + s.strikeZ() * along);
         double floor = FeltShaking.floor(), nearest = Double.MAX_VALUE;
+        double depthM = Earthquake.quakeDepthMetres(s.type(), m, level.random);
         boolean anyone = false;
         for (ServerPlayer p : players) {
             double d = Math.hypot(p.getX() - x, p.getZ() - z);
             nearest = Math.min(nearest, d);
-            if (FeltShaking.intensity(m, d) >= floor) anyone = true;
+            if (FeltShaking.intensity(m, d, depthM) >= floor) anyone = true;
         }
         int y = com.jeladastudios.ftsgeology.util.Loaded.at(level, x, z)
                 ? com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, x, z) : level.getSeaLevel();
@@ -303,10 +311,9 @@ public final class FaultClocks {
         small++;
         if (anyone) {
             smallFelt++;
-            Earthquake.tremor(level, epi, s.type(), m, s.strikeX(), s.strikeZ(), false);
+            Earthquake.tremor(level, epi, s.type(), m, s.strikeX(), s.strikeZ(), false, depthM);
         } else {
-            com.jeladastudios.ftsgeology.instrument.SeismicNetwork.record(level, epi, s.type(), m,
-                    Earthquake.quakeDepthMetres(s.type(), m, level.random));
+            com.jeladastudios.ftsgeology.instrument.SeismicNetwork.record(level, epi, s.type(), m, depthM);
         }
         com.jeladastudios.ftsgeology.util.Diagnostics.info("small quake: M{} {} at {} {}, {} blocks from the nearest player: {}",
                 String.format(Locale.ROOT, "%.1f", m), s.type(), x, z, nearest == Double.MAX_VALUE ? "-" : String.valueOf((int) nearest),
@@ -355,8 +362,18 @@ public final class FaultClocks {
         boolean anyone = false, faintly = false;
         double nearest = Double.MAX_VALUE;
         double range = FeltShaking.feltRange(m);
+        // From the rupture, which runs along the fault both ways as far as a quake this size breaks.
+        double reach = Math.min(8000.0, 0.5 * Math.pow(10.0, 0.69 * m - 3.22) * 1000.0
+                / com.jeladastudios.ftsgeology.tectonics.DepthScale.metresPerBlockHorizontal());
+        double sn = Math.hypot(s.strikeX(), s.strikeZ());
         for (ServerPlayer p : players) {
-            double d = Math.sqrt(Mth.square(p.getX() - s.x()) + Mth.square(p.getZ() - s.z()));
+            double dx = p.getX() - s.x(), dz = p.getZ() - s.z();
+            if (sn > 1e-6) {
+                double along = Mth.clamp((dx * s.strikeX() + dz * s.strikeZ()) / sn, -reach, reach);
+                dx -= along * s.strikeX() / sn;
+                dz -= along * s.strikeZ() / sn;
+            }
+            double d = Math.sqrt(dx * dx + dz * dz);
             nearest = Math.min(nearest, d);
             if (d > range) continue;
             double i = FeltShaking.intensity(m, d);

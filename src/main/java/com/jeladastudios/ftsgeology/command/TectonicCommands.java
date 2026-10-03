@@ -108,18 +108,10 @@ public final class TectonicCommands {
                                 // A quake right here that moves no ground: felt, recorded and shaken, as the faults' small
                                 // ones are; a strong one tries what is built round it.
                                 .then(Commands.literal("tremor").then(Commands.argument("magnitude", DoubleArgumentType.doubleArg(1.0, 9.5))
-                                        .executes(ctx -> {
-                                            ServerLevel level = ctx.getSource().getLevel();
-                                            BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
-                                            PlateSample s = TectonicMap.sample(level, at.getX(), at.getZ());
-                                            FaultType type = s.faultType() == FaultType.INTERIOR ? FaultType.TRANSFORM : s.faultType();
-                                            double m = DoubleArgumentType.getDouble(ctx, "magnitude");
-                                            Earthquake.tremor(level, at, type, m, s.onFault() ? s.faultStrikeX() : 1.0,
-                                                    s.onFault() ? s.faultStrikeZ() : 0.0, false);
-                                            ctx.getSource().sendSuccess(() -> Component.literal("tremor M" + m + " at " + at.toShortString())
-                                                    .withStyle(ChatFormatting.YELLOW), true);
-                                            return 1;
-                                        })))
+                                        .executes(ctx -> tremor(ctx, -1))
+                                        // Broken this many kilometres down, for tests that want the same shaking each time.
+                                        .then(Commands.argument("depthKm", DoubleArgumentType.doubleArg(0.5, 700.0))
+                                                .executes(ctx -> tremor(ctx, DoubleArgumentType.getDouble(ctx, "depthKm"))))))
                                 .then(Commands.literal("aftershocks")
                                         .executes(TectonicCommands::aftershocks)
                                         .then(Commands.literal("clear").executes(ctx -> {
@@ -381,6 +373,21 @@ public final class TectonicCommands {
     }
 
     /** /geology water weather dry|wet &lt;days&gt; [chunkRadius]: what a drought or a wet spell does to the ground round here. */
+    /** A quake too small to break the ground, here, at a depth in kilometres or (below 0) its own. */
+    private static int tremor(com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx, double depthKm) {
+        ServerLevel level = ctx.getSource().getLevel();
+        BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+        PlateSample s = TectonicMap.sample(level, at.getX(), at.getZ());
+        FaultType type = s.faultType() == FaultType.INTERIOR ? FaultType.TRANSFORM : s.faultType();
+        double m = DoubleArgumentType.getDouble(ctx, "magnitude");
+        double sx = s.onFault() ? s.faultStrikeX() : 1.0, sz = s.onFault() ? s.faultStrikeZ() : 0.0;
+        if (depthKm > 0) Earthquake.tremor(level, at, type, m, sx, sz, false, depthKm * 1000.0);
+        else Earthquake.tremor(level, at, type, m, sx, sz, false);
+        ctx.getSource().sendSuccess(() -> Component.literal("tremor M" + m + " at " + at.toShortString())
+                .withStyle(ChatFormatting.YELLOW), true);
+        return 1;
+    }
+
     /** Puts the player where they can watch the fissure eruption under way. */
     private static int fissureWatch(com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx, int across, int up)
             throws com.mojang.brigadier.exceptions.CommandSyntaxException {

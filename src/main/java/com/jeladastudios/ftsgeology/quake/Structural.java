@@ -303,34 +303,57 @@ public final class Structural {
 
     /** Strong blocks of a footing, and the most of them that count. */
     private static final int FOOTING_MOST = 8;
-    /** Intensity taken off per block of footing, for a footing down to rock, for an isolating course, per brace. */
-    private static final double PER_FOOTING = 0.15, ON_ROCK = 0.5, ISOLATED = 1.0, PER_BRACE = 0.3, BRACES_MOST = 1.0;
+    /**
+     * Intensity taken off per block of footing, more for concrete, for a footing down to rock, for an isolating course,
+     * per brace.
+     */
+    private static final double PER_FOOTING = 0.15, CONCRETE = 1.25, ON_ROCK = 0.5, ISOLATED = 1.0, PER_BRACE = 0.3,
+            BRACES_MOST = 1.0;
+    /** Intensity added for walls set straight on the ground with no footing: on soil, and on sand, gravel or mud. */
+    private static final double BARE_SOIL = 0.5, BARE_LOOSE = 1.0;
+    /** The most a column's ground ever adds to its shaking. */
+    static final double MOST_WORSE = BARE_LOOSE;
 
     /**
-     * How much less hard a building's column is shaken for the work done in its ground, in units of intensity (negative):
+     * How much harder or less hard a building's column is shaken for its foundation and the work done in its ground, in
+     * units of intensity:
      * <ul>
-     *   <li><b>A footing</b>: the strong blocks (stone, brick, concrete) at the bottom of the column that stand in the
-     *   ground, the ground on all four sides of them -- the deeper the better, and better again where it reaches rock.</li>
+     *   <li><b>No footing</b>: walls set straight on the ground. On rock they stand as they are; on soil they settle
+     *   unevenly and crack, half a degree the worse; on sand, gravel or mud, which give way and slide under them, a whole
+     *   degree. Houses of rubble and mud brick on bare ground are the first to fall in every great earthquake.</li>
+     *   <li><b>A footing of rubble, earth or wood</b> set in the ground: it spreads the load and is no worse than rock.</li>
+     *   <li><b>A footing</b> of stone, brick, concrete or metal standing in the ground, the ground on all four sides of
+     *   it: the deeper the better, concrete best, and better again where it reaches rock. Where the walls have one and
+     *   where they have not is told column by column, so a house with a footing under part of its walls is spared there
+     *   only.</li>
      *   <li><b>An isolating course</b>: slime or honey under the walls, which give and spring back and let the ground move
      *   under the building without shaking it as hard, as a modern building's rubber bearings do.</li>
      *   <li><b>Bracing</b>: iron bars and chains in the column, tying it across.</li>
      * </ul>
-     * A building on loose fill gets nothing from the ground; that it shakes the harder there is the ground's (see
-     * {@link SiteResponse}).
+     * That soft ground shakes harder whatever stands on it is the ground's own (see {@link SiteResponse}).
      */
     static double groundwork(ServerLevel level, LevelChunk chunk, int x, int z, int ground, LongSet placed,
                              List<BoundingBox> pieces, BlockPos.MutableBlockPos m) {
         double work = 0;
-        int footing = 0, y = ground + 1;
+        int footing = 0, weak = 0, y = ground + 1;
+        boolean concrete = false;
         for (; y <= ground + FOOTING_MOST * 2; y++) {
             BlockState s = chunk.getBlockState(m.set(x, y, z));
-            if (s.isAir() || !Collapse.built(level, s, m, placed, pieces) || !footing(s) || !buried(level, x, y, z, placed, pieces)) break;
-            footing++;
+            if (s.isAir() || !Collapse.built(level, s, m, placed, pieces) || !buried(level, x, y, z, placed, pieces)) break;
+            if (footing(s)) {
+                footing++;
+                if (fabric(s) == Fabric.C) concrete = true;
+            } else {
+                weak++;
+            }
         }
+        BlockState under = chunk.getBlockState(m.set(x, ground, z));
+        boolean rock = under.is(BlockTags.BASE_STONE_OVERWORLD) || under.is(Tags.Blocks.STONE);
         if (footing > 0) {
-            work -= PER_FOOTING * Math.min(footing, FOOTING_MOST);
-            BlockState under = chunk.getBlockState(m.set(x, ground, z));
-            if (under.is(BlockTags.BASE_STONE_OVERWORLD) || under.is(Tags.Blocks.STONE)) work -= ON_ROCK;
+            work -= PER_FOOTING * Math.min(footing, FOOTING_MOST) * (concrete ? CONCRETE : 1.0);
+            if (rock) work -= ON_ROCK;
+        } else if (weak == 0 && !rock) {
+            work += loose(under) ? BARE_LOOSE : BARE_SOIL;
         }
         // The course: slime or honey among the lowest few blocks over the footing.
         for (int k = y; k <= y + 2; k++) {
@@ -348,6 +371,13 @@ public final class Structural {
         }
         work -= Math.min(BRACES_MOST, PER_BRACE * braces);
         return work;
+    }
+
+    /** Ground that gives way under a wall: sand, gravel, mud, clay, snow, ash. */
+    private static boolean loose(BlockState s) {
+        return s.getBlock() instanceof FallingBlock || s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVEL) || s.is(Blocks.MUD)
+                || s.is(Blocks.CLAY) || s.is(BlockTags.SNOW) || s.is(Blocks.SOUL_SAND) || s.is(Blocks.SOUL_SOIL)
+                || s.is(com.jeladastudios.ftsgeology.registry.ModBlocks.VOLCANIC_ASH.get());
     }
 
     /** Whether a built block stands in the ground: natural ground on all four sides of it. */

@@ -39,8 +39,10 @@ public final class FeltShaking {
 
     private FeltShaking() {}
 
-    /** How far from the rupture, in blocks, the shaking has lost a third of a unit of intensity. As ShakingDamage. */
-    static final double FALLOFF = 30.0;
+    /** The depth a quake is taken to break at where its own is not known, in metres: a shallow crustal one. */
+    public static final double TYPICAL_DEPTH = 10_000.0;
+    /** The highest Mercalli intensity reached, XI: twelve is the scale's end, not something seen. */
+    private static final double MOST_MERCALLI = 11.0;
     /** The least intensity anyone feels: people at rest, indoors. */
     public static final double FELT = 3.0;
     /** How fast a rupture runs along its fault, metres a second: a little under the S wave. */
@@ -52,15 +54,169 @@ public final class FeltShaking {
 
     // === The physics, shared ===============================================
 
-    /** Shaking intensity at {@code blocks} from the rupture of a quake of this magnitude. */
-    public static double intensity(double magnitude, double blocks) {
-        return magnitude - 2.0 * Math.log10(1.0 + Math.max(0.0, blocks) / FALLOFF);
+    /**
+     * Shaking intensity at {@code blocks} from the rupture of a quake of this magnitude, broken this deep, on the mod's
+     * own scale ({@link #mercalli}: Mercalli = 1.35 I - 1).
+     *
+     * <p>The Mercalli intensity is the one measured in real earthquakes, as a function of the real distance: Allen,
+     * Wald and Worden's (2012) equation for shallow crust, by the distance to the rupture, which takes in how deep its
+     * top lies (from its width, Wells and Coppersmith 1994) and how big its near-field is. Distance in blocks becomes
+     * kilometres through the world's horizontal scale, as everything else about a quake does. Twelve kilometres from a
+     * magnitude 8 that is X, from a 7 VIII to IX, from a 6 VI to VII; a quake deep in a down-going slab is felt widely
+     * and hurts little. The first shaking here fell off with distance in blocks, whatever the scale: a magnitude 8 left
+     * a house twelve kilometres off with a few blocks off it.</p>
+     */
+    public static double intensity(double magnitude, double blocks, double depthMetres) {
+        double km = Math.max(0.0, blocks) * DepthScale.metresPerBlockHorizontal() / 1000.0;
+        return fromMercalli(mercalliAt(magnitude, km, depthMetres / 1000.0));
     }
 
-    /** How far from the rupture, in blocks, the shaking is still this strong. */
-    public static double distanceFor(double magnitude, double intensity) {
-        return FALLOFF * (Math.pow(10.0, (magnitude - intensity) / 2.0) - 1.0);
+    /** As {@link #intensity(double, double, double)}, for a quake of the usual shallow depth. */
+    public static double intensity(double magnitude, double blocks) {
+        return intensity(magnitude, blocks, TYPICAL_DEPTH);
     }
+
+    /** The Modified Mercalli intensity, as a real number, {@code km} from the trace of a rupture this deep. */
+    static double mercalliAt(double magnitude, double km, double depthKm) {
+        double width = Math.pow(10.0, -1.01 + 0.32 * magnitude);
+        double top = Math.max(1.0, depthKm - width / 2.0);
+        double near = 1.0 + 0.078 * Math.exp(magnitude - 5.0);
+        double rupture = Math.sqrt(km * km + top * top);
+        double mmi = 2.085 + 1.428 * magnitude - 1.402 * Math.log(Math.sqrt(rupture * rupture + near * near));
+        if (rupture > 50.0) mmi -= 0.209 * Math.log(rupture / 50.0);
+        return Math.min(MOST_MERCALLI, mmi);
+    }
+
+    /** The mod's intensity scale from a Mercalli intensity. */
+    public static double fromMercalli(double mmi) {
+        return (mmi + 1.0) / 1.35;
+    }
+
+    /**
+     * How far from the rupture, in blocks, the shaking of a quake broken this deep is still this strong; 0 where it
+     * never is. A shallow quake's, where the depth is not given: the farthest.
+     */
+    public static double distanceFor(double magnitude, double intensity, double depthMetres) {
+        if (intensity(magnitude, 0.0, depthMetres) < intensity) return 0.0;
+        double lo = 0.0, hi = 1_000_000.0;
+        if (intensity(magnitude, hi, depthMetres) >= intensity) return hi;
+        for (int i = 0; i < 40; i++) {
+            double mid = 0.5 * (lo + hi);
+            if (intensity(magnitude, mid, depthMetres) >= intensity) lo = mid;
+            else hi = mid;
+        }
+        return lo;
+    }
+
+    public static double distanceFor(double magnitude, double intensity) {
+        return distanceFor(magnitude, intensity, 3_000.0);
+    }
+
+    /**
+     * The rupture a quake's shaking comes from: the trace the ground was broken along, carried on along the fault's
+     * strike as far as a rupture of this magnitude really runs. The ground is moved over a few dozen kilometres at
+     * most ({@code quakeMaxRupture}), but a magnitude 8 breaks two hundred, and shakes as hard all along them; a town
+     * beside the far end of it is as near the rupture as one beside the near end. A single point, with its strike,
+     * becomes a line of its own. Points every so many blocks; the trace's own are kept as they are.
+     */
+    public static List<QuakePlanner.TracePoint> rupture(List<QuakePlanner.TracePoint> trace, double magnitude) {
+        if (trace.isEmpty()) return trace;
+        double full = Math.pow(10.0, 0.69 * magnitude - 3.22) * 1000.0 / DepthScale.metresPerBlockHorizontal();
+        QuakePlanner.TracePoint a = trace.get(0), b = trace.get(trace.size() - 1);
+        double have = Math.hypot(b.x() - a.x(), b.z() - a.z());
+        double each = Math.min(MOST_REACH, (full - have) / 2.0);
+        if (each < RUPTURE_STEP) return trace;
+        List<QuakePlanner.TracePoint> out = new ArrayList<>(trace.size() + 2 * (int) (each / RUPTURE_STEP) + 2);
+        // Outward from either end: the way the trace runs there, or for a single point both ways along its strike.
+        double ax, az, bx, bz;
+        if (trace.size() >= 2 && have >= 1.0) {
+            QuakePlanner.TracePoint a1 = trace.get(Math.min(trace.size() - 1, 4)), b1 = trace.get(Math.max(0, trace.size() - 5));
+            ax = a.x() - a1.x();
+            az = a.z() - a1.z();
+            bx = b.x() - b1.x();
+            bz = b.z() - b1.z();
+        } else {
+            ax = -a.strikeX();
+            az = -a.strikeZ();
+            bx = a.strikeX();
+            bz = a.strikeZ();
+        }
+        double an = Math.hypot(ax, az), bn = Math.hypot(bx, bz);
+        if (an < 1e-6 || bn < 1e-6) return trace;
+        ax /= an;
+        az /= an;
+        bx /= bn;
+        bz /= bn;
+        int n = (int) (each / RUPTURE_STEP);
+        for (int k = n; k >= 1; k--) {
+            out.add(new QuakePlanner.TracePoint((int) Math.round(a.x() + ax * k * RUPTURE_STEP), (int) Math.round(a.z() + az * k * RUPTURE_STEP),
+                    -ax, -az, 0.0));
+        }
+        out.addAll(trace);
+        for (int k = 1; k <= n; k++) {
+            out.add(new QuakePlanner.TracePoint((int) Math.round(b.x() + bx * k * RUPTURE_STEP), (int) Math.round(b.z() + bz * k * RUPTURE_STEP),
+                    bx, bz, 0.0));
+        }
+        return out;
+    }
+
+    /**
+     * The loaded chunks within {@code reach} blocks of a rupture, nearest the rupture first in no particular order.
+     * Every chunk of the rupture's box is looked at while the box is small; a great earthquake's is hundreds of
+     * kilometres across, and then only the chunks round the players (as far as they see), the forceloaded ones and the
+     * spawn's are.
+     */
+    public static java.util.Deque<net.minecraft.world.level.ChunkPos> loadedWithin(ServerLevel level,
+                                                                                    List<QuakePlanner.TracePoint> trace, double reach) {
+        java.util.Deque<net.minecraft.world.level.ChunkPos> out = new java.util.ArrayDeque<>();
+        if (trace.isEmpty()) return out;
+        int minX = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
+        for (QuakePlanner.TracePoint t : trace) {
+            minX = Math.min(minX, t.x());
+            maxX = Math.max(maxX, t.x());
+            minZ = Math.min(minZ, t.z());
+            maxZ = Math.max(maxZ, t.z());
+        }
+        int r = (int) Math.ceil(reach);
+        int cx0 = (minX - r) >> 4, cx1 = (maxX + r) >> 4, cz0 = (minZ - r) >> 4, cz1 = (maxZ + r) >> 4;
+        double[] d = new double[1];
+        if ((long) (cx1 - cx0 + 1) * (cz1 - cz0 + 1) <= BOX_CHUNKS) {
+            for (int cx = cx0; cx <= cx1; cx++) {
+                for (int cz = cz0; cz <= cz1; cz++) {
+                    if (level.getChunkSource().getChunkNow(cx, cz) == null) continue;
+                    nearest(trace, cx * 16 + 8, cz * 16 + 8, d);
+                    if (d[0] <= reach + 12) out.add(new net.minecraft.world.level.ChunkPos(cx, cz));
+                }
+            }
+            return out;
+        }
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet seen = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+        it.unimi.dsi.fastutil.longs.LongArrayList candidates = new it.unimi.dsi.fastutil.longs.LongArrayList();
+        int view = level.getServer().getPlayerList().getViewDistance() + 2;
+        for (ServerPlayer p : level.players()) {
+            int pcx = p.chunkPosition().x, pcz = p.chunkPosition().z;
+            for (int dx = -view; dx <= view; dx++) for (int dz = -view; dz <= view; dz++) candidates.add(net.minecraft.world.level.ChunkPos.asLong(pcx + dx, pcz + dz));
+        }
+        candidates.addAll(level.getForcedChunks());
+        BlockPos spawn = level.getSharedSpawnPos();
+        for (int dx = -12; dx <= 12; dx++) for (int dz = -12; dz <= 12; dz++) {
+            candidates.add(net.minecraft.world.level.ChunkPos.asLong((spawn.getX() >> 4) + dx, (spawn.getZ() >> 4) + dz));
+        }
+        for (long k : candidates) {
+            if (!seen.add(k)) continue;
+            int cx = net.minecraft.world.level.ChunkPos.getX(k), cz = net.minecraft.world.level.ChunkPos.getZ(k);
+            if (cx < cx0 || cx > cx1 || cz < cz0 || cz > cz1 || level.getChunkSource().getChunkNow(cx, cz) == null) continue;
+            nearest(trace, cx * 16 + 8, cz * 16 + 8, d);
+            if (d[0] <= reach + 12) out.add(new net.minecraft.world.level.ChunkPos(cx, cz));
+        }
+        return out;
+    }
+
+    /** The most chunks of a rupture's box gone through one by one. */
+    private static final long BOX_CHUNKS = 40_000;
+
+    /** Blocks between the points a rupture is carried on with, and the most it is carried either way. */
+    private static final double RUPTURE_STEP = 32.0, MOST_REACH = 8000.0;
 
     /** The Modified Mercalli class this intensity reads as, I to XII. */
     public static int mercalli(double intensity) {
@@ -200,7 +356,7 @@ public final class FeltShaking {
         double[] d = new double[1];
         QuakePlanner.TracePoint at = nearest(q.trace, p.getX(), p.getZ(), d);
         if (at == null || d[0] > q.range) return;
-        double intensity = intensity(q.magnitude, d[0]);
+        double intensity = intensity(q.magnitude, d[0], q.depthMetres);
         // Felt harder on soft ground and where the rupture ran toward (see SiteResponse); only where it is felt at all.
         if (intensity >= FELT - 1.2) {
             intensity += SiteResponse.ground(level, p.getBlockX(), p.getBlockZ()) + SiteResponse.directivity(q.epicentre, at, q.trace);

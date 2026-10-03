@@ -199,7 +199,7 @@ public final class Earthquake {
         // The ground is held back by the warning window, which gives the planning below that long.
         long startAt = level.getGameTime() + GeyserConfig.QUAKE_WARNING_TICKS.get();
         // Its waves go out from the rupture as it runs, and are felt wherever each player is.
-        FeltShaking.start(level, epicentreOnFault, trace, magnitude, depthM, startAt);
+        FeltShaking.start(level, epicentreOnFault, FeltShaking.rupture(trace, magnitude), magnitude, depthM, startAt);
         // And the fault goes on slipping for days.
         // A main shock has its sequence; a large aftershock a small one of its own, as aftershocks breed theirs (ETAS).
         if (!aftershock) Aftershocks.afterMain(level, trace, type, magnitude);
@@ -260,15 +260,21 @@ public final class Earthquake {
      */
     public static void tremor(ServerLevel level, BlockPos at, FaultType type, double magnitude,
                               double strikeX, double strikeZ, boolean aftershock) {
+        tremor(level, at, type, magnitude, strikeX, strikeZ, aftershock, quakeDepthMetres(type, magnitude, level.random));
+    }
+
+    /** As above, broken this deep. */
+    public static void tremor(ServerLevel level, BlockPos at, FaultType type, double magnitude,
+                              double strikeX, double strikeZ, boolean aftershock, double depthM) {
         if (!GeyserConfig.QUAKES_ENABLED.get() || type == FaultType.INTERIOR) return;
-        double depthM = quakeDepthMetres(type, magnitude, level.random);
         com.jeladastudios.ftsgeology.instrument.SeismicNetwork.record(level, at, type, magnitude, depthM);
         List<QuakePlanner.TracePoint> trace = List.of(new QuakePlanner.TracePoint(at.getX(), at.getZ(), strikeX, strikeZ, 0.0));
         announce(level, trace, at, type, magnitude, depthM, aftershock);
         long startAt = level.getGameTime() + GeyserConfig.QUAKE_WARNING_TICKS.get();
-        FeltShaking.start(level, at, trace, magnitude, depthM, startAt);
-        ShakingDamage.start(level, at, trace, magnitude, depthM, startAt);
-        Landslides.start(level, at, trace, magnitude, depthM, startAt);
+        List<QuakePlanner.TracePoint> shaken = FeltShaking.rupture(trace, magnitude);
+        FeltShaking.start(level, at, shaken, magnitude, depthM, startAt);
+        ShakingDamage.start(level, at, shaken, magnitude, depthM, startAt);
+        Landslides.start(level, at, shaken, magnitude, depthM, startAt);
         com.jeladastudios.ftsgeology.util.Diagnostics.info("tremor: M{} at {} {}{}",
                 String.format(Locale.ROOT, "%.1f", magnitude), at.getX(), at.getZ(), aftershock ? ", an aftershock" : "");
     }
@@ -356,12 +362,11 @@ public final class Earthquake {
             if (level.getGameTime() < run.startAt) return false;
             if (!run.shaking) {
                 run.shaking = true;
-                ShakingDamage.start(level, run.epicentre, run.trace, run.plan.magnitude(), run.depthMetres,
-                        level.getGameTime());
-                Liquefaction.start(level, run.epicentre, run.trace, run.plan.magnitude(), run.depthMetres,
-                        level.getGameTime());
-                Landslides.start(level, run.epicentre, run.trace, run.plan.magnitude(), run.depthMetres,
-                        level.getGameTime());
+                // Shaken all along the rupture, out past where the ground was moved.
+                List<QuakePlanner.TracePoint> shaken = FeltShaking.rupture(run.trace, run.plan.magnitude());
+                ShakingDamage.start(level, run.epicentre, shaken, run.plan.magnitude(), run.depthMetres, level.getGameTime());
+                Liquefaction.start(level, run.epicentre, shaken, run.plan.magnitude(), run.depthMetres, level.getGameTime());
+                Landslides.start(level, run.epicentre, shaken, run.plan.magnitude(), run.depthMetres, level.getGameTime());
             }
 
             int placed = 0;

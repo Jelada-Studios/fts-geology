@@ -67,8 +67,6 @@ public final class ShakingDamage {
     private static final double PER_INTENSITY = 0.5;
     /** The most that is ever shaken off: even a great earthquake leaves half of a wall standing. */
     private static final double CAP = 0.5;
-    /** How far from the fault, in blocks, the shaking has lost a third of a unit of intensity. */
-    private static final double FALLOFF = 30.0;
     /**
      * How far under the lowest ground of a chunk buildings are shaken: a cellar is, a mine is not. Read off the chunk,
      * not the sea: a flat world says its sea is at 63 with its ground at -61.
@@ -139,6 +137,11 @@ public final class ShakingDamage {
             new PriorityQueue<>(Comparator.comparingLong(LooseHanging::due));
     private static final PriorityQueue<Rock> ROCKFALL = new PriorityQueue<>(Comparator.comparingLong(Rock::due));
 
+    /** How hard blocks are shaken loose at an intensity: the chance for the weakest, at the config's scale. */
+    static double shakingAt(double intensity) {
+        return BASE * GeyserConfig.SHAKING_DAMAGE.get() * Math.pow(10.0, PER_INTENSITY * (intensity - 5.0));
+    }
+
     /** The least intensity that still shakes a block loose now and then. */
     private static final double DAMAGING = 4.0;
 
@@ -159,22 +162,7 @@ public final class ShakingDamage {
     public static void start(ServerLevel level, BlockPos epicentre, List<QuakePlanner.TracePoint> trace,
                              double magnitude, double depthMetres, long startAt) {
         if (!(builds() || trees()) || GeyserConfig.SHAKING_DAMAGE.get() <= 0 || trace.isEmpty()) return;
-        double reach = reach(magnitude);
-        int minX = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
-        for (QuakePlanner.TracePoint t : trace) {
-            minX = Math.min(minX, t.x());
-            maxX = Math.max(maxX, t.x());
-            minZ = Math.min(minZ, t.z());
-            maxZ = Math.max(maxZ, t.z());
-        }
-        Deque<ChunkPos> chunks = new ArrayDeque<>();
-        int r = (int) Math.ceil(reach);
-        for (int cx = (minX - r) >> 4; cx <= (maxX + r) >> 4; cx++) {
-            for (int cz = (minZ - r) >> 4; cz <= (maxZ + r) >> 4; cz++) {
-                if (level.getChunkSource().getChunkNow(cx, cz) == null) continue;
-                if (distance(trace, cx * 16 + 8, cz * 16 + 8) <= reach + 12) chunks.add(new ChunkPos(cx, cz));
-            }
-        }
+        Deque<ChunkPos> chunks = FeltShaking.loadedWithin(level, trace, reach(magnitude));
         if (!chunks.isEmpty()) JOBS.add(new Job(level.dimension(), epicentre, trace, magnitude, depthMetres, startAt, chunks));
     }
 
@@ -354,7 +342,7 @@ public final class ShakingDamage {
         QuakePlanner.TracePoint at = FeltShaking.nearest(job.trace, cp.getMiddleBlockX(), cp.getMiddleBlockZ(), far);
         double d = far[0];
         // Soft ground shakes harder than rock, and the ground the rupture ran toward harder than where it began.
-        double intensity = job.magnitude - 2.0 * Math.log10(1.0 + d / FALLOFF)
+        double intensity = FeltShaking.intensity(job.magnitude, d, job.depthMetres)
                 + SiteResponse.ground(level, cp.getMiddleBlockX(), cp.getMiddleBlockZ())
                 + SiteResponse.directivity(job.epicentre, at, job.trace);
         job.delay = (int) Math.max(0L, job.startAt - now) + FeltShaking.ruptureDelay(job.epicentre, at)
@@ -365,7 +353,7 @@ public final class ShakingDamage {
         for (net.minecraft.world.level.block.entity.BlockEntity be : chunk.getBlockEntities().values()) {
             if (be instanceof com.jeladastudios.ftsgeology.blockentity.GeyserCoreBlockEntity geyser) geyser.shaken(level, intensity);
         }
-        double shaking = BASE * GeyserConfig.SHAKING_DAMAGE.get() * Math.pow(10.0, PER_INTENSITY * (intensity - 5.0));
+        double shaking = shakingAt(intensity);
         if (shaking < 1.0e-4) return;
 
         int floor = Integer.MAX_VALUE;
@@ -379,8 +367,14 @@ public final class ShakingDamage {
         LongSet placed = PlayerBuilt.inChunk(level, cp.x, cp.z);
         List<BoundingBox> built = structureBoxes(level, chunk, floor);
         // The chance each kind of wall sheds a block with a face in the open, at this chunk's shaking.
-        double[] shed = new double[Structural.Fabric.values().length];
-        for (Structural.Fabric f : Structural.Fabric.values()) shed[f.ordinal()] = shedding(f, intensity, shaking);
+        double[] shed = new double[Structural.Fabric.values().length], most = new double[shed.length];
+        for (Structural.Fabric f : Structural.Fabric.values()) {
+            shed[f.ordinal()] = shedding(f, intensity, shaking);
+            // As shaken as a building standing on loose ground with no footing is (Structural#groundwork): the roll is made
+            // against this, and what comes up kept as often as its own column's ground has it shaken.
+            double worst = intensity + Structural.MOST_WORSE;
+            most[f.ordinal()] = shedding(f, worst, shakingAt(worst));
+        }
         // Walls of the ground's own stone and earth that no one was seen building are looked for where the shaking can harm
         // a building at all, and only near the top of each column, where houses stand.
         boolean plainWalls = intensity >= Structural.ONSET;
@@ -443,7 +437,8 @@ public final class ShakingDamage {
                         // A plain wall: the ground's own material standing as a wall of a house does.
                         boolean plain = plainHere && y >= surface[lx * 16 + lz] - PLAIN_DEPTH && plainWall(read, x, y, z, s);
                         if (plain || worked(s)) madeColumns.add(BlockPos.asLong(x, 0, z));
-                        double chance = shed[Structural.fabric(s).ordinal()];
+                        Structural.Fabric fabric = Structural.fabric(s);
+                        double chance = most[fabric.ordinal()];
                         if (chance <= 0) continue;
                         // The roll first: it is cheap, and only the few blocks that come up are looked at closely.
                         if (level.random.nextDouble() >= chance) continue;
@@ -460,7 +455,8 @@ public final class ShakingDamage {
                             int[] g = QuakePlanner.naturalGround(chunk, x, z, placed, built, new BlockPos.MutableBlockPos());
                             return g == null ? 0.0 : Structural.groundwork(level, chunk, x, z, g[0], placed, built, new BlockPos.MutableBlockPos());
                         });
-                        if (work < 0 && level.random.nextDouble() >= Math.pow(10.0, PER_INTENSITY * work)) continue;
+                        double want = work == 0 ? shed[fabric.ordinal()] : shedding(fabric, intensity + work, shakingAt(intensity + work));
+                        if (level.random.nextDouble() * chance >= want) continue;
                         m.set(x, y, z);
                         if (made) OF_STRUCTURES.increment();
                         if (job.loosened++ >= MOST) break sections;

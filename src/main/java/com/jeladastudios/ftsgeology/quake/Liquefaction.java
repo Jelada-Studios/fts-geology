@@ -94,23 +94,7 @@ public final class Liquefaction {
         if (!GeyserConfig.QUAKE_LIQUEFACTION.get() || trace.isEmpty()) return;
         double reach = reach(magnitude);
         if (reach < 1) return;
-        Deque<ChunkPos> chunks = new ArrayDeque<>();
-        int minX = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
-        for (QuakePlanner.TracePoint t : trace) {
-            minX = Math.min(minX, t.x());
-            maxX = Math.max(maxX, t.x());
-            minZ = Math.min(minZ, t.z());
-            maxZ = Math.max(maxZ, t.z());
-        }
-        int r = (int) Math.ceil(reach);
-        double[] d = new double[1];
-        for (int cx = (minX - r) >> 4; cx <= (maxX + r) >> 4; cx++) {
-            for (int cz = (minZ - r) >> 4; cz <= (maxZ + r) >> 4; cz++) {
-                if (level.getChunkSource().getChunkNow(cx, cz) == null) continue;
-                FeltShaking.nearest(trace, cx * 16 + 8, cz * 16 + 8, d);
-                if (d[0] <= reach + 12) chunks.add(new ChunkPos(cx, cz));
-            }
-        }
+        Deque<ChunkPos> chunks = FeltShaking.loadedWithin(level, trace, reach);
         if (!chunks.isEmpty()) {
             JOBS.add(new Job(level.dimension(), epicentre, trace, magnitude, depthMetres, startAt, chunks, new int[1]));
         }
@@ -181,7 +165,7 @@ public final class Liquefaction {
         if (chunk == null) return;
         double[] far = new double[1];
         QuakePlanner.TracePoint at = FeltShaking.nearest(job.trace(), cp.getMiddleBlockX(), cp.getMiddleBlockZ(), far);
-        double intensity = FeltShaking.intensity(job.magnitude(), far[0]);
+        double intensity = FeltShaking.intensity(job.magnitude(), far[0], job.depthMetres());
         if (intensity < ONSET) return;
         CHUNKS.increment();
         long now = level.getGameTime();

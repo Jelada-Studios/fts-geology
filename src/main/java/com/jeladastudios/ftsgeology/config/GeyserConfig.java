@@ -922,13 +922,13 @@ public final class GeyserConfig {
         QUAKE_FELT_RANGE = b
                 .comment("The farthest from the rupture, in blocks, a quake's shaking is felt. Each player feels",
                         "it as strongly as their distance allows: a quick jolt and a rumble as the P wave arrives,",
-                        "then the S wave's heavy shaking, seconds later the further out they are. A magnitude 6",
-                        "is felt some nine hundred blocks out, a great earthquake thousands.")
+                        "then the S wave's heavy shaking, seconds later the further out they are. A magnitude 4 is",
+                        "felt some fifteen hundred blocks out, a 6 to the edge of this range.")
                 .defineInRange("quakeFeltRange", 4000, 64, 50000);
         QUAKE_DAMAGE_RANGE = b
-                .comment("The farthest from the rupture, in blocks, the shaking loosens blocks off buildings. Only",
-                        "loaded chunks are gone through.")
-                .defineInRange("quakeDamageRange", 1500, 64, 20000);
+                .comment("The farthest from the rupture, in blocks, the shaking loosens blocks off buildings: a great",
+                        "earthquake still does damage a hundred kilometres out. Only loaded chunks are gone through.")
+                .defineInRange("quakeDamageRange", 6000, 64, 20000);
         QUAKE_LIQUEFACTION = b
                 .comment("Strong shaking (about Mercalli VII and up) liquefies loose wet ground: sand, silt, gravel and",
                         "soil by a river, lake or sea, on a floodplain, or over a high water table. Sand boils open,",
@@ -975,13 +975,15 @@ public final class GeyserConfig {
                         "the world's own quakes entirely (the /geology quake command still works).")
                 .defineInRange("quakeAmbientInterval", 1200, 0, 1728000);
         QUAKE_RECURRENCE_DAYS = b
-                .comment("Average in-game days between quakes of magnitude 5 and up on each 256 blocks of a fully",
-                        "stressed boundary; a sleepier boundary goes less often, by its stress. Every stretch keeps its",
-                        "own clock (quiet after it breaks, more and more likely to go the longer it holds), and sizes",
-                        "follow Gutenberg-Richter up to the boundary's largest, so small quakes are felt near the fault",
-                        "and great ones far out. At 8: on a boundary one is felt every two or three days and one does",
-                        "damage every month or so; a thousand blocks off one is felt every ten to fifteen days, and",
-                        "a seismograph there records several a day. The /geology quake command fires one at once.")
+                .comment("How often the faults break: each 256 blocks of a fully stressed boundary has a quake of",
+                        "magnitude 5 or more once in sixteen times this many in-game days; a sleepier boundary less often,",
+                        "by its stress. Every stretch keeps its own clock (quiet after it breaks, more and more likely to",
+                        "go the longer it holds), and sizes follow Gutenberg-Richter up to the boundary's largest. Their",
+                        "shaking is felt as far as a real quake's: a magnitude 5 some seventy kilometres out. At 8: on a",
+                        "boundary a large quake is felt every four or five game days, shaking that does damage (Mercalli",
+                        "VI) every twenty game days or so, and shaking that wrecks weak buildings (VII and up) every",
+                        "seventy; a thousand blocks off they are felt as often and damage is rare. The /geology quake",
+                        "command fires one at once.")
                 .defineInRange("quakeRecurrenceDays", 8.0, 0.01, 1000.0);
         SMALL_QUAKES = b
                 .comment("Small quakes, magnitude 2.5 to 5, on the boundaries between the larger ones: nothing breaks,",
@@ -997,10 +999,11 @@ public final class GeyserConfig {
                 .comment("How often a producing oil field shakes, against the usual (1).")
                 .defineInRange("inducedQuakeRate", 1.0, 0.0, 100.0);
         SMALL_QUAKE_RATE = b
-                .comment("Small quakes a game day on each 256 blocks of a fully stressed boundary (a sleepier one has",
-                        "fewer, by its stress); sizes follow Gutenberg-Richter, most of them small, felt only near the",
-                        "fault. With the faint shaking of the large quakes far off, a player living on a boundary feels a",
-                        "faint tremor about once or twice an hour of play, a thousand blocks off about once in two.")
+                .comment("How many small quakes there are: at 1, each 256 blocks of a fully stressed boundary has one",
+                        "every eight game days (a sleepier one fewer, by its stress); sizes follow Gutenberg-Richter, most",
+                        "of them small, felt only within a few hundred blocks. With the large quakes, a player living on a",
+                        "boundary feels about two quakes an hour of play, nearly half of them faintly; a thousand blocks",
+                        "off about one.")
                 .defineInRange("smallQuakeRate", 1.0, 0.0, 50.0);
         QUAKE_FELT_FLOOR = b
                 .comment("The faintest shaking felt, on the scale where 3 is a light quake felt indoors (Mercalli III):",
