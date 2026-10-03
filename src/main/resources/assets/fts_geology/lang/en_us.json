@@ -145,6 +145,7 @@
   "command.fts_geology.searching_for_the_nearest_s": "Searching for the nearest %s...",
   "command.fts_geology.no_s_found_within_about_21000_blocks_try": "No %s found within about 21000 blocks. Try another setting or world.",
   "command.fts_geology.nearest_s_d_d_d_about_d_blocks_away": "Nearest %s: %d, %d, %d  (about %d blocks away)",
+  "command.fts_geology.oil_depth": "Under it the oil lies from Y %s to Y %s, the gas cap over it up to Y %s. Take well casing down through the oil and set a wellhead on top.",
   "command.fts_geology.search_failed_s": "Search failed: %s",
   "command.fts_geology.geothermal_suitability_here": "== Geothermal suitability here ==",
   "command.fts_geology.suitability.volcano": "  Volcano %s %s",

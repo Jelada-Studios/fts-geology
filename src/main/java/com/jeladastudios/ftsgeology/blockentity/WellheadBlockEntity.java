@@ -116,7 +116,11 @@ public class WellheadBlockEntity extends BlockEntity {
         if (server.getGameTime() % 20 == 0) be.ventGas(server, pos);
     }
 
-    /** Follows the casing down to its foot, and reads what the foot is in. */
+    /**
+     * Follows the casing down to its foot, and reads what it passes through on the way. A real well is drilled on through
+     * its reservoir and opened where it crosses the oil: a casing run on past the oil, down to the bottom of the world,
+     * still draws the oil it went through. Oil first, then a gas cap, then the water under the oil.
+     */
     private void survey(ServerLevel level) {
         BlockPos.MutableBlockPos at = worldPosition.mutable();
         int depth = 0;
@@ -129,14 +133,27 @@ public class WellheadBlockEntity extends BlockEntity {
         field = null;
         zone = PetroleumFields.Zone.NONE;
         if (depth == 0) return;
-        // The foot's own length of casing, or the rock under it: whichever is in the reservoir.
-        for (BlockPos p : new BlockPos[]{worldPosition.below(depth), worldPosition.below(depth + 1)}) {
-            PetroleumFields.At a = PetroleumFields.at(level, p);
-            if (a == null || a.zone() == PetroleumFields.Zone.SEAL) continue;
-            field = a.field();
-            zone = a.zone();
-            break;
+        int x = worldPosition.getX(), z = worldPosition.getZ();
+        for (PetroleumFields.Field f : PetroleumFields.near(level, x, z, 0)) {
+            // The casing's whole length, and the rock under its foot.
+            for (int i = 1; i <= depth + 1; i++) {
+                PetroleumFields.Zone here = f.zone(x, worldPosition.getY() - i, z);
+                if (rank(here) > rank(zone)) {
+                    field = f;
+                    zone = here;
+                }
+            }
         }
+    }
+
+    /** Which of what a casing passes through it draws on: the oil before the gas cap, the gas cap before the water. */
+    private static int rank(PetroleumFields.Zone z) {
+        return switch (z) {
+            case OIL -> 3;
+            case GAS -> 2;
+            case WATER -> 1;
+            default -> 0;
+        };
     }
 
     private void flow(ServerLevel level) {

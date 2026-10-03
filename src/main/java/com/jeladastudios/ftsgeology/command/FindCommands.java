@@ -47,7 +47,9 @@ public final class FindCommands {
                     Hit hit = search(level, at, what);
                     // The generator's own surface there. The chunk is usually not loaded, and reading it would give
                     // the bottom of the world or build the chunk inside the tick.
-                    return hit == null ? null : new Located(hit, surfaceY(level, hit.x(), hit.z()));
+                    if (hit == null) return null;
+                    var oil = what.equals("oil") ? com.jeladastudios.ftsgeology.worldgen.PetroleumFields.nearest(level, hit.x(), hit.z(), 0) : null;
+                    return new Located(hit, surfaceY(level, hit.x(), hit.z()), oil);
                 }, Util.backgroundExecutor())
                 .thenAcceptAsync(found -> {
                     if (found == null) {
@@ -59,6 +61,15 @@ public final class FindCommands {
                     GeysersMod.LOGGER.info("Nearest {}: {} {} {}, {} blocks away", what, hit.x(), found.y(), hit.z(),
                             hit.distance());
                     source.sendSuccess(() -> Component.translatable("command.fts_geology.nearest_s_d_d_d_about_d_blocks_away", what, hit.x(), found.y(), hit.z(), hit.distance()).withStyle(ChatFormatting.GREEN), false);
+                    // Where the oil is, under that crest: the height the coordinates give is the ground's, and a well
+                    // taken down to the bottom of the world from there went past it.
+                    var f = found.oil();
+                    if (f != null) {
+                        int oilTop = Math.min(f.goc(), f.crest()), oilFoot = Math.max(f.owc() + 1, f.crest() - f.thick() + 1);
+                        GeysersMod.LOGGER.info("The oil there lies from Y {} to Y {}, the gas cap up to Y {}", oilFoot, oilTop, f.crest());
+                        source.sendSuccess(() -> Component.translatable("command.fts_geology.oil_depth", oilFoot, oilTop,
+                                f.crest()).withStyle(ChatFormatting.GREEN), false);
+                    }
                     // A named mountain's own fault: which, and where it passes nearest the summit.
                     var fault = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.nearest(level, what);
                     if (fault != null) {
@@ -80,8 +91,8 @@ public final class FindCommands {
     /** A located setting: where it is and roughly how far away. */
     record Hit(int x, int z, int distance) {}
 
-    /** A located setting and the generator's surface height there. */
-    record Located(Hit hit, int y) {}
+    /** A located setting and the generator's surface height there; for an oil field, the field. */
+    record Located(Hit hit, int y, com.jeladastudios.ftsgeology.worldgen.PetroleumFields.Field oil) {}
 
     /** The generator's surface at a column, without loading or building its chunk. Safe off the server thread. */
     static int surfaceY(ServerLevel level, int x, int z) {

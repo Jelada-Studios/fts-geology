@@ -145,6 +145,7 @@
   "command.fts_geology.searching_for_the_nearest_s": "En yakın %s aranıyor...",
   "command.fts_geology.no_s_found_within_about_21000_blocks_try": "Yaklaşık 21000 blok içinde hiçbir %s bulunamadı. Başka bir ortam veya dünya deneyin.",
   "command.fts_geology.nearest_s_d_d_d_about_d_blocks_away": "En yakın %s: %d, %d, %d  (yaklaşık %d blok uzakta)",
+  "command.fts_geology.oil_depth": "Altında petrol Y %s ile Y %s arasında, üstündeki gaz şapkası Y %s'e kadar. Kuyu borusunu petrolün içinden geçirip üstüne kuyu başı koy.",
   "command.fts_geology.search_failed_s": "Arama başarısız oldu: %s",
   "command.fts_geology.geothermal_suitability_here": "== Buradaki jeotermal uygunluk ==",
   "command.fts_geology.suitability.volcano": "  Volkan %s %s",
