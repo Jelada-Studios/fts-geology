@@ -105,6 +105,32 @@ public final class SoilProfile {
         }
     }
 
+    /**
+     * The soil laid at a column of a loaded world, by the name of its kind (see {@link Kind}; the API's own names), or
+     * null where none is: the same choice the painting makes, by the rock read down the column, the climate and the
+     * patch field. In worlds made before {@link WorldgenRevision#GREENER_GROUND} the climate does not count, as it did
+     * not when they were painted.
+     */
+    public static String kindAt(ServerLevel level, int x, int z) {
+        if (TfcCompat.active() || !GeyserConfig.SOIL_FROM_BEDROCK.get()) return null;
+        if (GeothermalBasin.basin(level, x, z) > GeothermalBasin.FLOOR_MIN) return null;
+        double gate = Mth.clamp(QUIET_SHARE + (setting(level, x, z) - GATE_MIN) / (GATE_FULL - GATE_MIN), QUIET_SHARE, 1.0);
+        double n = ValueNoise.noise(x, z, 21.0) + 0.5 * ValueNoise.noise(x + 8192, z - 8192, 7.0);
+        if (n - PATCH_CUT - QUIET_CUT * (1.0 - gate) <= 0.0) return null;
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE) return null;
+        Soil soil = probe(level, x, g, z);
+        if (soil == Soil.NONE) return null;
+        boolean underGrass = WorldgenRevision.has(WorldgenRevision.GREENER_GROUND) && GeyserConfig.SOIL_UNDER_GRASS.get();
+        if (!underGrass) return switch (soil) {
+            case LATERITE -> Kind.LATERITE.name();
+            case RENDZINA -> Kind.RENDZINA.name();
+            default -> Kind.PODZOL.name();
+        };
+        ColumnClimate.At c = ColumnClimate.at(level, x, z);
+        return kind(soil, c.yearAt(g, level.getSeaLevel()), c.humidity()).name();
+    }
+
     /** The share of the painting that runs in quiet country, away from any boundary or plume. */
     private static final double QUIET_SHARE = 0.35;
 

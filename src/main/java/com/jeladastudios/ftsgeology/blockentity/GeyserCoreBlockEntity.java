@@ -756,6 +756,20 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         }
     }
 
+    /** Whether a loaded core's vent lies within {@code radius} blocks, across the ground, of a column. */
+    public static boolean anyWithin(ServerLevel level, int x, int z, int radius) {
+        synchronized (LOADED) {
+            LongOpenHashSet all = LOADED.get(level.dimension());
+            if (all == null) return false;
+            long r2 = (long) radius * radius;
+            for (long l : all) {
+                long dx = BlockPos.getX(l) - x, dz = BlockPos.getZ(l) - z;
+                if (dx * dx + dz * dz <= r2) return true;
+            }
+        }
+        return false;
+    }
+
     /** Forgets every core: the server is going down, and the next may be another world. */
     public static void clearAll() {
         synchronized (LOADED) {

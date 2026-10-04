@@ -286,6 +286,21 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
         }
     }
 
+    /**
+     * The rock the model puts at a point of a loaded world, as a block state: what a cliff there shows. Plain stone where
+     * the model has nothing particular to say, or where the world is not one of the mod's own (see the API).
+     */
+    public static BlockState rockState(net.minecraft.server.level.ServerLevel level, int x, int y, int z) {
+        if (!com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level) || !GeyserConfig.LITHOLOGY.get()) {
+            return States.ALL[Rock.STONE.ordinal()];
+        }
+        long seed = TerrainContext.seed();
+        Column c = Lithology.column(seed, TerrainContext.params(), x, z);
+        int ground = level.getHeight(Heightmap.Types.OCEAN_FLOOR, x, z) - 1;
+        Rock r = Lithology.rockAt(seed, c, x, y, z, ground);
+        return States.ALL[(r == Rock.KEEP ? Rock.STONE : r).ordinal()];
+    }
+
     /** The blocks the rocks are, looked up once the blocks exist. */
     private static final class States {
         static final BlockState[] ALL = new BlockState[Rock.values().length];

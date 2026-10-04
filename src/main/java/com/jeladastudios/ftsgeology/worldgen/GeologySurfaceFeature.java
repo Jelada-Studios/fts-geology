@@ -38,6 +38,7 @@ public class GeologySurfaceFeature extends Feature<NoneFeatureConfiguration> {
             RiftSteps.generate(level, cp);
             SnowCover.generate(level, cp);
             RiverWater.clearReeds(level, cp);
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.jeladastudios.ftsgeology.api.GeologySurfacePaintedEvent(level, cp));
             long t3 = System.nanoTime();
             GenCost.add(GenCost.SIGNS, t1 - t0);
             GenCost.add(GenCost.BASIN, t2 - t1);

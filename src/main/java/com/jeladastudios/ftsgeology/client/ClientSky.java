@@ -148,7 +148,7 @@ public final class ClientSky {
         }
     }
 
-    private record Thunder(double x, double y, double z, int[] delay, float volume, float pitch) {}
+    private record Thunder(double x, double y, double z, int[] delay, int heard, float volume, float pitch) {}
 
     static List<Flash> flashes() {
         return FLASHES;
@@ -176,6 +176,7 @@ public final class ClientSky {
             double len = Math.max(1e-3, Math.sqrt(dx * dx + dy * dy + dz * dz));
             level.playLocalSound(player.getX() + dx / len * 12, player.getY() + dy / len * 12, player.getZ() + dz / len * 12,
                     SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.WEATHER, t.volume(), t.pitch(), false);
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.jeladastudios.ftsgeology.api.ThunderHeardEvent(t.x(), t.y(), t.z(), t.heard(), t.volume()));
             it.remove();
         }
         SkyPacket p = last;
@@ -204,7 +205,7 @@ public final class ClientSky {
             // Its thunder after, as far behind as sound takes, rolling low from afar.
             if (far < 1600) {
                 float volume = (float) (0.9 * (1 - far / 1600) + 0.1) * strength;
-                THUNDER.add(new Thunder(fx, fy, fz, new int[]{(int) (far / 343.0 * 20)}, Math.min(1f, volume), (float) (0.9 - far / 1600 * 0.35)));
+                THUNDER.add(new Thunder(fx, fy, fz, new int[]{(int) (far / 343.0 * 20)}, (int) (far / 343.0 * 20), Math.min(1f, volume), (float) (0.9 - far / 1600 * 0.35)));
             }
         }
     }

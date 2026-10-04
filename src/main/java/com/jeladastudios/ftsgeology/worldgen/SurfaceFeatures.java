@@ -102,6 +102,7 @@ public final class SurfaceFeatures {
             // The soil each named rock weathers into; four probes and out over ordinary country.
             SoilProfile.generate(level, cp);
             lap(3, t);
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.jeladastudios.ftsgeology.api.GeologySurfacePaintedEvent(level, cp));
         }
 
         // Features may read and write across chunk borders; from the tick queue, a forced load only
