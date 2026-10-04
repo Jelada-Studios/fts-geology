@@ -102,6 +102,7 @@
     "fts_geology:gas_heater",
     "fts_geology:oil_sandstone",
     "fts_geology:gas_seep",
-    "fts_geology:wellhead"
+    "fts_geology:wellhead",
+    {"id": "fts_geology:crankshaft", "required": false}
   ]
 }

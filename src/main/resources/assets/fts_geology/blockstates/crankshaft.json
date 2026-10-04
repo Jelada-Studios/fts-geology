@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "facing=north": {"model": "fts_geology:block/crankshaft"},
+    "facing=south": {"model": "fts_geology:block/crankshaft", "y": 180},
+    "facing=east": {"model": "fts_geology:block/crankshaft", "y": 90},
+    "facing=west": {"model": "fts_geology:block/crankshaft", "y": 270},
+    "facing=up": {"model": "fts_geology:block/crankshaft", "x": 270},
+    "facing=down": {"model": "fts_geology:block/crankshaft", "x": 90}
+  }
+}

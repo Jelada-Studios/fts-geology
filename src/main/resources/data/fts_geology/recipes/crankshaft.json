@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "conditions": [{"type": "forge:mod_loaded", "modid": "create"}],
+  "category": "misc",
+  "pattern": [" S ", "IAI", " I "],
+  "key": {
+    "S": {"item": "create:shaft"},
+    "I": {"item": "minecraft:iron_ingot"},
+    "A": {"item": "create:andesite_casing"}
+  },
+  "result": {"item": "fts_geology:crankshaft", "count": 1}
+}

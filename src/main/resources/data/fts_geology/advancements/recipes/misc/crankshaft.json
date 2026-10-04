@@ -1,0 +1,17 @@
+{
+  "conditions": [{"type": "forge:mod_loaded", "modid": "create"}],
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_gas_engine": {
+      "conditions": {"items": [{"items": ["fts_geology:gas_engine"]}]},
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {"recipe": "fts_geology:crankshaft"},
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [["has_gas_engine", "has_the_recipe"]],
+  "rewards": {"recipes": ["fts_geology:crankshaft"]},
+  "sends_telemetry_event": false
+}

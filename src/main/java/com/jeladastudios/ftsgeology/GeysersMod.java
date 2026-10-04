@@ -50,6 +50,15 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.gas.registry.GasBlockEntities.BLOCK_ENTITIES.register(modBus);
         com.jeladastudios.ftsgeology.gas.registry.GasTabs.TABS.register(modBus);
         modBus.addListener(com.jeladastudios.ftsgeology.gas.registry.GasCapabilities::register);
+        // Where Create is installed, a gas engine's crankshaft turns its shafts (compat.create, reached by name: it is built on
+        // Create's classes, and left out of a build made without Create's jar).
+        if (net.minecraftforge.fml.ModList.get().isLoaded("create")) {
+            try {
+                Class.forName("com.jeladastudios.ftsgeology.compat.create.CreateCrank").getMethod("register", IEventBus.class).invoke(null, modBus);
+            } catch (ReflectiveOperationException | LinkageError e) {
+                LOGGER.warn("Create's crankshaft not registered: {}", e.toString());
+            }
+        }
 
         // Populate the creative menu once tabs are built (mod bus event).
         modBus.addListener(this::onBuildCreativeTabs);

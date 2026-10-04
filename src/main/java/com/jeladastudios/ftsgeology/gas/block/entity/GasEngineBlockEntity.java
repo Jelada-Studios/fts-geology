@@ -44,6 +44,8 @@ public class GasEngineBlockEntity extends GasMachineBlockEntity {
     private final GasTank exhaust = new GasTank(0.2, 10).onChange(this::setChanged);
     private final MachineEnergy energy = new MachineEnergy(60000, 0, 1000, this::setChanged);
     private double lastFe;
+    /** What the engine made at full load on its fuel, FE a tick, kept while it only waits for its store to empty. */
+    private double fullLoad;
     private double lastPhi;
     private boolean lastCo;
     private String stallReason = "";
@@ -96,7 +98,9 @@ public class GasEngineBlockEntity extends GasMachineBlockEntity {
             stall("redstone");
             return;
         }
-        if (energy.space() < 50) {
+        // A full store waits, once what the engine makes at full load is known: until then a crankshaft on it offers its
+        // shaft nothing, takes nothing out of the store, and the engine would wait on it for ever.
+        if (energy.space() < 50 && fullLoad > 0) {
             stall("full");
             return;
         }
@@ -143,12 +147,31 @@ public class GasEngineBlockEntity extends GasMachineBlockEntity {
         int fe = (int) Math.floor(heat * EFFICIENCY);
         energy.generate(fe);
         lastFe = fe;
+        fullLoad = fullLoad * 0.8 + fe / load * 0.2;
         stallReason = "";
         exhaust.gas.add(charge);
         exhaust.changed();
         ventExhaust();
         setLit(true);
         effects();
+    }
+
+    /**
+     * Either end of the flywheel's axle, to the left and the right of the intake: where a crankshaft takes the engine's
+     * power as rotation (Create's, {@code compat.create}).
+     */
+    public boolean axleEnd(Direction side) {
+        return side.getAxis() != Direction.Axis.Y && side.getAxis() != facing().getAxis();
+    }
+
+    /** What the engine makes at full load on the fuel it has, FE a tick; 0 when it cannot run. */
+    public double fullLoadFe() {
+        return fullLoad;
+    }
+
+    /** Takes up to {@code fe} from the engine's store, for a shaft it turns; what it got. */
+    public int driveShaft(int fe) {
+        return energy.consume(fe);
     }
 
     private static void subtractInjected(GasMix charge, GasMix injected) {
@@ -167,6 +190,7 @@ public class GasEngineBlockEntity extends GasMachineBlockEntity {
 
     private void stall(String reason) {
         stallReason = reason;
+        if (!reason.equals("full")) fullLoad = 0;
         setLit(false);
     }
 
