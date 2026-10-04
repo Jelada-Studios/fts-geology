@@ -463,7 +463,7 @@
   "command.fts_geology.water.wells": "Wells have drawn it down %s blocks here (%s wells kept in this world)",
   "command.fts_geology.water.weather.dry": "The ground of %2$s chunks round here has been through %1$s game days of dry weather",
   "command.fts_geology.water.weather.wet": "The ground of %2$s chunks round here has been through %1$s game days of rain",
-  "command.fts_geology.water.looked": "Last looked at %s hours of the ground's time ago (a game day is a week of it); grass dryness %s/15; roots at the wilting point for %s game days",
+  "command.fts_geology.water.looked": "Last looked at %s hours of the ground's time ago (a game day is a week of it); grass colour %s (-15 lush, 15 straw); roots at the wilting point for %s game days",
   "item.fts_geology.core_drill": "Core Drill",
   "item.fts_geology.core_drill.tip": "Use on the ground: bores %s blocks down and brings up a core",
   "item.fts_geology.core_sample": "Core Sample",

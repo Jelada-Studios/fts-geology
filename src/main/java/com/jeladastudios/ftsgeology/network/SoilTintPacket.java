@@ -8,9 +8,10 @@ import net.minecraftforge.network.NetworkEvent;
 import java.util.function.Supplier;
 
 /**
- * How dry the grass of a chunk is, cell by cell, so the client can draw it paler where the ground has dried out.
+ * How the grass of a chunk looks, cell by cell, so the client can draw it paler where the ground has dried out and
+ * deeper where it is wet.
  *
- * @param dry sixteen cells of four by four columns, {@code (lz / 4) * 4 + lx / 4}, from 0 green to 15 straw
+ * @param dry sixteen cells of four by four columns, {@code (lz / 4) * 4 + lx / 4}, from -15 lushest through 0 to 15 straw
  */
 public record SoilTintPacket(int chunkX, int chunkZ, byte[] dry) {
 

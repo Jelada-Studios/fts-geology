@@ -49,9 +49,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * looked at every ten seconds, within a small share of the tick; a chunk loaded again after a while catches up on
  * the time it was away, with the rain the place gets on average. What is kept goes into the chunk's own save.</p>
  *
- * <p>On its own it changes nothing in the world. With {@code soilWaterChangesGround} the grass over drying ground is
- * drawn towards straw (the colour is sent to the players watching the chunk) and farmland over wet soil stays moist;
- * no block is replaced.</p>
+ * <p>On its own it changes no block. With {@code soilWaterTint} the grass over drying ground is drawn towards straw,
+ * and over soaked ground or a high water table a deeper green (the colour is sent to the players watching the chunk);
+ * with {@code soilWaterChangesGround} farmland over wet soil stays moist, grass dies back in a long drought and
+ * standing water turns hollows to mud.</p>
  */
 @Mod.EventBusSubscriber(modid = GeysersMod.MODID)
 public final class SoilWater {
@@ -400,7 +401,7 @@ public final class SoilWater {
         HollowPonds.look(level, chunk, c, first || away ? 0 : hours, c.runoff);
         c.runoff = 0;
         // Away, the place had its average weather, rain and all: no drought or flood is carried over it.
-        if (GeyserConfig.SOIL_WATER_GROUND.get()) showGround(level, chunk, c, first || away ? -1 : hours);
+        showGround(level, chunk, c, first || away ? -1 : hours);
     }
 
     /**
@@ -486,7 +487,7 @@ public final class SoilWater {
                     // Half the week in daylight and half in the dark, as the sky would give it.
                     advance(level, chunk, c, false, 84, false, wet, false, true);
                     advance(level, chunk, c, false, 84, false, wet, false, false);
-                    if (GeyserConfig.SOIL_WATER_GROUND.get()) showGround(level, chunk, c, 168);
+                    showGround(level, chunk, c, 168);
                 }
                 c.last = now;
                 n++;
@@ -498,13 +499,29 @@ public final class SoilWater {
     // === What it does to the ground (soilWaterChangesGround) ===============
 
     /**
-     * How dry the grass over a cell looks, 0 to 15: green while the root zone holds half of what plants can use, then
-     * paler, straw once it is nearly all gone -- from about the third dry day in temperate loam to the seventh.
+     * How the grass over a cell looks, -15 to 15: from 1 to 15 drier, green while the root zone holds half of what plants
+     * can use, then paler, straw once it is nearly all gone -- from about the third dry day in temperate loam to the
+     * seventh; from -1 to -15 lusher, where the groundwater stands within a few blocks of the ground ({@code below},
+     * blocks, or negative where not known) or the root zone is soaked. Ground over a high water table stays green in a
+     * drought while the ridges round it brown.
      */
-    static byte tintOf(Soil soil, float root) {
+    static byte tintOf(Soil soil, float root, double below) {
         if (soil != Soil.LOAM && soil != Soil.CLAY && soil != Soil.SAND) return 0;
-        double t = Mth.clamp((0.45 - soil.available(sat(root, soil.root))) / 0.35, 0.0, 1.0);
-        return (byte) Math.round(t * 15);
+        double usable = soil.available(sat(root, soil.root));
+        double near = below < 0 ? 0 : Mth.clamp((LUSH_DEPTH - below) / LUSH_DEPTH, 0.0, 1.0);
+        double soaked = Mth.clamp((usable - 0.85) / 0.15, 0.0, 1.0);
+        double lush = Math.max(near, soaked);
+        if (lush > 0 && usable >= 0.45) return (byte) -Math.round(lush * 15);
+        double t = Mth.clamp((0.45 - usable) / 0.35, 0.0, 1.0);
+        return (byte) Math.round(Math.max(0, t - near) * 15);
+    }
+
+    /** Blocks from the ground down to the groundwater within which the grass over it is drawn lusher. */
+    static final double LUSH_DEPTH = 3.0;
+
+    /** Blocks from the ground down to the groundwater under a cell, or -1 where not known yet. */
+    private static double groundwaterBelow(Cells c, int i) {
+        return c.depth < 0 ? -1 : Math.max(0, c.depth - (c.table[i] - c.lowered));
     }
 
     /** Farmland over soil this wet stays moist, as a rain-fed field does. */
@@ -529,6 +546,8 @@ public final class SoilWater {
      * and drying out again.
      */
     private static void showGround(ServerLevel level, LevelChunk chunk, Cells c, double hours) {
+        boolean tint = GeyserConfig.SOIL_WATER_TINT.get(), ground = GeyserConfig.SOIL_WATER_GROUND.get();
+        if (!tint && !ground) return;
         ChunkPos p = chunk.getPos();
         boolean changed = false;
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
@@ -538,11 +557,13 @@ public final class SoilWater {
             int g = ground(level, x0 + 2, z0 + 2);
             Soil soil = g == Integer.MIN_VALUE ? Soil.NONE
                     : cellSoil(chunk, x0 + 2, g, z0 + 2);
-            byte t = tintOf(soil, c.root[i]);
+            byte t = tint ? tintOf(soil, c.root[i], groundwaterBelow(c, i)) : 0;
             if (t != c.tint[i]) {
                 c.tint[i] = t;
                 changed = true;
             }
+            // The grass's colour alone: the ground itself is left as it is (soilWaterChangesGround).
+            if (!ground) continue;
             if (hours < 0) {
                 c.dry[i] = 0;
                 c.soak[i] = 0;
@@ -839,7 +860,7 @@ public final class SoilWater {
                     net.minecraftforge.network.PacketDistributor.PLAYER.with(event::getPlayer),
                     new com.jeladastudios.ftsgeology.network.SoilWetPacket(p.x, p.z, c.wet.clone()));
         }
-        if (!GeyserConfig.SOIL_WATER_GROUND.get()) return;
+        if (!GeyserConfig.SOIL_WATER_TINT.get()) return;
         boolean any = false;
         for (byte b : c.tint) any |= b != 0;
         if (!any) return;

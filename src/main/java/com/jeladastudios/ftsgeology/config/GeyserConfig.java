@@ -211,7 +211,8 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue RIVERS;                 // default ON, experimental
     public static final ForgeConfigSpec.BooleanValue RIVERS_REFILL;          // lost river water comes back
     public static final ForgeConfigSpec.BooleanValue SOIL_WATER;             // the ground's water, kept per chunk
-    public static final ForgeConfigSpec.BooleanValue SOIL_WATER_GROUND;      // grass colour, rain-fed farmland
+    public static final ForgeConfigSpec.BooleanValue SOIL_WATER_TINT;        // grass coloured by the water in the ground
+    public static final ForgeConfigSpec.BooleanValue SOIL_WATER_GROUND;      // grass dying back, mud, rain-fed farmland
     public static final ForgeConfigSpec.BooleanValue SEA_WATER_SALTY;        // sea water waters no field
     public static final ForgeConfigSpec.BooleanValue DAMS;                   // dammed rivers fill; weak dams break
     public static final ForgeConfigSpec.BooleanValue WATER_LOAD_COLLAPSE;    // cave roofs under new water, drained karst
@@ -1235,12 +1236,18 @@ public final class GeyserConfig {
                         "saves, a small share of the tick. On its own it changes no block; /geology water, the core",
                         "sample and the geothermal probe read it. Not in TerraFirmaCraft, which keeps its own.")
                 .define("soilWater", true);
+        SOIL_WATER_TINT = b
+                .comment("Let the water in the ground show in the grass (needs soilWater). Grass, ferns and the grass",
+                        "block turn towards straw as the root zone dries -- from about the third dry day, straw by the",
+                        "seventh -- and green again after rain; over ground soaked through, or where the groundwater is",
+                        "a few blocks down, they are a deeper green, as the bottoms stay green in a drought while the",
+                        "ridges round them brown. Only the colour: no block changes.")
+                .define("soilWaterTint", true);
         SOIL_WATER_GROUND = b
-                .comment("Let the water in the ground show (needs soilWater). Grass, ferns and the grass block turn",
-                        "towards straw as the root zone dries -- from about the third dry day, straw by the seventh --",
-                        "and green again after rain; farmland over soil wet enough stays moist without water beside",
-                        "it, as rain-fed fields do. A long drought -- the roots at the wilting point for six game days",
-                        "and more -- kills the grass back to bare soil in patches, and no grass spreads onto dry ground",
+                .comment("Let the water in the ground change it (needs soilWater). Farmland over soil wet enough stays",
+                        "moist without water beside it, as rain-fed fields do. A long drought -- the roots at the",
+                        "wilting point for six game days and more -- kills the grass back to bare soil in patches, and",
+                        "no grass spreads onto dry ground",
                         "meanwhile; it grows back after the rain comes. Grass within four blocks of water stays green,",
                         "and nothing a player placed is touched. A dry field's crops slow and stop; a watered one grows",
                         "as ever. Ground that stands in water two days and more, where the groundwater is up at the surface,",

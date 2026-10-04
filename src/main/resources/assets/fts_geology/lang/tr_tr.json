@@ -453,7 +453,7 @@
   "command.fts_geology.water.wells": "Kuyular burada suyu %s blok aşağı çekmiş (bu dünyada %s kuyu tutuluyor)",
   "command.fts_geology.water.weather.dry": "Buradaki %2$s chunk'ın toprağı %1$s oyun günü kurak hava geçirdi",
   "command.fts_geology.water.weather.wet": "Buradaki %2$s chunk'ın toprağı %1$s oyun günü yağmur geçirdi",
-  "command.fts_geology.water.looked": "Son bakış toprağın zamanıyla %s saat önce (bir oyun günü onun bir haftası); çim kuruluğu %s/15; kökler %s oyun günüdür solma noktasında",
+  "command.fts_geology.water.looked": "Son bakış toprağın zamanıyla %s saat önce (bir oyun günü onun bir haftası); çim rengi %s (-15 gür yeşil, 15 saman); kökler %s oyun günüdür solma noktasında",
   "item.fts_geology.core_drill": "Karot Sondası",
   "item.fts_geology.core_drill.tip": "Zemine kullan: %s blok aşağı deler ve bir karot çıkarır",
   "item.fts_geology.core_sample": "Karot Numunesi",

@@ -5,6 +5,7 @@ import com.jeladastudios.ftsgeology.network.SoilTintPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BiomeColors;
 import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GrassColor;
@@ -22,20 +23,24 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Grass drawn paler where the ground under it has dried out: the server says how dry each four-by-four cell of a
- * chunk is, and grass, ferns and the grass block's top take the biome's colour blended towards straw by that much.
- * Nothing is kept past the chunk; where nothing was said, the grass is the biome's own green.
+ * Grass drawn paler where the ground under it has dried out, and a deeper green where it is soaked or the groundwater
+ * is near: the server says how each four-by-four cell of a chunk looks, and grass, ferns and the grass block's top take
+ * the biome's colour blended towards straw, or darkened, by that much. The cells are blended into each other, across
+ * the chunks' edges too, so no square shows. Nothing is kept past the chunk; where nothing was said, the grass is the
+ * biome's own green.
  */
 @Mod.EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
 public final class ClientSoilTint {
 
     private ClientSoilTint() {}
 
-    /** Dryness by chunk, sixteen cells from 0 to 15. */
+    /** Each chunk's sixteen cells, from -15 lushest to 15 straw. */
     private static final Map<Long, byte[]> DRY = new ConcurrentHashMap<>();
     /** The colour of dry grass, and how far towards it the driest goes. */
     private static final int STRAW = 0xC2A864;
     private static final float MOST = 0.8f;
+    /** How much darker the lushest grass is drawn. */
+    private static final float LUSH = 0.15f;
 
     public static void set(SoilTintPacket p) {
         long key = ChunkPos.asLong(p.chunkX(), p.chunkZ());
@@ -43,28 +48,52 @@ public final class ClientSoilTint {
         for (byte b : p.dry()) any |= b != 0;
         byte[] was = any ? DRY.put(key, p.dry()) : DRY.remove(key);
         if (was == null && !any) return;
-        // The chunk's meshes keep the colours they were built with: build them again.
+        // The meshes keep the colours they were built with: build them again, the chunk's and, as its cells blend into
+        // theirs at the edges, those of the chunks round it.
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.levelRenderer == null) return;
         int min = mc.level.getMinSection(), max = mc.level.getMaxSection();
-        for (int sy = min; sy < max; sy++) mc.levelRenderer.setSectionDirty(p.chunkX(), sy, p.chunkZ());
+        for (int cx = p.chunkX() - 1; cx <= p.chunkX() + 1; cx++) {
+            for (int cz = p.chunkZ() - 1; cz <= p.chunkZ() + 1; cz++) {
+                if (mc.level.getChunkSource().getChunk(cx, cz, false) == null) continue;
+                for (int sy = min; sy < max; sy++) mc.levelRenderer.setSectionDirty(cx, sy, cz);
+            }
+        }
     }
 
-    /** How dry the grass at a place is, 0 to 1. */
-    static float dryness(BlockPos pos) {
-        byte[] d = DRY.get(ChunkPos.asLong(pos.getX() >> 4, pos.getZ() >> 4));
-        if (d == null) return 0f;
-        return d[((pos.getZ() & 15) >> 2) * 4 + ((pos.getX() & 15) >> 2)] / 15f;
+    /** One cell, by its index across the world (four columns to a cell): -1 lushest to 1 straw, 0 where nothing was said. */
+    private static float cell(int cx, int cz) {
+        byte[] d = DRY.get(ChunkPos.asLong(cx >> 2, cz >> 2));
+        return d == null ? 0f : d[(cz & 3) * 4 + (cx & 3)] / 15f;
     }
 
-    /** The biome's grass colour, drier where the ground is. */
+    /** How the grass at a place looks, -1 lushest to 1 straw: the four cells round it, blended by how near their middles are. */
+    static float tint(BlockPos pos) {
+        double fx = (pos.getX() + 0.5) / 4.0 - 0.5, fz = (pos.getZ() + 0.5) / 4.0 - 0.5;
+        int x0 = Mth.floor(fx), z0 = Mth.floor(fz);
+        float tx = (float) (fx - x0), tz = (float) (fz - z0);
+        float north = Mth.lerp(tx, cell(x0, z0), cell(x0 + 1, z0));
+        float south = Mth.lerp(tx, cell(x0, z0 + 1), cell(x0 + 1, z0 + 1));
+        return Mth.lerp(tz, north, south);
+    }
+
+    /** The biome's grass colour, drier where the ground is, deeper where it is wet. */
     public static int grass(BlockState state, BlockAndTintGetter level, BlockPos pos, int tint) {
         if (level == null || pos == null) return GrassColor.get(0.5, 1.0);
         BlockPos at = state.hasProperty(DoublePlantBlock.HALF) && state.getValue(DoublePlantBlock.HALF) == DoubleBlockHalf.UPPER
                 ? pos.below() : pos;
         int green = BiomeColors.getAverageGrassColor(level, at);
-        float t = dryness(at) * MOST;
-        if (t <= 0f) return green;
+        float look = tint(at);
+        if (look == 0f) return green;
+        if (look < 0f) {
+            // Lusher: darker, the red and blue down more than the green, so it reads as a fuller green.
+            float s = -look * LUSH;
+            int r = (int) ((green >> 16 & 255) * (1 - s * 0.9f));
+            int g = (int) ((green >> 8 & 255) * (1 - s * 0.25f));
+            int b = (int) ((green & 255) * (1 - s * 0.9f));
+            return r << 16 | g << 8 | b;
+        }
+        float t = look * MOST;
         int r = (int) ((green >> 16 & 255) * (1 - t) + (STRAW >> 16 & 255) * t);
         int g = (int) ((green >> 8 & 255) * (1 - t) + (STRAW >> 8 & 255) * t);
         int b = (int) ((green & 255) * (1 - t) + (STRAW & 255) * t);
