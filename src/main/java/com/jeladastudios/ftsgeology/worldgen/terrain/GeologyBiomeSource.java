@@ -198,7 +198,14 @@ public class GeologyBiomeSource extends BiomeSource {
             boolean onChannel = river != null
                     && com.jeladastudios.ftsgeology.hydrology.RiverNetwork.onRiver(bx, bz, ON_CHANNEL);
             if (onChannel && !TfcCompat.beach(base)) return river;
-            if (TfcCompat.river(base)) return ashore(qx, qy, qz, sampler, base);
+            if (TfcCompat.river(base)) {
+                Holder<Biome> land = ashore(qx, qy, qz, sampler, base);
+                if (!WorldgenRevision.has(WorldgenRevision.GREENER_GROUND)) return land;
+                // Worlds made since: the climate's own river, where no channel of ours runs, is land, and the plates
+                // have their say over it as over any land. Left a river, it was a dry river among a coast's beaches
+                // and in the middle of a geothermal basin, where /locate sent a player to find no water.
+                base = TfcCompat.river(land) ? inland(qx, qy, qz, sampler, land) : land;
+            }
         }
         Role role = GeologyRoles.roleAt(bx, bz);
         Holder<Biome> ours = roles[role.ordinal()];
@@ -255,6 +262,43 @@ public class GeologyBiomeSource extends BiomeSource {
         }
         return base;
     }
+
+    /** How far out, in quarts, the land round a climate's river with no channel in it is looked for, nearest first. */
+    private static final int[] RIVER_LAND = {4, 8, 16, 24};
+
+    /**
+     * The land a climate's river with no channel in it stands in, looked for further out than {@link #ashore}: the
+     * nearest land biome round it, a shore if there is nothing else, the river itself if there is not even that.
+     */
+    private Holder<Biome> inland(int qx, int qy, int qz, Climate.Sampler sampler, Holder<Biome> river) {
+        long key = com.jeladastudios.ftsgeology.util.ColumnCache.key(qx, qz);
+        Holder<Biome> known = inlandOf.get(key);
+        if (known != null) return known;
+        Holder<Biome> found = river;
+        search:
+        for (int r : RIVER_LAND) {
+            Holder<Biome> shore = null;
+            for (int[] w : WAYS) {
+                Holder<Biome> near = parent.getNoiseBiome(qx + w[0] * r, qy, qz + w[1] * r, sampler);
+                if (TfcCompat.river(near) || TfcCompat.ocean(near) || underground(near)) continue;
+                if (!TfcCompat.beach(near)) {
+                    found = near;
+                    break search;
+                }
+                if (shore == null) shore = near;
+            }
+            // Only shore at this distance: that is the land here, without looking further for more.
+            if (shore != null) {
+                found = shore;
+                break;
+            }
+        }
+        inlandOf.put(key, found);
+        return found;
+    }
+
+    /** Each column's answer from {@link #inland}: structures and the search ask the same columns over and over. */
+    private final com.jeladastudios.ftsgeology.util.ColumnCache<Holder<Biome>> inlandOf = new com.jeladastudios.ftsgeology.util.ColumnCache<>(12);
 
     /** Below this the offset's ground is under the sea whatever the rest of the terrain does to it; not looked at. */
     private static final double COAST_LOW = 60.0;
