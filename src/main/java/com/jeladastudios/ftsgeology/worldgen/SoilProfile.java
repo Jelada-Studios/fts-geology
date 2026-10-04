@@ -10,6 +10,8 @@ import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 import com.jeladastudios.ftsgeology.util.SeedHash;
 import com.jeladastudios.ftsgeology.util.ValueNoise;
 import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
+import com.jeladastudios.ftsgeology.worldgen.terrain.ColumnClimate;
+import com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
@@ -33,6 +35,11 @@ import net.minecraft.world.level.block.state.BlockState;
  *
  * <p>Every column reads its own parent rock, and where the feature runs at all comes from stress
  * interpolated between the chunk corners, so a soil patch never ends on a chunk border.</p>
+ *
+ * <p>In worlds made since {@link WorldgenRevision#GREENER_GROUND} the soil lies as real soil does, under its turf: the
+ * grass and what grows on it are left, and the colour goes into the blocks under it, to be seen in a cutting or a bank;
+ * the top is painted only where it is bare or steep. The climate has its say as well as the rock (see {@link Kind}).
+ * Before, the top block was painted, and a meadow came out patched with terracotta and calcite.</p>
  */
 public final class SoilProfile {
 
@@ -69,6 +76,9 @@ public final class SoilProfile {
         double b01 = GeothermalBasin.basin(model, x0, z0 + 16);
         double b11 = GeothermalBasin.basin(model, x0 + 16, z0 + 16);
         long seed = level.getSeed() ^ SALT;
+        // Worlds made since: the soil's colour under its grass, by the climate as well as the rock. Before: over it.
+        boolean underGrass = WorldgenRevision.has(WorldgenRevision.GREENER_GROUND) && GeyserConfig.SOIL_UNDER_GRASS.get();
+        ColumnClimate.At[] climate = underGrass ? ColumnClimate.corners(model, x0, z0) : null;
         for (int dx = 0; dx < 16; dx++) {
             for (int dz = 0; dz < 16; dz++) {
                 double s = Mth.lerp(dz / 16.0, Mth.lerp(dx / 16.0, s00, s10), Mth.lerp(dx / 16.0, s01, s11));
@@ -89,7 +99,8 @@ public final class SoilProfile {
                 double keep = (n - PATCH_CUT - QUIET_CUT * (1.0 - gate)) / 0.05;
                 if (keep <= 0.0 || (keep < 1.0 && rng.nextDouble() > keep)) continue;
 
-                paint(level, x, z);
+                if (underGrass) paintUnder(level, x, z, ColumnClimate.blend(climate, dx, dz));
+                else paint(level, x, z);
             }
         }
     }
@@ -180,6 +191,105 @@ public final class SoilProfile {
         if (!put.is(BlockTags.DIRT)) TerrainProbe.clearGroundCover(level, x, g, z, 2);
         level.setBlock(at, put, FLAGS);
     }
+
+    /**
+     * What the soil comes to under a climate. Red laterite is the tropics' soil, made where it is hot and wet enough for
+     * the rock to rot through; over the same basalt a temperate or cold country has an ordinary brown earth. A podzol
+     * shows at the top only where it is cool and wet, under conifers; where it is hot and dry, granite crumbles to a
+     * coarse gravelly grus instead. A rendzina is the same everywhere: thin, dark, under turf, the white rock just below.
+     */
+    private enum Kind { LATERITE, BROWN_EARTH, RENDZINA, PODZOL, GRUS, LEACHED }
+
+    /** Mean yearly temperatures, degrees, and the climate's humidity, -1 to 1, the soils above form in. */
+    private static final double LATERITE_WARMTH = 18.0, LATERITE_WET = -0.35;
+    private static final double PODZOL_COOLEST = 0.0, PODZOL_WARMEST = 12.0, PODZOL_WET = -0.05;
+    private static final double GRUS_WARMTH = 15.0, GRUS_DRY = -0.2;
+
+    private static Kind kind(Soil soil, double year, double humidity) {
+        return switch (soil) {
+            case LATERITE -> year >= LATERITE_WARMTH && humidity > LATERITE_WET ? Kind.LATERITE : Kind.BROWN_EARTH;
+            case RENDZINA -> Kind.RENDZINA;
+            case PODZOL -> year >= PODZOL_COOLEST && year <= PODZOL_WARMEST && humidity > PODZOL_WET ? Kind.PODZOL
+                    : year >= GRUS_WARMTH && humidity < GRUS_DRY ? Kind.GRUS : Kind.LEACHED;
+            default -> null;
+        };
+    }
+
+    /**
+     * One column of soil the way the ground holds it: under its turf. The grass and what grows on it stay; the soil's
+     * colour goes into the few blocks under it, where a cutting, a bank or a river shows it. The top is painted only
+     * where it is bare already -- earth, coarse earth -- or too steep to hold its turf, where real soil shows too.
+     */
+    private static void paintUnder(WorldGenLevel level, int x, int z, ColumnClimate.At climate) {
+        int g = TerrainProbe.groundY(level, x, z);
+        if (g == Integer.MIN_VALUE) return;
+        if (TerrainProbe.hasFluidAbove(level, x, z)) return;
+        if (com.jeladastudios.ftsgeology.tectonics.ThermalBiomes.isCaldera(level.getLevel(), x, z)) return;
+        BlockPos at = new BlockPos(x, g, z);
+        BlockState here = level.getBlockState(at);
+        if (!here.is(BlockTags.DIRT)) return;
+        if (EruptionHandler.isPlayerPlaced(here)) return;
+        Soil soil = probe(level, x, g, z);
+        if (soil == Soil.NONE) return;
+        Kind kind = kind(soil, climate.yearAt(g, level.getSeaLevel()), climate.humidity());
+        int r = Mth.clamp((int) Math.floor(5.0 + 5.0 * ValueNoise.noise(x + 4096, z + 4096, 5.0)), 0, 9);
+
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int d = 1; d <= 3; d++) {
+            BlockState s = level.getBlockState(m.set(x, g - d, z));
+            if (!s.is(Blocks.DIRT) && !s.is(Blocks.COARSE_DIRT) && !s.is(Blocks.ROOTED_DIRT)) break;
+            Block put = under(kind, r, d);
+            if (put != null) level.setBlock(m, put.defaultBlockState(), FLAGS);
+        }
+
+        boolean bare = here.is(Blocks.DIRT) || here.is(Blocks.COARSE_DIRT) || here.is(Blocks.ROOTED_DIRT) || steep(level, x, g, z);
+        Block top = bare ? bareTop(kind, soil, x, z, r) : turfTop(kind, r);
+        if (top == null) return;
+        BlockState put = top.defaultBlockState();
+        if (!put.is(BlockTags.DIRT)) TerrainProbe.clearGroundCover(level, x, g, z, 2);
+        level.setBlock(at, put, FLAGS);
+    }
+
+    /** What lies {@code d} blocks under the top, or null to leave the earth there. */
+    private static Block under(Kind kind, int r, int d) {
+        return switch (kind) {
+            case LATERITE -> r < 5 ? Blocks.RED_TERRACOTTA : r < 8 ? Blocks.TERRACOTTA : Blocks.BROWN_TERRACOTTA;
+            case BROWN_EARTH, PODZOL -> r < 4 ? Blocks.COARSE_DIRT : null;
+            // A hand's depth of dark earth, then the rock.
+            case RENDZINA -> d == 1 ? null : Blocks.CALCITE;
+            case GRUS -> Blocks.COARSE_DIRT;
+            case LEACHED -> r < 5 ? Blocks.COARSE_DIRT : null;
+        };
+    }
+
+    /** The top where it was bare or steep. */
+    private static Block bareTop(Kind kind, Soil soil, int x, int z, int r) {
+        return switch (kind) {
+            case BROWN_EARTH -> Blocks.COARSE_DIRT;
+            case GRUS -> r < 7 ? Blocks.COARSE_DIRT : Blocks.GRAVEL;
+            default -> block(soil, x, z);
+        };
+    }
+
+    /** The top where turf stands on it: left, but for a cool wet forest's podzol and a dry country's grus, in patches. */
+    private static Block turfTop(Kind kind, int r) {
+        return switch (kind) {
+            case PODZOL -> r < 5 ? Blocks.PODZOL : null;
+            case GRUS -> r < 6 ? Blocks.COARSE_DIRT : null;
+            default -> null;
+        };
+    }
+
+    /** A column standing two blocks or more over a neighbour: a bank or a scar its turf does not hold on. */
+    private static boolean steep(WorldGenLevel level, int x, int g, int z) {
+        for (int[] o : SIDES) {
+            int n = TerrainProbe.groundY(level, x + o[0], z + o[1]);
+            if (n != Integer.MIN_VALUE && g - n >= 2) return true;
+        }
+        return false;
+    }
+
+    private static final int[][] SIDES = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 
     private static Block block(Soil soil, int x, int z) {
         // A slow field picks the block, not a die a column at a time: the patch is a few blobs of colour a handful of

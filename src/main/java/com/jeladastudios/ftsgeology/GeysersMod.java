@@ -105,6 +105,7 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.hydrology.WaterTable.clearCache();
         com.jeladastudios.ftsgeology.volcano.VolcanoJob.clear();
         com.jeladastudios.ftsgeology.volcano.VolcanoField.clearCache();
+        com.jeladastudios.ftsgeology.worldgen.terrain.ColumnClimate.clear();
         com.jeladastudios.ftsgeology.volcano.VolcanoBuilder.clearFinishing();
         com.jeladastudios.ftsgeology.quake.Weathering.clear();
         com.jeladastudios.ftsgeology.quake.CaveCollapse.clear();

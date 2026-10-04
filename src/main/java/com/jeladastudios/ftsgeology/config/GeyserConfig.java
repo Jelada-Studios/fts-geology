@@ -99,6 +99,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue ASH_WEATHERING;         // how fast ash washes off, 0 never
     public static final ForgeConfigSpec.BooleanValue ASH_LOAD_COLLAPSES_ROOFS;
     public static final ForgeConfigSpec.BooleanValue SOIL_FROM_BEDROCK;     // default ON
+    public static final ForgeConfigSpec.BooleanValue SOIL_UNDER_GRASS;      // that soil under its turf, by the climate
 
     // --- Cooldown / recharge cycle -----------------------------------------
     public static final ForgeConfigSpec.IntValue COOLDOWN_TICKS_MIN;  // e.g. 5 min = 6000
@@ -537,6 +538,16 @@ public final class GeyserConfig {
                         "would repaint every hillside in the world. So this shows up where the mod",
                         "has actually put geology, and nowhere else.")
                 .define("soilFromBedrock", true);
+        SOIL_UNDER_GRASS = b
+                .comment("Lay that soil as real soil lies: under its turf. The grass and what grows on it stay, and the",
+                        "soil's colour goes into the blocks under it, where a cutting, a bank or a river shows it; the",
+                        "top is coloured only where it is bare earth already or too steep to hold its turf. The",
+                        "climate counts as well as the rock: red laterite only where it is hot and wet, a brown earth",
+                        "over the same basalt in cooler country; podzol on top only where it is cool and wet, a coarse",
+                        "grus over granite where it is hot and dry; a rendzina's white rock a block under its turf.",
+                        "Worlds made with an earlier version keep the old way, so no seam shows. Off: the old way,",
+                        "the top block coloured, everywhere.")
+                .define("soilUnderGrass", true);
         ERUPTIONS_START_FIRES = b
                 .comment("Let a lava flow set the countryside alight. A flow reaching the tree line",
                         "really does start a fire, and the lava budget above already stops the flow",

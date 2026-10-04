@@ -103,6 +103,12 @@ public final class RawGround {
         return offset != null;
     }
 
+    /** The climate the bound generator samples its biomes by, or null before one is bound (not one of the mod's worlds). */
+    public static net.minecraft.world.level.biome.Climate.Sampler climate() {
+        RandomState s = columnState;
+        return s == null ? null : s.sampler();
+    }
+
     /** The ground here, in blocks: where the offset puts the surface in both world types. */
     public static double heightAt(int x, int z) {
         DensityFunction f = offset;

@@ -39,8 +39,13 @@ public final class WorldgenRevision {
     public static final int PLAIN_BODIES = 4;
     /** A river cut through a deposit another mod laid under its bed, as through any ground (round 129). */
     public static final int RIVER_DEPOSITS = 5;
+    /**
+     * Ground left green where the climate keeps it so: soil coloured under its grass rather than over it, steep slopes
+     * and talus under the tree line clothed in a wet climate, volcanic and rift country grassed (Feel the Nature round).
+     */
+    public static final int GREENER_GROUND = 6;
     /** What a world made now gets. */
-    public static final int CURRENT = 5;
+    public static final int CURRENT = 6;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;
