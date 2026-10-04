@@ -1,0 +1,8 @@
+{
+  "type": "fts_geology:optional_spawns",
+  "biomes": ["fts_geology:montane_forest", "fts_geology:subalpine_forest", "fts_geology:treeline", "fts_geology:alpine_meadow",
+    "fts_geology:alpine_scree"],
+  "spawns": [
+    { "entity": "alexsmobs:crow", "weight": 5, "min": 2, "max": 4 }
+  ]
+}
