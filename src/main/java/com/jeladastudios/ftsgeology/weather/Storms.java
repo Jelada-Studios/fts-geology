@@ -329,7 +329,52 @@ public final class Storms {
         st.setDirty();
         steer(level, st);
         if (now % 40 == 0) tell(level, players);
-        if (now % 100 == 0) sky(level, players, st);
+        if (now % 100 == 0) {
+            sky(level, players, st);
+            double[][] copy = new double[st.all.size()][];
+            for (int i = 0; i < copy.length; i++) {
+                Storm s = st.all.get(i);
+                copy[i] = new double[]{s.x, s.z, s.radius, s.peak * s.life(now), s.seed};
+            }
+            SKY = new Sky(copy, now);
+        }
+    }
+
+    /**
+     * The storms as they stood at a moment, copied for reading on any thread: the regional rain an addon or the river
+     * forcing asks for off the server thread. Taken every five seconds.
+     */
+    public static final class Sky {
+        private final double[][] storms;
+        /** The game time it was taken at. */
+        public final long time;
+
+        Sky(double[][] storms, long time) {
+            this.storms = storms;
+            this.time = time;
+        }
+
+        /** How hard it rains at a place, 0 to 1, as the storms stood then (no lift over the hills). */
+        public double rain(double x, double z) {
+            double dry = 1;
+            for (double[] s : storms) {
+                double dx = x - s[0], dz = z - s[1], d2 = dx * dx + dz * dz, r = s[2];
+                if (d2 >= r * r) continue;
+                double edge = Mth.clamp((1.0 - Math.sqrt(d2) / r) * 1.8, 0.0, 1.0);
+                edge = edge * edge * (3 - 2 * edge);
+                int seed = (int) s[4];
+                double bands = 0.7 + 0.3 * ValueNoise.noise((int) dx + seed, (int) dz - seed, r * 0.35);
+                dry *= 1 - Mth.clamp(s[3] * edge * bands, 0.0, 1.0);
+            }
+            return Mth.clamp(1 - dry, 0.0, 1.0);
+        }
+    }
+
+    private static volatile Sky SKY = new Sky(new double[0][], 0L);
+
+    /** The storms as last copied (see {@link Sky}); none where the rain is not regional. */
+    public static Sky sky() {
+        return SKY;
     }
 
     /** Each player's sky: the storms within sight and the highs and lows round them, for the clouds drawn. */

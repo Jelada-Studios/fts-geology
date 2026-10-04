@@ -458,6 +458,7 @@ public final class Reservoirs {
 
     /** One look at a reservoir; true once it is gone. */
     private static boolean step(ServerLevel level, Reservoir r) {
+        if (HydraulicsHooks.active(level) && r.laid.isEmpty() && r.lowered.isEmpty()) return strain(level, r);
         if (r.state == State.DRAINING) return drain(level, r);
         if (!solid(level.getBlockState(r.dam))) {
             // The wall is gone from under it: it runs out.
@@ -480,6 +481,35 @@ public final class Reservoirs {
             else stopSpill(level, r);
         }
         return false;
+    }
+
+    /**
+     * A dam whose water another mod runs (see HydraulicsHooks): the water is that mod's, only the wall is the mod's. Its
+     * level is read off the river water standing against the wall's face, and a wall too weak for it still strains and
+     * breaks; the wave out of the gap is the other mod's to run. True once the reservoir is gone.
+     */
+    private static boolean strain(ServerLevel level, Reservoir r) {
+        if (!solid(level.getBlockState(r.dam))) return true;
+        int ax = r.fz != 0 ? 1 : 0, az = r.fx != 0 ? 1 : 0;
+        int top = r.below;
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        // Up the river from the wall, over its width: the highest river water within a few blocks of the face.
+        for (int a = -2; a <= 2; a++) {
+            for (int t = 1; t <= 10; t++) {
+                int x = r.dam.getX() + a * ax - t * r.fx, z = r.dam.getZ() + a * az - t * r.fz;
+                if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, x, z)) continue;
+                for (int y = Math.max(top, r.below); y <= r.crest + 1; y++) {
+                    if (riverWater(level.getFluidState(m.set(x, y, z)))) top = Math.max(top, y);
+                }
+            }
+        }
+        r.level = top;
+        if (holds(level, r)) return false;
+        tearWall(level, r);
+        broke++;
+        tell(level, r.dam, Component.translatable("message.fts_geology.dam.broke").withStyle(ChatFormatting.RED));
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("dam at {}: broke with {} blocks of water behind it", r.dam.toShortString(), r.level - r.below);
+        return true;
     }
 
     /** A layer at a time, as fast as the river brings water, to the top of the wall or the lowest gap in the valley. */
@@ -815,6 +845,16 @@ public final class Reservoirs {
 
     /** A gap torn through the dam, three blocks wide, from its top to the river below; then it runs out. */
     private static void breach(ServerLevel level, Reservoir r) {
+        tearWall(level, r);
+        tell(level, r.dam, Component.translatable("message.fts_geology.dam.broke").withStyle(ChatFormatting.RED));
+        com.jeladastudios.ftsgeology.util.Diagnostics.info("dam at {}: broke with {} blocks of water behind it", r.dam.toShortString(), r.level - r.below);
+        broke++;
+        letGo(level, r);
+        floodBelow(level, r);
+    }
+
+    /** The gap itself: three blocks wide, from the dam's top to the river below, through the whole thickness. */
+    private static void tearWall(ServerLevel level, Reservoir r) {
         int ax = r.fz != 0 ? 1 : 0, az = r.fx != 0 ? 1 : 0;       // across the river
         // What a player built there, whatever it is made of: a dam of earth or rock is of natural blocks.
         LongOpenHashSet built = new LongOpenHashSet(com.jeladastudios.ftsgeology.quake.PlayerBuilt.inChunk(level, r.dam.getX() >> 4, r.dam.getZ() >> 4));
@@ -839,11 +879,6 @@ public final class Reservoirs {
         }
         level.sendParticles(ParticleTypes.CLOUD, r.dam.getX() + 0.5, r.level, r.dam.getZ() + 0.5, 40, 1.5, 1.0, 1.5, 0.05);
         level.playSound(null, r.dam, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 2.0F, 0.6F);
-        tell(level, r.dam, Component.translatable("message.fts_geology.dam.broke").withStyle(ChatFormatting.RED));
-        com.jeladastudios.ftsgeology.util.Diagnostics.info("dam at {}: broke with {} blocks of water behind it", r.dam.toShortString(), r.level - r.below);
-        broke++;
-        letGo(level, r);
-        floodBelow(level, r);
     }
 
     /**

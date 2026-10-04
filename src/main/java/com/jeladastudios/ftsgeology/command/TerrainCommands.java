@@ -725,6 +725,41 @@ public final class TerrainCommands {
     }
 
     /** The rivers round here checked against what they promise: no crossings, no dead ends, no water going uphill. */
+    /**
+     * The rivers' flow as the API gives it, round the player: the channel at their column, the sources of their chunk
+     * and its forcing, and a check over a square. Worked out off the server thread, answered in the chat and the log.
+     */
+    public static int terrainRiversFlow(CommandContext<CommandSourceStack> ctx, int half) {
+        BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+        ServerLevel level = ctx.getSource().getLevel();
+        CommandSourceStack src = ctx.getSource();
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            StringBuilder sb = new StringBuilder();
+            try {
+                var c =com.jeladastudios.ftsgeology.api.FtsGeologyApi.channel(level, at.getX(), at.getZ(), 4.0, 30000L);
+                sb.append("channel ").append(c.status()).append(c.channel() == null ? "" : " " + c.channel()).append('\n');
+                var s = com.jeladastudios.ftsgeology.api.FtsGeologyApi.sources(level, at.getX() >> 4, at.getZ() >> 4);
+                sb.append("sources ").append(s.status()).append(s.inflows() == null ? "" : " " + s.inflows()).append('\n');
+                var f = com.jeladastudios.ftsgeology.api.FtsGeologyApi.forcing(level, at.getX() >> 4, at.getZ() >> 4);
+                sb.append(String.format(java.util.Locale.ROOT,
+                        "forcing base %.3f storm %.3f season %.3f phase %.3f drought %.2f seasonal %s cells %s runoff %s open %s leak %s draw %s%n",
+                        f.baseFactor(), f.stormFactor(), f.seasonFactor(), f.seasonPhase(), f.drought(), f.seasonal(), f.cellsKnown(),
+                        java.util.Arrays.toString(f.runoffExcess()), java.util.Arrays.toString(f.openWater()),
+                        java.util.Arrays.toString(f.leakance()), java.util.Arrays.toString(f.drawdown())));
+                sb.append(com.jeladastudios.ftsgeology.hydrology.RiverFlow.audit(level, at.getX(), at.getZ(), half));
+                sb.append(String.format(java.util.Locale.ROOT, "%napi version %d, revision %d", com.jeladastudios.ftsgeology.api.FtsGeologyApi.VERSION,
+                        com.jeladastudios.ftsgeology.api.FtsGeologyApi.worldgenRevision(level)));
+            } catch (Throwable t) {
+                sb.append("failed: ").append(t);
+                com.jeladastudios.ftsgeology.GeysersMod.LOGGER.error("river flow check", t);
+            }
+            String out = sb.toString();
+            com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(out);
+            level.getServer().execute(() -> src.sendSuccess(() -> Component.literal(out), false));
+        }, net.minecraft.Util.backgroundExecutor());
+        return 1;
+    }
+
     public static int terrainRiversAudit(CommandContext<CommandSourceStack> ctx, int half) {
         BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
         if (!com.jeladastudios.ftsgeology.hydrology.RiverNetwork.ready()) {

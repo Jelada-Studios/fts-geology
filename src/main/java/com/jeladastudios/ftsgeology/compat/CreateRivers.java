@@ -58,7 +58,7 @@ public final class CreateRivers {
      * What an open pipe end draws from the block in front of it when that block is a river's water: a bucket of plain
      * water, the river left standing. Null where it is anything else, and the pipe goes on as Create has it.
      */
-    public static FluidStack drawFromRiver(Object pipe) {
+    public static FluidStack drawFromRiver(Object pipe, boolean simulate) {
         if (WORLD == null) return null;
         try {
             Level level = (Level) WORLD.invokeExact(pipe);
@@ -66,6 +66,9 @@ public final class CreateRivers {
             if (level == null || at == null || !com.jeladastudios.ftsgeology.util.Loaded.at(level, at)) return null;
             FluidState state = level.getFluidState(at);
             if (!state.isSource() || !isRiver(state.getType())) return null;
+            // Where another mod runs the river's water, what it gives is what there is (see HydraulicsHooks).
+            int got = fromHydraulics(level, at, simulate);
+            if (got >= 0) return got == 0 ? FluidStack.EMPTY : new FluidStack(Fluids.WATER, got);
             return new FluidStack(Fluids.WATER, 1000);
         } catch (Throwable t) {
             return null;
@@ -116,6 +119,52 @@ public final class CreateRivers {
             return new FluidStack(Fluids.WATER, 1000);
         } catch (Throwable t) {
             return null;
+        }
+    }
+
+    /**
+     * Millibuckets a registered hydraulics gives up out of a river block for a whole bucket asked, or -1 where none runs
+     * that chunk's water and the river is drawn on as before.
+     */
+    public static int fromHydraulics(Level level, BlockPos at, boolean simulate) {
+        if (!(level instanceof net.minecraft.server.level.ServerLevel server)) return -1;
+        com.jeladastudios.ftsgeology.api.Hydraulics h = com.jeladastudios.ftsgeology.hydrology.HydraulicsHooks.of(server);
+        if (h == null || !com.jeladastudios.ftsgeology.hydrology.HydraulicsHooks.owns(server, at.getX() >> 4, at.getZ() >> 4)) return -1;
+        try {
+            return Math.max(0, Math.min(1000, h.drain(server, at.immutable(), 1000, simulate)));
+        } catch (RuntimeException e) {
+            return 0;
+        }
+    }
+
+    private static java.lang.reflect.Method behaviourWorld;
+    private static boolean behaviourLooked;
+
+    /**
+     * What a hose pulley draws from a river another mod runs: a whole block's worth from the hydraulics, or nothing; -1
+     * where its hose does not end in such a river, and the pulley goes on as Create has it. Only a whole block is taken,
+     * so nothing is lost to a pull that falls short.
+     */
+    public static int pulleyFromHydraulics(Object behaviour, BlockPos root, boolean simulate) {
+        try {
+            if (!behaviourLooked) {
+                behaviourLooked = true;
+                behaviourWorld = behaviour.getClass().getMethod("getWorld");
+            }
+            if (behaviourWorld == null || root == null) return -1;
+            Object w = behaviourWorld.invoke(behaviour);
+            if (!(w instanceof net.minecraft.server.level.ServerLevel level)) return -1;
+            BlockPos at = root;
+            if (!isRiver(level.getFluidState(at).getType())) {
+                at = root.below();
+                if (!isRiver(level.getFluidState(at).getType())) return -1;
+            }
+            int can = fromHydraulics(level, at, true);
+            if (can < 0) return -1;
+            if (can < 1000) return 0;
+            return simulate ? 1000 : Math.max(0, fromHydraulics(level, at, false));
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return -1;
         }
     }
 

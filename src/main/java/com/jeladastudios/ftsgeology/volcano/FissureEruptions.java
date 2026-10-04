@@ -5,6 +5,7 @@ import com.jeladastudios.ftsgeology.block.BasaltLayerBlock;
 import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
+import com.jeladastudios.ftsgeology.hydrology.HydraulicsHooks;
 import com.jeladastudios.ftsgeology.instrument.SeismicNetwork;
 import com.jeladastudios.ftsgeology.network.ModNetwork;
 import com.jeladastudios.ftsgeology.quake.Earthquake;
@@ -727,6 +728,13 @@ public final class FissureEruptions {
             if (!TerrainProbe.isVegetation(s) || TerrainProbe.isTreePart(s) || y == g + 3) return false;
             cover++;
         }
+        // Where another mod runs the rivers' water, the room under a river is left open for that water to come down
+        // into (see HydraulicsHooks); the ground still drops.
+        boolean theirs = HydraulicsHooks.active(level);
+        if (theirs && over.getFluidState().getType() instanceof com.jeladastudios.ftsgeology.fluid.RiverWaterFluid) {
+            over = Blocks.AIR.defaultBlockState();
+            HydraulicsHooks.moved(level, x >> 4, z >> 4, com.jeladastudios.ftsgeology.api.RiverBlocksChangedEvent.Cause.FISSURE);
+        }
         // Bottom up, so nothing is left hanging.
         for (int y = g - k; y <= g + cover; y++) {
             BlockState from = y + k <= g + cover ? level.getBlockState(new BlockPos(x, y + k, z)) : over;
@@ -735,7 +743,7 @@ public final class FissureEruptions {
         for (int y = g + cover + 1; y <= g + cover + k; y++) {
             level.setBlock(m.set(x, y, z), over, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
         }
-        if (over.isAir()) {
+        if (over.isAir() && !theirs) {
             // Dry ground on a shore dropped under the water beside it: the lake comes in over it, as high as it stands,
             // rather than running out of itself into the hollow.
             BlockPos beside = waterBeside(level, x, z, g - k + 1, g);
@@ -801,6 +809,13 @@ public final class FissureEruptions {
                 fill = level.getBlockState(beside);
                 wetTo = beside.getY();
             }
+        }
+        // Where another mod runs the rivers' water, a crack under or beside a river is left open for it (see
+        // HydraulicsHooks).
+        if (HydraulicsHooks.active(level) && fill.getFluidState().getType() instanceof com.jeladastudios.ftsgeology.fluid.RiverWaterFluid) {
+            fill = Blocks.AIR.defaultBlockState();
+            wetTo = Integer.MIN_VALUE;
+            HydraulicsHooks.moved(level, x >> 4, z >> 4, com.jeladastudios.ftsgeology.api.RiverBlocksChangedEvent.Cause.FISSURE);
         }
         for (int y = g; y > g - depth; y--) {
             level.setBlock(m.set(x, y, z), y <= wetTo ? fill : Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);

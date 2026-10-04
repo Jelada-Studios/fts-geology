@@ -100,6 +100,9 @@ public abstract class RiverWaterFluid extends ForgeFlowingFluid {
     @Override
     @Nonnull
     public Vec3 getFlow(@Nonnull BlockGetter level, @Nonnull BlockPos pos, @Nonnull FluidState state) {
+        // A mod that runs the rivers' water itself knows how it really runs (see HydraulicsHooks).
+        Vec3 real = com.jeladastudios.ftsgeology.hydrology.HydraulicsHooks.flow(level, pos, state);
+        if (real != null) return real;
         Vec3 run = way(state.getValue(FLOW));
         if (state.hasProperty(FALLING) && state.getValue(FALLING)) return run.add(0.0, -6.0, 0.0).normalize();
         return run.scale(CURRENT);

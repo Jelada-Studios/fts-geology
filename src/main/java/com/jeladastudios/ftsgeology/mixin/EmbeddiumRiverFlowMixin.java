@@ -9,6 +9,7 @@ import net.minecraft.world.phys.Vec3;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
 /**
@@ -23,5 +24,16 @@ public abstract class EmbeddiumRiverFlowMixin {
     private Vec3 fts_geology$riverFlow(Vec3 flow, WorldSlice world, FluidState fluid, BlockPos pos,
                                        BlockPos offset, ChunkBuildBuffers buffers) {
         return fluid.getType() instanceof RiverWaterFluid ? fluid.getFlow(world, pos) : flow;
+    }
+
+    /** A river block's water as high as a registered hook says it stands, in Embeddium's corner heights. */
+    @Inject(method = "fluidHeight", at = @At("HEAD"), cancellable = true, require = 0, remap = false)
+    private void fts_geology$riverSurface(net.minecraft.world.level.BlockAndTintGetter world, net.minecraft.world.level.material.Fluid fluid,
+                                          BlockPos pos, net.minecraft.core.Direction direction,
+                                          org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Float> cir) {
+        FluidState state = world.getFluidState(pos);
+        if (!(state.getType() instanceof RiverWaterFluid) || !fluid.isSame(state.getType())) return;
+        float h = com.jeladastudios.ftsgeology.hydrology.HydraulicsHooks.surface(world, pos, state);
+        if (!Float.isNaN(h)) cir.setReturnValue(h);
     }
 }

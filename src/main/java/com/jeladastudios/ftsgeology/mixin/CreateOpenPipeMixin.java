@@ -18,7 +18,7 @@ public abstract class CreateOpenPipeMixin {
 
     @Inject(method = "removeFluidFromSpace", at = @At("HEAD"), cancellable = true, require = 0, remap = false)
     private void fts_geology$riverIsWater(boolean simulate, CallbackInfoReturnable<FluidStack> cir) {
-        FluidStack water = CreateRivers.drawFromRiver(this);
+        FluidStack water = CreateRivers.drawFromRiver(this, simulate);
         if (water == null) water = CreateRivers.drawFromGround(this, simulate);
         if (water != null) cir.setReturnValue(water);
     }

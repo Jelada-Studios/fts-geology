@@ -73,8 +73,14 @@ public final class RiverFloods {
         float rain = Storms.intensityAt(level, cx * 16 + 8, cz * 16 + 8);
         if (rain < Storms.HEAVY || !Puddles.rainsAt(chunk, cx * 16 + 8, cz * 16 + 8)) return;
         String key = "rain " + cx + "," + cz;
+        // Where another mod runs the rivers' water, the flood is only reckoned and told (see HydraulicsHooks); the water
+        // laid before it came is let go down.
+        boolean hydraulics = HydraulicsHooks.active(level);
         // Already over its banks: it stays so while the rain goes on.
-        if (Floods.extend(level, key, HOLD)) return;
+        if (!hydraulics && Floods.extend(level, key, HOLD)) {
+            HydraulicsHooks.flood(level, cx, cz, 1);
+            return;
+        }
         double soaked = 0;
         int known = 0;
         for (int dx = -2; dx <= 2; dx++) {
@@ -89,6 +95,8 @@ public final class RiverFloods {
         soaked /= known;
         if (soaked < 0.6) return;
         int height = rain >= 0.8f && soaked >= 0.85 ? 2 : 1;
+        HydraulicsHooks.flood(level, cx, cz, height);
+        if (hydraulics) return;
         // The river's running water in this chunk: the tops of its channel, and the way it runs.
         List<BlockPos> tops = new ArrayList<>();
         double fx = 0, fz = 0;

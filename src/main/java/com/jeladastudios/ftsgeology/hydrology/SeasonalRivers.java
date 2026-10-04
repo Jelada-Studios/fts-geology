@@ -55,7 +55,7 @@ public final class SeasonalRivers {
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END || event.getServer() == null) return;
         ServerLevel level = event.getServer().overworld();
-        if (level == null || !GeyserConfig.SEASONAL_RIVERS.get() || !SereneSeasons.active()) return;
+        if (level == null || !GeyserConfig.SEASONAL_RIVERS.get() || !SereneSeasons.active() || HydraulicsHooks.active(level)) return;
         long now = level.getGameTime();
         if (now % EVERY == 0 && PENDING.isEmpty()) {
             LongOpenHashSet seen = new LongOpenHashSet();

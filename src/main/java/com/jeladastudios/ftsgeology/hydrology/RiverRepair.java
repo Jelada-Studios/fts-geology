@@ -106,7 +106,8 @@ public final class RiverRepair {
 
     private static boolean enabled(ServerLevel level) {
         return GeyserConfig.RIVERS.get() && GeyserConfig.RIVERS_REFILL.get() && !TfcCompat.active()
-                && Level.OVERWORLD.equals(level.dimension()) && GeologyWorld.isOwn(level) && RiverNetwork.ready();
+                && Level.OVERWORLD.equals(level.dimension()) && GeologyWorld.isOwn(level) && RiverNetwork.ready()
+                && !HydraulicsHooks.active(level);
     }
 
     /** The ground that moved under a quake: the columns it touched, as the settling keeps them ({@code x << 32 | z}). */

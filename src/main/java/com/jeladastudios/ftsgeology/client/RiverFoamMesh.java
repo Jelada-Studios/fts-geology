@@ -130,7 +130,9 @@ public final class RiverFoamMesh {
                 boolean cold = level.getBiome(m.set(x, y, z)).value().coldEnoughToSnow(m);
                 a *= SHARE * (cold ? COLD : 1f);
                 if (a < 0.02f) continue;
-                float surface = y + f.getHeight(level, m.set(x, y, z));
+                // At the water's drawn height: a mod's hook may draw it under the block's own (see the API).
+                float drawn = com.jeladastudios.ftsgeology.hydrology.HydraulicsHooks.surface(level, m.set(x, y, z), f);
+                float surface = y + (Float.isNaN(drawn) ? f.getHeight(level, m.set(x, y, z)) : drawn);
                 amount.put(key(x, z), a);
                 top.put(key(x, z), surface);
                 found.add(new Spot(x, z, surface, a, (float) way.x, (float) way.z, LevelRenderer.getLightColor(level, m.set(x, y + 1, z)),

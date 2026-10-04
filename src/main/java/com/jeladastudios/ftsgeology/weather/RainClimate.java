@@ -159,6 +159,11 @@ public final class RainClimate {
         return seasonOf(h.regime(), phase);
     }
 
+    /** A regime's share of the year's rain at a phase of the year: 1 on average over the year. */
+    public static double seasonShare(Regime r, double phase) {
+        return seasonOf(r, phase);
+    }
+
     /** A regime's share at a phase of the year, smoothed between the middles of the sub-seasons. */
     static double seasonOf(Regime r, double phase) {
         double[] s = SHARE[r.ordinal()];

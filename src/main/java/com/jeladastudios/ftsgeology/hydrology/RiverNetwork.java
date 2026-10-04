@@ -63,11 +63,13 @@ public final class RiverNetwork {
     /**
      * One length of river, or one disc of a lake: where it runs from and to, the water and the floor at each end,
      * how wide the flat floor is, and how far down its river it lies. {@code cut} is how far under its raw ground
-     * the channel may go at each end, where it runs through a hill: 0 everywhere else.
+     * the channel may go at each end, where it runs through a hill: 0 everywhere else. {@code node} is the lattice node
+     * whose river the length carries: the node's own for its channel, the joining river's for a join, the lake's
+     * outlet member for the way out of a lake.
      */
     public record Point(float x, float z, float ex, float ez, float water, float waterEnd,
                         float bed, float bedEnd, float halfWidth, float fromHead, float cut, float cutEnd, byte kind,
-                        byte under) {
+                        byte under, long node) {
         public boolean lake() {
             return kind == RiverPieces.LAKE;
         }
@@ -87,7 +89,11 @@ public final class RiverNetwork {
         }
 
         public Point withUnder(byte under) {
-            return new Point(x, z, ex, ez, water, waterEnd, bed, bedEnd, halfWidth, fromHead, cut, cutEnd, kind, under);
+            return new Point(x, z, ex, ez, water, waterEnd, bed, bedEnd, halfWidth, fromHead, cut, cutEnd, kind, under, node);
+        }
+
+        public Point withNode(long node) {
+            return new Point(x, z, ex, ez, water, waterEnd, bed, bedEnd, halfWidth, fromHead, cut, cutEnd, kind, under, node);
         }
     }
 
@@ -115,6 +121,7 @@ public final class RiverNetwork {
     public static void open(DrainageLattice.Ground g, long seed, double h) {
         DrainageLattice l = new DrainageLattice(g, seed, CELL * h, SEA - SHORE, MAX_POPS, AREA_CAP);
         INDEX.clear();
+        RiverFlow.clear();
         horizontal = h;
         pieces = new RiverPieces(l, g, h, AREA_MIN);
         ground = g;
@@ -125,12 +132,107 @@ public final class RiverNetwork {
         lattice = null;
         pieces = null;
         INDEX.clear();
+        RiverFlow.clear();
         BUILDING.clear();
     }
 
     public static boolean ready() {
         return lattice != null;
     }
+
+    /** The lattice and the drawing over it, for the flow worked out on them ({@link RiverFlow}); null before a server. */
+    static DrainageLattice lattice() {
+        return lattice;
+    }
+
+    static RiverPieces pieces() {
+        return pieces;
+    }
+
+    /** Whether the asking thread is the server's, which never waits for a square to be worked out. */
+    static boolean serverThread() {
+        return mustNotWait();
+    }
+
+    /**
+     * The query at a column, and whether its answer is only "not worked out yet": on the server thread a square not
+     * ready reads as empty and is worked out in the background; on any other thread, with {@code waitMs} of zero or
+     * more, a square not ready within that time does the same.
+     */
+    static Object[] atWithin(int x, int z, long waitMs) {
+        long was = DEADLINE.get()[0];
+        DEADLINE.get()[0] = waitMs < 0 ? Long.MAX_VALUE : System.nanoTime() + waitMs * 1_000_000L;
+        boolean[] short_ = SHORT.get();
+        boolean wasShort = short_[0];
+        short_[0] = false;
+        try {
+            At a = look(x, z);
+            return new Object[]{a, short_[0]};
+        } finally {
+            short_[0] = wasShort;
+            DEADLINE.get()[0] = was;
+        }
+    }
+
+    /** Runs {@code work} on this thread waiting no longer than {@code waitMs} for any square (see {@link #atWithin}). */
+    static <T> T within(long waitMs, java.util.function.Supplier<T> work) {
+        long was = DEADLINE.get()[0];
+        DEADLINE.get()[0] = waitMs < 0 ? Long.MAX_VALUE : System.nanoTime() + waitMs * 1_000_000L;
+        boolean[] short_ = SHORT.get();
+        boolean wasShort = short_[0];
+        short_[0] = false;
+        try {
+            return work.get();
+        } finally {
+            short_[0] = wasShort;
+            DEADLINE.get()[0] = was;
+        }
+    }
+
+    /** The query at a column, worked out afresh (see {@link #within}). */
+    static At lookNow(int x, int z) {
+        return look(x, z);
+    }
+
+    /** The length nearest a column within the reach a column looks for a channel over, or null. */
+    static Point nearest(int x, int z) {
+        if (lattice == null) return null;
+        double reach = reach(), best = reach * reach;
+        Point hit = null;
+        for (int bx = Math.floorDiv(x - (int) reach, BLOCK); bx <= Math.floorDiv(x + (int) reach, BLOCK); bx++) {
+            for (int bz = Math.floorDiv(z - (int) reach, BLOCK); bz <= Math.floorDiv(z + (int) reach, BLOCK); bz++) {
+                for (Point p : block(bx, bz).points()) {
+                    if (!Float.isFinite(p.water)) continue;
+                    double ax = p.ex - p.x, az = p.ez - p.z, len2 = ax * ax + az * az;
+                    double t = len2 < 1e-9 ? 0.0 : Math.max(0.0, Math.min(1.0, ((x - p.x) * ax + (z - p.z) * az) / len2));
+                    double dx = p.x + ax * t - x, dz = p.z + az * t - z, d2 = dx * dx + dz * dz;
+                    if (d2 < best) {
+                        best = d2;
+                        hit = p;
+                    }
+                }
+            }
+        }
+        return hit;
+    }
+
+    /** The drawn lake a column stands in, or null. */
+    static RiverPieces.LakeMask lakeAt(int x, int z) {
+        if (lattice == null) return null;
+        RiverPieces.LakeMask lake = null;
+        for (RiverPieces.LakeMask m : block(Math.floorDiv(x, BLOCK), Math.floorDiv(z, BLOCK)).lakes()) {
+            if (m.depthAt(x, z) > 0 && (lake == null || m.water < lake.water)) lake = m;
+        }
+        return lake;
+    }
+
+    /** Whether, since {@link #within} began on this thread, a square was read as empty for want of waiting. */
+    static boolean cutShort() {
+        return SHORT.get()[0];
+    }
+
+    /** When a thread asking with a wait gives up on a square, in {@link System#nanoTime()}; MAX_VALUE waits for good. */
+    private static final ThreadLocal<long[]> DEADLINE = ThreadLocal.withInitial(() -> new long[]{Long.MAX_VALUE});
 
     /** How much wider than the normal world's this world is laid out. */
     public static double horizontal() {
@@ -566,6 +668,41 @@ public final class RiverNetwork {
         }
         CompletableFuture<Square> mine = new CompletableFuture<>();
         CompletableFuture<Square> other = BUILDING.putIfAbsent(key, mine);
+        long deadline = DEADLINE.get()[0];
+        if (deadline != Long.MAX_VALUE) {
+            // A wait with a limit: the square is worked out in the background, and waited for only so long.
+            CompletableFuture<Square> f = other != null ? other : mine;
+            if (other == null) {
+                net.minecraft.Util.backgroundExecutor().execute(() -> {
+                    try {
+                        long t0 = System.nanoTime();
+                        Square made = buildBlock(bx, bz);
+                        long spent = System.nanoTime() - t0;
+                        SQUARES.increment();
+                        SQUARE_NANOS.add(spent);
+                        SLOWEST.accumulateAndGet(spent, Math::max);
+                        INDEX.put(key, made);
+                        mine.complete(made);
+                    } catch (Throwable t) {
+                        mine.completeExceptionally(t);
+                    } finally {
+                        BUILDING.remove(key, mine);
+                    }
+                });
+            }
+            try {
+                return f.get(Math.max(0L, deadline - System.nanoTime()), java.util.concurrent.TimeUnit.NANOSECONDS);
+            } catch (java.util.concurrent.TimeoutException e) {
+                SHORT.get()[0] = true;
+                return EMPTY;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                SHORT.get()[0] = true;
+                return EMPTY;
+            } catch (java.util.concurrent.ExecutionException e) {
+                throw new IllegalStateException("river square " + bx + "," + bz, e.getCause());
+            }
+        }
         if (other != null) return other.join();
         try {
             long t0 = System.nanoTime();

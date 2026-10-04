@@ -46,6 +46,8 @@ public final class HollowPonds {
      */
     static void look(ServerLevel level, LevelChunk chunk, SoilWater.Cells c, double hours, double runoff) {
         if (!GeyserConfig.HOLLOW_PONDS.get() || hours <= 0) return;
+        // A chunk whose water another mod runs: its rain is that mod's (see HydraulicsHooks).
+        if (HydraulicsHooks.owns(level, chunk.getPos().x, chunk.getPos().z)) return;
         // Millimetres off four-by-four cells, in cubic metres: blocks of water.
         c.gathered = (float) (c.gathered * Math.exp(-hours / DRIES_HOURS) + runoff * 16.0 / 1000.0 * CATCHMENT);
         ChunkPos p = chunk.getPos();

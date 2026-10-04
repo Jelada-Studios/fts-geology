@@ -101,6 +101,21 @@ public final class Floods {
 
     private static long laid, gone, mud, surges;
 
+    /**
+     * Whether a block is water a flood, a river's seasonal high water or a rain pond laid and will take back. Server
+     * thread.
+     */
+    public static boolean isFloodWater(ServerLevel level, BlockPos pos) {
+        if (!floodWater(level.getBlockState(pos))) return false;
+        Store st = level.getDataStorage().get(Store::load, "fts_geology_floods");
+        if (st == null) return false;
+        long k = pos.asLong();
+        for (Surge s : st.all) {
+            for (LongArrayList layer : s.layers) if (layer.contains(k)) return true;
+        }
+        return false;
+    }
+
     public static void clear() {
         laid = gone = mud = surges = 0;
     }
@@ -256,6 +271,8 @@ public final class Floods {
             if (floodWater(level.getBlockState(p))) {
                 level.setBlock(p, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
                 gone++;
+                HydraulicsHooks.moved(level, p.getX() >> 4, p.getZ() >> 4,
+                        com.jeladastudios.ftsgeology.api.RiverBlocksChangedEvent.Cause.RECEDE);
             }
             if (bottom && level.random.nextDouble() < MUD_SHARE && SoilWater.floodMud(level, p.below())) mud++;
         }

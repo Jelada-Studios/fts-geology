@@ -206,6 +206,11 @@ public final class TectonicCommands {
                                                 .then(Commands.argument("half", IntegerArgumentType.integer(16, 1000))
                                                         .executes(ctx -> TerrainCommands.terrainRiversWet(ctx,
                                                                 IntegerArgumentType.getInteger(ctx, "half")))))
+                                        // What the rivers carry and where it comes in, as the API gives it: a check.
+                                        .then(Commands.literal("flow")
+                                                .then(Commands.argument("half", IntegerArgumentType.integer(16, 4000))
+                                                        .executes(ctx -> TerrainCommands.terrainRiversFlow(ctx,
+                                                                IntegerArgumentType.getInteger(ctx, "half")))))
                                         // Crossings, dead ends, water going uphill or standing over its bank.
                                         .then(Commands.literal("audit")
                                                 .then(Commands.argument("half", IntegerArgumentType.integer(64, 8000))

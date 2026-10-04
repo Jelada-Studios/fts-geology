@@ -353,7 +353,7 @@ final class RiverPieces {
                 intoLake(path, mask);
                 java.util.Collections.reverse(path);
                 double w = mask.water;
-                List<RiverNetwork.Point> pts = lay(tidy(c, new Led(path, false, false), halfFor(lat.area(m))), w, w, w, FROM_LAKE, halfFor(lat.area(m)), JOIN, w, 0);
+                List<RiverNetwork.Point> pts = tag(lay(tidy(c, new Led(path, false, false), halfFor(lat.area(m))), w, w, w, FROM_LAKE, halfFor(lat.area(m)), JOIN, w, 0), m);
                 out.addAll(pts);
                 segments(pts, segs);
                 joins.increment();
@@ -693,13 +693,13 @@ final class RiverPieces {
         inlets.increment();
         // At the river's own last level or the sea's, whichever is lower: water never rises on its way out.
         double w = Math.min(lat.sea, last.waterEnd());
-        return lay(way, w, w, w, last.fromHead(), last.halfWidth(), JOIN, w, 0);
+        return tag(lay(way, w, w, w, last.fromHead(), last.halfWidth(), JOIN, w, 0), last.node());
     }
 
     // === Channels ===========================================================
 
     /** The rivers that come into a node, biggest first: rivers of their own, and lakes that spill into it. */
-    private long[] riverDonors(long u, DrainageLattice.Lake ownLake) {
+    long[] riverDonors(long u, DrainageLattice.Lake ownLake) {
         LongArrayList out = new LongArrayList();
         for (long d : lat.donors(u)) {
             if (lat.area(d) < areaMin) continue;
@@ -770,9 +770,9 @@ final class RiverPieces {
             path = tidy(c, lead(c, path, main == Long.MIN_VALUE ? null : across(main, u),
                     r == Long.MIN_VALUE ? null : across(u, r)), halfFor(lat.area(u)));
         }
-        List<RiverNetwork.Point> pts = lay(path, tS, tE, wIn, lenIn, halfFor(lat.area(u)), CHANNEL,
+        List<RiverNetwork.Point> pts = tag(lay(path, tS, tE, wIn, lenIn, halfFor(lat.area(u)), CHANNEL,
                 r == Long.MIN_VALUE ? Double.NEGATIVE_INFINITY : level(r) - 1.0,
-                main != Long.MIN_VALUE && underLake(main) ? LAKE_HOLD : 0);
+                main != Long.MIN_VALUE && underLake(main) ? LAKE_HOLD : 0), u);
         if (main == Long.MIN_VALUE) eye(pts);
         if (r == Long.MIN_VALUE) {
             // A river the ground closes round: it ends in a pond of its own.
@@ -782,7 +782,7 @@ final class RiverPieces {
             float bed = (float) (w - LAKE_BED * h);
             float ux = (float) lat.x(u), uz = (float) lat.z(u);
             pts.add(new RiverNetwork.Point(ux, uz, ux, uz, w, w, bed, bed, (float) (SINK_HALF * lat.cell), FROM_LAKE,
-                    0f, 0f, LAKE, (byte) 0));
+                    0f, 0f, LAKE, (byte) 0, u));
         }
         // The other rivers that come in, biggest first, each carried to the nearest water already drawn in this cell.
         List<double[]> segs = new ArrayList<>();
@@ -873,8 +873,8 @@ final class RiverPieces {
         }
         if (ontoWater && lake != null) intoLake(path, lake);
         path = tidy(c, lead(c, path, across(d, owner), null), from.half());
-        List<RiverNetwork.Point> pts = lay(path, from.water(), Math.min(from.water(), endWater), from.water(),
-                from.length(), from.half(), JOIN, endWater, 0);
+        List<RiverNetwork.Point> pts = tag(lay(path, from.water(), Math.min(from.water(), endWater), from.water(),
+                from.length(), from.half(), JOIN, endWater, 0), d);
         out.addAll(pts);
         segments(pts, segs);
         joins.increment();
@@ -1076,8 +1076,14 @@ final class RiverPieces {
             if (cutS > 0) gorges.increment();
             pts.add(new RiverNetwork.Point((float) qx[q], (float) qz[q], (float) qx[q + 1], (float) qz[q + 1],
                     (float) qw[q], (float) qw[q + 1], (float) bedS, (float) bedE,
-                    (float) hw, (float) (lenIn + step * q), (float) cutS, (float) cutE, kind, (byte) 0));
+                    (float) hw, (float) (lenIn + step * q), (float) cutS, (float) cutE, kind, (byte) 0, Long.MIN_VALUE));
         }
+        return pts;
+    }
+
+    /** The lengths laid, marked with the node whose river they carry. */
+    private static List<RiverNetwork.Point> tag(List<RiverNetwork.Point> pts, long node) {
+        for (int i = 0; i < pts.size(); i++) pts.set(i, pts.get(i).withNode(node));
         return pts;
     }
 
@@ -1103,7 +1109,7 @@ final class RiverPieces {
         if (rim - 1.0 < w) return;
         float bed = (float) (w - depthFor(half));
         pts.add(0, new RiverNetwork.Point((float) cx, (float) cz, (float) cx, (float) cz, (float) w, (float) w,
-                bed, bed, (float) half, 0f, 0f, 0f, CHANNEL, (byte) 0));
+                bed, bed, (float) half, 0f, 0f, 0f, CHANNEL, (byte) 0, p.node()));
         eyes.increment();
     }
 

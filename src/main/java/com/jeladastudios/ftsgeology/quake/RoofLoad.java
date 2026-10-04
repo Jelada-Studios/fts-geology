@@ -389,6 +389,8 @@ public final class RoofLoad {
         }
         if (pool.isEmpty()) return;
         fell++;
+        com.jeladastudios.ftsgeology.hydrology.HydraulicsHooks.moved(level, x >> 4, z >> 4,
+                com.jeladastudios.ftsgeology.api.RiverBlocksChangedEvent.Cause.COLLAPSE);
         CaveCollapse.heap(level, x, z, floor, pool);
         level.sendParticles(ParticleTypes.CLOUD, x + 0.5, cave.top(), z + 0.5, 30, radius * 0.6, 0.5, radius * 0.6, 0.02);
         level.playSound(null, x + 0.5, cave.top(), z + 0.5, SoundEvents.GRAVEL_BREAK, SoundSource.BLOCKS, 3.0F, 0.5F);

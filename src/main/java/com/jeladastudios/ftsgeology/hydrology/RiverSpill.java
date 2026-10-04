@@ -29,7 +29,7 @@ public final class RiverSpill {
 
     /** A block next to a river's water at {@code pos} changed, at {@code from}. */
     public static void consider(ServerLevel level, BlockPos pos, BlockPos from) {
-        if (!GeyserConfig.RIVER_SPILLS.get()) return;
+        if (!GeyserConfig.RIVER_SPILLS.get() || HydraulicsHooks.active(level)) return;
         if (from.getY() > pos.getY() || Math.abs(from.getX() - pos.getX()) + Math.abs(from.getY() - pos.getY()) + Math.abs(from.getZ() - pos.getZ()) != 1) return;
         FluidState here = level.getFluidState(pos);
         if (!(here.getType() instanceof RiverWaterFluid) || !here.isSource()) return;

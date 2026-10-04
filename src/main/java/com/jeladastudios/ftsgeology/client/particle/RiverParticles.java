@@ -94,7 +94,8 @@ public final class RiverParticles {
                 this.zd = flow.z * CARRY;
             } else {
                 // On the surface, carried at the water's pace; a still pool lets it drift to a stop.
-                double ty = at.getY() + f.getHeight(this.level, at) + 0.01;
+                float drawn = com.jeladastudios.ftsgeology.hydrology.HydraulicsHooks.surface(this.level, at, f);
+                double ty = at.getY() + (Float.isNaN(drawn) ? f.getHeight(this.level, at) : drawn) + 0.01;
                 this.y += (ty - this.y) * 0.5;
                 double tx = flow.x * CARRY * this.pace * 2.0, tz = flow.z * CARRY * this.pace * 2.0;
                 this.xd += (tx - this.xd) * 0.08 + (this.random.nextDouble() - 0.5) * 0.002;
