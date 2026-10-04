@@ -68,3 +68,11 @@ earthquakes may deform player blocks at all, are config toggles.
     versionRange = "*"
     ordering = "AFTER"
     side = "BOTH"
+
+# Immersive Weathering: loaded after it so the mod's data can still its lightning turning rock into magma.
+[[dependencies.fts_geology]]
+    modId = "immersive_weathering"
+    mandatory = false
+    versionRange = "*"
+    ordering = "AFTER"
+    side = "BOTH"

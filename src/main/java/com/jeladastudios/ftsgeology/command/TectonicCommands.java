@@ -234,6 +234,11 @@ public final class TectonicCommands {
                                 .executes(ctx -> fillVoids(ctx, 32))
                                 .then(Commands.argument("radius", IntegerArgumentType.integer(4, 96))
                                         .executes(ctx -> fillVoids(ctx, IntegerArgumentType.getInteger(ctx, "radius")))))
+                        // The burning magma Immersive Weathering's lightning left on bare rock, turned back to rock.
+                        .then(Commands.literal("fixlightning")
+                                .executes(ctx -> fixLightning(ctx, 64))
+                                .then(Commands.argument("radius", IntegerArgumentType.integer(8, 256))
+                                        .executes(ctx -> fixLightning(ctx, IntegerArgumentType.getInteger(ctx, "radius")))))
                         // The network of stations (see instrument.StationNetwork): a station's screen opened for the
                         // operator, at it or seen from a terminal afar, and a station renamed.
                         .then(Commands.literal("station")
@@ -443,6 +448,15 @@ public final class TectonicCommands {
         ctx.getSource().sendSuccess(() -> Component.translatable("command.fts_geology.fillvoids", f.pockets(), f.niches(),
                 f.blocks(), radius).withStyle(ChatFormatting.YELLOW), true);
         return f.blocks();
+    }
+
+    /** /geology fixlightning [radius]: the magma lightning left on bare rock round here, turned back to rock. */
+    static int fixLightning(CommandContext<CommandSourceStack> ctx, int radius) {
+        com.jeladastudios.ftsgeology.compat.LightningMagma.Cleaned c = com.jeladastudios.ftsgeology.compat.LightningMagma
+                .clean(ctx.getSource().getLevel(), BlockPos.containing(ctx.getSource().getPosition()), radius);
+        ctx.getSource().sendSuccess(() -> Component.translatable("command.fts_geology.fixlightning", c.blocks(), c.fires(),
+                radius, c.kept()).withStyle(ChatFormatting.YELLOW), true);
+        return c.blocks();
     }
 
     /** /geology debug cost: what world generation has cost the mod since the last time it was asked; then starts again. */

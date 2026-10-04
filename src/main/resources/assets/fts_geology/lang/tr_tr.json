@@ -438,6 +438,7 @@
   "command.fts_geology.aftershocks_main": "  ANA ŞOK M%s, %s %s, %s blok uzakta, %s s sonra (öncesinde öncü deprem oldu)",
   "command.fts_geology.aftershocks_cleared": "Bekleyen %s sarsıntı silindi",
   "command.fts_geology.fillvoids": "Kayada %s kapalı boşluk ve %s oyuk dolduruldu, %s blok, %s blok içinde",
+  "command.fts_geology.fixlightning": "Yıldırımın magmaya çevirdiği %s blok yeniden kaya oldu, %s ateş söndü (%s blok içinde); lav, kaynak ya da volkan yanındaki %s magma bloğuna dokunulmadı",
   "command.fts_geology.water.none": "Burada topraktaki su için henüz kayıt yok: yüklü bir chunk'a on saniyede bir bakılır.",
   "command.fts_geology.water.header": "Topraktaki su, %s, %s: %s",
   "command.fts_geology.water.soil.sand": "kum",

@@ -1,0 +1,6 @@
+{
+  "builtin": "no_op",
+  "tick_sources": [
+    "lightning_strike"
+  ]
+}
