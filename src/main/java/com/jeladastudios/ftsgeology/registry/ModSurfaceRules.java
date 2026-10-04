@@ -24,6 +24,10 @@ public final class ModSurfaceRules {
     public static final RegistryObject<Codec<? extends SurfaceRules.RuleSource>> RIFT_AXIS =
             MATERIAL_RULES.register("rift_axis", () -> com.jeladastudios.ftsgeology.worldgen.lithology.RiftAxisRule.CODEC.codec());
 
+    /** Another rule, only where a column passes a test. See {@link com.jeladastudios.ftsgeology.worldgen.lithology.ColumnTestRule}. */
+    public static final RegistryObject<Codec<? extends SurfaceRules.RuleSource>> COLUMN_TEST =
+            MATERIAL_RULES.register("column_test", () -> com.jeladastudios.ftsgeology.worldgen.lithology.ColumnTestRule.CODEC.codec());
+
     /** The overworld's surface where a mod changed it. See {@link com.jeladastudios.ftsgeology.worldgen.terrain.OverworldSurfaceRule}. */
     public static final RegistryObject<Codec<? extends SurfaceRules.RuleSource>> OVERWORLD_SURFACE =
             MATERIAL_RULES.register("overworld_surface",

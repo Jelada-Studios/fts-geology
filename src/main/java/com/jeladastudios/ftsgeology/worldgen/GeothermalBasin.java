@@ -127,6 +127,11 @@ public final class GeothermalBasin {
      * {@link HotspotMap#basinStrength}: a thermal biome is a basin by itself, but the seed grid needs
      * a plume under it.
      */
+    /** Whether a column is on a geothermal basin's floor, which its springs crust over with sinter. */
+    public static boolean onFloor(ServerLevel level, int x, int z) {
+        return basin(level, x, z) > FLOOR_MIN;
+    }
+
     static double basin(ServerLevel level, int x, int z) {
         // Asked at chunk corners by this and by the soil painting; a corner is shared by four chunks and two askers.
         long key = com.jeladastudios.ftsgeology.util.ColumnCache.key(x, z);
