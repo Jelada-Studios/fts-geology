@@ -208,6 +208,23 @@
 	#over, wakes twice as slowly.
 	#Range: 200 ~ 72000
 	volcanoUnrestTicks = 3600
+	#Fissure eruptions on the rifts between continents and over hot spots, as on Iceland's
+	#Reykjanes peninsula in 2023-24: for a day the ground swells and a swarm of small quakes
+	#thickens, then a dike of magma runs along the rift, the swarm racing with it, and a narrow
+	#graben drops a block or two over it, its edges cracking open. A few minutes later a fissure
+	#some hundreds of blocks long opens in a curtain of lava fountains and its lava spreads over
+	#the plain; the eruption then draws into a few vents that build small cinder cones, and it
+	#ends, leaving a field of young basalt. Only near players, and rare.
+	fissureEruptions = true
+	#Game days between fissure eruptions, on average, for a player who stays near a rift.
+	#Range: 1.0 ~ 10000.0
+	fissureEruptionDays = 30.0
+	#How long the swelling and the swarm last before the dike runs (24000 = a game day).
+	#Range: 200 ~ 480000
+	fissureUnrestTicks = 24000
+	#The most blocks of lava one fissure eruption lays down.
+	#Range: 0 ~ 200000
+	fissureLava = 8000
 	#Pyroclastic flows an eruption of a stratovolcano or a caldera sends down its flanks: part
 	#of the column falls back and runs down the valleys as a glowing avalanche of ash and gas,
 	#faster than anyone can run. It burns whatever is caught in it, strips the plants and the
@@ -215,15 +232,22 @@
 	#the valley, deepest where it stops. Shields and fissures, with their runny lava, send none.
 	#0 turns them off.
 	#Range: 0 ~ 8
-	pyroclasticFlows = 2
+	pyroclasticFlows = 1
 	#How far pyroclastic flows run: 1 takes a large volcano's some two hundred blocks out from
 	#its crater down a valley; less on open slopes, where they spread and stop sooner.
 	#Range: 0.25 ~ 3.0
 	pyroclasticFlowReach = 1.0
-	#Carbon dioxide seeping out of a restless or erupting volcano collects, unseen, in its
-	#crater and in hollows on its flanks. Breathing it makes you sick and weak, and it
-	#suffocates whatever keeps its head down in it; torches, candles and campfires go out in it.
+	#Carbon dioxide seeping out of a volcano collects, unseen, in its crater and round its vents,
+	#and while it is restless or erupting in hollows on its flanks too. Breathing it makes you sick
+	#and weak, and it suffocates whatever keeps its head down in it; torches, candles and campfires
+	#go out in it, and the plants in it die.
 	volcanicGas = true
+	#How fast fallen ash wears away where the sky is open over it: the rain washes it off and the
+	#wind takes it, a layer about every game day, twice as fast in the rain, and the ground and its
+	#grass come back out from under it. A deep bed goes a layer at a time, so it lasts. 1 is the
+	#default, 2 twice as fast, 0 keeps it for good.
+	#Range: 0.0 ~ 10.0
+	ashWeathering = 1.0
 	#Ash piling up on a roof can bring it down, as it did round Pinatubo in 1991: glass and
 	#wool give way under a couple of layers, wood under a few more, stone under most of a
 	#block; less in the rain, since wet ash is twice as heavy. Obsidian and metal hold.
@@ -251,6 +275,15 @@
 	#would repaint every hillside in the world. So this shows up where the mod
 	#has actually put geology, and nowhere else.
 	soilFromBedrock = true
+	#Lay that soil as real soil lies: under its turf. The grass and what grows on it stay, and the
+	#soil's colour goes into the blocks under it, where a cutting, a bank or a river shows it; the
+	#top is coloured only where it is bare earth already or too steep to hold its turf. The
+	#climate counts as well as the rock: red laterite only where it is hot and wet, a brown earth
+	#over the same basalt in cooler country; podzol on top only where it is cool and wet, a coarse
+	#grus over granite where it is hot and dry; a rendzina's white rock a block under its turf.
+	#Worlds made with an earlier version keep the old way, so no seam shows. Off: the old way,
+	#the top block coloured, everywhere.
+	soilUnderGrass = true
 	#Let a lava flow set the countryside alight. A flow reaching the tree line
 	#really does start a fire, and the lava budget above already stops the flow
 	#itself from running away, so the burn stays a consequence of where the
@@ -468,6 +501,20 @@
 	#seams in the quiet basins between. Applies to chunks that have not had their
 	#deep geology yet; it never touches player blocks.
 	oreGenesisEnabled = true
+	#Oil and gas fields in the sedimentary basins: a dome of reservoir sandstone under shale, gas at
+	#its top, oil-soaked sandstone under it, water below. Broken into, its gas comes out under the
+	#pressure of its depth. With Create Diesel Generators the pumpjack finds oil over the fields only.
+	#New chunks only.
+	petroleumFields = true
+	#Share of the 640-block grid cells in a basin that hold a field.
+	#Range: 0.0 ~ 1.0
+	petroleumFieldChance = 0.4
+	#With Jurassic Reborn, on the mod's own world type: its fossils, amber and gypsum are laid by the
+	#geology instead of in every chunk -- bone beds of one age in the sedimentary rock of the basins (sea
+	#creatures in shale and limestone, land animals in sandstone), rich in a few places, plant fossils over
+	#the coal, amber with the young coal, gypsum in dry basins; the ages in order through the rock, oldest deepest.
+	#New chunks only; the world must be restarted for a change.
+	fossilBeds = true
 	#Per-chunk chance of a natural volcano BEFORE tectonic suitability is applied.
 	#Deliberately tiny: volcanoes are huge structures and should be landmarks.
 	#The suitability gate then removes them entirely outside volcanic settings.
@@ -512,6 +559,11 @@
 	#into a village and make one of its houses yours and the quake will still
 	#take it, because as far as the world is concerned it is still the village.
 	quakesBreakStructures = true
+	#Mods whose blocks are all made things, never ground: what a quake carries, shakes and brings down
+	#as part of a building wherever it stands, placed by whoever. A name ending in * takes every mod
+	#whose id starts so. Single blocks can be added with the block tag fts_geology:built. Blocks that hold
+	#contents or machinery, and blocks that do not fill their space, count as made already.
+	buildingMods = ["rechiseled", "rechiseledcreate", "chipped", "chisel", "chiselsandbits", "buildersdelight", "createdeco", "framedblocks", "createframed", "mcw*", "refurbished_furniture", "handcrafted", "decorative_blocks", "another_furniture", "architects_palette", "blockus", "everycomp", "domum_ornamentum"]
 	#Let the shaking knock loose blocks off buildings: what players built and the villages and
 	#other structures the world made, never the ground or a tree. A block with a face in the open
 	#may be shaken off and fall; the weaker its material the likelier -- sand and gravel first,
@@ -571,27 +623,100 @@
 	#once and the siren and the shaking coincide.
 	#Range: 0 ~ 1200
 	quakeWarningTicks = 200
-	#Ticks between ambient earthquake rolls. 0 disables ambient quakes entirely
-	#(the /geology quake command still works).
+	#Where a quake is told to the players who feel it. Off: a few seconds over the hotbar -- the
+	#alert, the P wave's countdown to the strong shaking, and how hard it shook here -- and nothing
+	#in chat. On: the alert also goes to chat, as it used to. A seismograph's own report is chat
+	#either way.
+	quakeMessagesInChat = false
+	#The farthest from the rupture, in blocks, a quake's shaking is felt. Each player feels
+	#it as strongly as their distance allows: a quick jolt and a rumble as the P wave arrives,
+	#then the S wave's heavy shaking, seconds later the further out they are. A magnitude 4 is
+	#felt some fifteen hundred blocks out, a 6 to the edge of this range.
+	#Range: 64 ~ 50000
+	quakeFeltRange = 4000
+	#The farthest from the rupture, in blocks, the shaking loosens blocks off buildings: a great
+	#earthquake still does damage a hundred kilometres out. Only loaded chunks are gone through.
+	#Range: 64 ~ 20000
+	quakeDamageRange = 6000
+	#Strong shaking (about Mercalli VII and up) liquefies loose wet ground: sand, silt, gravel and
+	#soil by a river, lake or sea, on a floodplain, or over a high water table. Sand boils open,
+	#what players and villages built on it settles a block into it -- unevenly, so a house can
+	#crack across -- and whoever stands on it is held fast for a few seconds.
+	quakeLiquefaction = true
+	#Strong shaking (about Mercalli VI and up) brings down the loose cover of steep natural slopes:
+	#soil, scree, sand and snow slide down as one mass, trees and all, heap up at the foot and leave
+	#a scar. Never on a slope a player or a village built on, never beside water.
+	quakeLandslides = true
+	#Steep natural slopes whose ground days of rain have soaked through can come down in a downpour,
+	#with no quake: stones roll and the ground creaks first, then the slope goes, the wet soil as mud
+	#running on further. Seldom, only round players, never on built ground or beside water.
+	rainLandslides = true
+	#How often a soaked slope gives way in rain, against the usual (1).
+	#Range: 0.0 ~ 20.0
+	rainLandslideRate = 1.0
+	#After a quake of magnitude 5.5 or more the fault goes on slipping for days: the few aftershocks
+	#worth feeling, three to five for most quakes, sooner rather than later (Omori's law), the largest
+	#about 1.2 below the main shock. Those of 5.5 and up near a player break the ground too; the rest
+	#are felt and recorded.
+	#Also lets a great earthquake be announced by a foreshock minutes before it.
+	quakeAftershocks = true
+	#How many aftershocks: 1 is the natural number for the main shock's size, 0.5 half as many.
+	#Range: 0.0 ~ 10.0
+	aftershockRate = 1.0
+	#The most aftershocks one quake has.
+	#Range: 1 ~ 500
+	aftershockMax = 8
+	#Over how many in-game days a sequence dies away.
+	#Range: 0.1 ~ 100.0
+	aftershockDays = 3.0
+	#Share of the great ambient earthquakes (magnitude 7 and up) that a foreshock, about two
+	#magnitudes smaller, comes before by one to five minutes.
+	#Range: 0.0 ~ 1.0
+	foreshockShare = 0.3
+	#Ticks between rolls of the faults' clocks. Every stretch of boundary within quakeFeltRange of a
+	#player or seismographRange of a seismograph is run on this far through its cycle at each roll;
+	#the rate of quakes does not depend on it, only how finely their times are drawn. 0 disables
+	#the world's own quakes entirely (the /geology quake command still works).
 	#Range: 0 ~ 1728000
-	quakeAmbientInterval = 6000
-	#How far from a player an ambient quake looks for a fault, in blocks.
-	#This is the knob that actually decides how often you feel one. Each roll
-	#picks a single random point inside this radius, and if that point is plate
-	#interior nothing happens at all - so a player who is not near a boundary can
-	#go a very long time without a quake however low the recurrence is set.
-	#Raise it to find faults further off; lower it to make quakes strictly local.
-	#Range: 16 ~ 2048
-	quakeSearchRadius = 128
-	#Average in-game days between ruptures on a fully stressed fault.
-	#Real faults rupture on a recurrence interval - decades to centuries - rather
-	#than at random every few minutes, and a quake you have to travel to and wait
-	#for is worth far more than one that happens constantly. Stress scales this:
-	#a locked boundary goes off closer to this figure, a sleepy one much less
-	#often. The /geology quake command still fires one instantly whenever you
-	#want to demonstrate or test.
-	#Range: 0.05 ~ 1000.0
+	quakeAmbientInterval = 1200
+	#How often the faults break: each 256 blocks of a fully stressed boundary has a quake of
+	#magnitude 5 or more once in sixteen times this many in-game days; a sleepier boundary less often,
+	#by its stress. Every stretch keeps its own clock (quiet after it breaks, more and more likely to
+	#go the longer it holds), and sizes follow Gutenberg-Richter up to the boundary's largest. Their
+	#shaking is felt as far as a real quake's: a magnitude 5 some seventy kilometres out. At 8: on a
+	#boundary a large quake is felt every four or five game days, shaking that does damage (Mercalli
+	#VI) every twenty game days or so, and shaking that wrecks weak buildings (VII and up) every
+	#seventy; a thousand blocks off they are felt as often and damage is rare. The /geology quake
+	#command fires one at once.
+	#Range: 0.01 ~ 1000.0
 	quakeRecurrenceDays = 8.0
+	#Small quakes, magnitude 2.5 to 5, on the boundaries between the larger ones: nothing breaks,
+	#near the fault they are felt as a faint tremor and a low rumble, and the seismographs record
+	#them.
+	smallQuakes = true
+	#An oil field's reservoir compacts as its oil is taken, and the faults through it slip: small quakes,
+	#magnitude 2 to 3.6, under a producing field, the likelier the more of its oil is gone (Groningen).
+	#Felt and recorded; the ground is left as it is.
+	inducedQuakes = true
+	#How often a producing oil field shakes, against the usual (1).
+	#Range: 0.0 ~ 100.0
+	inducedQuakeRate = 1.0
+	#How many small quakes there are: at 1, each 256 blocks of a fully stressed boundary has one
+	#every eight game days (a sleepier one fewer, by its stress); sizes follow Gutenberg-Richter, most
+	#of them small, felt only within a few hundred blocks. With the large quakes, a player living on a
+	#boundary feels about two quakes an hour of play, nearly half of them faintly; a thousand blocks
+	#off about one.
+	#Range: 0.0 ~ 50.0
+	smallQuakeRate = 1.0
+	#The faintest shaking felt, on the scale where 3 is a light quake felt indoors (Mercalli III):
+	#between this and 3 a quake is only a faint tremor in the view and a far rumble, with nothing
+	#written. 3 turns the faint ones off; 2 is felt twice as often as 2.5.
+	#Range: 1.0 ~ 3.0
+	quakeFeltFloor = 2.5
+	#A quake's size, place and depth are told only to a player near a seismograph that recorded
+	#it (or a station terminal on the network): without one a player only feels it -- the P wave
+	#and then the S wave and how hard it shook. The instruments' screens list every quake heard.
+	quakeInfoNeedsInstrument = true
 	#Milliseconds the WHOLE MOD may spend on the server thread per tick.
 	#A hard wall-clock brake shared by everything: the quake itself, deformation
 	#replayed into chunks that just loaded, ground settling afterwards, volcano
@@ -645,44 +770,6 @@
 	#dramatic without gutting the landscape.
 	#Range: 2 ~ 128
 	quakeMaxFissureDepth = 15
-	#The farthest from the rupture, in blocks, a quake's shaking is felt. Each player feels
-	#it as strongly as their distance allows: a quick jolt and a rumble as the P wave arrives,
-	#then the S wave's heavy shaking, seconds later the further out they are. A magnitude 6
-	#is felt some nine hundred blocks out, a great earthquake thousands.
-	#Range: 64 ~ 50000
-	quakeFeltRange = 4000
-	#The farthest from the rupture, in blocks, the shaking loosens blocks off buildings. Only
-	#loaded chunks are gone through.
-	#Range: 64 ~ 20000
-	quakeDamageRange = 1500
-	#Strong shaking (about Mercalli VII and up) liquefies loose wet ground: sand, silt, gravel and
-	#soil by a river, lake or sea, on a floodplain, or over a high water table. Sand boils open,
-	#what players and villages built on it settles a block into it -- unevenly, so a house can
-	#crack across -- and whoever stands on it is held fast for a few seconds.
-	quakeLiquefaction = true
-	#Strong shaking (about Mercalli VI and up) brings down the loose cover of steep natural slopes:
-	#soil, scree, sand and snow slide down as one mass, trees and all, heap up at the foot and leave
-	#a scar. Never on a slope a player or a village built on, never beside water.
-	quakeLandslides = true
-	#After a quake of magnitude 5.5 or more the fault goes on slipping for days: the few aftershocks
-	#worth feeling, three to five for most quakes, sooner rather than later (Omori's law), the largest
-	#about 1.2 below the main shock. Those of 5.5 and up near a player break the ground too; the rest
-	#are felt and recorded.
-	#Also lets a great earthquake be announced by a foreshock minutes before it.
-	quakeAftershocks = true
-	#How many aftershocks: 1 is the natural number for the main shock's size, 0.5 half as many.
-	#Range: 0.0 ~ 10.0
-	aftershockRate = 1.0
-	#The most aftershocks one quake has.
-	#Range: 1 ~ 500
-	aftershockMax = 8
-	#Over how many in-game days a sequence dies away.
-	#Range: 0.1 ~ 100.0
-	aftershockDays = 3.0
-	#Share of the great ambient earthquakes (magnitude 7 and up) that a foreshock, about two
-	#magnitudes smaller, comes before by one to five minutes.
-	#Range: 0.0 ~ 1.0
-	foreshockShare = 0.3
 
 [sulfur]
 	#Native sulfur crusts around volcanic fumaroles and vents.
@@ -718,6 +805,38 @@
 	#without trees' shapes, villages or caves, which appear once the ground is really generated.
 	#Off, Distant Horizons generates the far chunks its own way.
 	distantHorizonsTerrain = true
+	#When a mod is taken out of a world, the blocks it laid in the ground turn to air as their
+	#chunks load, and the hole is saved: ore and fossil pockets, crystals and rock left empty in
+	#cave walls. On, such a block becomes the rock round it instead (deepslate for a deepslate
+	#one, the local rock in TerraFirmaCraft) as its chunk loads, where its name reads like
+	#rock, ore, a crystal or soil, or where rock closes round it on every side. What reads as
+	#a build - bricks, planks, glass, lamps, doors - is left to go, as before. Chunks already
+	#loaded and saved without the mod have lost those blocks for good; /geology fillvoids
+	#closes the small holes they left. It cannot tell them from a small sealed room or a
+	#one-block tunnel end a player dug: run it where the mod's blocks were, not over your own.
+	removedModBlocksToRock = true
+	#Your own choice for a removed mod's blocks, before the rules above: "modid:block=replacement"
+	#for one block or "modid:*=replacement" for all of a mod's, the replacement a block id or
+	#"air" (to let it go) or "rock" (the rock round it). For example
+	#["jurassicreborn:*=rock", "somemod:glowing_egg=air"].
+	removedModBlockRules = []
+	#One ore of a kind: where several mods add the same ore (tin, lead, silver, uranium and so on, by the
+	#forge:ores/ tags), new chunks have only one of them, the first mod's in oreUnifyOrder, in its stone and
+	#deepslate forms, and the others' ore of it is not placed a second time where that mod places its own,
+	#so there is as much of it as one mod would put. What is mined drops that mod's ore. Ingots and the
+	#like are not made one: a mod such as Almost Unified does that. Not in TerraFirmaCraft.
+	unifyOres = true
+	#Which mod's ore is kept, first first; mods not named come after, by name.
+	oreUnifyOrder = ["minecraft", "alltheores", "create", "immersiveengineering", "electrodynamics", "mekanism", "thermal"]
+	#Other mods' ores where the geology would put them, in the mod's own world types: tin, tungsten and
+	#lithium in greisen at the roofs of granite bodies; lead, zinc, silver and fluorite in pods in platform
+	#limestone; bauxite (aluminium) and lateritic nickel under hot wet uplands; chromite with platinum,
+	#osmium and iridium in serpentinite; titanium, monazite and thorium in old beach sands; salt, potash and
+	#saltpetre in desert basins; uranium in roll fronts in sandstone. Those mods' own ore of these is not
+	#placed then. Off by default: a pack that relies on finding them everywhere will find them rarer.
+	geologicalModOres = false
+	#Also make the ores one in chunks made before, as each is next loaded. Off: those keep what they had.
+	unifyOresInExistingChunks = false
 
 [instruments]
 	#How far away, in blocks, a seismograph will look at an earthquake at all.
@@ -729,6 +848,10 @@
 	#player is likely to have built a second station.
 	#Range: 64 ~ 100000
 	seismographRange = 4000
+	#The magnitude, as a station reads it, from which it sounds its siren. Smaller quakes it
+	#records with a short chime of notes. 11 never wails.
+	#Range: 0.0 ~ 11.0
+	seismographSirenMagnitude = 6.0
 	#Forge Energy per tick a geothermal turbine makes when its well reaches the hottest
 	#ground: a hot spring's or geyser's deep chamber with its magma bed. A short well to a
 	#pool's own bed makes less. Turbines within eight blocks of each other draw on the same
@@ -743,6 +866,14 @@
 	#bottom of the world, out of reach unless this is raised.
 	#Range: 1 ~ 512
 	turbineWellMaxDepth = 96
+	#Millibuckets a tick a well pump lifts at most. What it lifts is also what the rock at its
+	#well's foot lets through -- gravel and sand far more than this, clay a trickle -- and what
+	#the water standing over the foot allows: drawn down to the foot, the well runs dry.
+	#Range: 1 ~ 10000
+	wellPumpRate = 100
+	#Forge Energy a well pump spends on each bucket for each block it lifts the water.
+	#Range: 0 ~ 100000
+	wellPumpEnergyPerBucketBlock = 40
 	#How many blocks down the core drill bores from the block it is set on. Its core logs every
 	#bed it went through, any deposit named for what laid it, and the water table.
 	#Range: 8 ~ 512
@@ -757,6 +888,112 @@
 	#a seam. Set it before a world is made, not after.
 	#Off, the world keeps vanilla's own rivers and nothing else.
 	rivers = true
+	#The water of the mod's rivers and lakes comes back where it is lost. After a quake, a
+	#landslide or a cave falling in, the rivers and lakes of the ground that moved are laid again
+	#at their level, as far as their banks hold them. Near players, water taken out of a river or
+	#drained away by another mod flows back in from the water beside it, a little at a time.
+	#A stretch walled off from the rest of the river stays dry.
+	riversRefill = true
+	#Keep account of the water in the ground across the overworld: how wet the soil is at the top,
+	#in the root zone and deep down, water standing on it, and how far the groundwater stands over
+	#or under its usual level. Rain soaks in as the soil takes it, sun and plants dry it out, the
+	#deep soil feeds the groundwater. A game day is a week of the ground's time: a shower wets the
+	#top for half a day, a dry spell dries the root zone in three or four. Kept in the chunks' own
+	#saves, a small share of the tick. On its own it changes no block; /geology water, the core
+	#sample and the geothermal probe read it. Not in TerraFirmaCraft, which keeps its own.
+	soilWater = true
+	#Let the water in the ground show in the grass (needs soilWater). Grass, ferns and the grass
+	#block turn towards straw as the root zone dries -- from about the third dry day, straw by the
+	#seventh -- and green again after rain; over ground soaked through, or where the groundwater is
+	#a few blocks down, they are a deeper green, as the bottoms stay green in a drought while the
+	#ridges round them brown. Only the colour: no block changes.
+	soilWaterTint = true
+	#Let the water in the ground change it (needs soilWater). Farmland over soil wet enough stays
+	#moist without water beside it, as rain-fed fields do. A long drought -- the roots at the
+	#wilting point for six game days and more -- kills the grass back to bare soil in patches, and
+	#no grass spreads onto dry ground
+	#meanwhile; it grows back after the rain comes. Grass within four blocks of water stays green,
+	#and nothing a player placed is touched. A dry field's crops slow and stop; a watered one grows
+	#as ever. Ground that stands in water two days and more, where the groundwater is up at the surface,
+	#goes to mud in its hollows and dries out again. /geology water weather dry|wet <days>
+	#shows what a drought or a wet spell does, without waiting. Off by default while it is new.
+	soilWaterChangesGround = false
+	#A cave roof may give way under water brought over it later -- a reservoir, a pond dug and filled --
+	#or, in karst, once the wells round it have drawn the water down out of its cave: only a roof that
+	#was nearly failing anyway, thin, wide and in soft or soluble rock. It drips and creaks a minute or
+	#two first. The lakes and rivers the world was made with are the load the roofs grew up under, and
+	#water that only passes (a flood, another mod's water finding its level) does not count.
+	waterLoadCollapsesCaves = true
+	#Game days a cave roof in karst takes to come down once the wells round it have drawn its water out:
+	#the ground over it cracks a third of the way, sinks a block in a ring round the middle at two thirds,
+	#and then the sinkhole opens. A roof under water brought over it goes in a minute or two.
+	#Range: 0.001 ~ 30.0
+	sinkholeWarningDays = 1.5
+	#The ground settling over clay and soft soil the wells round it have drawn the water out of, as on the
+	#Konya plain: slowly, over game days, a block at a time in rings round the wells, the soil cracking first,
+	#and for good -- the water coming back does not lift it again. How far it settles follows the deepest the
+	#water has been drawn and how much soft ground is under it; sand, gravel and rock hardly settle. What
+	#a player built stays where it stands. 1 is the mod's rate, 2 twice as much, 0 none.
+	#Range: 0.0 ~ 5.0
+	groundSubsidence = 1.0
+	#Rain in storms that drift with the wind, not over the whole world at once: each region goes through
+	#wet and dry spells lasting days to weeks, wet biomes get more rain than dry ones, a windward mountainside
+	#more than its lee. It rains, snows, fills cauldrons and strikes lightning only under a storm, and each
+	#player sees the weather where they stand. /weather still works: rain brings a storm over the players.
+	#Not in TerraFirmaCraft, which keeps its own climate.
+	regionalRain = true
+	#How much rain the storms bring, 1 as designed: about a fifth of the land under rain in a temperate
+	#region on average, most of it in a wet spell, little in a dry one.
+	#Range: 0.0 ~ 4.0
+	rainAmount = 1.0
+	#How hard the storms rain, 1 as designed: under 1 more drizzle and fewer downpours, over 1 the other way.
+	#Range: 0.25 ~ 2.0
+	rainStrength = 1.0
+	#How long the storms last, 1 as designed: a shower an hour or so, a front most of a day, a wet spell's rain
+	#days to weeks. Twice as long is half as many of them for the same amount of rain.
+	#Range: 0.25 ~ 4.0
+	stormLength = 1.0
+	#How wide the storms are, 1 as designed: showers a few hundred blocks across, fronts a couple of thousand.
+	#Where the land wants little rain a storm is kept small enough not to bring more than it wants.
+	#Range: 0.25 ~ 3.0
+	stormSize = 1.0
+	#Puddles after rain where the ground holds water: in hollows of rock, clay, paths and soaked loam, never on
+	#sand, in ragged shapes that shrink as the ground dries; a pixel of water a shader draws as water. Only
+	#without Puddles & Floods, whose own puddles are told where the ground holds water instead. Needs soilWater.
+	puddles = true
+	#A river runs out through its bank where a block beside or under its water is taken away: ordinary running
+	#water into the gap, kept coming from the river until the hole is full (with Flowing Fluids too).
+	riverSpills = true
+	#A small stream over ground the wells round it have drawn down two blocks and more runs dry there, and
+	#fills back in from its ends once the water comes back under a block.
+	streamsDryUp = true
+	#A river over its banks where it rains hard over it on ground already soaked: a block over the low ground
+	#beside it, two in the heaviest rain, for as long as the rain goes on, then down a layer at a time, leaving
+	#some mud (with soilWaterChangesGround). In a narrow valley it comes as a flash flood and carries along
+	#what stands in it. The ground is not moved. Needs soilWater.
+	riverFloods = true
+	#Where Serene Seasons keeps the seasons, the rivers run high in their season: a snow-fed river as the snow
+	#melts at the end of winter, a Mediterranean one in winter, a monsoon one in summer. The water comes up a
+	#block over its banks, two at the height of it (a 3-block river runs 6-7 across on a plain), and goes back
+	#down after. Without Serene Seasons nothing changes.
+	seasonalRivers = true
+	#Rain the soaked ground cannot take in runs off; what runs into a closed hollow stands there as a pond,
+	#as deep as the hollow holds up to the lowest point of its rim and no deeper than the water that gathered,
+	#until it soaks in and dries up after the rain, a layer at a time, leaving some mud. Water is laid only
+	#there, never over the ground at large. Needs soilWater.
+	rainPondsInHollows = true
+	#A lake goes down a block in a region's long drought, its shallow shore drying out, and comes back when the
+	#rains do, filling from the water still in it. Needs regionalRain for the region's wet and dry spells.
+	lakesFallInDroughts = true
+	#A river walled across fills up behind the wall, a layer at a time, as fast as the river brings water,
+	#up to the top of the wall or the lowest gap in the valley; a wall too thin for the water it holds
+	#(stone about as thick as the water is high, concrete a little over half, earth three times, an earth
+	#bank not overtopped) leaks, creaks and breaks, and the reservoir runs out through the gap.
+	dams = true
+	#The sea is salt. Water at sea level in an ocean or on a beach waters no field, and a bucket dipped
+	#in it comes up with sea water, which waters none wherever it is poured. River, lake, well and rain
+	#water are fresh and water fields as ever.
+	seaWaterSalty = true
 	#Karst, in the mod's own world types: where marble or calcite lies close under a plateau's
 	#flat beds, a platform's or a foreland's, in the regions that have it, the ground takes its
 	#water underground. It is pocked with sinkholes, and now and then a small river falls into a
@@ -874,6 +1111,23 @@
 	#belt's gneiss and marble, an arc's ash over its plutons. Off leaves plain stone, and chunks
 	#generate a little faster.
 	lithology = true
+	#How many blocks the ground has to climb across two for a slope to shed its soil and show
+	#its rock (worlds made with this version on; older ones keep 3). About 56 degrees: no soil
+	#holds on steeper ground in a dry climate or over the tree line. Where it is wet enough for
+	#plants to hold a slope, bare and green ground meet in patches near the threshold, not on a
+	#line.
+	#Range: 2 ~ 8
+	steepRise = 3
+	#The same in a wet climate well under the tree line, where plants hold far steeper slopes:
+	#Madeira's, the Na Pali coast's, the Faroes'. Between the two by how wet and how far under
+	#the line a slope is.
+	#Range: 2 ~ 10
+	humidSteepRise = 4
+	#How much of the scree at the foot of the cliffs is grown over -- grass, coarse earth, mossy
+	#stones -- in a wet climate under the tree line, as old talus is; less the drier and higher it
+	#lies, none over the tree line. 0 leaves it all bare rubble.
+	#Range: 0.0 ~ 1.0
+	talusGreening = 0.5
 	#How many times as fast crops on tilled soil ripen, and melon and pumpkin stems fruit, on the
 	#alluvial plain, where the rivers spread their silt in flood. 1 grows them as anywhere else.
 	#Bone meal is not changed.
