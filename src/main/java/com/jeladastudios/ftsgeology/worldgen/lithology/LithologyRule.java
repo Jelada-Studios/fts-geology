@@ -6,10 +6,13 @@ import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.Column;
 import com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.Rock;
 import com.jeladastudios.ftsgeology.util.ValueNoise;
+import com.jeladastudios.ftsgeology.worldgen.terrain.ColumnClimate;
 import com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext;
+import com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.util.KeyDispatchDataCodec;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -32,6 +35,10 @@ import net.minecraft.world.level.levelgen.SurfaceRules;
  *
  * <p>With {@code bare} it answers in every column, stone included, whatever the slope: the rule above the tree line,
  * where a mountain carries no soil at all.</p>
+ *
+ * <p>In worlds made since {@link WorldgenRevision#GREENER_GROUND} the climate has its say: a wet slope under the tree line
+ * holds its plants steeper ({@link #steepRise}), bare and green ground meet in patches rather than on a line, the scree
+ * thins out from the tree line to the snow line, and low scree in a wet climate is partly grown over.</p>
  */
 public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceRules.RuleSource {
 
@@ -41,8 +48,33 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
                     Codec.BOOL.optionalFieldOf("bare", false).forGetter(LithologyRule::bare)
             ).apply(i, LithologyRule::new)));
 
-    /** How much the ground must climb across two blocks for a column to count as a cliff. */
+    /** How much the ground must climb across two blocks for a column to count as a cliff (worlds made before GREENER_GROUND). */
     private static final int STEEP_RISE = 3;
+
+    /**
+     * In worlds made since {@link WorldgenRevision#GREENER_GROUND}, the rise a column has to beat to go bare, for its
+     * climate: {@code steepRise} where it is dry or over the tree line, up to {@code humidSteepRise} where it is wet and
+     * well under it. A wet climate's slopes hold their plants far steeper than a dry one's -- Madeira's, the Na Pali
+     * coast's, the Faroes' -- and none hold them over the tree line.
+     */
+    public static double steepRise(ColumnClimate.At climate, int x, int z, int ground) {
+        double dry = GeyserConfig.STEEP_RISE.get(), humid = GeyserConfig.HUMID_STEEP_RISE.get();
+        return dry + (humid - dry) * green(climate, x, z, ground);
+    }
+
+    /** How far a column's climate lets plants hold steep ground and scree: 1 wet and well under the tree line, 0 dry or over it. */
+    public static double green(ColumnClimate.At climate, int x, int z, int ground) {
+        double wet = Mth.clamp((climate.humidity() - WET_FROM) / (WET_FULL - WET_FROM), 0.0, 1.0);
+        if (wet <= 0.0) return 0.0;
+        double under = Mth.clamp((climate.treeLine(x, z, SEA) - ground) / TREE_LINE_FADE, 0.0, 1.0);
+        return wet * under;
+    }
+
+    /** The climate's humidity a slope starts holding its plants at, and holds them fully at. */
+    private static final double WET_FROM = -0.1, WET_FULL = 0.4;
+    /** Blocks under the tree line over which plants come back to steep ground. */
+    private static final double TREE_LINE_FADE = 12.0;
+    private static final int SEA = 63;
 
     /**
      * How much of a steep slope is loose debris rather than bare face, low down, and how wide those patches are.
@@ -56,6 +88,10 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
      * summits stay the bare rock the twenty-fourth round asked for.</p>
      */
     private static final double TALUS_SHARE = 0.75, TALUS_SCALE = 20.0, TALUS_GRAIN = 4.0;
+    /** The size of the patches a slope near its threshold goes bare in, and old scree grows over in, in blocks. */
+    private static final double BARE_GRAIN = 6.0, GROWN_SCALE = 9.0;
+    /** How far under its threshold, in blocks of rise, a fully green place's slope may already go bare now and then. */
+    private static final double SOFT_BAND = 1.5;
 
     /**
      * How far past a channel's flat bed the river still owns the ground it runs on, in fault widths of the
@@ -74,7 +110,11 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
     @Override
     public SurfaceRules.SurfaceRule apply(SurfaceRules.Context context) {
         if (!GeyserConfig.LITHOLOGY.get()) return (x, y, z) -> null;
-        return new Pass(context.chunk, TerrainContext.seed(), steepOnly, bare);
+        Pass pass = new Pass(context.chunk, TerrainContext.seed(), steepOnly, bare);
+        if (steepOnly && WorldgenRevision.has(WorldgenRevision.GREENER_GROUND)) {
+            pass.climate = ColumnClimate.corners(context.chunk.getPos().getMinBlockX(), context.chunk.getPos().getMinBlockZ());
+        }
+        return pass;
     }
 
     /** One chunk's pass: each column worked out the first time one of its blocks is asked about. */
@@ -88,8 +128,10 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
         private final byte[] steep = new byte[256];
         /** 0 not yet looked at, 1 dry land, 2 a river's own ground. */
         private final byte[] river = new byte[256];
-        /** 0 not yet looked at, 1 bare face, 2 scree. */
+        /** 0 not yet looked at, 1 bare face, 2 scree, 3 scree grown over. */
         private final byte[] talus = new byte[256];
+        /** The chunk's corners' climate, in worlds made since GREENER_GROUND; null before, and the old rules hold. */
+        ColumnClimate.At[] climate;
 
         Pass(ChunkAccess chunk, long seed, boolean steepOnly, boolean bare) {
             this.chunk = chunk;
@@ -118,6 +160,12 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
             // Scree, where the face has broken off: mostly gravel, with fragments of the very rock above it. The
             // grain is a slow field rather than a die a block at a time, so it reads as rubble and not as confetti.
             if (steepOnly && talusAt(i, x, z, c, grounds[i])) {
+                // Under the tree line in a wet climate, scree grows over: grass, coarse earth and moss over the rubble,
+                // as old talus does, and the plants the biome grows can root in it.
+                if (talus[i] == 3 && grounds[i] >= SEA - 1) {
+                    if (y == grounds[i]) return overgrown(x, z);
+                    if (y == grounds[i] - 1) return States.DIRT;
+                }
                 return ValueNoise.noise(x + 313, z - 571, TALUS_GRAIN) > 0.35
                         ? States.ALL[(r == Rock.KEEP ? Rock.STONE : r).ordinal()]
                         : States.GRAVEL;
@@ -145,10 +193,34 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
                 int north = height(lx, lz - 1), south = height(lx, lz + 1);
                 int spanX = (east - west) * (lx == 0 || lx == 15 ? 2 : 1);
                 int spanZ = (south - north) * (lz == 0 || lz == 15 ? 2 : 1);
-                boolean cliff = Math.abs(spanX) >= STEEP_RISE || Math.abs(spanZ) >= STEEP_RISE;
+                boolean cliff;
+                if (climate == null) {
+                    cliff = Math.abs(spanX) >= STEEP_RISE || Math.abs(spanZ) >= STEEP_RISE;
+                } else {
+                    // Where plants can hold the slope, no hard line at the threshold: the chance of bare rock climbs over
+                    // a band under it, wider the greener the place, by a field and not a die, so bare and green ground
+                    // come in patches. Dry or over the tree line the line is where it always was.
+                    int x = chunk.getPos().getMinBlockX() + lx, z = chunk.getPos().getMinBlockZ() + lz;
+                    int rise = Math.max(Math.abs(spanX), Math.abs(spanZ));
+                    ColumnClimate.At here = ColumnClimate.blend(climate, lx, lz);
+                    int ground = height(lx, lz);
+                    double need = steepRise(here, x, z, ground), band = SOFT_BAND * green(here, x, z, ground);
+                    if (band <= 0.0) {
+                        cliff = rise >= need;
+                    } else {
+                        double p = Mth.clamp((rise - (need - band)) / band, 0.0, 1.0);
+                        cliff = p >= 1.0 || p > 0.0 && 0.5 + 0.5 * ValueNoise.noise(x - 1931, z + 4477, BARE_GRAIN) < p;
+                    }
+                }
                 steep[i] = (byte) (cliff ? 2 : 1);
             }
             return steep[i] == 2;
+        }
+
+        /** Grass, coarse earth and mossy stones over old scree, by a field. */
+        private static BlockState overgrown(int x, int z) {
+            double n = ValueNoise.noise(x + 6151, z - 2711, TALUS_GRAIN);
+            return n > 0.30 ? States.MOSSY : n > 0.15 ? States.COARSE : States.GRASS;
         }
 
         /**
@@ -161,11 +233,25 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
          */
         private boolean talusAt(int i, int x, int z, Column c, int ground) {
             if (talus[i] == 0) {
-                double share = TALUS_SHARE * (1.0 - c.high(ground));
+                double fade = 1.0 - c.high(ground);
+                ColumnClimate.At here = null;
+                if (climate != null) {
+                    // Debris thins out from the tree line up and is gone at the snow line, where the summit is rock.
+                    here = ColumnClimate.blend(climate, x & 15, z & 15);
+                    int tree = here.treeLine(x, z, SEA), snow = here.snowLine(x, z, SEA);
+                    fade = Math.min(fade, snow <= tree ? (ground < tree ? 1.0 : 0.0)
+                            : Mth.clamp((snow - ground) / (double) (snow - tree), 0.0, 1.0));
+                }
+                double share = TALUS_SHARE * fade;
                 boolean scree = share > 0.0 && ValueNoise.noise(x + 8171, z + 2333, TALUS_SCALE) > screeCut(share);
-                talus[i] = (byte) (scree ? 2 : 1);
+                byte kind = (byte) (scree ? 2 : 1);
+                if (scree && here != null) {
+                    double grown = GeyserConfig.TALUS_GREENING.get() * green(here, x, z, ground);
+                    if (grown > 0.0 && 0.5 + 0.5 * ValueNoise.noise(x - 3407, z + 6113, GROWN_SCALE) < grown) kind = 3;
+                }
+                talus[i] = kind;
             }
-            return talus[i] == 2;
+            return talus[i] >= 2;
         }
 
         /**
@@ -204,6 +290,10 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
     private static final class States {
         static final BlockState[] ALL = new BlockState[Rock.values().length];
         static final BlockState GRAVEL = Blocks.GRAVEL.defaultBlockState();
+        static final BlockState GRASS = Blocks.GRASS_BLOCK.defaultBlockState();
+        static final BlockState COARSE = Blocks.COARSE_DIRT.defaultBlockState();
+        static final BlockState MOSSY = Blocks.MOSSY_COBBLESTONE.defaultBlockState();
+        static final BlockState DIRT = Blocks.DIRT.defaultBlockState();
 
         static {
             put(Rock.STONE, Blocks.STONE);

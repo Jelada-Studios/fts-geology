@@ -253,6 +253,9 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue TERRAIN_UPLIFT;        // blocks a collision lifts the ground
     public static final ForgeConfigSpec.DoubleValue DEM_HEIGHT_SCALE;      // how much the real mountain crops are exaggerated
     public static final ForgeConfigSpec.BooleanValue LITHOLOGY;           // rock sequences under the ground (own terrain)
+    public static final ForgeConfigSpec.IntValue STEEP_RISE;              // rise in two blocks that bares a slope
+    public static final ForgeConfigSpec.IntValue HUMID_STEEP_RISE;        // the same, wet and under the tree line
+    public static final ForgeConfigSpec.DoubleValue TALUS_GREENING;       // share of low scree grown over
     public static final ForgeConfigSpec.DoubleValue ALLUVIAL_CROP_GROWTH; // how much faster crops ripen on a floodplain
 
     // --- Instruments ---------------------------------------------------------
@@ -1474,6 +1477,23 @@ public final class GeyserConfig {
                         "belt's gneiss and marble, an arc's ash over its plutons. Off leaves plain stone, and chunks",
                         "generate a little faster.")
                 .define("lithology", true);
+        STEEP_RISE = b
+                .comment("How many blocks the ground has to climb across two for a slope to shed its soil and show",
+                        "its rock (worlds made with this version on; older ones keep 3). About 56 degrees: no soil",
+                        "holds on steeper ground in a dry climate or over the tree line. Where it is wet enough for",
+                        "plants to hold a slope, bare and green ground meet in patches near the threshold, not on a",
+                        "line.")
+                .defineInRange("steepRise", 3, 2, 8);
+        HUMID_STEEP_RISE = b
+                .comment("The same in a wet climate well under the tree line, where plants hold far steeper slopes:",
+                        "Madeira's, the Na Pali coast's, the Faroes'. Between the two by how wet and how far under",
+                        "the line a slope is.")
+                .defineInRange("humidSteepRise", 4, 2, 10);
+        TALUS_GREENING = b
+                .comment("How much of the scree at the foot of the cliffs is grown over -- grass, coarse earth, mossy",
+                        "stones -- in a wet climate under the tree line, as old talus is; less the drier and higher it",
+                        "lies, none over the tree line. 0 leaves it all bare rubble.")
+                .defineInRange("talusGreening", 0.5D, 0.0D, 1.0D);
         ALLUVIAL_CROP_GROWTH = b
                 .comment("How many times as fast crops on tilled soil ripen, and melon and pumpkin stems fruit, on the",
                         "alluvial plain, where the rivers spread their silt in flood. 1 grows them as anywhere else.",

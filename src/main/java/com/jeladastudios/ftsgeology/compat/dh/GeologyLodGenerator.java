@@ -152,6 +152,18 @@ final class GeologyLodGenerator implements IDhApiWorldGenerator {
         if (SOURCES.sum() % 200 == 0) com.jeladastudios.ftsgeology.util.Diagnostics.info("{}", summary());
     }
 
+    /**
+     * How steep the ground must be to show bare rock: in worlds made since GREENER_GROUND, steeper where the climate is
+     * wet and the ground under the tree line, as the ground's own cliff rule has it ({@link
+     * com.jeladastudios.ftsgeology.worldgen.lithology.LithologyRule#steepRise}).
+     */
+    private double bareSlope(int x, int z, int top) {
+        if (!com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.has(
+                com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.GREENER_GROUND)) return BARE_SLOPE;
+        var climate = com.jeladastudios.ftsgeology.worldgen.terrain.ColumnClimate.at(sampler, x, z);
+        return BARE_SLOPE * com.jeladastudios.ftsgeology.worldgen.lithology.LithologyRule.steepRise(climate, x, z, top) / 3.0;
+    }
+
     /** One column's blocks, bottom to top, as spans of Y relative to the bottom of the world. */
     private void column(int x, int z, double g, double slope, byte detail, List<DhApiTerrainDataPoint> out) {
         int top = clamp((int) Math.floor(g));
@@ -188,7 +200,7 @@ final class GeologyLodGenerator implements IDhApiWorldGenerator {
             soil = surface;
         } else if (!belted && top >= snowLine || biome.value().coldEnoughToSnow(new BlockPos(x, top + 1, z))) {
             surface = slope > BARE_SLOPE * 1.5 ? "minecraft:stone" : "minecraft:snow_block";
-        } else if (slope > BARE_SLOPE || belt.equals("alpine_scree")) {
+        } else if (slope > BARE_SLOPE && slope > bareSlope(x, z, top) || belt.equals("alpine_scree")) {
             surface = "minecraft:stone";
             soil = "minecraft:stone";
         } else if (biome.is(BiomeTags.IS_BEACH) || biome.is(Tags.Biomes.IS_DESERT) || biome.is(Tags.Biomes.IS_SANDY)) {
