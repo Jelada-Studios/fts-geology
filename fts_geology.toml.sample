@@ -1135,6 +1135,12 @@
 	#lies, none over the tree line. 0 leaves it all bare rubble.
 	#Range: 0.0 ~ 1.0
 	talusGreening = 0.5
+	#How much of the ledges on a steep face keep soil and plants in a wet climate under the tree
+	#line: a shelf level with the ground beside it, across the slope, as the ledges of the cliffs of
+	#Madeira or the Faroes are green. Less the drier and higher it lies, none over the tree line.
+	#0 leaves every ledge bare rock. New worlds only.
+	#Range: 0.0 ~ 1.0
+	ledgeGreening = 1.0
 	#How many times as fast crops on tilled soil ripen, and melon and pumpkin stems fruit, on the
 	#alluvial plain, where the rivers spread their silt in flood. 1 grows them as anywhere else.
 	#Bone meal is not changed.

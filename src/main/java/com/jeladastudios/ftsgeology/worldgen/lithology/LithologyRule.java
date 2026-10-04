@@ -92,6 +92,8 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
     private static final double BARE_GRAIN = 6.0, GROWN_SCALE = 9.0;
     /** How far under its threshold, in blocks of rise, a fully green place's slope may already go bare now and then. */
     private static final double SOFT_BAND = 1.5;
+    /** The size of the patches a wet cliff's ledges are green in, in blocks. */
+    private static final double LEDGE_GRAIN = 3.0;
 
     /**
      * How far past a channel's flat bed the river still owns the ground it runs on, in fault widths of the
@@ -211,10 +213,30 @@ public record LithologyRule(boolean steepOnly, boolean bare) implements SurfaceR
                         double p = Mth.clamp((rise - (need - band)) / band, 0.0, 1.0);
                         cliff = p >= 1.0 || p > 0.0 && 0.5 + 0.5 * ValueNoise.noise(x - 1931, z + 4477, BARE_GRAIN) < p;
                     }
+                    // A ledge on the face: level with a neighbour across the slope, a shelf a block or more deep. In a wet
+                    // climate under the tree line soil holds on it and plants with it, as on the green ledges of the
+                    // cliffs of Madeira and the Faroes, while the face above and below it stays bare.
+                    if (cliff && WorldgenRevision.has(WorldgenRevision.GREEN_LEDGES)) {
+                        double hold = GeyserConfig.LEDGE_GREENING.get() * green(here, x, z, ground);
+                        if (hold > 0.0 && ledge(lx, lz, ground, Math.abs(spanX) >= Math.abs(spanZ))
+                                && 0.5 + 0.5 * ValueNoise.noise(x + 7121, z - 3307, LEDGE_GRAIN) < hold) {
+                            cliff = false;
+                        }
+                    }
                 }
                 steep[i] = (byte) (cliff ? 2 : 1);
             }
             return steep[i] == 2;
+        }
+
+        /**
+         * Whether a steep column is level with a neighbour along the axis it climbs on. Only neighbours inside the chunk
+         * count: one past its edge cannot be read and stands in as the column itself, which would have made a ledge of
+         * every column on the chunk's border.
+         */
+        private boolean ledge(int lx, int lz, int ground, boolean alongX) {
+            if (alongX) return lx > 0 && height(lx - 1, lz) == ground || lx < 15 && height(lx + 1, lz) == ground;
+            return lz > 0 && height(lx, lz - 1) == ground || lz < 15 && height(lx, lz + 1) == ground;
         }
 
         /** Grass, coarse earth and mossy stones over old scree, by a field. */

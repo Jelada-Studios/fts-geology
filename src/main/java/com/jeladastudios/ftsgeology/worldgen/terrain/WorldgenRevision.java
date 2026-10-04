@@ -51,8 +51,10 @@ public final class WorldgenRevision {
      * volcanic highland, the rest of its body belted by height wherever it stands, a shield in a wet arc grassed.
      */
     public static final int VOLCANO_GROUND = 8;
+    /** The ledges of a wet cliff under the tree line green, a shelf level with the ground beside it (round 132). */
+    public static final int GREEN_LEDGES = 9;
     /** What a world made now gets. */
-    public static final int CURRENT = 8;
+    public static final int CURRENT = 9;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;

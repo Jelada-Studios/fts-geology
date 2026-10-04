@@ -257,6 +257,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue STEEP_RISE;              // rise in two blocks that bares a slope
     public static final ForgeConfigSpec.IntValue HUMID_STEEP_RISE;        // the same, wet and under the tree line
     public static final ForgeConfigSpec.DoubleValue TALUS_GREENING;       // share of low scree grown over
+    public static final ForgeConfigSpec.DoubleValue LEDGE_GREENING;       // share of a wet cliff's ledges green
     public static final ForgeConfigSpec.DoubleValue ALLUVIAL_CROP_GROWTH; // how much faster crops ripen on a floodplain
 
     // --- Instruments ---------------------------------------------------------
@@ -1503,6 +1504,12 @@ public final class GeyserConfig {
                         "stones -- in a wet climate under the tree line, as old talus is; less the drier and higher it",
                         "lies, none over the tree line. 0 leaves it all bare rubble.")
                 .defineInRange("talusGreening", 0.5D, 0.0D, 1.0D);
+        LEDGE_GREENING = b
+                .comment("How much of the ledges on a steep face keep soil and plants in a wet climate under the tree",
+                        "line: a shelf level with the ground beside it, across the slope, as the ledges of the cliffs of",
+                        "Madeira or the Faroes are green. Less the drier and higher it lies, none over the tree line.",
+                        "0 leaves every ledge bare rock. New worlds only.")
+                .defineInRange("ledgeGreening", 1.0D, 0.0D, 1.0D);
         ALLUVIAL_CROP_GROWTH = b
                 .comment("How many times as fast crops on tilled soil ripen, and melon and pumpkin stems fruit, on the",
                         "alluvial plain, where the rivers spread their silt in flood. 1 grows them as anywhere else.",
