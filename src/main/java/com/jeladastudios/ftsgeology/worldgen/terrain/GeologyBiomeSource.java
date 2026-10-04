@@ -223,7 +223,37 @@ public class GeologyBiomeSource extends BiomeSource {
         // The coast is still the parent's to place; only the rivers were taken over, above.
         if (sea || TfcCompat.beach(base)) return base;
         if (role == Role.OROGENIC_HIGHLAND && beltsOn()) return belts[beltAt(qx, qy, qz, sampler).ordinal()];
+        // A volcanic arc is clothed by height as a fold belt is: Kilimanjaro's rain forest, heath, alpine desert and ice,
+        // Etna's, Fuji's, Rainier's. Bare ash and rock is left where the climate is too dry for anything to take: there
+        // the arc stays the volcanic highland. A volcano's own cone is painted by the volcano, whatever the biome.
+        if (role == Role.VOLCANIC_HIGHLAND && beltsOn() && WorldgenRevision.has(WorldgenRevision.VOLCANIC_BELTS)
+                && !dry(qx, qz, sampler)) {
+            return belts[beltAt(qx, qy, qz, sampler).ordinal()];
+        }
         return ours;
+    }
+
+    /** The climate's humidity under which a volcanic arc stays bare highland, its ash unweathered. */
+    private static final double ARC_DRY = -0.35;
+
+    /** Each column's humidity, once worked out. */
+    private final com.jeladastudios.ftsgeology.util.ColumnCache<Double> humidity = new com.jeladastudios.ftsgeology.util.ColumnCache<>(14);
+
+    private boolean dry(int qx, int qz, Climate.Sampler sampler) {
+        long key = com.jeladastudios.ftsgeology.util.ColumnCache.key(qx, qz);
+        Double h = humidity.get(key);
+        if (h == null) {
+            // One sample for both: the belt asked for next wants the same sample's temperature, kept as beltAt keeps it.
+            Climate.TargetPoint p = sampler.sample(qx, 0, qz);
+            h = (double) Climate.unquantizeCoord(p.humidity());
+            humidity.put(key, h);
+            if (seaLevel.get(key) == null) {
+                double t = Climate.unquantizeCoord(p.temperature());
+                seaLevel.put(key, AltitudeBelts.summer(AltitudeBelts.seaLevel(t))
+                        + AltitudeBelts.waver(QuartPos.toBlock(qx), QuartPos.toBlock(qz)));
+            }
+        }
+        return h < ARC_DRY;
     }
 
     /** Whether the mountains are belted: a world made since the belts came, with them named in its preset. */

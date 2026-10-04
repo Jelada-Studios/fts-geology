@@ -44,8 +44,10 @@ public final class WorldgenRevision {
      * and talus under the tree line clothed in a wet climate, volcanic and rift country grassed (Feel the Nature round).
      */
     public static final int GREENER_GROUND = 6;
+    /** A volcanic arc belted by height as a fold belt is, forest at its foot to snow on its summits (FtN round). */
+    public static final int VOLCANIC_BELTS = 7;
     /** What a world made now gets. */
-    public static final int CURRENT = 6;
+    public static final int CURRENT = 7;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;
