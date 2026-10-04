@@ -1004,11 +1004,16 @@ public final class FissureEruptions {
             if (!openWater(what)) continue;
             LongSet built = PLAYER_BUILT.computeIfAbsent(chunkKey(x >> 4, z >> 4), k -> PlayerBuilt.inChunk(level, x >> 4, z >> 4));
             BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+            // Where another mod runs the rivers' water, a river's room is opened and its water left to come back itself.
+            boolean theirs = HydraulicsHooks.active(level)
+                    && what.getFluidState().getType() instanceof com.jeladastudios.ftsgeology.fluid.RiverWaterFluid;
+            BlockState put = theirs ? Blocks.AIR.defaultBlockState() : what;
             for (int y = bed + 1; y <= top; y++) {
                 BlockState s = level.getBlockState(m.set(x, y, z));
-                if (s.getFluidState().is(FluidTags.WATER) || built.contains(m.asLong()) || !setByLava(s)) continue;
-                level.setBlock(m, what, Block.UPDATE_ALL);
+                if (s.getFluidState().is(FluidTags.WATER) || built.contains(m.asLong()) || !setByLava(s) || theirs && s.isAir()) continue;
+                level.setBlock(m, put, Block.UPDATE_ALL);
                 reopened++;
+                if (theirs) HydraulicsHooks.moved(level, x >> 4, z >> 4, com.jeladastudios.ftsgeology.api.RiverBlocksChangedEvent.Cause.FISSURE);
             }
             // Over it, open air before: the rock of lava that ran out on to the water's top is taken off it.
             for (int y = top + 1; y <= top + DEEPEST + 1; y++) {
