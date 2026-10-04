@@ -92,6 +92,12 @@ public class GeologyBiomeSource extends BiomeSource {
             java.util.function.Predicate<Holder<Biome>> wanted, Climate.Sampler sampler,
             net.minecraft.world.level.LevelReader level) {
         boolean surface = parent.possibleBiomes().stream().noneMatch(wanted);
+        // A mountain's belts go by height: up in the sky every column is the snowfield, and a forest belt was never
+        // found. Each column is asked at its own ground instead, where the offset puts it.
+        if (surface && RawGround.ready()) {
+            return com.jeladastudios.ftsgeology.hydrology.RiverNetwork.builtOnly(
+                    () -> onTheGround(origin, radius, horizontalStep, wanted, sampler, level));
+        }
         net.minecraft.core.BlockPos from = surface
                 ? new net.minecraft.core.BlockPos(origin.getX(), level.getMaxBuildHeight() - 16, origin.getZ()) : origin;
         int step = surface ? level.getHeight() : verticalStep;
@@ -107,6 +113,35 @@ public class GeologyBiomeSource extends BiomeSource {
                     found.getSecond());
         }
         return found;
+    }
+
+    /**
+     * The search vanilla makes, out from the origin in a spiral, each column asked once, a little over its ground (or
+     * the sea's surface over the sea); the place reported on the ground, the coordinates a player clicks to go there.
+     */
+    private com.mojang.datafixers.util.Pair<net.minecraft.core.BlockPos, Holder<Biome>> onTheGround(
+            net.minecraft.core.BlockPos origin, int radius, int horizontalStep,
+            java.util.function.Predicate<Holder<Biome>> wanted, Climate.Sampler sampler,
+            net.minecraft.world.level.LevelReader level) {
+        int rings = Math.floorDiv(radius, horizontalStep);
+        for (net.minecraft.core.BlockPos.MutableBlockPos p : net.minecraft.core.BlockPos.spiralAround(
+                net.minecraft.core.BlockPos.ZERO, rings, net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.SOUTH)) {
+            int x = origin.getX() + p.getX() * horizontalStep, z = origin.getZ() + p.getZ() * horizontalStep;
+            double h = RawGround.heightAt(x, z);
+            int ground = Double.isNaN(h) ? level.getMaxBuildHeight() - 16
+                    : Math.min(level.getMaxBuildHeight() - 1, (int) Math.max(h, SEA_LEVEL));
+            Holder<Biome> b = getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(ground + 2), QuartPos.fromBlock(z), sampler);
+            if (wanted.test(b)) {
+                int y = ground;
+                if (level instanceof net.minecraft.server.level.ServerLevel server) {
+                    y = server.getChunkSource().getGenerator().getBaseHeight(x, z,
+                            net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, server,
+                            server.getChunkSource().randomState());
+                }
+                return com.mojang.datafixers.util.Pair.of(new net.minecraft.core.BlockPos(x, y, z), b);
+            }
+        }
+        return null;
     }
 
     /** How much of a channel has to reach a column before the river biome follows it there. */
