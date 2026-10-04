@@ -86,6 +86,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.IntValue QUAKE_ERUPTION_DELAY_MAX_TICKS;
     public static final ForgeConfigSpec.DoubleValue DORMANT_VOLCANO_QUIET_FACTOR; // how much longer a dormant one sleeps
     public static final ForgeConfigSpec.BooleanValue VOLCANIC_ASHFALL;      // default ON
+    public static final ForgeConfigSpec.BooleanValue VOLCANO_GROUND_BIOME;
     public static final ForgeConfigSpec.BooleanValue ASHFALL_BURIES_CROPS;  // default ON
     public static final ForgeConfigSpec.BooleanValue VOLCANO_UNREST;        // swarm, warming springs before an eruption
     public static final ForgeConfigSpec.IntValue VOLCANO_UNREST_TICKS;
@@ -529,6 +530,14 @@ public final class GeyserConfig {
                         "dug off. Turn it off if you would rather the countryside around a volcano",
                         "stayed green.")
                 .define("volcanicAshfall", true);
+        VOLCANO_GROUND_BIOME = b
+                .comment("A large volcano's own ground keeps its own biome. Its crater, its young lava and, round a",
+                        "live one, the fresh ash strewn downwind of it are the bare volcanic highland, and the rest",
+                        "of the mountain is belted by height wherever it stands, forest at its foot to snow on its",
+                        "summit. An eruption's frozen lava and the ground a pyroclastic flow burns take the bare",
+                        "highland's biome as they are made. New worlds only for the ground made with the world;",
+                        "the mod's own world types only.")
+                .define("volcanoPaintsBiome", true);
         SOIL_FROM_BEDROCK = b
                 .comment("Let the soil show what rock it weathered out of.",
                         "Soil is the rotted top of whatever is underneath it, and its colour is the",

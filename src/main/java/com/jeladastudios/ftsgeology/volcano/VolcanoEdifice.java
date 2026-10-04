@@ -449,7 +449,7 @@ public final class VolcanoEdifice {
         // A large cone reaches up through the climate: its lower half is the country round it, grown over, and the bare
         // rock only takes over higher up, through a wide ragged band of scree -- not a grey mountain from its foot.
         boolean large = c.size == VolcanoSize.LARGE;
-        double line = (extinct ? 0.55 : large ? 0.45 : 0.24) + 0.10 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx, gz, 40.0);
+        double line = stratoLine(c, gx, gz);
         double grassFade = large ? 0.22 : 0.14, screeFade = large ? 0.30 : 0.20;
         if (!extinct && h > line && c.size != VolcanoSize.SMALL
                 && oldLava(c, gx, gz) > 0.38 - 0.12 * rng.nextDouble()) {
@@ -490,7 +490,7 @@ public final class VolcanoEdifice {
             int r = rng.nextInt(10);
             return (r < 6 ? Blocks.BASALT : r < 9 ? Blocks.SMOOTH_BASALT : Blocks.BLACKSTONE).defaultBlockState();
         }
-        double line = (extinct ? 0.82 : 0.62) + 0.1 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + 311, gz - 311, 45.0);
+        double line = shieldLine(c, gx, gz);
         if (h > line + 0.18) {
             int r = rng.nextInt(10);
             return (r < 5 ? Blocks.BASALT : r < 8 ? Blocks.SMOOTH_BASALT : Blocks.BLACKSTONE).defaultBlockState();
@@ -498,7 +498,7 @@ public final class VolcanoEdifice {
         // Fine noise rather than a dice roll decides the mix, so grass and scree break up in small patches.
         double jitter = 0.5 + 0.5 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx - 97, gz + 97, 4.0);
         double grass = Mth.clamp(1.0 - (h - line + 0.06) / 0.14, 0.0, 1.0);
-        if (jitter < grass) return c.highland ? highlandSkin(rng) : Blocks.GRASS_BLOCK.defaultBlockState();
+        if (jitter < grass) return !c.highland ? Blocks.GRASS_BLOCK.defaultBlockState() : c.greenFlank ? forestFloor(rng) : highlandSkin(rng);
         double scree = Mth.clamp(1.0 - (h - line) / 0.22, 0.0, 1.0);
         if (jitter < scree) {
             int r = rng.nextInt(10);
@@ -506,6 +506,22 @@ public final class VolcanoEdifice {
                     : r < 9 ? Blocks.TUFF : Blocks.GRAVEL).defaultBlockState();
         }
         return (rng.nextInt(3) == 0 ? Blocks.SMOOTH_BASALT : Blocks.BASALT).defaultBlockState();
+    }
+
+    /**
+     * A stratocone's tree line, as a share of the way up it: a large cone reaches up through the climate, so its lower
+     * half is the country round it, grown over, and the bare rock only takes over higher up; a dead one has grown over
+     * far up its flanks.
+     */
+    static double stratoLine(Ctx c, int gx, int gz) {
+        boolean extinct = c.activity == VolcanoActivity.EXTINCT, large = c.size == VolcanoSize.LARGE;
+        return (extinct ? 0.55 : large ? 0.45 : 0.24) + 0.10 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx, gz, 40.0);
+    }
+
+    /** A shield's tree line, as a share of the way up it: half way, higher on a dead one. */
+    static double shieldLine(Ctx c, int gx, int gz) {
+        return (c.activity == VolcanoActivity.EXTINCT ? 0.82 : 0.62)
+                + 0.1 * com.jeladastudios.ftsgeology.util.ValueNoise.noise(gx + 311, gz - 311, 45.0);
     }
 
     /** An arc stratocone's flank in the volcanic highland, below its tree line: forest floor. */

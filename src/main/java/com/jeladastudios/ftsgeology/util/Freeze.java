@@ -18,7 +18,12 @@ public final class Freeze {
 
     /** Puts {@code state} where a fluid may stand, with {@code flags}; the fluid, if any, goes first, quietly. */
     public static void set(Level level, BlockPos pos, BlockState state, int flags) {
-        if (!level.getBlockState(pos).getFluidState().isEmpty()) {
+        var fluid = level.getBlockState(pos).getFluidState();
+        // Lava frozen where it lay is new bare ground, and its biome goes with it (volcano.BiomeScars).
+        if (fluid.is(net.minecraft.tags.FluidTags.LAVA) && level instanceof net.minecraft.server.level.ServerLevel server) {
+            com.jeladastudios.ftsgeology.volcano.BiomeScars.mark(server, pos.getX(), pos.getY(), pos.getZ());
+        }
+        if (!fluid.isEmpty()) {
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
         }
         level.setBlock(pos, state, flags);

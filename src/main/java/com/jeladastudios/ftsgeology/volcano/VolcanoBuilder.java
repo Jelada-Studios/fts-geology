@@ -216,7 +216,10 @@ public final class VolcanoBuilder {
                 TectonicMap.sampleCached(level, site.x(), site.z()), site.setting(), site.age(), level.getSeaLevel(),
                 site.setting().ocean() ? VolcanoField.seaTemperature(level, site.x(), site.z()) : 0.0, site.activity());
         if (c != null && c.isle != null) c.isle.coastLand = VolcanoField.coastLand(level, c);
-        if (c != null) c.highland = highlandAt(level, site.x(), site.z());
+        if (c != null) {
+            c.highland = highlandAt(level, site.x(), site.z());
+            c.greenFlank = c.highland && VolcanoGround.greenArc(level, site.x(), site.z());
+        }
         return c;
     }
 
@@ -243,7 +246,10 @@ public final class VolcanoBuilder {
         Ctx c = plan(level, x, baseY, z, magnitude, type, VolcanoSize.LARGE, RandomSource.create(seed),
                 TectonicMap.sampleCached(level, x, z), setting, age, level.getSeaLevel(), seaTemp,
                 VolcanoActivity.of(seed, x, z, type, setting));
-        if (c != null) c.highland = highlandAt(level, x, z);
+        if (c != null) {
+            c.highland = highlandAt(level, x, z);
+            c.greenFlank = c.highland && VolcanoGround.greenArc(level, x, z);
+        }
         return c;
     }
 
@@ -306,6 +312,8 @@ public final class VolcanoBuilder {
                 if (hasRamparts(c)) fissureRampartColumn(level, c, gx, gz, true);
             }
         }
+        // The mountain's own ground: fresh tephra downwind of a live one, and its biomes over its footprint.
+        if (columns > 0) VolcanoGround.paint(level, generator, cp, c);
         // An ocean biome grows nothing on dry land, so the island plants its own, once all its columns here stand.
         if (c.isle != null) OceanColumn.plant(level, generator, c, cp, site.seed());
         // An extinct volcano, on land or an old island, has no core to finish.

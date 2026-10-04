@@ -381,6 +381,7 @@ public final class PyroclasticFlow {
 
     /** Strips a column the cloud passes over: plants, leaves, snow, and the weak or burnable parts of buildings. */
     private static void burn(ServerLevel level, Flow f, int x, int g, int z) {
+        BiomeScars.mark(level, x, g, z);
         int top = Math.min(g + CLOUD + 16, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z));
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         boolean fires = GeyserConfig.ERUPTIONS_START_FIRES.get();

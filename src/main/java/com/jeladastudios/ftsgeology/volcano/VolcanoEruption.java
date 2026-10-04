@@ -450,6 +450,7 @@ public final class VolcanoEruption {
                     ? com.jeladastudios.ftsgeology.registry.ModBlocks.COOLING_LAVA_CRUST.get().defaultBlockState()
                     : (level.random.nextInt(100) < 65 ? Blocks.TUFF : Blocks.BASALT).defaultBlockState();
             level.setBlock(p.below(), TfcCompat.translate(level, p.below(), skin), 2);
+            BiomeScars.mark(level, p.getX(), p.getY() - 1, p.getZ());
         }
     }
 

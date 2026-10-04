@@ -102,6 +102,8 @@ public final class VolcanoPlan {
         boolean natural;
         /** Standing in an arc's volcanic highland, where a flank stays tuff and scree instead of grassing over. */
         boolean highland;
+        /** In a wet arc in a world made since its volcanoes grass over (round 132): a highland flank under the tree line green. */
+        boolean greenFlank;
         /** The crater cells a dormant volcano keeps crusted over, which turn to lava only while it erupts. */
         final List<BlockPos> seal = new ArrayList<>();
     }

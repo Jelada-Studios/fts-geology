@@ -233,6 +233,19 @@ public class GeologyBiomeSource extends BiomeSource {
         return ours;
     }
 
+    /**
+     * The biome a large volcano writes over its own ground ({@code volcano.VolcanoGround}): bare ground (its crater, young
+     * lava, fresh ash, a dry highland shield's flank) the volcanic highland, the rest of the mountain belted by height as
+     * an arc is. The volcano's skin, not the climate, says what is bare: it grasses a flank over in any climate. Null in a
+     * world without the belts.
+     */
+    public Holder<Biome> volcanoGround(int qx, int qy, int qz, Climate.Sampler sampler, boolean bare) {
+        Holder<Biome> highland = roles[Role.VOLCANIC_HIGHLAND.ordinal()];
+        if (!beltsOn() || highland == null) return null;
+        if (bare) return highland;
+        return belts[beltAt(qx, qy, qz, sampler).ordinal()];
+    }
+
     /** The climate's humidity under which a volcanic arc stays bare highland, its ash unweathered. */
     private static final double ARC_DRY = -0.35;
 

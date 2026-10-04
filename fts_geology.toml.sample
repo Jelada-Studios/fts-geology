@@ -264,6 +264,13 @@
 	#dug off. Turn it off if you would rather the countryside around a volcano
 	#stayed green.
 	volcanicAshfall = true
+	#A large volcano's own ground keeps its own biome. Its crater, its young lava and, round a
+	#live one, the fresh ash strewn downwind of it are the bare volcanic highland, and the rest
+	#of the mountain is belted by height wherever it stands, forest at its foot to snow on its
+	#summit. An eruption's frozen lava and the ground a pyroclastic flow burns take the bare
+	#highland's biome as they are made. New worlds only for the ground made with the world;
+	#the mod's own world types only.
+	volcanoPaintsBiome = true
 	#Let the soil show what rock it weathered out of.
 	#Soil is the rotted top of whatever is underneath it, and its colour is the
 	#clearest single clue about what a place is made of: iron-rich rock like

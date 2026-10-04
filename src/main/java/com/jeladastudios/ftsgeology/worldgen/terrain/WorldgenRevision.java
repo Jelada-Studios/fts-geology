@@ -46,8 +46,13 @@ public final class WorldgenRevision {
     public static final int GREENER_GROUND = 6;
     /** A volcanic arc belted by height as a fold belt is, forest at its foot to snow on its summits (FtN round). */
     public static final int VOLCANIC_BELTS = 7;
+    /**
+     * A large volcano's own ground (round 132): its crater, young lava and the fresh ash downwind of a live one the bare
+     * volcanic highland, the rest of its body belted by height wherever it stands, a shield in a wet arc grassed.
+     */
+    public static final int VOLCANO_GROUND = 8;
     /** What a world made now gets. */
-    public static final int CURRENT = 7;
+    public static final int CURRENT = 8;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;
