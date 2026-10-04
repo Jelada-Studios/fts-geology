@@ -413,6 +413,16 @@ public final class VolcanoField {
                 gen.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, rs)};
     }
 
+    /** Whether a cell is worked out already, or being worked out. */
+    static boolean known(int cx, int cz) {
+        return CACHE.containsKey(((long) cx << 32) ^ (cz & 0xFFFFFFFFL));
+    }
+
+    /** Works a cell out now, on the thread asking, so that it is there when a chunk wants it. See VolcanoCellPrewarm. */
+    static void warm(ServerLevel level, int cx, int cz) {
+        cell(level, cx, cz);
+    }
+
     private static Cell cell(ServerLevel level, int cx, int cz) {
         long key = ((long) cx << 32) ^ (cz & 0xFFFFFFFFL);
         CompletableFuture<Cell> hit = CACHE.get(key);
