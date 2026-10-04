@@ -18,7 +18,7 @@
       "tick_delay": 6000
     },
     "sky_color": 8560639,
-    "water_color": 4159204,
+    "water_color": 5219256,
     "water_fog_color": 329011
   },
   "features": [
@@ -78,11 +78,7 @@
       "minecraft:glow_lichen",
       "minecraft:trees_windswept_hills",
       "minecraft:flower_default",
-      "minecraft:patch_grass_badlands",
-      "minecraft:brown_mushroom_normal",
-      "minecraft:red_mushroom_normal",
-      "minecraft:patch_sugar_cane",
-      "minecraft:patch_pumpkin"
+      "minecraft:patch_grass_taiga_2"
     ],
     [
       "minecraft:freeze_top_layer"

@@ -9,8 +9,8 @@
   "downfall": 0.35,
   "effects": {
     "fog_color": 11051934,
-    "foliage_color": 7241546,
-    "grass_color": 8031060,
+    "foliage_color": 4885044,
+    "grass_color": 5938750,
     "mood_sound": {
       "block_search_extent": 8,
       "offset": 2.0,
@@ -18,7 +18,7 @@
       "tick_delay": 6000
     },
     "sky_color": 9349320,
-    "water_color": 4159204,
+    "water_color": 3108467,
     "water_fog_color": 329011
   },
   "features": [
@@ -79,11 +79,7 @@
       "minecraft:trees_windswept_hills",
       "minecraft:trees_taiga",
       "minecraft:flower_default",
-      "minecraft:patch_grass_badlands",
-      "minecraft:brown_mushroom_normal",
-      "minecraft:red_mushroom_normal",
-      "minecraft:patch_sugar_cane",
-      "minecraft:patch_pumpkin"
+      "minecraft:patch_grass_plain"
     ],
     [
       "minecraft:freeze_top_layer"
