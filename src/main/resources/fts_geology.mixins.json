@@ -16,6 +16,9 @@
     "FarmlandSaltMixin",
     "LevelWeatherMixin",
     "ServerLevelWeatherMixin",
+    "EntityRainContextMixin",
+    "PlayerRainContextMixin",
+    "BlockEntityRainContextMixin",
     "DieselOilChunksMixin",
     "AbstractFurnaceAccessor"
   ],

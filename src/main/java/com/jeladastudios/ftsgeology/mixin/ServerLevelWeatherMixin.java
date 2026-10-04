@@ -19,6 +19,8 @@ public abstract class ServerLevelWeatherMixin {
     @Inject(method = "tickChunk", at = @At("HEAD"))
     private void fts_geology$chunkWeather(LevelChunk chunk, int randomTickSpeed, CallbackInfo ci) {
         ServerLevel level = (ServerLevel) (Object) this;
+        // No entity is ticking now; one whose tick a mod cut short may have left its place standing.
+        com.jeladastudios.ftsgeology.weather.RainContext.reset();
         if (!Storms.on(level)) return;
         int x = chunk.getPos().getMiddleBlockX(), z = chunk.getPos().getMiddleBlockZ();
         LocalWeather.CHUNK.set(new float[]{Storms.intensityAt(level, x, z), Storms.thunderAt(level, x, z)});
