@@ -4,14 +4,18 @@ import com.simibubi.create.content.kinetics.base.DirectionalKineticBlock;
 import com.simibubi.create.foundation.block.IBE;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
+
+import java.util.List;
 
 /**
  * The crankshaft's end and its bearing, set on a gas engine at either end of its flywheel's axle: the engine then turns
@@ -43,6 +47,12 @@ public class CrankshaftBlock extends DirectionalKineticBlock implements IBE<Cran
             case UP -> UP;
             case DOWN -> DOWN;
         };
+    }
+
+    /** Its own item, from code: a loot table for a block that is only there with Create fails to load without it. */
+    @Override
+    public List<ItemStack> getDrops(BlockState state, LootParams.Builder params) {
+        return List.of(new ItemStack(this));
     }
 
     @Override
