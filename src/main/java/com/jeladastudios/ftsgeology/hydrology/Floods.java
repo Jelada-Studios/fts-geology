@@ -79,6 +79,23 @@ public final class Floods {
 
     static final class Store extends SavedData {
         final List<Surge> all = new ArrayList<>();
+        /** Every block of water the surges hold, for the question asked of each river column; made again after a change. */
+        private LongOpenHashSet index;
+
+        LongOpenHashSet index() {
+            if (index == null) {
+                LongOpenHashSet made = new LongOpenHashSet();
+                for (Surge s : all) for (LongArrayList layer : s.layers) made.addAll(layer);
+                index = made;
+            }
+            return index;
+        }
+
+        /** The surges' water changed: saved, and the index made again when next asked. */
+        void changed() {
+            index = null;
+            setDirty();
+        }
 
         static Store load(CompoundTag tag) {
             Store s = new Store();
@@ -109,12 +126,7 @@ public final class Floods {
         if (!floodWater(level.getBlockState(pos))) return false;
         if (HydraulicsHooks.owns(level, pos.getX() >> 4, pos.getZ() >> 4)) return false;
         Store st = level.getDataStorage().get(Store::load, "fts_geology_floods");
-        if (st == null) return false;
-        long k = pos.asLong();
-        for (Surge s : st.all) {
-            for (LongArrayList layer : s.layers) if (layer.contains(k)) return true;
-        }
-        return false;
+        return st != null && !st.all.isEmpty() && st.index().contains(pos.asLong());
     }
 
     public static void clear() {
@@ -222,7 +234,7 @@ public final class Floods {
         s.why = why;
         Store st = store(level);
         st.all.add(s);
-        st.setDirty();
+        st.changed();
         laid += n;
         surges++;
         com.jeladastudios.ftsgeology.util.Diagnostics.info("flood ({}): {} blocks of water in {} layers, going in {} s ({} ms)", why, n, s.layers.size(), holdTicks / 20,
@@ -244,12 +256,12 @@ public final class Floods {
         Store st = level.getDataStorage().get(Store::load, "fts_geology_floods");
         if (st == null || st.all.isEmpty()) return;
         long now = level.getGameTime();
-        if (HydraulicsHooks.active(level) && handOver(level, st)) st.setDirty();
+        if (HydraulicsHooks.active(level) && handOver(level, st)) st.changed();
         st.all.removeIf(s -> {
             if (s.layers.stream().allMatch(LongArrayList::isEmpty)) return true;
             if (now < s.recedeAt) return false;
             recede(level, s);
-            st.setDirty();
+            st.changed();
             if (s.layers.isEmpty()) {
                 com.jeladastudios.ftsgeology.util.Diagnostics.info("flood ({}) gone", s.why);
                 return true;

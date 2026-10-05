@@ -74,6 +74,18 @@ public final class FtsGeologyApi {
     public record River(double distance, double halfWidth, double water, double flowX, double flowZ, boolean lake) {}
 
     /**
+     * Whether the river at a column runs underground there, in a cave under a dry valley (the {@code sunk} of
+     * {@link #channel}): over it the valley floor is dry ground, not a river's bank. As cheap as {@link #river} and
+     * asked the same way, for world generation. False where no channel reaches the column within {@code within}
+     * blocks past its bed, in a lake, or outside the mod's world.
+     */
+    public static boolean riverSunk(int x, int z, double within) {
+        if (!RiverNetwork.ready()) return false;
+        RiverNetwork.At a = RiverNetwork.at(x, z);
+        return a.distance() != Double.MAX_VALUE && a.within(within) && !a.lake() && a.sunk();
+    }
+
+    /**
      * What the plates make of a column, by name: {@code fold_belt}, {@code volcanic_arc}, {@code rift}, ... as the
      * mod's {@code /geology terrain here} names them; {@code none} outside the mod's world.
      */
@@ -176,11 +188,16 @@ public final class FtsGeologyApi {
      * @param capped      whether the catchment is past the network's count, and the discharge only "at least"
      * @param baseFactor  the season and the region's spell over the catchment now (1 on average), see {@link #forcing}
      * @param stormFactor the catchment's quick rise in a heavy rain on soaked ground now (1 with no rain)
+     * @param lakeArea    the lake's water surface, blocks squared, the same in every column of it whatever is loaded;
+     *                    0 outside one
+     * @param lakeOwnDischarge what the lake's own ground gives, m^3/s: its {@link InflowKind#LAKE_OUTLET} source's
+     *                    discharge, the same in every column of it (the rivers into the lake bring theirs on their own,
+     *                    and {@code discharge} is all that leaves it); 0 outside one, or for a lake no river leaves
      */
     public record Channel(double distance, double halfWidth, double water, double bed, double flowX, double flowZ,
                           boolean lake, long lakeId, double lakeLevel, boolean lakeOutlet, boolean head, double fromHead,
                           boolean sunk, double discharge, double catchment, boolean capped, double baseFactor,
-                          double stormFactor) {}
+                          double stormFactor, double lakeArea, double lakeOwnDischarge) {}
 
     /** An answer about a channel: the channel itself only where {@code status} is PRESENT. */
     public record ChannelAnswer(Status status, Channel channel) {}
@@ -210,7 +227,8 @@ public final class FtsGeologyApi {
         }
         return new ChannelAnswer(Status.PRESENT, new Channel(a.distance(), a.halfWidth(), a.water(), a.bed(), a.flowX(),
                 a.flowZ(), a.lake(), a.lakeId(), a.lakeLevel(), a.lakeOutlet(), a.head(), a.fromHead(), a.sunk(),
-                a.discharge(), a.catchment(), a.capped(), a.baseFactor(), a.stormFactor()));
+                a.discharge(), a.catchment(), a.capped(), a.baseFactor(), a.stormFactor(), a.lakeArea(),
+                a.lakeOwnDischarge()));
     }
 
     /** Where water comes into the river network, or leaves it. */
@@ -316,7 +334,8 @@ public final class FtsGeologyApi {
     /**
      * Whether a block is water the mod laid for a while and will take back: a flood over a river's banks, a river's
      * seasonal high water, a rain pond in a hollow. River water ({@code fts_geology:river_water}) all of it, not vanilla
-     * water. The thin puddle of a rain shower is its own block ({@code fts_geology:puddle}), not a fluid. Server thread.
+     * water. The thin puddle of a rain shower is its own block ({@code fts_geology:puddle}), not a fluid. Server thread;
+     * cheap enough to ask of every river column read.
      */
     public static boolean isFloodWater(ServerLevel level, BlockPos pos) {
         return com.jeladastudios.ftsgeology.hydrology.Floods.isFloodWater(level, pos);

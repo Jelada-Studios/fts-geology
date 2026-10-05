@@ -485,6 +485,26 @@ final class RiverPieces {
             return raw(gi, gk) > 0;
         }
 
+        /**
+         * The lake's water surface, blocks squared: every column under its water, as {@link #depthAt} reads it -- the
+         * columns a question about the rivers calls this lake's. Worked out once.
+         */
+        double area() {
+            double a = area;
+            if (a < 0) {
+                long n = 0;
+                if (wi > 0) {
+                    int x0 = (gi0 - 1) * grid, x1 = (gi0 + wi) * grid, z0 = (gk0 - 1) * grid, z1 = (gk0 + wk) * grid;
+                    for (int z = z0; z <= z1; z++) for (int x = x0; x <= x1; x++) if (depthAt(x, z) > 0) n++;
+                }
+                a = n;
+                area = a;
+            }
+            return a;
+        }
+
+        private volatile double area = -1;
+
         /** How far the nearest water is from here, looking no further than {@code reach}; MAX_VALUE where none is. */
         double distanceToWater(double x, double z, double reach) {
             double[] w = nearestWater(x, z, reach);

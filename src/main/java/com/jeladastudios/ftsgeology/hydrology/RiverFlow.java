@@ -321,6 +321,14 @@ public final class RiverFlow {
         return Long.MIN_VALUE;
     }
 
+    /** What a lake's own ground gives, m^3/s: its way out's LAKE_OUTLET source; 0 for a lake no river leaves. */
+    static double lakeOwn(ServerLevel level, long lakeOwner) {
+        long out = lakeOutlet(lakeOwner);
+        if (out == Long.MIN_VALUE) return 0;
+        for (Source s : drawing(level, out).sources) if (s.kind() == Kind.LAKE_OUTLET) return s.discharge();
+        return 0;
+    }
+
     /** The water that comes in or leaves in a chunk, from every node whose cell may reach into it. */
     static List<Source> sourcesIn(ServerLevel level, int cx, int cz) {
         DrainageLattice lat = RiverNetwork.lattice();
@@ -375,10 +383,10 @@ public final class RiverFlow {
     public record Asked(int status, double distance, double halfWidth, double water, double bed, double flowX, double flowZ,
                         boolean lake, long lakeId, double lakeLevel, boolean lakeOutlet, boolean head, double fromHead,
                         boolean sunk, double discharge, double catchment, boolean capped, double baseFactor,
-                        double stormFactor) {}
+                        double stormFactor, double lakeArea, double lakeOwnDischarge) {}
 
     private static Asked only(int status) {
-        return new Asked(status, 0, 0, 0, 0, 0, 0, false, 0L, 0, false, false, 0, false, 0, 0, false, 1, 1);
+        return new Asked(status, 0, 0, 0, 0, 0, 0, false, 0L, 0, false, false, 0, false, 0, 0, false, 1, 1, 0, 0);
     }
 
     private static double finite(double v, double or) {
@@ -409,9 +417,10 @@ public final class RiverFlow {
                 water = finite(water, lakeLevel);
                 bed = finite(bed, water - 2);
                 if (!Double.isFinite(water)) return only(ABSENT);
+                double area = m == null ? 0 : m.area(), own = m == null ? 0 : lakeOwn(level, m.owner);
                 return new Asked(PRESENT, finite(a.distance(), 0), finite(a.halfWidth(), 0), water, bed, 0, 0, true, lakeId,
                         lakeLevel, false, false, 0, false, finite(q, 0), out == Long.MIN_VALUE ? 0 : catchment(out),
-                        out != Long.MIN_VALUE && capped(out), finite(f[0], 1), finite(f[1], 1));
+                        out != Long.MIN_VALUE && capped(out), finite(f[0], 1), finite(f[1], 1), finite(area, 0), finite(own, 0));
             }
             RiverNetwork.Point p = RiverNetwork.nearest(x, z);
             if (RiverNetwork.cutShort()) return only(NOT_READY);
@@ -429,7 +438,7 @@ public final class RiverFlow {
             }
             return new Asked(PRESENT, finite(a.distance(), 0), finite(a.halfWidth(), 0), water, bed, fx, fz, false, 0L, 0,
                     outletWay(p), a.isHead(), finite(a.fromHead(), 0), a.sunk(), finite(dq[0], 0), catchment(p.node()),
-                    dq[1] > 0, finite(f[0], 1), finite(f[1], 1));
+                    dq[1] > 0, finite(f[0], 1), finite(f[1], 1), 0, 0);
         });
     }
 
@@ -453,7 +462,8 @@ public final class RiverFlow {
                 if (a.status() == ABSENT) { absent++; continue; }
                 present++;
                 double[] all = {a.distance(), a.halfWidth(), a.water(), a.bed(), a.flowX(), a.flowZ(), a.lakeLevel(),
-                        a.fromHead(), a.discharge(), a.catchment(), a.baseFactor(), a.stormFactor()};
+                        a.fromHead(), a.discharge(), a.catchment(), a.baseFactor(), a.stormFactor(), a.lakeArea(),
+                        a.lakeOwnDischarge()};
                 for (double v : all) if (!Double.isFinite(v)) { nan++; break; }
                 if (a.lake()) lakes++;
                 if (a.capped()) capped++;
