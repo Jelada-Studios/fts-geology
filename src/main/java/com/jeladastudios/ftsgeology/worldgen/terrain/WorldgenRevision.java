@@ -53,8 +53,12 @@ public final class WorldgenRevision {
     public static final int VOLCANO_GROUND = 8;
     /** The ledges of a wet cliff under the tree line green, a shelf level with the ground beside it (round 132). */
     public static final int GREEN_LEDGES = 9;
+    /** A beach only at the water: ground the climate called beach well over the sea is the land beside it (round 135). */
+    public static final int HIGH_BEACHES = 10;
+    /** A river ending on the shore short of the sea cut on through the strip of sand to the water (round 135). */
+    public static final int MOUTH_BERMS = 11;
     /** What a world made now gets. */
-    public static final int CURRENT = 9;
+    public static final int CURRENT = 11;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;

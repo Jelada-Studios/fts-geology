@@ -150,7 +150,7 @@ final class RiverPieces {
     final LongAdder channels = new LongAdder(), joins = new LongAdder(), fallbacks = new LongAdder(),
             dams = new LongAdder(), gorges = new LongAdder(), eyes = new LongAdder(), pools = new LongAdder(), inlets = new LongAdder(), inletOpen = new LongAdder(), inletBig = new LongAdder(), inletShut = new LongAdder(), bankClamps = new LongAdder(), lakeMasks = new LongAdder(), sinks = new LongAdder(),
             mouths = new LongAdder(), dryJoins = new LongAdder(), gridReads = new LongAdder(), backwater = new LongAdder(),
-            sunk = new LongAdder(), plainLakes = new LongAdder();
+            sunk = new LongAdder(), plainLakes = new LongAdder(), berms = new LongAdder();
 
     RiverPieces(DrainageLattice lat, DrainageLattice.Ground ground, double horizontal, int areaMin) {
         this.lat = lat;
@@ -584,9 +584,57 @@ final class RiverPieces {
                 List<RiverNetwork.Point> cut = inlet(out.get(out.size() - 1));
                 out.addAll(cut);
                 segments(cut, segs);
+                if (com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.has(
+                        com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.MOUTH_BERMS)) {
+                    List<RiverNetwork.Point> through = berm(out.get(out.size() - 1));
+                    out.addAll(through);
+                    segments(through, segs);
+                }
             }
         }
         return out.toArray(NONE);
+    }
+
+    /**
+     * How far on a river that ends on dry ground looks for the sea, and how far over the sea the ground in between may
+     * stand, in blocks at the normal world's layout; the turns either side of its way it looks along, in degrees.
+     */
+    static final double BERM_REACH = 24.0, BERM_RISE = 3.0;
+    private static final double[] BERM_TURNS = {0.0, 20.0, -20.0, 40.0, -40.0};
+
+    /**
+     * Where a river came out on the shore short of the water: the lattice reads the raw ground, which lies under the sea
+     * there, but the ground once built stands a block or two over it in a strip of sand between the river's end and the
+     * waves, and the river ended in a pond short of the sea. On the way it ran, or a little to either side, over ground
+     * no more than a few blocks over the sea, to the first water: a way cut through the strip at the sea's level. Nothing
+     * where its end is in water already, or no water lies near.
+     */
+    private List<RiverNetwork.Point> berm(RiverNetwork.Point last) {
+        double ex = last.ex(), ez = last.ez();
+        if (ground.wet((int) Math.floor(ex), (int) Math.floor(ez))) return List.of();
+        double dx = ex - last.x(), dz = ez - last.z(), len = Math.hypot(dx, dz);
+        if (len < 1e-6) return List.of();
+        dx /= len;
+        dz /= len;
+        double reach = BERM_REACH * h, rise = lat.sea + BERM_RISE;
+        for (double turn : BERM_TURNS) {
+            double a = Math.toRadians(turn);
+            double wx = dx * Math.cos(a) - dz * Math.sin(a), wz = dx * Math.sin(a) + dz * Math.cos(a);
+            for (double t = 2.0; t <= reach; t += 2.0) {
+                double px = ex + wx * t, pz = ez + wz * t;
+                if (read(px, pz) > rise) break;          // a hill on the way, not a strip of sand
+                if (!ground.wet((int) Math.floor(px), (int) Math.floor(pz))) continue;
+                // A little way into the water, so the cut opens on it.
+                List<double[]> way = new ArrayList<>();
+                way.add(new double[]{ex, ez});
+                way.add(new double[]{ex + wx * (t + 2.0), ez + wz * (t + 2.0)});
+                berms.increment();
+                // At the river's own last level or the sea's, whichever is lower, as through a lagoon's bar.
+                double w = Math.min(lat.sea, last.waterEnd());
+                return tag(lay(way, w, w, w, last.fromHead(), last.halfWidth(), JOIN, w, 0), last.node());
+            }
+        }
+        return List.of();
     }
 
     /**

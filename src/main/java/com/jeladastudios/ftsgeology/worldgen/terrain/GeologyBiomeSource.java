@@ -194,6 +194,13 @@ public class GeologyBiomeSource extends BiomeSource {
                 sea = false;
             }
         }
+        // The climate lays its beach where its own coast falls, and the ground does not keep to it: sand up a hillside
+        // over the sea, or a field's width inland. A beach is the strip at the water; ground well over the sea is the
+        // land beside it. Only in worlds made since, for the seams.
+        if (!sea && TfcCompat.beach(base) && !underground(base) && WorldgenRevision.has(WorldgenRevision.HIGH_BEACHES)) {
+            Holder<Biome> land = highBeach(qx, qz, sampler);
+            if (land != null) base = land;
+        }
         if (!sea && !underground(base)) {
             boolean onChannel = river != null
                     && com.jeladastudios.ftsgeology.hydrology.RiverNetwork.onRiver(bx, bz, ON_CHANNEL);
@@ -367,28 +374,52 @@ public class GeologyBiomeSource extends BiomeSource {
         int bx = QuartPos.toBlock(qx) + 2, bz = QuartPos.toBlock(qz) + 2;
         if (RawGround.ready()) {
             double h = RawGround.heightAt(bx, bz);
-            if (h > COAST_LOW && !RawGround.wet(bx, bz)) {
-                int qy = QuartPos.fromBlock((int) Math.max(h, SEA_LEVEL) + 2);
-                // The climate's own coast is a strip of shore between its sea and its land; this ground is past it, on
-                // the land side of the real water, so it is the land beyond the strip. A shore only if there is no other.
-                Holder<Biome> shore = null;
-                search:
-                for (int r : INLAND) {
-                    for (int[] w : WAYS) {
-                        Holder<Biome> near = parent.getNoiseBiome(qx + w[0] * r, qy, qz + w[1] * r, sampler);
-                        if (TfcCompat.ocean(near) || TfcCompat.river(near) || TfcCompat.beach(near) || underground(near)) continue;
-                        if (!shoreline(near)) {
-                            land = near;
-                            break search;
-                        }
-                        if (shore == null) shore = near;
-                    }
-                }
-                if (land == null) land = shore;
-            }
+            if (h > COAST_LOW && !RawGround.wet(bx, bz)) land = landBeside(qx, qz, h, sampler);
         }
         coasts.put(key, new Coast(land));
         return land;
+    }
+
+    /** How far over the sea, in blocks, the climate's beach may stand and still be a beach. */
+    private static final double BEACH_RISE = 4.0;
+
+    private final com.jeladastudios.ftsgeology.util.ColumnCache<Coast> beaches = new com.jeladastudios.ftsgeology.util.ColumnCache<>(14);
+
+    /**
+     * The land biome for a column the climate calls beach whose ground stands dry and well over the sea, or null where it
+     * is a beach indeed (or no land lies near). The land is found as a dry coast's is.
+     */
+    private Holder<Biome> highBeach(int qx, int qz, Climate.Sampler sampler) {
+        long key = com.jeladastudios.ftsgeology.util.ColumnCache.key(qx, qz);
+        Coast known = beaches.get(key);
+        if (known != null) return known.land();
+        Holder<Biome> land = null;
+        int bx = QuartPos.toBlock(qx) + 2, bz = QuartPos.toBlock(qz) + 2;
+        if (RawGround.ready()) {
+            double h = RawGround.heightAt(bx, bz);
+            if (h >= SEA_LEVEL + BEACH_RISE && !RawGround.wet(bx, bz)) land = landBeside(qx, qz, h, sampler);
+        }
+        beaches.put(key, new Coast(land));
+        return land;
+    }
+
+    /**
+     * The land the climate puts nearest a column standing at {@code h}, read at that height: the climate's own coast is a
+     * strip of shore between its sea and its land, and ground past it on the land side of the real water is the land
+     * beyond the strip. A shore only if there is no other; null if there is none either.
+     */
+    private Holder<Biome> landBeside(int qx, int qz, double h, Climate.Sampler sampler) {
+        int qy = QuartPos.fromBlock((int) Math.max(h, SEA_LEVEL) + 2);
+        Holder<Biome> shore = null;
+        for (int r : INLAND) {
+            for (int[] w : WAYS) {
+                Holder<Biome> near = parent.getNoiseBiome(qx + w[0] * r, qy, qz + w[1] * r, sampler);
+                if (TfcCompat.ocean(near) || TfcCompat.river(near) || TfcCompat.beach(near) || underground(near)) continue;
+                if (!shoreline(near)) return near;
+                if (shore == null) shore = near;
+            }
+        }
+        return shore;
     }
 
     /** A coast's own biome that is not tagged a beach: vanilla's stony shore, a terrain mod's rocky or gravel shores. */

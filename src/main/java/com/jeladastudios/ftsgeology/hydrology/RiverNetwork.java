@@ -765,10 +765,10 @@ public final class RiverNetwork {
         if (l == null || pc == null) return "no river network";
         return String.format(Locale.ROOT,
                 "%d channel nodes (%d joins, %d with nothing to join, %d not traced, %d dam samples, %d gorge lengths, %d spring eyes, %d inlets cut through a bar (%d open, %d big, %d shut), %d plunge pools, %d backwater points, %d held under a "
-                        + "bank), %d lakes drawn (%d on a plain cut through), %d mouths, %d sinks, %d cells sunk into a cave; %d hollows (%d closed), %d lakes, %d ground reads "
+                        + "bank), %d lakes drawn (%d on a plain cut through), %d mouths (%d cut through a berm), %d sinks, %d cells sunk into a cave; %d hollows (%d closed), %d lakes, %d ground reads "
                         + "and %d on the grid; %d squares in %.0f ms, slowest %.0f ms",
                 pc.channels.sum(), pc.joins.sum(), pc.dryJoins.sum(), pc.fallbacks.sum(), pc.dams.sum(), pc.gorges.sum(), pc.eyes.sum(), pc.inlets.sum(), pc.inletOpen.sum(), pc.inletBig.sum(), pc.inletShut.sum(), pc.pools.sum(), pc.backwater.sum(),
-                pc.bankClamps.sum(), pc.lakeMasks.sum(), pc.plainLakes.sum(), pc.mouths.sum(), pc.sinks.sum(), pc.sunk.sum(), l.pitsFoundCount(),
+                pc.bankClamps.sum(), pc.lakeMasks.sum(), pc.plainLakes.sum(), pc.mouths.sum(), pc.berms.sum(), pc.sinks.sum(), pc.sunk.sum(), l.pitsFoundCount(),
                 l.closedCount(), l.lakesCount(), l.readsCount(), pc.gridReads.sum(), SQUARES.sum(),
                 SQUARE_NANOS.sum() / 1e6, SLOWEST.get() / 1e6);
     }

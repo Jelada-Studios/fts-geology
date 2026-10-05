@@ -343,7 +343,8 @@ public final class FtsGeologyApi {
     /**
      * Which of the mod's terrain revisions a world was made with: a world keeps the ground of the version that made it,
      * and new ground in it is laid as then. 0 outside the mod's world. Changes this API names: 7 the volcanic arcs belted
-     * by height (wet arcs no longer {@code volcanic_highland}), 8 the large volcanoes' own ground, 9 green ledges.
+     * by height (wet arcs no longer {@code volcanic_highland}), 8 the large volcanoes' own ground, 9 green ledges, 10 no
+     * beach well over the sea, 11 rivers cut on through a strip of sand to the sea.
      */
     public static int worldgenRevision(ServerLevel level) {
         return isGeologyWorld(level) ? com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.revision() : 0;
