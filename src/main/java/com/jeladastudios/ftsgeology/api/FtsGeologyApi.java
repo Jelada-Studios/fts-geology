@@ -335,10 +335,7 @@ public final class FtsGeologyApi {
     public static boolean flowing(ServerLevel level, BlockPos pos) {
         FluidState f = level.getFluidState(pos);
         if (!(f.getType() instanceof com.jeladastudios.ftsgeology.fluid.RiverWaterFluid)) return false;
-        net.minecraft.world.phys.Vec3 v = com.jeladastudios.ftsgeology.hydrology.HydraulicsHooks.flow(level, pos, f);
-        if (v != null) return v.horizontalDistanceSqr() > 0.05 * 0.05;
-        return f.hasProperty(com.jeladastudios.ftsgeology.fluid.RiverWaterFluid.FLOW)
-                && f.getValue(com.jeladastudios.ftsgeology.fluid.RiverWaterFluid.FLOW) != 0;
+        return com.jeladastudios.ftsgeology.fluid.RiverWaterFluid.runningWay(level, pos, f) != 0;
     }
 
     // === Version 2: the world and the weather ================================
@@ -352,17 +349,34 @@ public final class FtsGeologyApi {
         return isGeologyWorld(level) ? com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.revision() : 0;
     }
 
-    /** The wind at a place, blocks a second, towards +x and +z: round the highs and lows, gusts not counted. Server thread. */
+    /**
+     * Whether the mod's regional weather runs in a level: its storms, highs and lows. Only the overworld, with
+     * {@code regionalRain} on and not under TerraFirmaCraft. Where it does not, {@link #rainAt} is the level's one
+     * weather and {@link #windAt} the prevailing wind alone. Any thread.
+     */
+    public static boolean weatherActive(ServerLevel level) {
+        return com.jeladastudios.ftsgeology.weather.Storms.on(level);
+    }
+
+    /**
+     * The wind at a place, blocks a second, towards +x and +z: round the highs and lows, gusts not counted. In the
+     * overworld without {@link #weatherActive regional weather}, the prevailing wind alone; none in any other level.
+     * Server thread.
+     */
     public static net.minecraft.world.phys.Vec3 windAt(ServerLevel level, double x, double z) {
+        if (!net.minecraft.world.level.Level.OVERWORLD.equals(level.dimension())) return net.minecraft.world.phys.Vec3.ZERO;
         double[] w = com.jeladastudios.ftsgeology.weather.Atmosphere.wind(level, x, z);
         return new net.minecraft.world.phys.Vec3(w[0] * 20.0, 0, w[1] * 20.0);
     }
 
     /**
      * How hard it rains at a place, 0 to 1, by the regional storms. On the server thread, now and with the lift over
-     * the hills; on another thread, as the storms stood at their last copy (every five seconds), without it.
+     * the hills; on another thread, as the storms stood at their last copy (every five seconds), without it. Where the
+     * {@link #weatherActive regional weather} does not run, on any thread, the level's one weather: a thunderstorm 1,
+     * rain 0.4, none 0.
      */
     public static double rainAt(ServerLevel level, int x, int z) {
+        if (!weatherActive(level)) return com.jeladastudios.ftsgeology.weather.Storms.worldRain(level);
         if (level.getServer().isSameThread()) return com.jeladastudios.ftsgeology.weather.Storms.intensityAt(level, x, z);
         return com.jeladastudios.ftsgeology.weather.Storms.sky().rain(x, z);
     }

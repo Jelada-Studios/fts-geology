@@ -124,7 +124,8 @@ public final class RiverFoamMesh {
                 if (y == Integer.MIN_VALUE || Math.abs(y - at.getY()) > HEIGHT_REACH) continue;
                 FluidState f = level.getFluidState(m.set(x, y, z));
                 if (!f.hasProperty(RiverWaterFluid.FLOW)) continue;
-                int flow = f.getValue(RiverWaterFluid.FLOW);
+                // A mod that runs the water says which way it runs (see the API's hydraulics).
+                int flow = RiverWaterFluid.runningWay(level, m.set(x, y, z), f);
                 Vec3 way = RiverWaterFluid.way(flow);
                 float a = foam(level, x, y, z, way, flow, rain, m);
                 boolean cold = level.getBiome(m.set(x, y, z)).value().coldEnoughToSnow(m);

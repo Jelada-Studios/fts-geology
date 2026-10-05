@@ -89,6 +89,12 @@ public final class HydraulicsHooks {
         clientFlow = f;
     }
 
+    /**
+     * The lowest a hook may draw a river block's water: vanilla's renderer takes a thousandth off the top of a face it
+     * draws and builds a shape that high, and a shape under nothing throws, taking the game down.
+     */
+    private static final float LOWEST_SURFACE = 0.01f;
+
     public static void clientSurface(com.jeladastudios.ftsgeology.api.SurfaceHeight s) {
         clientSurface = s;
     }
@@ -123,7 +129,7 @@ public final class HydraulicsHooks {
         if (s == null || !(state.getType() instanceof RiverWaterFluid)) return Float.NaN;
         try {
             float h = s.height(level, pos, state);
-            return Float.isFinite(h) ? Mth.clamp(h, 0f, 1f) : Float.NaN;
+            return Float.isFinite(h) ? Mth.clamp(h, LOWEST_SURFACE, 1f) : Float.NaN;
         } catch (RuntimeException e) {
             return Float.NaN;
         }

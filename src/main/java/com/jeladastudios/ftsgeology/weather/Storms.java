@@ -187,13 +187,18 @@ public final class Storms {
      * own thread, or where the rain is not regional, the world's one weather.
      */
     public static float intensityAt(ServerLevel level, int x, int z) {
-        if (!on(level) || !level.getServer().isSameThread()) return level.isRaining() ? (level.isThundering() ? 1f : 0.4f) : 0f;
+        if (!on(level) || !level.getServer().isSameThread()) return worldRain(level);
         refresh(level);
         long k = BlockPos.asLong(x >> 4, 0, z >> 4);
         float v = RAIN.getOrDefault(k, -1f);
         if (v >= 0) return v;
         work(level, x >> 4, z >> 4, k);
         return RAIN.get(k);
+    }
+
+    /** The level's one weather as a rain, 0 to 1: a thunderstorm 1, rain 0.4, none 0. Any thread. */
+    public static float worldRain(ServerLevel level) {
+        return level.isRaining() ? (level.isThundering() ? 1f : 0.4f) : 0f;
     }
 
     /** How much of a thunderstorm stands over a place, 0 to 1. */

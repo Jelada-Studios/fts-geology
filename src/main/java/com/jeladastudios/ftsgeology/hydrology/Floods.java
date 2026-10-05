@@ -107,6 +107,7 @@ public final class Floods {
      */
     public static boolean isFloodWater(ServerLevel level, BlockPos pos) {
         if (!floodWater(level.getBlockState(pos))) return false;
+        if (HydraulicsHooks.owns(level, pos.getX() >> 4, pos.getZ() >> 4)) return false;
         Store st = level.getDataStorage().get(Store::load, "fts_geology_floods");
         if (st == null) return false;
         long k = pos.asLong();
@@ -243,7 +244,9 @@ public final class Floods {
         Store st = level.getDataStorage().get(Store::load, "fts_geology_floods");
         if (st == null || st.all.isEmpty()) return;
         long now = level.getGameTime();
+        if (HydraulicsHooks.active(level) && handOver(level, st)) st.setDirty();
         st.all.removeIf(s -> {
+            if (s.layers.stream().allMatch(LongArrayList::isEmpty)) return true;
             if (now < s.recedeAt) return false;
             recede(level, s);
             st.setDirty();
@@ -253,6 +256,30 @@ public final class Floods {
             }
             return false;
         });
+    }
+
+    /**
+     * Gives the water left standing in the chunks a registered hydraulics runs over to it: forgotten, not taken back. The
+     * blocks stay as they are, theirs to drain; no mud, no news of it. A layer emptied stays in its place, so the one under
+     * it is still the bottom. True if any was given over.
+     */
+    private static boolean handOver(ServerLevel level, Store st) {
+        it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap owned = new it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap();
+        int given = 0;
+        for (Surge s : st.all) {
+            for (LongArrayList layer : s.layers) {
+                int before = layer.size();
+                layer.removeIf((long k) -> {
+                    int x = BlockPos.getX(k) >> 4, z = BlockPos.getZ(k) >> 4;
+                    long c = net.minecraft.world.level.ChunkPos.asLong(x, z);
+                    if (!owned.containsKey(c)) owned.put(c, HydraulicsHooks.owns(level, x, z));
+                    return owned.get(c);
+                });
+                given += before - layer.size();
+            }
+        }
+        if (given > 0) com.jeladastudios.ftsgeology.util.Diagnostics.info("floods: {} blocks of standing water given over to the hydraulics", given);
+        return given > 0;
     }
 
     /** Takes back the top layer of a surge, where its ground is loaded; the rest of it waits. */

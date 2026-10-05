@@ -108,7 +108,7 @@ public final class RiverForcing {
         double spell = 0.5 + wet;
         Cellwise c = CELLS.get(ChunkPos.asLong(bx >> 4, bz >> 4));
         double soaked = c != null && c.soaked() >= 0 ? c.soaked() : 0.3 + 0.6 * wet;
-        double rain = Storms.sky().rain(x, z);
+        double rain = Storms.on(level) ? Storms.sky().rain(x, z) : Storms.worldRain(level);
         double storm = 1.0 + STORM_GAIN * rain * soaked;
         double drought = Mth.clamp((0.35 - wet) / 0.35, 0.0, 1.0);
         return new double[]{season * spell, storm, season, seasonal ? phase : 0.0, drought, seasonal ? 1 : 0};

@@ -35,6 +35,17 @@ public abstract class RiverWaterFluid extends ForgeFlowingFluid {
     /** How hard the current carries a player: a gentle drift, not the push of a waterfall. */
     private static final double CURRENT = 0.5;
 
+    /**
+     * The push for each block a second a registered hydraulics says the water runs. Vanilla adds 0.014 of the push a
+     * tick to a player in water, and a player there keeps 0.8 of the speed a tick: one lying still drifts at
+     * 0.014 / 0.2 = 0.07 blocks a tick, 1.4 a second, for each unit of push. The water's speed over 1.4 carries a player
+     * at the water's speed. Whatever else floats (an item, a boat, a fish) is pushed by the way of the push alone.
+     */
+    private static final double PUSH_PER_SPEED = 1.0 / 1.4;
+
+    /** Slower than this, blocks a second, a registered hydraulics' water stands. */
+    public static final double STILL = 0.05;
+
     protected RiverWaterFluid(Properties properties) {
         super(properties);
     }
@@ -102,10 +113,20 @@ public abstract class RiverWaterFluid extends ForgeFlowingFluid {
     public Vec3 getFlow(@Nonnull BlockGetter level, @Nonnull BlockPos pos, @Nonnull FluidState state) {
         // A mod that runs the rivers' water itself knows how it really runs (see HydraulicsHooks).
         Vec3 real = com.jeladastudios.ftsgeology.hydrology.HydraulicsHooks.flow(level, pos, state);
-        if (real != null) return real;
+        if (real != null) return real.scale(PUSH_PER_SPEED);
         Vec3 run = way(state.getValue(FLOW));
         if (state.hasProperty(FALLING) && state.getValue(FALLING)) return run.add(0.0, -6.0, 0.0).normalize();
         return run.scale(CURRENT);
+    }
+
+    /**
+     * Which way the river runs at a block, 0 (still) to 8 as {@link #FLOW} numbers them: by a registered hydraulics'
+     * flow where one runs the water (standing under {@link #STILL}), else the block's own.
+     */
+    public static int runningWay(BlockGetter level, BlockPos pos, FluidState state) {
+        Vec3 real = com.jeladastudios.ftsgeology.hydrology.HydraulicsHooks.flow(level, pos, state);
+        if (real != null) return real.horizontalDistanceSqr() > STILL * STILL ? wayOf(real.x, real.z) : 0;
+        return state.hasProperty(FLOW) ? state.getValue(FLOW) : 0;
     }
 
     /**

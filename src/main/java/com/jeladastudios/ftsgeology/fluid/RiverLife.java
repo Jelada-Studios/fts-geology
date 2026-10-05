@@ -46,7 +46,7 @@ public final class RiverLife {
             }
             return;
         }
-        if (!state.hasProperty(RiverWaterFluid.FLOW) || state.getValue(RiverWaterFluid.FLOW) == 0) return;
+        if (RiverWaterFluid.runningWay(level, pos, state) == 0) return;
         if (!level.getBlockState(pos.above()).isAir()) return;
         double top = pos.getY() + state.getHeight(level, pos) + 0.01;
         double x = pos.getX() + rnd.nextDouble(), z = pos.getZ() + rnd.nextDouble();

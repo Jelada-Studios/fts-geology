@@ -84,23 +84,25 @@ public final class RiverParticles {
                 return;
             }
             this.stranded = 0;
-            Vec3 flow = f.getFlow(this.level, at);
+            // Blocks a tick the surface carries a thing: a registered hydraulics' own speed, else from the push.
+            Vec3 real = com.jeladastudios.ftsgeology.hydrology.HydraulicsHooks.flow(this.level, at, f);
+            Vec3 carry = real != null ? real.scale(1.0 / 20.0) : f.getFlow(this.level, at).scale(CARRY * 2.0);
             boolean falling = f.hasProperty(net.minecraft.world.level.material.FlowingFluid.FALLING)
                     && f.getValue(net.minecraft.world.level.material.FlowingFluid.FALLING);
             if (falling) {
                 // Down the face of the step with the water, and a little forward.
                 this.y -= 0.18;
-                this.xd = flow.x * CARRY;
-                this.zd = flow.z * CARRY;
+                this.xd = carry.x * 0.5;
+                this.zd = carry.z * 0.5;
             } else {
                 // On the surface, carried at the water's pace; a still pool lets it drift to a stop.
                 float drawn = com.jeladastudios.ftsgeology.hydrology.HydraulicsHooks.surface(this.level, at, f);
                 double ty = at.getY() + (Float.isNaN(drawn) ? f.getHeight(this.level, at) : drawn) + 0.01;
                 this.y += (ty - this.y) * 0.5;
-                double tx = flow.x * CARRY * this.pace * 2.0, tz = flow.z * CARRY * this.pace * 2.0;
+                double tx = carry.x * this.pace, tz = carry.z * this.pace;
                 this.xd += (tx - this.xd) * 0.08 + (this.random.nextDouble() - 0.5) * 0.002;
                 this.zd += (tz - this.zd) * 0.08 + (this.random.nextDouble() - 0.5) * 0.002;
-                if (flow.lengthSqr() < 1e-6) {
+                if (carry.lengthSqr() < 1e-8) {
                     this.xd *= 0.96;
                     this.zd *= 0.96;
                 }
