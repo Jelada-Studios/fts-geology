@@ -41,6 +41,7 @@ public final class QuakeWrites {
         BlockState was = branch ? DynamicTreesFelling.quietly(() -> chunk.setBlockState(pos, state, false))
                 : chunk.setBlockState(pos, state, false);
         if (was == null) return false;
+        com.jeladastudios.ftsgeology.util.Falls.shaken(level, pos);
         com.jeladastudios.ftsgeology.hydrology.HydraulicsHooks.moved(level, pos.getX(), pos.getZ(), was, state,
                 com.jeladastudios.ftsgeology.api.RiverBlocksChangedEvent.Cause.QUAKE);
         BlockPos at = pos.immutable();   // the point of interest update runs later, and a mutable position moves on

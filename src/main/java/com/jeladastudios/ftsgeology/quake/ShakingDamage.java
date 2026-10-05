@@ -219,6 +219,7 @@ public final class ShakingDamage {
     }
 
     private static void fall(ServerLevel level, BlockPos pos, BlockState state) {
+        com.jeladastudios.ftsgeology.util.Falls.shaken(level, pos);
         if (DynamicTreesFelling.isBranch(state)) {
             // Over the way the ground threw it: any side.
             Direction side = Direction.Plane.HORIZONTAL.getRandomDirection(level.random);
