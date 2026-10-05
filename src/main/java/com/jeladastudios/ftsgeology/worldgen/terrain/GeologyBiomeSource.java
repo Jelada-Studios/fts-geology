@@ -194,6 +194,14 @@ public class GeologyBiomeSource extends BiomeSource {
                 sea = false;
             }
         }
+        // Terralith's sea cliff of columnar basalt falls where the climate puts a coast, whatever the rock: a low plain
+        // of grass over a rift's shale and sandstone came out bristling with basalt spires, a third of a coast. Columns
+        // are a thick lava flow cooling, so the cliff keeps to the coasts whose rock is basalt; elsewhere the coast is
+        // the shore round it. Only in worlds made since, for the seams.
+        if (!sea && !underground(base) && basaltCliffs(base) && WorldgenRevision.has(WorldgenRevision.BASALT_COASTS)) {
+            Holder<Biome> shore = otherShore(qx, qy, qz, sampler);
+            if (shore != null) base = shore;
+        }
         // The climate lays its beach where its own coast falls, and the ground does not keep to it: sand up a hillside
         // over the sea, or a field's width inland. A beach is the strip at the water; ground well over the sea is the
         // land beside it. Only in worlds made since, for the seams.
@@ -422,6 +430,80 @@ public class GeologyBiomeSource extends BiomeSource {
         return shore;
     }
 
+    private final com.jeladastudios.ftsgeology.util.ColumnCache<Coast> basaltShores = new com.jeladastudios.ftsgeology.util.ColumnCache<>(14);
+    /** How far out, in quarts, the shore a basalt cliff off basalt is given is looked for, nearest first. */
+    private static final int[] SHORE_RINGS = {2, 4, 8, 16, 32};
+
+    /**
+     * The shore for a column the climate calls a basalt cliff where the rock is not basalt, or null where it is (the
+     * cliff stays). The nearest beach or shore the climate puts round it that is not a basalt cliff; failing one, the
+     * stony shore; failing that, the land beside it.
+     */
+    private Holder<Biome> otherShore(int qx, int qy, int qz, Climate.Sampler sampler) {
+        long key = com.jeladastudios.ftsgeology.util.ColumnCache.key(qx, qz);
+        Coast known = basaltShores.get(key);
+        if (known != null) return known.land();
+        Holder<Biome> shore = null;
+        int bx = QuartPos.toBlock(qx) + 2, bz = QuartPos.toBlock(qz) + 2;
+        if (!basaltCoast(bx, bz)) {
+            search:
+            for (int r : SHORE_RINGS) {
+                for (int[] w : WAYS) {
+                    Holder<Biome> near = parent.getNoiseBiome(qx + w[0] * r, qy, qz + w[1] * r, sampler);
+                    if (basaltCliffs(near) || underground(near) || TfcCompat.ocean(near) || TfcCompat.river(near)) continue;
+                    if (TfcCompat.beach(near) || shoreline(near)) {
+                        shore = near;
+                        break search;
+                    }
+                }
+            }
+            if (shore == null) shore = stonyShore();
+            if (shore == null && RawGround.ready()) shore = landBeside(qx, qz, RawGround.heightAt(bx, bz), sampler);
+        }
+        basaltShores.put(key, new Coast(shore));
+        return shore;
+    }
+
+    /**
+     * Whether the rock at a coast is basalt: a mantle plume's flood basalts, the ocean crust of an island on an ocean
+     * plate, the lavas down the middle of a rift. An arc's andesite and tuff is not, nor a rift's sandstone shoulders.
+     */
+    static boolean basaltCoast(int x, int z) {
+        var c = com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.column(TerrainContext.seed(), TerrainContext.params(), x, z);
+        return switch (c.setting()) {
+            case HOTSPOT -> c.weight() >= 0.5;
+            case OCEAN_FLOOR -> true;
+            case RIFT -> c.weight() >= 0.5 && com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.coverDepth(c) >= RIFT_BASALT_FILL;
+            default -> false;
+        };
+    }
+
+    /** How deep a rift's fill has to be for its coast to be basalt: the axis, where the flows lie thickest. */
+    private static final int RIFT_BASALT_FILL = 30;
+
+    private volatile Holder<Biome> stony;
+    private volatile boolean stonyLooked;
+
+    /** Vanilla's stony shore, if the parent can give it; else any shore of its own. */
+    private Holder<Biome> stonyShore() {
+        if (!stonyLooked) {
+            Holder<Biome> any = null, found = null;
+            for (Holder<Biome> b : parent.possibleBiomes()) {
+                String id = b.unwrapKey().map(k -> k.location().toString()).orElse("");
+                if (id.equals("minecraft:stony_shore")) found = b;
+                else if (any == null && shoreline(b) && !basaltCliffs(b)) any = b;
+            }
+            stony = found != null ? found : any;
+            stonyLooked = true;
+        }
+        return stony;
+    }
+
+    /** Terralith's sea cliff of columnar basalt. */
+    private boolean basaltCliffs(Holder<Biome> biome) {
+        return (kindOf(biome) & BASALT_CLIFFS) != 0;
+    }
+
     /** A coast's own biome that is not tagged a beach: vanilla's stony shore, a terrain mod's rocky or gravel shores. */
     private static boolean shoreline(Holder<Biome> biome) {
         return biome.unwrapKey().map(k -> k.location().getPath().contains("shore")).orElse(false);
@@ -441,7 +523,7 @@ public class GeologyBiomeSource extends BiomeSource {
         return (kindOf(biome) & FROZEN) != 0;
     }
 
-    private static final int UNDERGROUND = 1, FROZEN = 2, MOUNTAIN = 4;
+    private static final int UNDERGROUND = 1, FROZEN = 2, MOUNTAIN = 4, BASALT_CLIFFS = 8;
 
     /** Whether a biome is one of vanilla's mountain ones, from the meadow up to the peaks. */
     private boolean mountain(Holder<Biome> biome) {
@@ -466,6 +548,7 @@ public class GeologyBiomeSource extends BiomeSource {
                     || p.equals("snowy_slopes") || p.endsWith("_peaks"))) bits |= MOUNTAIN;
             if (p.startsWith("snowy") || p.startsWith("frozen") || p.startsWith("ice")
                     || p.equals("grove") || p.equals("jagged_peaks")) bits |= FROZEN;
+            if (k.location().getNamespace().equals("terralith") && p.equals("basalt_cliffs")) bits |= BASALT_CLIFFS;
             return bits;
         }).orElse(0);
         kinds.put(biome, kind);

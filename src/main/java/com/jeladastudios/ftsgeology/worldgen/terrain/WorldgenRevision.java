@@ -59,8 +59,10 @@ public final class WorldgenRevision {
     public static final int MOUTH_BERMS = 11;
     /** A river's bed dug to where it was drawn where the noise left it standing higher under the water (round 136). */
     public static final int DRAWN_BEDS = 12;
+    /** Terralith's basalt cliffs only on a coast whose rock is basalt; elsewhere the shore round it (round 137). */
+    public static final int BASALT_COASTS = 13;
     /** What a world made now gets. */
-    public static final int CURRENT = 12;
+    public static final int CURRENT = 13;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;

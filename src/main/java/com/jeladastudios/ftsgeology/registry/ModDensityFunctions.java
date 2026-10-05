@@ -23,6 +23,10 @@ public final class ModDensityFunctions {
     public static final RegistryObject<Codec<? extends DensityFunction>> RIVERS =
             DENSITY_FUNCTIONS.register("rivers", () -> com.jeladastudios.ftsgeology.worldgen.terrain.RiverDensity.CODEC.codec());
 
+    /** Sea cliffs on a basalt coast. See {@link com.jeladastudios.ftsgeology.worldgen.terrain.CoastCliffs}. */
+    public static final RegistryObject<Codec<? extends DensityFunction>> COAST_CLIFFS =
+            DENSITY_FUNCTIONS.register("coast_cliffs", () -> com.jeladastudios.ftsgeology.worldgen.terrain.CoastCliffs.CODEC.codec());
+
     /** The plate model's continents, erosion, ridge factor and relief. See {@link PlateDensity}. */
     public static final RegistryObject<Codec<? extends DensityFunction>> PLATE =
             DENSITY_FUNCTIONS.register("plate", () -> PlateDensity.CODEC.codec());

@@ -1,3 +1,4 @@
+{"type":"minecraft:flat_cache","argument":{"type":"minecraft:cache_2d","argument":{"type":"fts_geology:coast_cliffs","argument":
 {
   "type": "minecraft:flat_cache",
   "argument": {
@@ -68,3 +69,5 @@
     }
   }
 }
+
+}}}
