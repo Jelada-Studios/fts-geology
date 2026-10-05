@@ -77,6 +77,8 @@ public final class RiverWater {
 
     /** Lake floor columns taken down to a block over their lowest neighbour. */
     private static final LongAdder EASED = new LongAdder();
+    /** Channel floors under the water dug down to the drawn floor ({@link WorldgenRevision#DRAWN_BEDS}). */
+    private static final LongAdder DEEPENED = new LongAdder();
     /** How many times a chunk's lake floor is eased: a step is taken down a block a pass, at most this many. */
     private static final int EASE_PASSES = 4;
 
@@ -162,6 +164,18 @@ public final class RiverWater {
                     }
                     g = bedY;
                     LEVELLED.increment();
+                } else if (!a.lake() && !mouth && WorldgenRevision.has(WorldgenRevision.DRAWN_BEDS)
+                        && g > Math.min(w - 1, (int) Math.round(a.floor()) - 1)) {
+                    // Under the water too the floor is the drawn one. The noise left most channel floors a block or two
+                    // over it, so the river held a block of water where its course had two or three: a mod that runs
+                    // the water read the drawn level over that floor and found a riffle a few tenths of a block deep,
+                    // too shallow to carry the river's own discharge even at critical flow. Where it cannot be dug,
+                    // the floor stays as it is.
+                    int bedY = level(level, at, x, z, g, w, a);
+                    if (bedY != Integer.MIN_VALUE) {
+                        g = bedY;
+                        DEEPENED.increment();
+                    }
                 }
                 // Nothing is poured over a hole: the block under the water has to be solid, or a cave under the bed is
                 // stopped up first.
@@ -228,9 +242,9 @@ public final class RiverWater {
         if (CHUNKS.incrementAndGet() % 100 == 0) {
             com.jeladastudios.ftsgeology.util.Diagnostics.info("River water over {} chunks: {} columns in a channel, {} kept, {} of them wet, "
                             + "{} levelled, {} let go, {} springs, {} blocks, {} banks built up, {} left as cliffs, "
-                            + "{} lake columns iced, {} glacier columns, {} hollows stopped up, {} steps hung with falling water, {} lake shore columns taken down, {} lake necks filled, {} plants cleared off the water, {} lake floor columns eased; {}; {}; {}",
+                            + "{} lake columns iced, {} glacier columns, {} hollows stopped up, {} steps hung with falling water, {} lake shore columns taken down, {} lake necks filled, {} plants cleared off the water, {} lake floor columns eased, {} floors under the water dug to the drawn floor; {}; {}; {}",
                     CHUNKS.get(), CANDIDATES.sum(), KEPT.sum(), WET.sum(), LEVELLED.sum(), DROPPED.sum(),
-                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(), PLUGGED.sum(), CURTAINS.sum(), SHORED.sum(), GAPS.sum(), REEDS.sum(), EASED.sum(),
+                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(), PLUGGED.sum(), CURTAINS.sum(), SHORED.sum(), GAPS.sum(), REEDS.sum(), EASED.sum(), DEEPENED.sum(),
                     RiverNetwork.summary(), GeologyChunkGenerator.summary(), SnowCover.summary() + "; " + SnowLineSpawns.summary() + "; " + KarstCaves.summary() + "; " + Dolines.summary());
         }
         return placed;
@@ -498,7 +512,10 @@ public final class RiverWater {
         // quarter of the bed columns on K2's rivers stood five to seven blocks over their water and were dropped,
         // which read as a river broken off and starting again further down.
         if (g - w > Math.round(LEVEL_SHAVE * RiverNetwork.horizontal())) return Integer.MIN_VALUE;
-        int bedY = Math.min(w - 1, (int) Math.floor(a.floor()));
+        // The top of the floor nearest the drawn one: the floor's top block under it. It used to be the block the drawn
+        // floor runs through, whose top stands up to a block over it -- half a block on average, a third of a rill.
+        int bedY = Math.min(w - 1, WorldgenRevision.has(WorldgenRevision.DRAWN_BEDS)
+                ? (int) Math.round(a.floor()) - 1 : (int) Math.floor(a.floor()));
         // A lake's shore taken down is a shelf under its water, not dug to the lake's bed: dug to the bed, it was a
         // trench along the shore with the ground left standing behind it a cliff above the water.
         if (a.lake()) bedY = Math.max(bedY, w - LAKE_SHELF);
@@ -538,8 +555,11 @@ public final class RiverWater {
         int deep = half >= 4.0 ? 2 : 1;
         for (int y = g; y > g - deep; y--) {
             BlockState was = level.getBlockState(at.set(x, y, z));
+            // An ore the cut came down on is covered too: no ore shows on the surface, a river's floor included. The floor
+            // dug to its drawn depth (DRAWN_BEDS) reached one in a column in seventy in the tall world's mountains.
+            boolean ore = was.is(net.minecraftforge.common.Tags.Blocks.ORES) && WorldgenRevision.has(WorldgenRevision.DRAWN_BEDS);
             if (!was.is(BlockTags.DIRT) && !was.is(BlockTags.BASE_STONE_OVERWORLD) && !was.is(BlockTags.TERRACOTTA)
-                    && !was.is(Blocks.SANDSTONE) && !was.is(Blocks.RED_SANDSTONE)) break;
+                    && !was.is(Blocks.SANDSTONE) && !was.is(Blocks.RED_SANDSTONE) && !ore) break;
             if (EruptionHandler.isPlayerPlaced(was)) break;
             // Sand and gravel fall: never over a hole.
             if (!level.getBlockState(at.set(x, y - 1, z)).isSolidRender(level, at)) break;

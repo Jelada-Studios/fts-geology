@@ -57,8 +57,10 @@ public final class WorldgenRevision {
     public static final int HIGH_BEACHES = 10;
     /** A river ending on the shore short of the sea cut on through the strip of sand to the water (round 135). */
     public static final int MOUTH_BERMS = 11;
+    /** A river's bed dug to where it was drawn where the noise left it standing higher under the water (round 136). */
+    public static final int DRAWN_BEDS = 12;
     /** What a world made now gets. */
-    public static final int CURRENT = 11;
+    public static final int CURRENT = 12;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;

@@ -684,6 +684,164 @@ public final class TerrainCommands {
         return 1;
     }
 
+    /**
+     * What the rivers round here can carry, as a mod that runs their water reads it: across the river every four blocks
+     * down its middle, the most the water the world holds could carry at critical flow (each wet column of the section
+     * {@code h * sqrt(g h)}, its depth in blocks), against the long-run discharge there. Loaded chunks only. Counts the
+     * sections that cannot carry it, and where they are: a lake's way out, a step's lip, elsewhere; and whether the
+     * drawing or the ground made them shallow.
+     */
+    public static int terrainRiversCapacity(CommandContext<CommandSourceStack> ctx, int half) {
+        ServerLevel level = ctx.getSource().getLevel();
+        BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+        if (!com.jeladastudios.ftsgeology.hydrology.RiverNetwork.ready()) {
+            ctx.getSource().sendSuccess(() -> Component.literal("No river network: this world type traces none."), false);
+            return 0;
+        }
+        String[] result = new String[1];
+        com.jeladastudios.ftsgeology.hydrology.RiverNetwork.mayWait(() -> result[0] = riversCapacity(level, at, half));
+        final String out = result[0];
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(out);
+        ctx.getSource().sendSuccess(() -> Component.literal(out), false);
+        return 1;
+    }
+
+    private static String riversCapacity(ServerLevel level, BlockPos at, int half) {
+        int sea = level.getSeaLevel();
+        double fromLake = 1.0e4, lakeReach = 4 * 8.0 * com.jeladastudios.ftsgeology.hydrology.RiverNetwork.horizontal();
+        java.util.List<Double> ratio = new java.util.ArrayList<>(), need = new java.util.ArrayList<>(), ratioApi = new java.util.ArrayList<>();
+        int looked = 0, under = 0, uLake = 0, uLip = 0, uOther = 0, uGround = 0, uDrawn = 0, uNarrow = 0, notReady = 0;
+        int underApi = 0, aLake = 0, aLip = 0, aOther = 0, aGround = 0, aDrawn = 0, columns = 0, groundHigh = 0;
+        java.util.List<String> egApi = new java.util.ArrayList<>();
+        int[] depthHist = new int[5];
+        java.util.List<String> eg = new java.util.ArrayList<>();
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        for (int x = (at.getX() - half) & ~3; x <= at.getX() + half; x += 4) {
+            for (int z = (at.getZ() - half) & ~3; z <= at.getZ() + half; z += 4) {
+                if (!level.hasChunkAt(x, z)) continue;
+                var a = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.at(x, z);
+                if (a.distance() > 0.75 || a.lake() || a.sunk() || a.water() < sea + 1) continue;
+                double fl = Math.hypot(a.fx(), a.fz());
+                if (!(fl > 0.5)) continue;
+                var c = com.jeladastudios.ftsgeology.api.FtsGeologyApi.channel(level, x, z, 0.0, -1L);
+                if (c.status() != com.jeladastudios.ftsgeology.api.FtsGeologyApi.Status.PRESENT) {
+                    notReady++;
+                    continue;
+                }
+                double q = c.channel().discharge();
+                if (!(q > 0.2)) continue;
+                double fx = a.fx() / fl, fz = a.fz() / fl, nx = -fz, nz = fx;
+                double cap = 0, centre = 0, capApi = 0, centreApi = 0;
+                boolean high = false;
+                int wet = 0;
+                for (int k = -20; k <= 20; k++) {
+                    int cx = (int) Math.round(x + k * nx), cz = (int) Math.round(z + k * nz);
+                    if (!level.hasChunkAt(cx, cz)) continue;
+                    double[] hb = columnWater(level, p, cx, cz, (int) Math.floor(a.water()) + 3);
+                    double h = hb[0];
+                    if (!(h > 0.01)) continue;
+                    wet++;
+                    cap += h * Math.sqrt(9.81 * h);
+                    if (k == 0) centre = h;
+                    // The same against the drawn water: the network's level here over the bed the world holds.
+                    var c2 = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.at(cx, cz);
+                    if (c2.distance() == Double.MAX_VALUE) continue;
+                    double hApi = Math.max(0.0, c2.water() - hb[1]);
+                    capApi += hApi * Math.sqrt(9.81 * hApi);
+                    if (k == 0) centreApi = hApi;
+                    columns++;
+                    // Over by more than a block: past what laying a floor in whole blocks can leave.
+                    if (!c2.lake() && hb[1] > c2.floor() + 1.0) {
+                        groundHigh++;
+                        if (Math.abs(k) <= 2) high = true;
+                    }
+                }
+                if (wet == 0) continue;
+                looked++;
+                ratio.add(cap / q);
+                ratioApi.add(capApi / q);
+                double perColumn = q / wet;
+                need.add(Math.cbrt(perColumn * perColumn / 9.81));
+                boolean lake = a.fromHead() >= fromLake && a.fromHead() < fromLake + lakeReach;
+                var down = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.at((int) Math.round(x + 8 * fx), (int) Math.round(z + 8 * fz));
+                boolean lip = down.distance() != Double.MAX_VALUE && Math.floor(down.water()) < Math.floor(a.water());
+                if (capApi < q) {
+                    underApi++;
+                    if (lake) aLake++;
+                    else if (lip) aLip++;
+                    else aOther++;
+                    if (high) aGround++;
+                    else aDrawn++;
+                    if (egApi.size() < 16) {
+                        egApi.add(String.format(Locale.ROOT, "%d,%d q %.1f cap %.1f centre %.2f water %.2f bed %.2f hw %.1f %s%s", x, z, q,
+                                capApi, centreApi, a.water(), a.bed(), a.halfWidth(), lake ? "lake" : lip ? "lip" : "other", high ? " ground" : ""));
+                    }
+                }
+                if (cap >= q) continue;
+                under++;
+                depthHist[Math.min(4, (int) Math.floor(centre * 2))]++;
+                if (lake) uLake++;
+                else if (lip) uLip++;
+                else uOther++;
+                if (wet <= 2) uNarrow++;
+                // The drawing's own depth in blocks here, against what the ground holds.
+                int drawn = (int) Math.floor(a.water()) - (int) Math.floor(a.bed());
+                if (centre < drawn - 0.5) uGround++;
+                else uDrawn++;
+                if (eg.size() < 12) {
+                    eg.add(String.format(Locale.ROOT, "%d,%d q %.1f cap %.1f wet %d centre %.2f drawn %d hw %.1f %s", x, z, q, cap, wet,
+                            centre, drawn, a.halfWidth(), lake ? "lake" : lip ? "lip" : "other"));
+                }
+            }
+        }
+        java.util.Collections.sort(ratio);
+        java.util.Collections.sort(need);
+        java.util.Collections.sort(ratioApi);
+        String api = String.format(Locale.ROOT,
+                "; against the drawn water: %d cannot carry it (%.1f%%): at a lake's way out %d, at a step's lip %d, elsewhere %d; "
+                        + "ground over the drawn floor near the middle %d, as drawn %d; capacity over discharge 10%% %.2f, 50%% %.2f, 90%% %.2f; "
+                        + "columns %d, ground over the drawn floor %d; e.g. %s",
+                underApi, looked == 0 ? 0.0 : 100.0 * underApi / looked, aLake, aLip, aOther, aGround, aDrawn,
+                pct(ratioApi, 0.1), pct(ratioApi, 0.5), pct(ratioApi, 0.9), columns, groundHigh, egApi);
+        return String.format(Locale.ROOT,
+                "rivers capacity within %d of %d,%d: %d sections (%d not ready), %d cannot carry their discharge at critical flow "
+                        + "(%.1f%%): at a lake's way out %d, at a step's lip %d, elsewhere %d; two columns wide or less %d; "
+                        + "shallower than drawn %d, as drawn %d; centre depth 0-0.5 %d, 0.5-1 %d, 1-1.5 %d, 1.5-2 %d, 2+ %d; "
+                        + "capacity over discharge 10%% %.2f, 50%% %.2f, 90%% %.2f; depth needed 10%% %.2f, 50%% %.2f, 90%% %.2f; e.g. %s",
+                half, at.getX(), at.getZ(), looked, notReady, under, looked == 0 ? 0.0 : 100.0 * under / looked, uLake, uLip, uOther,
+                uNarrow, uGround, uDrawn, depthHist[0], depthHist[1], depthHist[2], depthHist[3], depthHist[4],
+                pct(ratio, 0.1), pct(ratio, 0.5), pct(ratio, 0.9), pct(need, 0.1), pct(need, 0.5), pct(need, 0.9), eg) + api;
+    }
+
+    /**
+     * How deep the water stands in a column, in blocks (the blocks of it under its top one, and the top one's height),
+     * and the top of the bed under it; nought and NaN where the column holds no water.
+     */
+    private static double[] columnWater(ServerLevel level, BlockPos.MutableBlockPos p, int x, int z, int from) {
+        int y = from, floor = Math.max(level.getMinBuildHeight(), from - 8);
+        while (y > floor) {
+            var s = level.getBlockState(p.set(x, y, z));
+            if (!s.getFluidState().isEmpty()) break;
+            if (!s.isAir() && !s.canBeReplaced()) return new double[]{0, Double.NaN};
+            y--;
+        }
+        if (y <= floor) return new double[]{0, Double.NaN};
+        floor = level.getMinBuildHeight();
+        var top = level.getFluidState(p.set(x, y, z));
+        double h = top.getHeight(level, p);
+        y--;
+        while (y > floor && !level.getFluidState(p.set(x, y, z)).isEmpty()) {
+            h += 1.0;
+            y--;
+        }
+        return new double[]{h, y + 1.0};
+    }
+
+    private static double pct(java.util.List<Double> sorted, double q) {
+        if (sorted.isEmpty()) return Double.NaN;
+        return sorted.get(Math.min(sorted.size() - 1, (int) Math.floor(q * sorted.size())));
+    }
+
     /** The traced river nearest this column: its channel, the pool over it and the rock bar below it. */
     public static int terrainTrace(CommandContext<CommandSourceStack> ctx) {
         ServerLevel level = ctx.getSource().getLevel();
