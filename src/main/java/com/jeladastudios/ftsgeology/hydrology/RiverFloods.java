@@ -42,6 +42,10 @@ public final class RiverFloods {
     /** Ticks between looks, the chunks looked at round each player, and how long a flood holds after its last renewal. */
     private static final int EVERY = 400, REACH = 3, HOLD = 1200, RECEDE = 600;
 
+    /** How far out over its banks a flood goes, in channel half widths, and the most blocks from the chunk's middle. */
+    private static final double FLOODPLAIN = 3.0;
+    private static final int REACH_BLOCKS = 40;
+
     private record Flash(AABB box, double fx, double fz, long until) {}
 
     private static final List<Flash> FLASHES = new ArrayList<>();
@@ -117,7 +121,10 @@ public final class RiverFloods {
         }
         if (tops.size() < 4) return;
         BlockPos middle = new BlockPos(cx * 16 + 8, tops.get(0).getY(), cz * 16 + 8);
-        List<LongOpenHashSet> layers = Floods.spread(level, tops, height, middle, 24, 3000, k -> true);
+        // Over the low ground along the river, out to a few times its width: not every flat column in reach, which
+        // laid a square of water with straight sides on a plain.
+        List<LongOpenHashSet> layers = Floods.spread(level, tops, height, middle, REACH_BLOCKS, 3000,
+                Floods.besideChannel(FLOODPLAIN, 4.0));
         if (layers.isEmpty()) return;
         int laid = Floods.surge(level, layers, HOLD, RECEDE, "river over its banks at " + middle.toShortString(), key);
         if (laid == 0) return;

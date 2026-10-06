@@ -53,6 +53,8 @@ public final class Floods {
         String why = "";
         /** What laid it, for a flood that goes on while its cause lasts (see {@link #extend}); empty for one that does not. */
         String key = "";
+        /** Laid along its channel (see {@link #besideChannel}); a river's rise from before that is let go (see {@link #extend}). */
+        boolean banded = true;
 
         CompoundTag save() {
             CompoundTag t = new CompoundTag();
@@ -63,6 +65,7 @@ public final class Floods {
             t.putInt("Every", every);
             t.putString("Why", why);
             t.putString("Key", key);
+            t.putBoolean("Banded", banded);
             return t;
         }
 
@@ -73,6 +76,7 @@ public final class Floods {
             s.every = t.getInt("Every");
             s.why = t.getString("Why");
             s.key = t.getString("Key");
+            s.banded = t.getBoolean("Banded");
             return s;
         }
     }
@@ -187,6 +191,25 @@ public final class Floods {
     }
 
     /**
+     * Only the columns a river over its banks may cover: within {@code widen} times its channel's half width of the
+     * channel's middle line, and {@code beyond} blocks more. Not a lake, which rises as a whole or not at all, and nothing
+     * where the network is not worked out yet. Without it a rise spread over every flat column in reach, out to the edges
+     * of the square looked at.
+     */
+    public static java.util.function.LongPredicate besideChannel(double widen, double beyond) {
+        it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap seen = new it.unimi.dsi.fastutil.longs.Long2BooleanOpenHashMap();
+        return k -> {
+            int x = BlockPos.getX(k), z = BlockPos.getZ(k);
+            long column = ((long) x << 32) | (z & 0xFFFFFFFFL);
+            if (seen.containsKey(column)) return seen.get(column);
+            RiverNetwork.At a = RiverNetwork.at(x, z);
+            boolean ok = !a.lake() && a.distance() <= a.halfWidth() * widen + beyond;
+            seen.put(column, ok);
+            return ok;
+        };
+    }
+
+    /**
      * Lays a flood's layers, from the bottom, and keeps them: after {@code holdTicks} its top layer goes, then the next
      * every {@code everyTicks}. Returns the blocks of water laid.
      */
@@ -203,6 +226,13 @@ public final class Floods {
         if (st == null) return false;
         for (Surge s : st.all) {
             if (!s.key.equals(key)) continue;
+            // A river's rise laid before it kept to its channel: over all the flat ground in reach, a square of water
+            // round the head of a river on a plain. It goes down now, and is laid again along the channel after.
+            if (!s.banded && (key.startsWith("season ") || key.startsWith("rain "))) {
+                s.recedeAt = Math.min(s.recedeAt, level.getGameTime());
+                st.setDirty();
+                return true;
+            }
             s.recedeAt = Math.max(s.recedeAt, level.getGameTime() + holdTicks);
             st.setDirty();
             return true;

@@ -31,7 +31,7 @@ import java.util.Locale;
  * river runs 6-7 blocks across in the spring.
  *
  * <p>The water comes up a block, or two at the height of it, over its banks, by the same way as a flood in a long rain
- * (see {@link Floods}): on a flat plain a little rise spreads it wide, in a canyon it hardly widens. It holds while the
+ * (see {@link Floods}), out to the width its flow gives it and no further: in a canyon it hardly widens. It holds while the
  * season does and goes back down after. Only round the players, a few chunks at a look; a creek of a few blocks rises one
  * block at most.</p>
  */
@@ -44,6 +44,9 @@ public final class SeasonalRivers {
     private static final int EVERY = 600, REACH = 3, HOLD = 2400, RECEDE = 600;
 
     private static long risen;
+
+    /** How many times its summer width a river runs at a rise of one block, and of two: the square roots of 2 and 5. */
+    private static final double WIDER = 1.5, WIDER_HIGH = 2.25;
 
     /** A season with less than this share of the year's rain is a dry one, when the rivers are down a block. */
     private static final double LOW = 0.45;
@@ -153,7 +156,10 @@ public final class SeasonalRivers {
         // A creek rises a block at most.
         if (tops.size() < 24) stage = Math.min(stage, 1);
         BlockPos middle = new BlockPos(cx * 16 + 8, tops.get(0).getY(), cz * 16 + 8);
-        List<LongOpenHashSet> layers = Floods.spread(level, tops, stage, middle, 24, 3000, k -> true);
+        // As wide as the season's flow makes the river, and no wider: on a plain a rise left to spread anywhere covered
+        // every flat column in reach, a square pool round the head of a river.
+        List<LongOpenHashSet> layers = Floods.spread(level, tops, stage, middle, 24, 3000,
+                Floods.besideChannel(stage >= 2 ? WIDER_HIGH : WIDER, 0.5));
         if (layers.isEmpty()) return;
         int laid = Floods.surge(level, layers, HOLD, RECEDE, String.format(Locale.ROOT, "the season's high water at %s, +%d",
                 middle.toShortString(), stage), key);
