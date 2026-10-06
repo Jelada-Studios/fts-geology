@@ -65,8 +65,14 @@ public final class LandmarkSites {
                     / (TerrainFields.METRES_PER_BLOCK / p.horizontal()) + SPAWN_CLEAR;
             Site found = ring(seed, p, which, turn, bearing, Math.max(NEAR_FROM, clear), NEAR_TO, NEAR_STEP, out, made, reach);
             if (found == null) {
-                found = ring(seed, p, which, turn, bearing, FROM * p.horizontal(), TO * p.horizontal(),
-                        STEP * p.horizontal(), out, made, reach);
+                // On out from where the near ring stopped. In the tall world the far ring began at twenty-five thousand,
+                // its layout's ten, and the ground between was never looked at: a world whose near belts the first two
+                // had taken put its third mountain thirty kilometres off.
+                // In steps a fraction of the far ring's, so it is the nearest belt with room that is taken, not the
+                // first of a few rings six kilometres apart.
+                boolean near = WorldgenRevision.has(WorldgenRevision.NEAR_LANDMARKS);
+                found = ring(seed, p, which, turn, bearing, near ? NEAR_TO : FROM * p.horizontal(), TO * p.horizontal(),
+                        (near ? NEAR_STEP : STEP) * p.horizontal(), out, made, reach);
             }
             if (found == null) continue;
             out[made++] = found;

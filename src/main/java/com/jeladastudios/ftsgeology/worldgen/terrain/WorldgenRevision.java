@@ -61,8 +61,10 @@ public final class WorldgenRevision {
     public static final int DRAWN_BEDS = 12;
     /** Terralith's basalt cliffs only on a coast whose rock is basalt; elsewhere the shore round it (round 137). */
     public static final int BASALT_COASTS = 13;
+    /** A named mountain the near ring has no room for looked for on from ten kilometres, the tall world too (round 138). */
+    public static final int NEAR_LANDMARKS = 14;
     /** What a world made now gets. */
-    public static final int CURRENT = 13;
+    public static final int CURRENT = 14;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;

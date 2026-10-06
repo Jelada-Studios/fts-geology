@@ -165,6 +165,8 @@
   "command.fts_geology.suitability.reason.hotspot_basin": "  Mantle hotspot, inside a geyser basin: the densest thermal ground there is (Yellowstone's Upper Basin, Iceland's Haukadalur).",
   "command.fts_geology.suitability.reason.hotspot": "  Mantle hotspot: a plume burning through the plate. Geysers here cluster into basins - keep walking to find one.",
   "command.fts_geology.suitability.reason.hotspot_trail": "  Hotspot trail: extinct volcanoes carried off the plume by plate drift.",
+  "command.fts_geology.quake_started": "M%s %s earthquake setting off at %s, %s.",
+  "command.fts_geology.quakes_off": "Earthquakes are switched off in the config (quakesEnabled).",
   "command.fts_geology.no_fault_here_plate_interiors_do_not_rup": "No fault here - plate interiors do not rupture. Use /geology find <type> tp, or force one with /geology quake <type>.",
   "command.fts_geology.unknown_fault_type_s": "Unknown fault type: %s",
   "command.fts_geology.forcing_a_s_rupture_here_the_real_bounda": "Forcing a %s rupture here - the real boundary at this spot is %s. Use /geology quake with no type to rupture the actual fault.",

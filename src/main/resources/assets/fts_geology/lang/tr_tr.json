@@ -165,6 +165,8 @@
   "command.fts_geology.suitability.reason.hotspot_basin": "  Manto sıcak noktası, gayzer havzası içinde: var olan en yoğun termal zemin (Yellowstone Yukarı Havzası, İzlanda Haukadalur).",
   "command.fts_geology.suitability.reason.hotspot": "  Manto sıcak noktası: levhayı delip geçen bir tüy (plüm). Buradaki gayzerler havzalar halinde kümelenir - birini bulmak için yürümeye devam edin.",
   "command.fts_geology.suitability.reason.hotspot_trail": "  Sıcak nokta izi: levha hareketiyle plümden uzaklaşmış sönmüş volkanlar.",
+  "command.fts_geology.quake_started": "M%s %s depremi başlıyor: %s, %s.",
+  "command.fts_geology.quakes_off": "Depremler ayarlarda kapalı (quakesEnabled).",
   "command.fts_geology.no_fault_here_plate_interiors_do_not_rup": "Burada fay yok - levha içleri kırılmaz. /geology find <type> tp kullanın veya /geology quake <type> ile zorlayın.",
   "command.fts_geology.unknown_fault_type_s": "Bilinmeyen fay tipi: %s",
   "command.fts_geology.forcing_a_s_rupture_here_the_real_bounda": "Burada zorla bir %s kırılması oluşturuluyor - bu noktadaki gerçek sınır: %s. Gerçek fayı kırmak için tür belirtmeden /geology quake kullanın.",

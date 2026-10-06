@@ -113,12 +113,22 @@ public final class Earthquake {
      * Returns false when the column is not on a fault - plate interiors do not rupture.
      */
     public static boolean triggerHere(ServerLevel level, BlockPos at, double magnitudeOverride) {
+        return !Double.isNaN(triggerHereMagnitude(level, at, magnitudeOverride));
+    }
+
+    /** As {@link #triggerHere}, and what it rolled: the magnitude of the quake set off, NaN where none was. */
+    public static double triggerHereMagnitude(ServerLevel level, BlockPos at, double magnitudeOverride) {
         PlateSample s = com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sample(level, at.getX(), at.getZ());
-        if (s.faultType() == FaultType.INTERIOR) return false;
+        if (s.faultType() == FaultType.INTERIOR) return Double.NaN;
         double magnitude = magnitudeOverride > 0 ? magnitudeOverride
                 : rollMagnitude(s.faultType(), s.stress(), level.random);
         trigger(level, at, s.faultType(), magnitude, s.faultStrikeX(), s.faultStrikeZ());
-        return true;
+        return magnitude;
+    }
+
+    /** The fault a quake set off here would break: for a command to name it. */
+    public static FaultType faultHere(ServerLevel level, BlockPos at) {
+        return com.jeladastudios.ftsgeology.tectonics.LandmarkFaults.sample(level, at.getX(), at.getZ()).faultType();
     }
 
     /**

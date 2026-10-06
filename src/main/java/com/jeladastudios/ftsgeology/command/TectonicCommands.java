@@ -519,11 +519,22 @@ public final class TectonicCommands {
         ServerLevel level = source.getLevel();
         BlockPos at = BlockPos.containing(source.getPosition());
 
+        // Said to whoever gave the command -- a command block, the console, RCON -- and not only to the players the
+        // shaking reaches, who may be none.
+        if (!com.jeladastudios.ftsgeology.config.GeyserConfig.QUAKES_ENABLED.get()) {
+            source.sendFailure(Component.translatable("command.fts_geology.quakes_off"));
+            return 0;
+        }
         if (forcedType == null) {
-            if (!Earthquake.triggerHere(level, at, magnitude)) {
+            FaultType here = Earthquake.faultHere(level, at);
+            double rolled = Earthquake.triggerHereMagnitude(level, at, magnitude);
+            if (Double.isNaN(rolled)) {
                 source.sendFailure(Component.translatable("command.fts_geology.no_fault_here_plate_interiors_do_not_rup"));
                 return 0;
             }
+            source.sendSuccess(() -> Component.translatable("command.fts_geology.quake_started",
+                    String.format(java.util.Locale.ROOT, "%.1f", rolled), here.name().toLowerCase(java.util.Locale.ROOT),
+                    at.getX(), at.getZ()), true);
             return 1;
         }
 
@@ -552,6 +563,8 @@ public final class TectonicCommands {
             source.sendSuccess(() -> Component.translatable("command.fts_geology.forcing_a_s_rupture_here_the_real_bounda", forcedType, real).withStyle(ChatFormatting.YELLOW), false);
         }
         Earthquake.trigger(level, at, type, mag, sx, sz, true);   // command picked the type
+        source.sendSuccess(() -> Component.translatable("command.fts_geology.quake_started",
+                String.format(java.util.Locale.ROOT, "%.1f", mag), forcedType, at.getX(), at.getZ()), true);
         return 1;
     }
 
