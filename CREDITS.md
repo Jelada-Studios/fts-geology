@@ -24,6 +24,18 @@ Jonathan de Ferranti at [viewfinderpanoramas.org](http://viewfinderpanoramas.org
 SRTM and other public sources, reproduced here with acknowledgement under the terms given on that site. The
 crops and their provenance are listed in `data/fts_geology/dem/README.txt`.
 
+## Sounds
+
+Both earthquake sounds are cut from recordings on [Freesound](https://freesound.org), released under
+CC0 (public domain):
+
+- The ground rumble: "Earthquake or distant space shuttle rumble" by metrostock99
+  ([freesound.org/s/203281](https://freesound.org/s/203281/)).
+- The seismograph siren: "2010-01-05 Tornado Siren Test" by thaighaudio
+  ([freesound.org/s/121532](https://freesound.org/s/121532/)).
+
+Thank you to both recordists.
+
 ## Built on
 
 - Minecraft Forge, and the MDK it ships with.
