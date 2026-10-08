@@ -18,3 +18,7 @@ Instead of scattering volcanoes, springs, and quakes by arbitrary chance, FT's G
 - **Field Instruments**: Geologist's Hammer (rock classes & stratigraphic sections in real meters), Fault Compass (Brunton compass for strike, drift velocity & strain), Drum Seismograph (S-P distance & Richter magnitude), and the in-game **Geological Field Guide** book.
 - **Complete Localization**: Full English (`en_us`) and Turkish (`tr_tr`) translations for all blocks, items, messages, and the 18-page field guide.
 - **Zero Hard Dependencies**: Runs standalone on Minecraft Forge 1.20.1. Stacks seamlessly on top of Terralith and Tectonic, and detects Flowing Fluids (finite water) when present.
+
+## License
+
+Copyright (C) 2026 Jelada Studios. FT's Geology is free software under the GNU General Public License v3.0: see `LICENSE`. Versions up to 0.10 were released under the MIT License. Third-party data and sounds are credited in `CREDITS.md`.
