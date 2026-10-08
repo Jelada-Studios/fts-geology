@@ -404,7 +404,7 @@ public final class FeltShaking {
             jolts++;
             if (!faint) {
                 // The P wave: a sharp jolt and a boom, and what it is, told; its size only off an instrument (below).
-                p.playNotifySound(net.minecraft.sounds.SoundEvents.GENERIC_EXPLODE, net.minecraft.sounds.SoundSource.BLOCKS,
+                p.playNotifySound(net.minecraft.sounds.SoundEvents.GENERIC_EXPLODE.value(), net.minecraft.sounds.SoundSource.BLOCKS,
                         (float) Mth.clamp((intensity - 2.0) / 6.0, 0.2, 0.8), 0.45f);
                 if (!f.informed || intensity < 4.0) {
                     p.displayClientMessage(Component.translatable("message.fts_geology.p_wave_felt").withStyle(ChatFormatting.GOLD), true);

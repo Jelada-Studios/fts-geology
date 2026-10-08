@@ -17,9 +17,6 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
-import net.neoforged.neoforge.common.capabilities.Capability;
-import net.neoforged.neoforge.common.capabilities.ForgeCapabilities;
-import net.neoforged.neoforge.common.util.LazyOptional;
 import net.neoforged.neoforge.fluids.FluidUtil;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
@@ -48,7 +45,6 @@ public class ElectrolyzerBlockEntity extends GasMachineBlockEntity {
             setChanged();
         }
     };
-    private final LazyOptional<IFluidHandler> waterCap = LazyOptional.of(() -> water);
     private double waterDebt;
     private double lastRate;
 
@@ -143,16 +139,9 @@ public class ElectrolyzerBlockEntity extends GasMachineBlockEntity {
         return out;
     }
 
-    @Override
-    public @NotNull <T> LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
-        if (cap == ForgeCapabilities.FLUID_HANDLER && side != Direction.UP) return waterCap.cast();
-        return super.getCapability(cap, side);
-    }
-
-    @Override
-    public void invalidateCaps() {
-        super.invalidateCaps();
-        waterCap.invalidate();
+    /** Its water inlet on a side, for the capability registration: every side but the top. */
+    public @Nullable IFluidHandler waterOn(@Nullable Direction side) {
+        return side != Direction.UP ? water : null;
     }
 
     @Override

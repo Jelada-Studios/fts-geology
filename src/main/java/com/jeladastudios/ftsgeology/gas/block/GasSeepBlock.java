@@ -66,7 +66,8 @@ public class GasSeepBlock extends BaseEntityBlock {
 
     @Override
     @SuppressWarnings("deprecation")
-    public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
+    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
+        InteractionHand hand = InteractionHand.MAIN_HAND;
         ItemStack held = player.getItemInHand(hand);
         if (state.getValue(LIT) || !(held.is(Items.FLINT_AND_STEEL) || held.is(Items.FIRE_CHARGE))) return InteractionResult.PASS;
         if (level.isClientSide) return InteractionResult.SUCCESS;

@@ -52,7 +52,7 @@ public class GasPanelScreen extends Screen {
 
     @Override
     public void tick() {
-        if (++ticks % 20 == 0) ModNetwork.CHANNEL.sendToServer(new TerminalRequestPacket(pos));
+        if (++ticks % 20 == 0) net.neoforged.neoforge.network.PacketDistributor.sendToServer(new TerminalRequestPacket(pos));
     }
 
     @Override
@@ -170,7 +170,7 @@ public class GasPanelScreen extends Screen {
                 if (mx >= h.x0() && mx < h.x1() && my >= h.y0() && my < h.y1()) {
                     Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance
                             .forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0f));
-                    ModNetwork.CHANNEL.sendToServer(new com.jeladastudios.ftsgeology.network.GasControlPacket(pos, h.key()));
+                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.jeladastudios.ftsgeology.network.GasControlPacket(pos, h.key()));
                     return true;
                 }
             }

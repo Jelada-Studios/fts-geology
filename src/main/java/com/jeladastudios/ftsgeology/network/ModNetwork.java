@@ -4,9 +4,9 @@ import com.jeladastudios.ftsgeology.GeysersMod;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.NetworkRegistry;
 import net.neoforged.neoforge.network.PacketDistributor;
-import net.neoforged.neoforge.network.simple.SimpleChannel;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 /**
  * The mod's one channel to the client.
@@ -31,76 +31,23 @@ public final class ModNetwork {
 
     private ModNetwork() {}
 
-    private static final String VERSION = "10";
+    private static final String VERSION = "11";
 
-    public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-            ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "main"),
-            () -> VERSION,
-            VERSION::equals,
-            VERSION::equals);
-
-    public static void register() {
-        int id = 0;
-        CHANNEL.messageBuilder(ShakePacket.class, id++)
-                .encoder(ShakePacket::encode)
-                .decoder(ShakePacket::decode)
-                .consumerMainThread(ShakePacket::handle)
-                .add();
-        CHANNEL.messageBuilder(EruptionPacket.class, id++)
-                .encoder(EruptionPacket::encode)
-                .decoder(EruptionPacket::decode)
-                .consumerMainThread(EruptionPacket::handle)
-                .add();
-        CHANNEL.messageBuilder(FlowPacket.class, id++)
-                .encoder(FlowPacket::encode)
-                .decoder(FlowPacket::decode)
-                .consumerMainThread(FlowPacket::handle)
-                .add();
-        CHANNEL.messageBuilder(SoilTintPacket.class, id++)
-                .encoder(SoilTintPacket::encode)
-                .decoder(SoilTintPacket::decode)
-                .consumerMainThread(SoilTintPacket::handle)
-                .add();
-        CHANNEL.messageBuilder(SoilWetPacket.class, id++)
-                .encoder(SoilWetPacket::encode)
-                .decoder(SoilWetPacket::decode)
-                .consumerMainThread(SoilWetPacket::handle)
-                .add();
-        CHANNEL.messageBuilder(LocalWeatherPacket.class, id++)
-                .encoder(LocalWeatherPacket::encode)
-                .decoder(LocalWeatherPacket::decode)
-                .consumerMainThread(LocalWeatherPacket::handle)
-                .add();
-        CHANNEL.messageBuilder(SkyPacket.class, id++)
-                .encoder(SkyPacket::encode)
-                .decoder(SkyPacket::decode)
-                .consumerMainThread(SkyPacket::handle)
-                .add();
-        CHANNEL.messageBuilder(TerminalPacket.class, id++, net.neoforged.neoforge.network.NetworkDirection.PLAY_TO_CLIENT)
-                .encoder(TerminalPacket::encode)
-                .decoder(TerminalPacket::decode)
-                .consumerMainThread(TerminalPacket::handle)
-                .add();
-        CHANNEL.messageBuilder(TerminalRequestPacket.class, id++, net.neoforged.neoforge.network.NetworkDirection.PLAY_TO_SERVER)
-                .encoder(TerminalRequestPacket::encode)
-                .decoder(TerminalRequestPacket::decode)
-                .consumerMainThread(TerminalRequestPacket::handle)
-                .add();
-        CHANNEL.messageBuilder(StationRenamePacket.class, id++, net.neoforged.neoforge.network.NetworkDirection.PLAY_TO_SERVER)
-                .encoder(StationRenamePacket::encode)
-                .decoder(StationRenamePacket::decode)
-                .consumerMainThread(StationRenamePacket::handle)
-                .add();
-        CHANNEL.messageBuilder(GasFiredPacket.class, id++, net.neoforged.neoforge.network.NetworkDirection.PLAY_TO_CLIENT)
-                .encoder(GasFiredPacket::encode)
-                .decoder(GasFiredPacket::decode)
-                .consumerMainThread(GasFiredPacket::handle)
-                .add();
-        CHANNEL.messageBuilder(GasControlPacket.class, id++, net.neoforged.neoforge.network.NetworkDirection.PLAY_TO_SERVER)
-                .encoder(GasControlPacket::encode)
-                .decoder(GasControlPacket::decode)
-                .consumerMainThread(GasControlPacket::handle)
-                .add();
+    /** Registers every packet, on the mod bus. */
+    public static void register(RegisterPayloadHandlersEvent event) {
+        PayloadRegistrar r = event.registrar(VERSION);
+        r.playToClient(ShakePacket.TYPE, ShakePacket.STREAM_CODEC, ShakePacket::handle);
+        r.playToClient(EruptionPacket.TYPE, EruptionPacket.STREAM_CODEC, EruptionPacket::handle);
+        r.playToClient(FlowPacket.TYPE, FlowPacket.STREAM_CODEC, FlowPacket::handle);
+        r.playToClient(SoilTintPacket.TYPE, SoilTintPacket.STREAM_CODEC, SoilTintPacket::handle);
+        r.playToClient(SoilWetPacket.TYPE, SoilWetPacket.STREAM_CODEC, SoilWetPacket::handle);
+        r.playToClient(LocalWeatherPacket.TYPE, LocalWeatherPacket.STREAM_CODEC, LocalWeatherPacket::handle);
+        r.playToClient(SkyPacket.TYPE, SkyPacket.STREAM_CODEC, SkyPacket::handle);
+        r.playToClient(TerminalPacket.TYPE, TerminalPacket.STREAM_CODEC, TerminalPacket::handle);
+        r.playToServer(TerminalRequestPacket.TYPE, TerminalRequestPacket.STREAM_CODEC, TerminalRequestPacket::handle);
+        r.playToServer(StationRenamePacket.TYPE, StationRenamePacket.STREAM_CODEC, StationRenamePacket::handle);
+        r.playToClient(GasFiredPacket.TYPE, GasFiredPacket.STREAM_CODEC, GasFiredPacket::handle);
+        r.playToServer(GasControlPacket.TYPE, GasControlPacket.STREAM_CODEC, GasControlPacket::handle);
     }
 
     /** How far away an eruption is still worth drawing: a column hundreds of blocks tall. */
@@ -112,7 +59,7 @@ public final class ModNetwork {
         for (ServerPlayer p : level.players()) {
             double dx = p.getX() - packet.summit().getX(), dz = p.getZ() - packet.summit().getZ();
             if (dx * dx + dz * dz > r2) continue;
-            CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), packet);
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, packet);
         }
     }
 
@@ -122,7 +69,7 @@ public final class ModNetwork {
         for (ServerPlayer p : level.players()) {
             double dx = p.getX() - packet.x(), dz = p.getZ() - packet.z();
             if (dx * dx + dz * dz > r2) continue;
-            CHANNEL.send(PacketDistributor.PLAYER.with(() -> p), packet);
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, packet);
         }
     }
 
@@ -133,7 +80,7 @@ public final class ModNetwork {
 
     /** The same, swaying at {@code speed} times the usual pace: the P wave's quick jolt. */
     public static void sendShake(ServerPlayer player, float intensity, int ticks, float speed) {
-        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new ShakePacket(intensity, ticks, speed));
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, new ShakePacket(intensity, ticks, speed));
     }
 
     /** Convenience for a source that shakes everyone near it - an eruption, say. */

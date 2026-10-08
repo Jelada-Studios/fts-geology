@@ -81,7 +81,7 @@ public class GasDetectorItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, net.minecraft.world.item.Item.TooltipContext context, List<Component> tip, TooltipFlag flag) {
         tip.add(Component.translatable("item.fts_geology.gas_detector.desc").withStyle(ChatFormatting.GRAY));
     }
 }

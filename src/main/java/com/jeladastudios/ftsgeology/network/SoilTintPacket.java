@@ -2,10 +2,7 @@ package com.jeladastudios.ftsgeology.network;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.DistExecutor;
-import net.neoforged.neoforge.network.NetworkEvent;
 
-import java.util.function.Supplier;
 
 /**
  * How the grass of a chunk looks, cell by cell, so the client can draw it paler where the ground has dried out and
@@ -13,7 +10,18 @@ import java.util.function.Supplier;
  *
  * @param dry sixteen cells of four by four columns, {@code (lz / 4) * 4 + lx / 4}, from -15 lushest through 0 to 15 straw
  */
-public record SoilTintPacket(int chunkX, int chunkZ, byte[] dry) {
+public record SoilTintPacket(int chunkX, int chunkZ, byte[] dry) implements net.minecraft.network.protocol.common.custom.CustomPacketPayload {
+
+    public static final Type<SoilTintPacket> TYPE = new Type<>(
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(com.jeladastudios.ftsgeology.GeysersMod.MODID, "soil_tint"));
+    public static final net.minecraft.network.codec.StreamCodec<net.minecraft.network.FriendlyByteBuf, SoilTintPacket> STREAM_CODEC =
+            net.minecraft.network.codec.StreamCodec.of((buf, p) -> encode(p, buf), SoilTintPacket::decode);
+
+    @Override
+    public Type<SoilTintPacket> type() {
+        return TYPE;
+    }
+
 
     public static void encode(SoilTintPacket p, FriendlyByteBuf buf) {
         buf.writeInt(p.chunkX);
@@ -25,10 +33,8 @@ public record SoilTintPacket(int chunkX, int chunkZ, byte[] dry) {
         return new SoilTintPacket(buf.readInt(), buf.readInt(), buf.readByteArray(16));
     }
 
-    public static void handle(SoilTintPacket p, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() ->
-                DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                        () -> () -> com.jeladastudios.ftsgeology.client.ClientSoilTint.set(p)));
-        ctx.get().setPacketHandled(true);
+    public static void handle(SoilTintPacket p, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() ->
+                com.jeladastudios.ftsgeology.util.Sides.client(() -> com.jeladastudios.ftsgeology.client.ClientSoilTint.set(p)));
     }
 }

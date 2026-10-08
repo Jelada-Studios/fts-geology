@@ -2,10 +2,7 @@ package com.jeladastudios.ftsgeology.network;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.DistExecutor;
-import net.neoforged.neoforge.network.NetworkEvent;
 
-import java.util.function.Supplier;
 
 /**
  * A furnace, smoker or blast furnace that has started or stopped burning gas (see {@code gas.GasFiredFurnaces}), so the
@@ -14,7 +11,18 @@ import java.util.function.Supplier;
  * @param pos the furnace, as {@code BlockPos.asLong}
  * @param on  whether it burns gas now
  */
-public record GasFiredPacket(long pos, boolean on) {
+public record GasFiredPacket(long pos, boolean on) implements net.minecraft.network.protocol.common.custom.CustomPacketPayload {
+
+    public static final Type<GasFiredPacket> TYPE = new Type<>(
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(com.jeladastudios.ftsgeology.GeysersMod.MODID, "gas_fired"));
+    public static final net.minecraft.network.codec.StreamCodec<net.minecraft.network.FriendlyByteBuf, GasFiredPacket> STREAM_CODEC =
+            net.minecraft.network.codec.StreamCodec.of((buf, p) -> encode(p, buf), GasFiredPacket::decode);
+
+    @Override
+    public Type<GasFiredPacket> type() {
+        return TYPE;
+    }
+
 
     public static void encode(GasFiredPacket p, FriendlyByteBuf buf) {
         buf.writeLong(p.pos);
@@ -25,10 +33,8 @@ public record GasFiredPacket(long pos, boolean on) {
         return new GasFiredPacket(buf.readLong(), buf.readBoolean());
     }
 
-    public static void handle(GasFiredPacket p, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() ->
-                DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                        () -> () -> com.jeladastudios.ftsgeology.client.ClientGasFired.set(p.pos, p.on)));
-        ctx.get().setPacketHandled(true);
+    public static void handle(GasFiredPacket p, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() ->
+                com.jeladastudios.ftsgeology.util.Sides.client(() -> com.jeladastudios.ftsgeology.client.ClientGasFired.set(p.pos, p.on)));
     }
 }

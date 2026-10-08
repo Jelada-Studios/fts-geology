@@ -116,7 +116,8 @@ public class WeatherInstrumentBlock extends BaseEntityBlock {
     }
 
     @Override
-    public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
+    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
+        InteractionHand hand = InteractionHand.MAIN_HAND;
         if (level.isClientSide) return InteractionResult.SUCCESS;
         player.displayClientMessage(reading((ServerLevel) level, pos), true);
         return InteractionResult.CONSUME;

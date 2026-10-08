@@ -163,7 +163,7 @@ public class CoreDrillItem extends Item {
 
     /** What the drill says of itself in the inventory. */
     @Override
-    public void appendHoverText(ItemStack stack, @javax.annotation.Nullable net.minecraft.world.level.Level level,
+    public void appendHoverText(ItemStack stack, net.minecraft.world.item.Item.TooltipContext context,
                                 java.util.List<Component> tooltip, net.minecraft.world.item.TooltipFlag flag) {
         int depth = 64;
         try {

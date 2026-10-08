@@ -36,12 +36,12 @@ final class StationUi {
     /** Asks for the station's latest: straight, or through the terminal it is seen from. */
     static void request(BlockPos pos, CompoundTag data) {
         BlockPos via = via(pos, data);
-        ModNetwork.CHANNEL.sendToServer(via == null ? new TerminalRequestPacket(pos) : TerminalRequestPacket.through(via, pos, false));
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(via == null ? new TerminalRequestPacket(pos) : TerminalRequestPacket.through(via, pos, false));
     }
 
     /** Opens a station on the network from the terminal at {@code via}; the terminal's own screen when it is that one. */
     static void open(BlockPos via, BlockPos station) {
-        ModNetwork.CHANNEL.sendToServer(TerminalRequestPacket.through(via, station, true));
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(TerminalRequestPacket.through(via, station, true));
     }
 
     /** The name to show: the station's own, or its kind and place. */
@@ -94,7 +94,7 @@ final class StationUi {
     }
 
     static void rename(BlockPos pos, EditBox box) {
-        ModNetwork.CHANNEL.sendToServer(new StationRenamePacket(pos, box.getValue()));
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(new StationRenamePacket(pos, box.getValue()));
         box.setFocused(false);
     }
 }

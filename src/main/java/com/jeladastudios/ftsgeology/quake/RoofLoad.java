@@ -91,7 +91,7 @@ public final class RoofLoad {
     static final class Store extends SavedData {
         final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<Going> going = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
 
-        static Store load(CompoundTag tag) {
+        static Store load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             Store s = new Store();
             CompoundTag g = tag.getCompound("Going");
             for (String k : g.getAllKeys()) s.going.put(Long.parseLong(k), Going.load(g.getCompound(k)));
@@ -99,7 +99,7 @@ public final class RoofLoad {
         }
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public CompoundTag save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             CompoundTag g = new CompoundTag();
             for (var e : going.long2ObjectEntrySet()) g.put(Long.toString(e.getLongKey()), e.getValue().save());
             tag.put("Going", g);
@@ -108,7 +108,7 @@ public final class RoofLoad {
     }
 
     private static Store store(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(Store::load, Store::new, "fts_geology_roof_load");
+        return level.getDataStorage().computeIfAbsent(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_roof_load");
     }
 
     /** Columns looked at, to when. */
@@ -201,7 +201,7 @@ public final class RoofLoad {
         if (level == null) return;
         long now = level.getGameTime();
         if (goingNow == 0 && now % 100 != 0) return;
-        Store st = level.getDataStorage().get(Store::load, "fts_geology_roof_load");
+        Store st = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_roof_load");
         goingNow = st == null ? 0 : st.going.size();
         if (goingNow == 0) return;
         List<Long> go = new ArrayList<>(), back = new ArrayList<>();

@@ -48,7 +48,7 @@ public final class VolcanoEruption {
             throwBomb(level, summit, magnitude, craterR);
         }
         if (eruptionTicks % 30 == 0) {
-            level.playSound(null, summit, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 1.2f, 0.5f);
+            level.playSound(null, summit, SoundEvents.GENERIC_EXPLODE.value(), SoundSource.BLOCKS, 1.2f, 0.5f);
         }
 
         ashfall(level, summit, magnitude);

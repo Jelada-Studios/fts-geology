@@ -155,7 +155,7 @@ public final class GasHealth {
         }
     }
 
-    private static void effect(LivingEntity e, MobEffect effect, int amp) {
+    private static void effect(LivingEntity e, net.minecraft.core.Holder<MobEffect> effect, int amp) {
         MobEffectInstance cur = e.getEffect(effect);
         if (cur != null && cur.getAmplifier() > amp && cur.getDuration() > 30) return;
         e.addEffect(new MobEffectInstance(effect, effect == MobEffects.CONFUSION ? 120 : 60, amp, false, false, true));

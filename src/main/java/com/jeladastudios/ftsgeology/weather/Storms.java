@@ -142,7 +142,7 @@ public final class Storms {
         /** Until when no storm forms over the players: a /weather clear, or a night slept through. */
         long clearUntil;
 
-        static Store load(CompoundTag tag) {
+        static Store load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             Store s = new Store();
             for (Tag t : tag.getList("Storms", Tag.TAG_COMPOUND)) s.all.add(Storm.load((CompoundTag) t));
             s.clearUntil = tag.getLong("ClearUntil");
@@ -150,7 +150,7 @@ public final class Storms {
         }
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public CompoundTag save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             ListTag list = new ListTag();
             for (Storm s : all) list.add(s.save());
             tag.put("Storms", list);
@@ -160,12 +160,12 @@ public final class Storms {
     }
 
     private static Store store(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(Store::load, Store::new, "fts_geology_storms");
+        return level.getDataStorage().computeIfAbsent(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_storms");
     }
 
     /** The storms out now, for a forecast; empty where none have formed. */
     static List<Storm> storms(ServerLevel level) {
-        Store st = level.getDataStorage().get(Store::load, "fts_geology_storms");
+        Store st = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_storms");
         return st == null ? List.of() : st.all;
     }
 
@@ -218,7 +218,7 @@ public final class Storms {
     }
 
     private static void work(ServerLevel level, int cx, int cz, long k) {
-        Store st = level.getDataStorage().get(Store::load, "fts_geology_storms");
+        Store st = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_storms");
         long now = level.getGameTime();
         double px = cx * 16 + 8, pz = cz * 16 + 8;
         double dry = 1, thunder = 0;
@@ -409,8 +409,7 @@ public final class Storms {
                 systems.add((float) c.vx);
                 systems.add((float) c.vz);
             }
-            ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p),
-                    new com.jeladastudios.ftsgeology.network.SkyPacket(now, storms.toFloatArray(), systems.toFloatArray()));
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, new com.jeladastudios.ftsgeology.network.SkyPacket(now, storms.toFloatArray(), systems.toFloatArray()));
         }
     }
 
@@ -634,8 +633,7 @@ public final class Storms {
         for (ServerPlayer p : players) {
             float[] here = smoothAt(level, p.getX(), p.getZ());
             double[] w = wind(level, p.getX(), p.getZ());
-            ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> p),
-                    new LocalWeatherPacket(here[0], here[1], (float) (w[0] * 20), (float) (w[1] * 20), Moisture.fog(level, p.blockPosition())));
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, new LocalWeatherPacket(here[0], here[1], (float) (w[0] * 20), (float) (w[1] * 20), Moisture.fog(level, p.blockPosition())));
         }
     }
 
@@ -790,7 +788,7 @@ public final class Storms {
         out.add(Moisture.describe(level, at));
         out.add(RainClimate.describe(level, x, z));
         out.addAll(Atmosphere.describe(level, x, z));
-        Store st = level.getDataStorage().get(Store::load, "fts_geology_storms");
+        Store st = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_storms");
         if (st == null) return out;
         out.add(String.format(Locale.ROOT, "the land within %d blocks: %.2f under rain now, %.2f with the storms on their way; its weather wants %.2f",
                 (int) AROUND, covered(level, st, x, z, false), covered(level, st, x, z, true), wanted(level, at)));

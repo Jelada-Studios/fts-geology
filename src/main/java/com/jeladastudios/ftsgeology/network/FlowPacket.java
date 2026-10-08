@@ -2,10 +2,7 @@ package com.jeladastudios.ftsgeology.network;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.DistExecutor;
-import net.neoforged.neoforge.network.NetworkEvent;
 
-import java.util.function.Supplier;
 
 /**
  * Where a pyroclastic flow's front is, so the client can draw its cloud billowing along behind it; as with
@@ -15,7 +12,18 @@ import java.util.function.Supplier;
  * @param width how far to either side the flow reaches, in blocks
  * @param done  the flow has stopped: its cloud drifts off and thins out
  */
-public record FlowPacket(int id, double x, double y, double z, float width, boolean done) {
+public record FlowPacket(int id, double x, double y, double z, float width, boolean done) implements net.minecraft.network.protocol.common.custom.CustomPacketPayload {
+
+    public static final Type<FlowPacket> TYPE = new Type<>(
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(com.jeladastudios.ftsgeology.GeysersMod.MODID, "flow"));
+    public static final net.minecraft.network.codec.StreamCodec<net.minecraft.network.FriendlyByteBuf, FlowPacket> STREAM_CODEC =
+            net.minecraft.network.codec.StreamCodec.of((buf, p) -> encode(p, buf), FlowPacket::decode);
+
+    @Override
+    public Type<FlowPacket> type() {
+        return TYPE;
+    }
+
 
     public static void encode(FlowPacket p, FriendlyByteBuf buf) {
         buf.writeVarInt(p.id);
@@ -31,10 +39,8 @@ public record FlowPacket(int id, double x, double y, double z, float width, bool
                 buf.readBoolean());
     }
 
-    public static void handle(FlowPacket p, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() ->
-                DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                        () -> () -> com.jeladastudios.ftsgeology.client.ClientEruptions.flow(p)));
-        ctx.get().setPacketHandled(true);
+    public static void handle(FlowPacket p, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() ->
+                com.jeladastudios.ftsgeology.util.Sides.client(() -> com.jeladastudios.ftsgeology.client.ClientEruptions.flow(p)));
     }
 }

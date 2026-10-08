@@ -9,11 +9,9 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.NetworkEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.function.Supplier;
 
 /**
  * An open terminal or seismograph screen asking for its station's latest, or ({@code chat}) a seismograph's log written
@@ -21,7 +19,18 @@ import java.util.function.Supplier;
  * at, for any station on the network, wherever it is (see {@link StationNetwork}); {@code open} asks for its screen to
  * be opened, not only brought up to date.
  */
-public record TerminalRequestPacket(BlockPos pos, boolean chat, @Nullable BlockPos via, boolean open) {
+public record TerminalRequestPacket(BlockPos pos, boolean chat, @Nullable BlockPos via, boolean open) implements net.minecraft.network.protocol.common.custom.CustomPacketPayload {
+
+    public static final Type<TerminalRequestPacket> TYPE = new Type<>(
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(com.jeladastudios.ftsgeology.GeysersMod.MODID, "terminal_request"));
+    public static final net.minecraft.network.codec.StreamCodec<net.minecraft.network.FriendlyByteBuf, TerminalRequestPacket> STREAM_CODEC =
+            net.minecraft.network.codec.StreamCodec.of((buf, p) -> encode(p, buf), TerminalRequestPacket::decode);
+
+    @Override
+    public Type<TerminalRequestPacket> type() {
+        return TYPE;
+    }
+
 
     public TerminalRequestPacket(BlockPos pos) {
         this(pos, false, null, false);
@@ -51,12 +60,11 @@ public record TerminalRequestPacket(BlockPos pos, boolean chat, @Nullable BlockP
         return new TerminalRequestPacket(pos, chat, via, buf.readBoolean());
     }
 
-    public static void handle(TerminalRequestPacket p, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            ServerPlayer player = ctx.get().getSender();
+    public static void handle(TerminalRequestPacket p, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() -> {
+            ServerPlayer player = (ServerPlayer) ctx.player();
             if (player != null) answer(player, p);
         });
-        ctx.get().setPacketHandled(true);
     }
 
     /** Answers one request from a player. */
@@ -88,6 +96,6 @@ public record TerminalRequestPacket(BlockPos pos, boolean chat, @Nullable BlockP
     }
 
     private static void send(ServerPlayer player, TerminalPacket packet) {
-        ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, packet);
     }
 }

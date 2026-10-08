@@ -159,14 +159,14 @@ public final class Reservoirs {
     static final class Store extends SavedData {
         final List<Reservoir> all = new ArrayList<>();
 
-        static Store load(CompoundTag tag) {
+        static Store load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             Store s = new Store();
             for (Tag t : tag.getList("Reservoirs", Tag.TAG_COMPOUND)) s.all.add(Reservoir.load((CompoundTag) t));
             return s;
         }
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public CompoundTag save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             ListTag list = new ListTag();
             for (Reservoir r : all) list.add(r.save());
             tag.put("Reservoirs", list);
@@ -175,7 +175,7 @@ public final class Reservoirs {
     }
 
     private static Store store(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(Store::load, Store::new, "fts_geology_reservoirs");
+        return level.getDataStorage().computeIfAbsent(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_reservoirs");
     }
 
     /** Blocks set in rivers, to the tick the wall there is read. */
@@ -228,7 +228,7 @@ public final class Reservoirs {
             }
         }
         if (now % EVERY != 0) return;
-        Store s = level.getDataStorage().get(Store::load, "fts_geology_reservoirs");
+        Store s = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_reservoirs");
         if (!heldRead) {
             heldRead = true;
             rebuildHeld(level);
@@ -244,7 +244,7 @@ public final class Reservoirs {
 
     /** A dam already known near this block: a wall is read once, not again for every block of it. */
     private static boolean claimed(ServerLevel level, BlockPos p) {
-        Store s = level.getDataStorage().get(Store::load, "fts_geology_reservoirs");
+        Store s = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_reservoirs");
         if (s == null) return false;
         for (Reservoir r : s.all) if (r.dam.distManhattan(p) <= 24) return true;
         return false;
@@ -700,7 +700,7 @@ public final class Reservoirs {
 
     private static void rebuildHeld(ServerLevel level) {
         LongOpenHashSet h = new LongOpenHashSet();
-        Store s = level.getDataStorage().get(Store::load, "fts_geology_reservoirs");
+        Store s = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_reservoirs");
         if (s != null) {
             for (Reservoir r : s.all) {
                 for (int i = 0; i < r.lowered.size(); i++) {
@@ -880,7 +880,7 @@ public final class Reservoirs {
             }
         }
         level.sendParticles(ParticleTypes.CLOUD, r.dam.getX() + 0.5, r.level, r.dam.getZ() + 0.5, 40, 1.5, 1.0, 1.5, 0.05);
-        level.playSound(null, r.dam, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 2.0F, 0.6F);
+        level.playSound(null, r.dam, SoundEvents.GENERIC_EXPLODE.value(), SoundSource.BLOCKS, 2.0F, 0.6F);
     }
 
     /**

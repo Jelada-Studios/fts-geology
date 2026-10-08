@@ -87,7 +87,7 @@ public class GasTankBlockEntity extends GasMachineBlockEntity {
         for (Direction d : Direction.values()) gas().release(worldPosition.relative(d), escaping.copy());
         sl.sendParticles(ParticleTypes.CLOUD, worldPosition.getX() + 0.5, worldPosition.getY() + 0.5, worldPosition.getZ() + 0.5,
                 (int) Math.min(80, 10 + n / 50), 0.8, 0.8, 0.8, 0.2);
-        sl.playSound(null, worldPosition, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 1.0f, 1.6f);
+        sl.playSound(null, worldPosition, SoundEvents.GENERIC_EXPLODE.value(), SoundSource.BLOCKS, 1.0f, 1.6f);
         // The escaping jet is too rich to burn at first; once it mixes with air, the fire from
         // the blast that broke the tank lights it.
         if (Combustion.fuelFraction(escaping) > 0) gas().igniteLater(worldPosition, 6, 4, 12);

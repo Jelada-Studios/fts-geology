@@ -211,7 +211,7 @@ public final class FossilBeds {
      * them (its petrified trees and ice shards stay).
      */
     public record Remove() implements BiomeModifier {
-        public static final Codec<Remove> CODEC = Codec.unit(new Remove());
+        public static final com.mojang.serialization.MapCodec<Remove> CODEC = com.mojang.serialization.MapCodec.unit(new Remove());
 
         @Override
         public void modify(Holder<Biome> biome, Phase phase, ModifiableBiomeInfo.BiomeInfo.Builder builder) {
@@ -227,7 +227,7 @@ public final class FossilBeds {
         }
 
         @Override
-        public Codec<? extends BiomeModifier> codec() {
+        public com.mojang.serialization.MapCodec<? extends net.neoforged.neoforge.common.world.BiomeModifier> codec() {
             return CODEC;
         }
     }

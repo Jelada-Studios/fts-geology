@@ -53,14 +53,14 @@ public final class JoinNotices {
     private static final class Stamp extends SavedData {
         String version = "";
 
-        static Stamp load(CompoundTag tag) {
+        static Stamp load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             Stamp s = new Stamp();
             s.version = tag.getString("version");
             return s;
         }
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public CompoundTag save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             tag.putString("version", version);
             return tag;
         }
@@ -72,7 +72,7 @@ public final class JoinNotices {
     }
 
     private static Stamp stamp(ServerLevel overworld) {
-        return overworld.getDataStorage().computeIfAbsent(Stamp::load, Stamp::new, DATA);
+        return overworld.getDataStorage().computeIfAbsent(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Stamp::new, Stamp::load, null), DATA);
     }
 
     @SubscribeEvent

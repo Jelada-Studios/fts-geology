@@ -11,7 +11,7 @@ import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.fluids.ForgeFlowingFluid;
+import net.neoforged.neoforge.fluids.BaseFlowingFluid;
 
 import javax.annotation.Nonnull;
 
@@ -23,7 +23,7 @@ import javax.annotation.Nonnull;
  * down a valley a block at a time instead of being cut into flat pools with a rock bar between them, and a mod that
  * moves water about finds nothing here to move.</p>
  */
-public abstract class RiverWaterFluid extends ForgeFlowingFluid {
+public abstract class RiverWaterFluid extends BaseFlowingFluid {
 
     /**
      * Which way the river runs here: 0 still (a lake, a mouth, a pool), 1 to 8 the eight compass ways, a quarter turn

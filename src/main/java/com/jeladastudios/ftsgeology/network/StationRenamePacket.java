@@ -4,15 +4,24 @@ import com.jeladastudios.ftsgeology.instrument.StationNetwork;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.NetworkEvent;
 
-import java.util.function.Supplier;
 
 /**
  * A station renamed from its own screen: by whoever set it up, an operator, or anyone where nobody did (see
  * {@link StationNetwork#rename}). The screen is brought up to date after.
  */
-public record StationRenamePacket(BlockPos pos, String name) {
+public record StationRenamePacket(BlockPos pos, String name) implements net.minecraft.network.protocol.common.custom.CustomPacketPayload {
+
+    public static final Type<StationRenamePacket> TYPE = new Type<>(
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(com.jeladastudios.ftsgeology.GeysersMod.MODID, "station_rename"));
+    public static final net.minecraft.network.codec.StreamCodec<net.minecraft.network.FriendlyByteBuf, StationRenamePacket> STREAM_CODEC =
+            net.minecraft.network.codec.StreamCodec.of((buf, p) -> encode(p, buf), StationRenamePacket::decode);
+
+    @Override
+    public Type<StationRenamePacket> type() {
+        return TYPE;
+    }
+
 
     public static void encode(StationRenamePacket p, FriendlyByteBuf buf) {
         buf.writeBlockPos(p.pos);
@@ -23,14 +32,13 @@ public record StationRenamePacket(BlockPos pos, String name) {
         return new StationRenamePacket(buf.readBlockPos(), buf.readUtf(StationNetwork.NAME));
     }
 
-    public static void handle(StationRenamePacket p, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            ServerPlayer player = ctx.get().getSender();
+    public static void handle(StationRenamePacket p, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() -> {
+            ServerPlayer player = (ServerPlayer) ctx.player();
             if (player == null || player.distanceToSqr(p.pos.getCenter()) > 64 || !player.serverLevel().isLoaded(p.pos)) return;
             if (StationNetwork.rename(player.serverLevel(), player, p.pos, p.name)) {
                 TerminalRequestPacket.answer(player, new TerminalRequestPacket(p.pos));
             }
         });
-        ctx.get().setPacketHandled(true);
     }
 }

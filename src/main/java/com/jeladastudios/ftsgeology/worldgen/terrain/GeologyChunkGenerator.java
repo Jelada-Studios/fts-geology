@@ -43,7 +43,7 @@ import java.util.concurrent.atomic.LongAdder;
  */
 public final class GeologyChunkGenerator extends NoiseBasedChunkGenerator {
 
-    public static final Codec<GeologyChunkGenerator> CODEC = RecordCodecBuilder.create(i -> i.group(
+    public static final com.mojang.serialization.MapCodec<GeologyChunkGenerator> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             BiomeSource.CODEC.fieldOf("biome_source").forGetter(g -> g.biomeSource),
             NoiseGeneratorSettings.CODEC.fieldOf("settings").forGetter(NoiseBasedChunkGenerator::generatorSettings)
     ).apply(i, i.stable(GeologyChunkGenerator::new)));
@@ -63,7 +63,7 @@ public final class GeologyChunkGenerator extends NoiseBasedChunkGenerator {
     }
 
     @Override
-    protected Codec<? extends ChunkGenerator> codec() {
+    protected com.mojang.serialization.MapCodec<? extends ChunkGenerator> codec() {
         return CODEC;
     }
 

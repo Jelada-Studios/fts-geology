@@ -4,7 +4,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.neoforged.neoforge.common.capabilities.ForgeCapabilities;
 import net.neoforged.neoforge.energy.EnergyStorage;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 
@@ -83,7 +82,7 @@ public class MachineEnergy extends EnergyStorage {
                 }
                 continue;
             }
-            IEnergyStorage target = be.getCapability(ForgeCapabilities.ENERGY, d.getOpposite()).orElse(null);
+            IEnergyStorage target = be.getLevel() == null ? null : be.getLevel().getCapability(net.neoforged.neoforge.capabilities.Capabilities.EnergyStorage.BLOCK, be.getBlockPos(), d.getOpposite());
             if (target == null || !target.canReceive()) continue;
             int sent = target.receiveEnergy(offered, false);
             if (sent > 0) {

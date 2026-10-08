@@ -21,9 +21,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
-import net.neoforged.neoforge.common.capabilities.Capability;
-import net.neoforged.neoforge.common.capabilities.ForgeCapabilities;
-import net.neoforged.neoforge.common.util.LazyOptional;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.EnergyStorage;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import org.jetbrains.annotations.NotNull;
@@ -78,9 +76,8 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
     }
 
     private final Buffer energy = new Buffer();
-    private final LazyOptional<IEnergyStorage> handle = LazyOptional.of(() -> energy);
     /** The same store as Electrodynamics' electricity, where it is installed: its wires take nothing else. */
-    private final LazyOptional<Object> volts = ElectrodynamicsPower.generator(energy::getEnergyStored, () -> CAPACITY,
+    private final Object volts = ElectrodynamicsPower.generator(energy::getEnergyStored, () -> CAPACITY,
             energy::set, this::setChanged);
 
     /** What the ground under it gives, before sharing, and what it made on the last tick after sharing. */
@@ -266,7 +263,7 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
             // Electrodynamics' electricity where the block takes it -- a wire takes nothing else -- and Forge Energy where not.
             int taken = ElectrodynamicsPower.give(other, d.getOpposite(), offered);
             if (taken < 0) {
-                IEnergyStorage into = other.getCapability(ForgeCapabilities.ENERGY, d.getOpposite()).orElse(null);
+                IEnergyStorage into = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos.relative(d), d.getOpposite());
                 if (into == null || !into.canReceive()) continue;
                 taken = into.receiveEnergy(offered, false);
             }
@@ -330,18 +327,9 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
         }
     }
 
-    @Override
-    public <T> @NotNull LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
-        if (cap == ForgeCapabilities.ENERGY && side != Direction.DOWN) return handle.cast();
-        if (ElectrodynamicsPower.is(cap) && side != Direction.DOWN) return volts.cast();
-        return super.getCapability(cap, side);
-    }
-
-    @Override
-    public void invalidateCaps() {
-        super.invalidateCaps();
-        handle.invalidate();
-        volts.invalidate();
+    /** Its Forge Energy on a side, for the capability registration: every side but its foot, the well. */
+    public @Nullable IEnergyStorage energyOn(@Nullable Direction side) {
+        return side != Direction.DOWN ? energy : null;
     }
 
     @Override

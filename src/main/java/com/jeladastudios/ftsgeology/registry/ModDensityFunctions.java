@@ -3,7 +3,7 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.worldgen.terrain.PlateDensity;
-import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -16,18 +16,18 @@ public final class ModDensityFunctions {
 
     private ModDensityFunctions() {}
 
-    public static final DeferredRegister<Codec<? extends DensityFunction>> DENSITY_FUNCTIONS =
+    public static final DeferredRegister<MapCodec<? extends DensityFunction>> DENSITY_FUNCTIONS =
             DeferredRegister.create(Registries.DENSITY_FUNCTION_TYPE, GeysersMod.MODID);
 
     /** The rivers traced down the raw ground. See {@link com.jeladastudios.ftsgeology.worldgen.terrain.RiverDensity}. */
-    public static final DeferredHolder<Codec<? extends DensityFunction>, Codec<? extends DensityFunction>> RIVERS =
+    public static final DeferredHolder<MapCodec<? extends DensityFunction>, MapCodec<? extends DensityFunction>> RIVERS =
             DENSITY_FUNCTIONS.register("rivers", () -> com.jeladastudios.ftsgeology.worldgen.terrain.RiverDensity.CODEC.codec());
 
     /** Sea cliffs on a basalt coast. See {@link com.jeladastudios.ftsgeology.worldgen.terrain.CoastCliffs}. */
-    public static final DeferredHolder<Codec<? extends DensityFunction>, Codec<? extends DensityFunction>> COAST_CLIFFS =
+    public static final DeferredHolder<MapCodec<? extends DensityFunction>, MapCodec<? extends DensityFunction>> COAST_CLIFFS =
             DENSITY_FUNCTIONS.register("coast_cliffs", () -> com.jeladastudios.ftsgeology.worldgen.terrain.CoastCliffs.CODEC.codec());
 
     /** The plate model's continents, erosion, ridge factor and relief. See {@link PlateDensity}. */
-    public static final DeferredHolder<Codec<? extends DensityFunction>, Codec<? extends DensityFunction>> PLATE =
+    public static final DeferredHolder<MapCodec<? extends DensityFunction>, MapCodec<? extends DensityFunction>> PLATE =
             DENSITY_FUNCTIONS.register("plate", () -> PlateDensity.CODEC.codec());
 }

@@ -3,7 +3,7 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyChunkGenerator;
-import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -13,10 +13,10 @@ public final class ModChunkGenerators {
 
     private ModChunkGenerators() {}
 
-    public static final DeferredRegister<Codec<? extends ChunkGenerator>> CHUNK_GENERATORS =
+    public static final DeferredRegister<MapCodec<? extends ChunkGenerator>> CHUNK_GENERATORS =
             DeferredRegister.create(Registries.CHUNK_GENERATOR, GeysersMod.MODID);
 
     /** The noise generator that keeps villages out of the rivers. See {@link GeologyChunkGenerator}. */
-    public static final DeferredHolder<Codec<? extends ChunkGenerator>, Codec<? extends ChunkGenerator>> NOISE =
+    public static final DeferredHolder<MapCodec<? extends ChunkGenerator>, MapCodec<? extends ChunkGenerator>> NOISE =
             CHUNK_GENERATORS.register("noise", () -> GeologyChunkGenerator.CODEC);
 }

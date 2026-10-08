@@ -28,7 +28,7 @@ public class GasTankItem extends BlockItem {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, net.minecraft.world.item.Item.TooltipContext context, List<Component> tip, TooltipFlag flag) {
         GasMix g = contents(stack);
         if (g.isEmpty()) {
             tip.add(Component.translatable("item.fts_geology.gas_tank.empty").withStyle(ChatFormatting.GRAY));

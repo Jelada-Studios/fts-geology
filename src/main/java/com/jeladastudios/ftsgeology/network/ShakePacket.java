@@ -2,10 +2,7 @@ package com.jeladastudios.ftsgeology.network;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.DistExecutor;
-import net.neoforged.neoforge.network.NetworkEvent;
 
-import java.util.function.Supplier;
 
 /**
  * "Shake the view this hard, for this long."
@@ -21,7 +18,18 @@ import java.util.function.Supplier;
  * @param ticks     how long it takes to decay to nothing
  * @param speed     how quick the swaying is: 1 for the heavy S wave, faster for the P wave's jolt
  */
-public record ShakePacket(float intensity, int ticks, float speed) {
+public record ShakePacket(float intensity, int ticks, float speed) implements net.minecraft.network.protocol.common.custom.CustomPacketPayload {
+
+    public static final Type<ShakePacket> TYPE = new Type<>(
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(com.jeladastudios.ftsgeology.GeysersMod.MODID, "shake"));
+    public static final net.minecraft.network.codec.StreamCodec<net.minecraft.network.FriendlyByteBuf, ShakePacket> STREAM_CODEC =
+            net.minecraft.network.codec.StreamCodec.of((buf, p) -> encode(p, buf), ShakePacket::decode);
+
+    @Override
+    public Type<ShakePacket> type() {
+        return TYPE;
+    }
+
 
     public static void encode(ShakePacket p, FriendlyByteBuf buf) {
         buf.writeFloat(p.intensity);
@@ -33,13 +41,11 @@ public record ShakePacket(float intensity, int ticks, float speed) {
         return new ShakePacket(buf.readFloat(), buf.readVarInt(), buf.readFloat());
     }
 
-    public static void handle(ShakePacket p, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() ->
+    public static void handle(ShakePacket p, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() ->
                 // Guarded rather than called directly: the class it reaches is client-only, and on a
                 // dedicated server loading it at all would be a crash on the first quake.
-                DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                        () -> () -> com.jeladastudios.ftsgeology.client.ClientShake.add(
+                com.jeladastudios.ftsgeology.util.Sides.client(() -> com.jeladastudios.ftsgeology.client.ClientShake.add(
                                 p.intensity(), p.ticks(), p.speed())));
-        ctx.get().setPacketHandled(true);
     }
 }

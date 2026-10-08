@@ -612,9 +612,7 @@ public final class SoilWater {
         }
         if (hours > 0) soakIn(level, chunk, c, hours);
         if (changed) {
-            com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
-                    net.neoforged.neoforge.network.PacketDistributor.TRACKING_CHUNK.with(() -> chunk),
-                    new com.jeladastudios.ftsgeology.network.SoilTintPacket(p.x, p.z, c.tint.clone()));
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingChunk((net.minecraft.server.level.ServerLevel) chunk.getLevel(), chunk.getPos(), new com.jeladastudios.ftsgeology.network.SoilTintPacket(p.x, p.z, c.tint.clone()));
         }
     }
 
@@ -837,9 +835,7 @@ public final class SoilWater {
         }
         if (!changed) return;
         ChunkPos p = chunk.getPos();
-        com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
-                net.neoforged.neoforge.network.PacketDistributor.TRACKING_CHUNK.with(() -> chunk),
-                new com.jeladastudios.ftsgeology.network.SoilWetPacket(p.x, p.z, c.wet.clone()));
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingChunk((net.minecraft.server.level.ServerLevel) chunk.getLevel(), chunk.getPos(), new com.jeladastudios.ftsgeology.network.SoilWetPacket(p.x, p.z, c.wet.clone()));
     }
 
     /**
@@ -863,17 +859,13 @@ public final class SoilWater {
         Cells c = CELLS.get(key(level, p.x, p.z));
         if (c == null) return;
         if (c.last >= 0) {
-            com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
-                    net.neoforged.neoforge.network.PacketDistributor.PLAYER.with(event::getPlayer),
-                    new com.jeladastudios.ftsgeology.network.SoilWetPacket(p.x, p.z, c.wet.clone()));
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(event.getPlayer(), new com.jeladastudios.ftsgeology.network.SoilWetPacket(p.x, p.z, c.wet.clone()));
         }
         if (!GeyserConfig.SOIL_WATER_TINT.get()) return;
         boolean any = false;
         for (byte b : c.tint) any |= b != 0;
         if (!any) return;
-        com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
-                net.neoforged.neoforge.network.PacketDistributor.PLAYER.with(event::getPlayer),
-                new com.jeladastudios.ftsgeology.network.SoilTintPacket(p.x, p.z, c.tint.clone()));
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(event.getPlayer(), new com.jeladastudios.ftsgeology.network.SoilTintPacket(p.x, p.z, c.tint.clone()));
     }
 
     private enum Change { DIE, GROW, MUD, DRY }

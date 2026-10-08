@@ -12,10 +12,9 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.ModLoadingContext;
+import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
-import net.neoforged.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,8 +28,7 @@ public class GeysersMod {
     public static final String MODID = "fts_geology";
     public static final Logger LOGGER = LoggerFactory.getLogger("FTsGeology");
 
-    public GeysersMod() {
-        IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
+    public GeysersMod(IEventBus modBus, ModContainer modContainer) {
 
         ModBlocks.BLOCKS.register(modBus);
         ModItems.ITEMS.register(modBus);
@@ -49,6 +47,7 @@ public class GeysersMod {
         // The gases: their own registers, tab and settings, so the module stays whole in itself.
         com.jeladastudios.ftsgeology.gas.registry.GasBlocks.BLOCKS.register(modBus);
         com.jeladastudios.ftsgeology.gas.registry.GasItems.ITEMS.register(modBus);
+        com.jeladastudios.ftsgeology.gas.item.GasArmorMaterials.MATERIALS.register(modBus);
         com.jeladastudios.ftsgeology.gas.registry.GasBlockEntities.BLOCK_ENTITIES.register(modBus);
         com.jeladastudios.ftsgeology.gas.registry.GasTabs.TABS.register(modBus);
         modBus.addListener(com.jeladastudios.ftsgeology.gas.registry.GasCapabilities::register);
@@ -68,10 +67,8 @@ public class GeysersMod {
         // Let the fish be born in the mod's river water as well as in vanilla's (mod bus event).
         modBus.addListener(com.jeladastudios.ftsgeology.hydrology.RiverSpawns::register);
 
-        // The mod's first packet. Registered in common setup because the channel has to exist on
-        // both sides before anybody joins, and the handler itself is guarded for physical side.
-        modBus.addListener((net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent e) ->
-                e.enqueueWork(com.jeladastudios.ftsgeology.network.ModNetwork::register));
+        // The mod's packets, registered on the mod bus; the client handlers are guarded for physical side.
+        modBus.addListener(com.jeladastudios.ftsgeology.network.ModNetwork::register);
 
         // Distant Horizons' far terrain from the plate model, when it is installed.
         modBus.addListener((net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent e) ->
@@ -83,11 +80,11 @@ public class GeysersMod {
         // SERVER, not COMMON: every setting decides what the world does, and SERVER configs are synced
         // to clients on join. The file lives in <world>/serverconfig/fts_geology.toml; a file in the
         // instance's defaultconfigs/ folder is copied into each new world.
-        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, GeyserConfig.SPEC, "fts_geology.toml");
+        modContainer.registerConfig(ModConfig.Type.SERVER, GeyserConfig.SPEC, "fts_geology.toml");
         // The gases' settings, beside it in the same folder.
-        ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, com.jeladastudios.ftsgeology.gas.GasConfig.SPEC, "fts_geology-gases.toml");
+        modContainer.registerConfig(ModConfig.Type.SERVER, com.jeladastudios.ftsgeology.gas.GasConfig.SPEC, "fts_geology-gases.toml");
         // The player's own sound and sky settings, on their machine.
-        ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, com.jeladastudios.ftsgeology.config.ClientConfig.SPEC, "fts_geology-client.toml");
+        modContainer.registerConfig(ModConfig.Type.CLIENT, com.jeladastudios.ftsgeology.config.ClientConfig.SPEC, "fts_geology-client.toml");
 
         // The geology advancements' trigger, registered before advancements are read.
         com.jeladastudios.ftsgeology.advancement.GeologyTrigger.init();

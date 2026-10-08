@@ -14,7 +14,7 @@ import com.jeladastudios.ftsgeology.blockentity.VolcanoCoreBlockEntity;
 import com.jeladastudios.ftsgeology.blockentity.VolcanoIgniterBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
 public final class ModBlockEntities {
 

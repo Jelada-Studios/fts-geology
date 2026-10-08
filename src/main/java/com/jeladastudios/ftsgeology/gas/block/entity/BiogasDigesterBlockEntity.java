@@ -21,9 +21,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
-import net.neoforged.neoforge.common.capabilities.Capability;
-import net.neoforged.neoforge.common.capabilities.ForgeCapabilities;
-import net.neoforged.neoforge.common.util.LazyOptional;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
 import net.neoforged.neoforge.items.ItemStackHandler;
@@ -54,7 +51,6 @@ public class BiogasDigesterBlockEntity extends GasMachineBlockEntity {
             setChanged();
         }
     };
-    private final LazyOptional<IItemHandler> itemCap = LazyOptional.of(() -> items);
     private final GasTank out = new GasTank(1.0, MAX_PRESSURE).onChange(this::setChanged);
     private double pending;
     private int feedTimer;
@@ -134,16 +130,9 @@ public class BiogasDigesterBlockEntity extends GasMachineBlockEntity {
         return o;
     }
 
-    @Override
-    public @NotNull <T> LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
-        if (cap == ForgeCapabilities.ITEM_HANDLER) return itemCap.cast();
-        return super.getCapability(cap, side);
-    }
-
-    @Override
-    public void invalidateCaps() {
-        super.invalidateCaps();
-        itemCap.invalidate();
+    /** Its feed slots, for the capability registration: on every side. */
+    public IItemHandler itemsOn(@Nullable Direction side) {
+        return items;
     }
 
     @Override

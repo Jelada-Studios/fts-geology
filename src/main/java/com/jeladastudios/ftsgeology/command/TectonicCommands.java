@@ -387,8 +387,7 @@ public final class TectonicCommands {
         if (via == null && level.getBlockEntity(pos) instanceof com.jeladastudios.ftsgeology.blockentity.WeatherTerminalBlockEntity) via = pos;
         data = com.jeladastudios.ftsgeology.instrument.StationNetwork.decorate(level, player, via, pos, data);
         data.putInt("Tab", tab);
-        com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(net.neoforged.neoforge.network.PacketDistributor.PLAYER.with(() -> player),
-                new com.jeladastudios.ftsgeology.network.TerminalPacket(pos, data, true));
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, new com.jeladastudios.ftsgeology.network.TerminalPacket(pos, data, true));
         return 1;
     }
 

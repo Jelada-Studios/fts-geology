@@ -279,7 +279,7 @@ public final class FissureEruptions {
     static final class Store extends SavedData {
         final List<Fissure> all = new ArrayList<>();
 
-        static Store load(CompoundTag tag) {
+        static Store load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             Store s = new Store();
             ListTag list = tag.getList("fissures", Tag.TAG_COMPOUND);
             for (int i = 0; i < list.size(); i++) s.all.add(Fissure.load(list.getCompound(i)));
@@ -287,7 +287,7 @@ public final class FissureEruptions {
         }
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public CompoundTag save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             ListTag list = new ListTag();
             for (Fissure f : all) list.add(f.save());
             tag.put("fissures", list);
@@ -296,7 +296,7 @@ public final class FissureEruptions {
     }
 
     private static Store store(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(Store::load, Store::new, NAME);
+        return level.getDataStorage().computeIfAbsent(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), NAME);
     }
 
     // === Where ============================================================
@@ -478,7 +478,7 @@ public final class FissureEruptions {
         ServerLevel level = event.getServer().overworld();
         if (level == null) return;
         long now = level.getGameTime();
-        Store st = level.getDataStorage().get(Store::load, NAME);
+        Store st = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), NAME);
         // One at a time, but one left a day with nobody near does not keep the others off.
         if (now % ROLL == 0 && GeyserConfig.FISSURE_ERUPTIONS.get() && (st == null || st.all.stream().allMatch(e -> e.held > 24000))) roll(level);
         if (st == null || st.all.isEmpty()) return;
@@ -562,7 +562,7 @@ public final class FissureEruptions {
                     f.opened = true;
                     carve(level, f, f.start);
                     level.playSound(null, f.x(f.start, 0), level.getSeaLevel() + 40, f.z(f.start, 0),
-                            SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 6.0f, 0.4f);
+                            SoundEvents.GENERIC_EXPLODE.value(), SoundSource.BLOCKS, 6.0f, 0.4f);
                     Diagnostics.info("fissure eruption at {}, {}: the fissure opens at {}, {}", f.cx, f.cz, f.x(f.start, 0), f.z(f.start, 0));
                 }
                 for (int i = 0; i < UNZIP; i++) {
@@ -1718,7 +1718,7 @@ public final class FissureEruptions {
                     send(level, near, ParticleTypes.EXPLOSION, x + 0.5, y + 1.5, z + 0.5, 3, 1.0, 1.0, 1.0, 0.0);
                     send(level, near, ParticleTypes.SPLASH, x + 0.5, y + 1.2, z + 0.5, 60, 2.0, 0.6, 2.0, 0.4);
                     send(level, near, ParticleTypes.ASH, x + 0.5, y + 4, z + 0.5, 40, 4.0, 3.0, 4.0, 0.02);
-                    level.playSound(null, x, y, z, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 5.0f, 0.5f + 0.2f * level.random.nextFloat());
+                    level.playSound(null, x, y, z, SoundEvents.GENERIC_EXPLODE.value(), SoundSource.BLOCKS, 5.0f, 0.5f + 0.2f * level.random.nextFloat());
                     blasts++;
                 }
                 if (i == 2 && now % 10 == 0) level.playSound(null, x, y, z, SoundEvents.LAVA_EXTINGUISH, SoundSource.BLOCKS, 3.0f, 0.5f);
@@ -1763,7 +1763,7 @@ public final class FissureEruptions {
 
     /** Moves the eruption under way on to its next stage at once. */
     public static String next(ServerLevel level) {
-        Store st = level.getDataStorage().get(Store::load, NAME);
+        Store st = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), NAME);
         if (st == null || st.all.isEmpty()) return "no fissure eruption under way";
         for (Fissure f : st.all) f.stageAt = level.getGameTime() - f.ticks(f.stage) + 20;
         st.setDirty();
@@ -1771,7 +1771,7 @@ public final class FissureEruptions {
     }
 
     public static String info(ServerLevel level) {
-        Store st = level.getDataStorage().get(Store::load, NAME);
+        Store st = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), NAME);
         if (st == null || st.all.isEmpty()) return "no fissure eruption under way; " + summary();
         StringBuilder b = new StringBuilder();
         for (Fissure f : st.all) {
@@ -1801,7 +1801,7 @@ public final class FissureEruptions {
      * out (of its first vent, once it has them) and {@code up} over it, looking at it.
      */
     public static String watch(ServerLevel level, ServerPlayer player, int across, int up) {
-        Store st = level.getDataStorage().get(Store::load, NAME);
+        Store st = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), NAME);
         if (st == null || st.all.isEmpty()) return "no fissure eruption under way";
         Fissure f = st.all.get(0);
         int tx, tz;
@@ -1823,7 +1823,7 @@ public final class FissureEruptions {
     }
 
     public static String stop(ServerLevel level) {
-        Store st = level.getDataStorage().get(Store::load, NAME);
+        Store st = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), NAME);
         if (st == null || st.all.isEmpty()) return "no fissure eruption under way";
         for (Fissure f : st.all) VolcanoUnrest.settle(f.centre());
         st.all.clear();

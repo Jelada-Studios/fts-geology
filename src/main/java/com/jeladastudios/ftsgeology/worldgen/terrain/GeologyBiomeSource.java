@@ -24,7 +24,7 @@ import java.util.stream.Stream;
  */
 public class GeologyBiomeSource extends BiomeSource {
 
-    public static final Codec<GeologyBiomeSource> CODEC = RecordCodecBuilder.create(i -> i.group(
+    public static final com.mojang.serialization.MapCodec<GeologyBiomeSource> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             BiomeSource.CODEC.fieldOf("parent").forGetter(s -> s.parent),
             Codec.unboundedMap(Codec.STRING, Biome.CODEC).fieldOf("biomes").forGetter(s -> s.byRole)
     ).apply(i, GeologyBiomeSource::new));
@@ -70,7 +70,7 @@ public class GeologyBiomeSource extends BiomeSource {
     }
 
     @Override
-    protected Codec<? extends BiomeSource> codec() {
+    protected com.mojang.serialization.MapCodec<? extends BiomeSource> codec() {
         return CODEC;
     }
 

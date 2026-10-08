@@ -176,7 +176,7 @@ public class GeothermalProbeItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @javax.annotation.Nullable Level level, List<Component> tooltip,
+    public void appendHoverText(ItemStack stack, net.minecraft.world.item.Item.TooltipContext context, List<Component> tooltip,
                                 net.minecraft.world.item.TooltipFlag flag) {
         tooltip.add(Component.translatable("item.fts_geology.geothermal_probe.tip").withStyle(ChatFormatting.GRAY));
     }

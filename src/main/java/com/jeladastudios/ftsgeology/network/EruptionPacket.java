@@ -3,10 +3,7 @@ package com.jeladastudios.ftsgeology.network;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.DistExecutor;
-import net.neoforged.neoforge.network.NetworkEvent;
 
-import java.util.function.Supplier;
 
 /**
  * "This volcano is doing this": the state its smoke is drawn from, rather than the smoke itself.
@@ -27,7 +24,18 @@ import java.util.function.Supplier;
  * @param fumaroles packed positions of the chimney bases on the flanks
  */
 public record EruptionPacket(BlockPos summit, byte phase, float magnitude, float windX, float windZ,
-                             boolean ashfall, long[] fumaroles) {
+                             boolean ashfall, long[] fumaroles) implements net.minecraft.network.protocol.common.custom.CustomPacketPayload {
+
+    public static final Type<EruptionPacket> TYPE = new Type<>(
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(com.jeladastudios.ftsgeology.GeysersMod.MODID, "eruption"));
+    public static final net.minecraft.network.codec.StreamCodec<net.minecraft.network.FriendlyByteBuf, EruptionPacket> STREAM_CODEC =
+            net.minecraft.network.codec.StreamCodec.of((buf, p) -> encode(p, buf), EruptionPacket::decode);
+
+    @Override
+    public Type<EruptionPacket> type() {
+        return TYPE;
+    }
+
 
     /** Never more chimneys than this in one packet; a cone carries about ten. */
     private static final int MAX_FUMAROLES = 32;
@@ -48,11 +56,9 @@ public record EruptionPacket(BlockPos summit, byte phase, float magnitude, float
                 buf.readFloat(), buf.readBoolean(), buf.readLongArray());
     }
 
-    public static void handle(EruptionPacket p, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() ->
+    public static void handle(EruptionPacket p, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() ->
                 // Guarded for the same reason as ShakePacket: the class it reaches is client-only.
-                DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                        () -> () -> com.jeladastudios.ftsgeology.client.ClientEruptions.update(p)));
-        ctx.get().setPacketHandled(true);
+                com.jeladastudios.ftsgeology.util.Sides.client(() -> com.jeladastudios.ftsgeology.client.ClientEruptions.update(p)));
     }
 }

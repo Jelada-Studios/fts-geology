@@ -81,14 +81,14 @@ public final class WorldgenRevision {
     private static final class Stamp extends SavedData {
         int revision;
 
-        static Stamp load(CompoundTag tag) {
+        static Stamp load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             Stamp s = new Stamp();
             s.revision = tag.getInt("revision");
             return s;
         }
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public CompoundTag save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             tag.putInt("revision", revision);
             return tag;
         }
@@ -104,7 +104,7 @@ public final class WorldgenRevision {
         File file = server.getWorldPath(LevelResource.ROOT).resolve("data").resolve(DATA + ".dat").toFile();
         if (file.isFile()) {
             try {
-                r = NbtIo.readCompressed(file).getCompound("data").getInt("revision");
+                r = NbtIo.readCompressed(file.toPath(), net.minecraft.nbt.NbtAccounter.unlimitedHeap()).getCompound("data").getInt("revision");
             } catch (Exception e) {
                 GeysersMod.LOGGER.warn("Could not read {}; the world is generated as one made before it: {}", file, e.toString());
             }
@@ -115,11 +115,11 @@ public final class WorldgenRevision {
     @SubscribeEvent
     public static void onLevelLoad(LevelEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel level) || level.dimension() != Level.OVERWORLD) return;
-        level.getDataStorage().computeIfAbsent(Stamp::load, () -> {
+        level.getDataStorage().computeIfAbsent(new net.minecraft.world.level.saveddata.SavedData.Factory<>(() -> {
             Stamp s = new Stamp();
             s.revision = revision;
             s.setDirty();
             return s;
-        }, DATA);
+        }, Stamp::load, null), DATA);
     }
 }

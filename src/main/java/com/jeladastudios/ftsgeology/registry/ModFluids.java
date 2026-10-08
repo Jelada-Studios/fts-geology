@@ -7,10 +7,10 @@ import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.fluid.RiverWaterFluid;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.material.Fluid;
-import net.neoforged.neoforge.common.ForgeMod;
-import net.neoforged.neoforge.fluids.ForgeFlowingFluid;
+import net.neoforged.neoforge.common.NeoForgeMod;
+import net.neoforged.neoforge.fluids.BaseFlowingFluid;
 import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
 /** The mod's fluids: the standing water of a traced river, and sea water carried off the sea in a bucket. */
 public final class ModFluids {
@@ -30,12 +30,12 @@ public final class ModFluids {
      * flows and spreads as water does, but it waters no field; see {@link com.jeladastudios.ftsgeology.hydrology.SeaWater}.
      */
     public static final DeferredHolder<Fluid, Fluid> SEA_WATER =
-            FLUIDS.register("sea_water", () -> new ForgeFlowingFluid.Source(seaProperties()));
+            FLUIDS.register("sea_water", () -> new BaseFlowingFluid.Source(seaProperties()));
     public static final DeferredHolder<Fluid, Fluid> FLOWING_SEA_WATER =
-            FLUIDS.register("flowing_sea_water", () -> new ForgeFlowingFluid.Flowing(seaProperties()));
+            FLUIDS.register("flowing_sea_water", () -> new BaseFlowingFluid.Flowing(seaProperties()));
 
     public static final DeferredRegister<net.neoforged.neoforge.fluids.FluidType> FLUID_TYPES =
-            DeferredRegister.create(net.neoforged.neoforge.registries.ForgeRegistries.Keys.FLUID_TYPES, GeysersMod.MODID);
+            DeferredRegister.create(net.neoforged.neoforge.registries.NeoForgeRegistries.Keys.FLUID_TYPES, GeysersMod.MODID);
 
     /**
      * Crude oil from a well head on an oil field: heavy, slow, black, burning rather than putting a fire out. In the
@@ -77,19 +77,19 @@ public final class ModFluids {
             });
 
     public static final DeferredHolder<Fluid, Fluid> CRUDE_OIL =
-            FLUIDS.register("crude_oil", () -> new ForgeFlowingFluid.Source(oilProperties()));
+            FLUIDS.register("crude_oil", () -> new BaseFlowingFluid.Source(oilProperties()));
     public static final DeferredHolder<Fluid, Fluid> FLOWING_CRUDE_OIL =
-            FLUIDS.register("flowing_crude_oil", () -> new ForgeFlowingFluid.Flowing(oilProperties()));
+            FLUIDS.register("flowing_crude_oil", () -> new BaseFlowingFluid.Flowing(oilProperties()));
 
-    private static ForgeFlowingFluid.Properties oilProperties() {
-        return new ForgeFlowingFluid.Properties(CRUDE_OIL_TYPE, CRUDE_OIL, FLOWING_CRUDE_OIL)
+    private static BaseFlowingFluid.Properties oilProperties() {
+        return new BaseFlowingFluid.Properties(CRUDE_OIL_TYPE, CRUDE_OIL, FLOWING_CRUDE_OIL)
                 .block(() -> (net.minecraft.world.level.block.LiquidBlock) ModBlocks.CRUDE_OIL.get())
                 .bucket(() -> ModItems.CRUDE_OIL_BUCKET.get())
                 .slopeFindDistance(2).levelDecreasePerBlock(2).tickRate(30).explosionResistance(100.0F);
     }
 
-    private static ForgeFlowingFluid.Properties seaProperties() {
-        return new ForgeFlowingFluid.Properties(ForgeMod.WATER_TYPE, SEA_WATER, FLOWING_SEA_WATER)
+    private static BaseFlowingFluid.Properties seaProperties() {
+        return new BaseFlowingFluid.Properties(NeoForgeMod.WATER_TYPE, SEA_WATER, FLOWING_SEA_WATER)
                 .block(() -> (net.minecraft.world.level.block.LiquidBlock) ModBlocks.SEA_WATER.get())
                 .bucket(() -> ModItems.SEA_WATER_BUCKET.get())
                 .slopeFindDistance(4).levelDecreasePerBlock(1).tickRate(5).explosionResistance(100.0F);
@@ -102,7 +102,7 @@ public final class ModFluids {
      * <p>Forge routes almost everything a player can feel about a fluid through the fluid type -- swimming, boats,
      * putting a fire out, watering a field -- and a type of our own answered all of those. But
      * {@code Entity.wasTouchingWater}, which is what {@code isInWater()} reads, is set by comparing the type against
-     * {@code ForgeMod.WATER_TYPE} <em>by identity</em>; the {@code #minecraft:water} tag has no part in it. So with a
+     * {@code NeoForgeMod.WATER_TYPE} <em>by identity</em>; the {@code #minecraft:water} tag has no part in it. So with a
      * type of our own a player could swim in a river and a boat could float on it while every fish in it quietly
      * suffocated, because {@code WaterAnimal.handleAirSupply} refills its air only when {@code isInWater()} is true.</p>
      *
@@ -117,8 +117,8 @@ public final class ModFluids {
      * <p>A bucket dipped in a river comes up holding ordinary water, and what the player pours back is ordinary water
      * too. There is no river-water bucket: the fluid is a thing the generator lays, not a thing to carry about.</p>
      */
-    private static ForgeFlowingFluid.Properties properties() {
-        return new ForgeFlowingFluid.Properties(ForgeMod.WATER_TYPE, RIVER_WATER, FLOWING_RIVER_WATER)
+    private static BaseFlowingFluid.Properties properties() {
+        return new BaseFlowingFluid.Properties(NeoForgeMod.WATER_TYPE, RIVER_WATER, FLOWING_RIVER_WATER)
                 .block(() -> (net.minecraft.world.level.block.LiquidBlock) ModBlocks.RIVER_WATER.get())
                 .bucket(() -> Items.WATER_BUCKET);
     }

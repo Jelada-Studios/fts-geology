@@ -33,7 +33,7 @@ public class GasCameraItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, net.minecraft.world.item.Item.TooltipContext context, List<Component> tip, TooltipFlag flag) {
         tip.add(Component.translatable("item.fts_geology.gas_camera.desc").withStyle(ChatFormatting.GRAY));
         tip.add(Component.translatable("item.fts_geology.gas_camera.legend").withStyle(ChatFormatting.DARK_GRAY));
     }

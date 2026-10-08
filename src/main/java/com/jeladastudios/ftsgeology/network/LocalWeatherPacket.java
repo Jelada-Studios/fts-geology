@@ -2,10 +2,7 @@ package com.jeladastudios.ftsgeology.network;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.DistExecutor;
-import net.neoforged.neoforge.network.NetworkEvent;
 
-import java.util.function.Supplier;
 
 /**
  * The weather where a player stands (see {@code Storms}): how hard it rains there, 0 to 1, how much of a thunderstorm
@@ -17,7 +14,18 @@ import java.util.function.Supplier;
  * @param windZ   the wind towards +z, blocks a second
  * @param fog     how thick a ground fog lies where the player stands, 0 to 1 (see {@code Moisture})
  */
-public record LocalWeatherPacket(float rain, float thunder, float windX, float windZ, float fog) {
+public record LocalWeatherPacket(float rain, float thunder, float windX, float windZ, float fog) implements net.minecraft.network.protocol.common.custom.CustomPacketPayload {
+
+    public static final Type<LocalWeatherPacket> TYPE = new Type<>(
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(com.jeladastudios.ftsgeology.GeysersMod.MODID, "local_weather"));
+    public static final net.minecraft.network.codec.StreamCodec<net.minecraft.network.FriendlyByteBuf, LocalWeatherPacket> STREAM_CODEC =
+            net.minecraft.network.codec.StreamCodec.of((buf, p) -> encode(p, buf), LocalWeatherPacket::decode);
+
+    @Override
+    public Type<LocalWeatherPacket> type() {
+        return TYPE;
+    }
+
 
     public static void encode(LocalWeatherPacket p, FriendlyByteBuf buf) {
         buf.writeFloat(p.rain);
@@ -31,10 +39,8 @@ public record LocalWeatherPacket(float rain, float thunder, float windX, float w
         return new LocalWeatherPacket(buf.readFloat(), buf.readFloat(), buf.readFloat(), buf.readFloat(), buf.readFloat());
     }
 
-    public static void handle(LocalWeatherPacket p, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() ->
-                DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                        () -> () -> com.jeladastudios.ftsgeology.client.ClientWeather.set(p)));
-        ctx.get().setPacketHandled(true);
+    public static void handle(LocalWeatherPacket p, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() ->
+                com.jeladastudios.ftsgeology.util.Sides.client(() -> com.jeladastudios.ftsgeology.client.ClientWeather.set(p)));
     }
 }

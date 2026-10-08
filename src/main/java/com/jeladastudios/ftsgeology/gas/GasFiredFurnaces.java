@@ -62,7 +62,7 @@ public final class GasFiredFurnaces {
         else stopped++;
         BlockPos pos = BlockPos.of(key);
         if (!level.hasChunkAt(pos)) return;
-        ModNetwork.CHANNEL.send(PacketDistributor.TRACKING_CHUNK.with(() -> level.getChunkAt(pos)), new GasFiredPacket(key, on));
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingChunk((net.minecraft.server.level.ServerLevel) level.getChunkAt(pos).getLevel(), level.getChunkAt(pos).getPos(), new GasFiredPacket(key, on));
     }
 
     @SubscribeEvent
@@ -91,7 +91,7 @@ public final class GasFiredFurnaces {
         for (long key : fired.keySet()) {
             BlockPos pos = BlockPos.of(key);
             if ((pos.getX() >> 4) != cp.x || (pos.getZ() >> 4) != cp.z) continue;
-            ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(event::getPlayer), new GasFiredPacket(key, true));
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(event.getPlayer(), new GasFiredPacket(key, true));
         }
     }
 

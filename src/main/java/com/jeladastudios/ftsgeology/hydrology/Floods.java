@@ -101,14 +101,14 @@ public final class Floods {
             setDirty();
         }
 
-        static Store load(CompoundTag tag) {
+        static Store load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             Store s = new Store();
             for (Tag t : tag.getList("Surges", Tag.TAG_COMPOUND)) s.all.add(Surge.load((CompoundTag) t));
             return s;
         }
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public CompoundTag save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             ListTag list = new ListTag();
             for (Surge s : all) list.add(s.save());
             tag.put("Surges", list);
@@ -117,7 +117,7 @@ public final class Floods {
     }
 
     private static Store store(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(Store::load, Store::new, "fts_geology_floods");
+        return level.getDataStorage().computeIfAbsent(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_floods");
     }
 
     private static long laid, gone, mud, surges;
@@ -129,7 +129,7 @@ public final class Floods {
     public static boolean isFloodWater(ServerLevel level, BlockPos pos) {
         if (!floodWater(level.getBlockState(pos))) return false;
         if (HydraulicsHooks.owns(level, pos.getX() >> 4, pos.getZ() >> 4)) return false;
-        Store st = level.getDataStorage().get(Store::load, "fts_geology_floods");
+        Store st = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_floods");
         return st != null && !st.all.isEmpty() && st.index().contains(pos.asLong());
     }
 
@@ -222,7 +222,7 @@ public final class Floods {
      * more (and nothing is laid); true if there was one.
      */
     public static boolean extend(ServerLevel level, String key, int holdTicks) {
-        Store st = level.getDataStorage().get(Store::load, "fts_geology_floods");
+        Store st = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_floods");
         if (st == null) return false;
         for (Surge s : st.all) {
             if (!s.key.equals(key)) continue;
@@ -283,7 +283,7 @@ public final class Floods {
         if (event.getServer() == null) return;
         ServerLevel level = event.getServer().overworld();
         if (level == null || level.getGameTime() % 20 != 0) return;
-        Store st = level.getDataStorage().get(Store::load, "fts_geology_floods");
+        Store st = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_floods");
         if (st == null || st.all.isEmpty()) return;
         long now = level.getGameTime();
         if (HydraulicsHooks.active(level) && handOver(level, st)) st.changed();
@@ -364,7 +364,7 @@ public final class Floods {
     /** Whether any flood stands in the world now. */
     public static boolean standing(Level level) {
         if (!(level instanceof ServerLevel sl)) return false;
-        Store st = sl.getDataStorage().get(Store::load, "fts_geology_floods");
+        Store st = sl.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_floods");
         return st != null && !st.all.isEmpty();
     }
 }

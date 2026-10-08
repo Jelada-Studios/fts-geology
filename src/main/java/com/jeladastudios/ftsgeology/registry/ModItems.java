@@ -11,7 +11,7 @@ import com.jeladastudios.ftsgeology.item.GeologistsHammerItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
 /**
  * BlockItems for the technical blocks. They aren't obtainable in survival (blocks are
@@ -274,7 +274,7 @@ public final class ModItems {
      * empty bucket is left; refining it is Create Diesel Generators' work.
      */
     public static final DeferredHolder<Item, Item> CRUDE_OIL_BUCKET = ITEMS.register("crude_oil_bucket",
-            () -> new net.minecraft.world.item.BucketItem(ModFluids.CRUDE_OIL, new Item.Properties()
+            () -> new net.minecraft.world.item.BucketItem(ModFluids.CRUDE_OIL.get(), new Item.Properties()
                     .craftRemainder(net.minecraft.world.item.Items.BUCKET).stacksTo(1)) {
                 @Override
                 public int getBurnTime(net.minecraft.world.item.ItemStack stack,
@@ -285,10 +285,10 @@ public final class ModItems {
 
     /** A bucket of sea water: it pours out as water that waters no field. */
     public static final DeferredHolder<Item, Item> SEA_WATER_BUCKET = ITEMS.register("sea_water_bucket",
-            () -> new net.minecraft.world.item.BucketItem(ModFluids.SEA_WATER, new Item.Properties()
+            () -> new net.minecraft.world.item.BucketItem(ModFluids.SEA_WATER.get(), new Item.Properties()
                     .craftRemainder(net.minecraft.world.item.Items.BUCKET).stacksTo(1)) {
                 @Override
-                public void appendHoverText(net.minecraft.world.item.ItemStack stack, @org.jetbrains.annotations.Nullable net.minecraft.world.level.Level level,
+                public void appendHoverText(net.minecraft.world.item.ItemStack stack, net.minecraft.world.item.Item.TooltipContext context,
                                             java.util.List<net.minecraft.network.chat.Component> tooltip, net.minecraft.world.item.TooltipFlag flag) {
                     tooltip.add(net.minecraft.network.chat.Component.translatable("item.fts_geology.sea_water_bucket.tooltip")
                             .withStyle(net.minecraft.ChatFormatting.GRAY));
@@ -313,7 +313,7 @@ public final class ModItems {
     public static final DeferredHolder<Item, Item> GAS_METER = described("gas_meter", ModBlocks.GAS_METER, 2);
     public static final DeferredHolder<Item, Item> WEATHER_TERMINAL = described("weather_terminal", ModBlocks.WEATHER_TERMINAL, 3);
 
-    private static DeferredHolder<Item, Item> described(String name, DeferredHolder<Item, net.minecraft.world.level.block.Block> block, int lines) {
+    private static DeferredHolder<Item, Item> described(String name, DeferredHolder<net.minecraft.world.level.block.Block, net.minecraft.world.level.block.Block> block, int lines) {
         return ITEMS.register(name, () -> new com.jeladastudios.ftsgeology.item.DescribedBlockItem(block.get(), new Item.Properties(), lines));
     }
 

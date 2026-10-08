@@ -78,7 +78,7 @@ public final class FaultClocks {
         final Long2LongOpenHashMap last = new Long2LongOpenHashMap();
         final LongOpenHashSet stations = new LongOpenHashSet();
 
-        static Clocks load(CompoundTag tag) {
+        static Clocks load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             Clocks c = new Clocks();
             long[] k = tag.getLongArray("Cells"), t = tag.getLongArray("Last");
             for (int i = 0; i < Math.min(k.length, t.length); i++) c.last.put(k[i], t[i]);
@@ -87,7 +87,7 @@ public final class FaultClocks {
         }
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public CompoundTag save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             tag.putLongArray("Cells", last.keySet().toLongArray());
             long[] t = new long[last.size()];
             int i = 0;
@@ -99,7 +99,7 @@ public final class FaultClocks {
     }
 
     private static Clocks of(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(Clocks::load, Clocks::new, "fts_geology_fault_clocks");
+        return level.getDataStorage().computeIfAbsent(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Clocks::new, Clocks::load, null), "fts_geology_fault_clocks");
     }
 
     /** A seismograph stands here: the boundary round it keeps its clocks while nobody is near. */

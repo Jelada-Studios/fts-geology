@@ -79,7 +79,7 @@ public final class VentFlames {
 
     private Store store() {
         if (store == null) {
-            store = level.getDataStorage().computeIfAbsent(Store::load, Store::new, "fts_geology_vent_flames");
+            store = level.getDataStorage().computeIfAbsent(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_vent_flames");
             for (long l : store.saved) {
                 Flame f = new Flame();
                 f.pos = l;
@@ -380,14 +380,14 @@ public final class VentFlames {
     static final class Store extends SavedData {
         long[] saved = new long[0];
 
-        static Store load(CompoundTag tag) {
+        static Store load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             Store s = new Store();
             s.saved = tag.getLongArray("Flames");
             return s;
         }
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public CompoundTag save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             tag.put("Flames", new LongArrayTag(saved));
             return tag;
         }

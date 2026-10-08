@@ -113,7 +113,7 @@ public class BasaltLayerBlock extends Block {
     }
 
     @Override
-    public boolean isPathfindable(BlockState state, BlockGetter level, BlockPos pos, PathComputationType type) {
+    protected boolean isPathfindable(BlockState state, PathComputationType type) {
         return type == PathComputationType.LAND && state.getValue(LAYERS) < 5;
     }
 }

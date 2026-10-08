@@ -16,9 +16,6 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.BlockHitResult;
-import net.neoforged.neoforge.common.capabilities.Capability;
-import net.neoforged.neoforge.common.capabilities.ForgeCapabilities;
-import net.neoforged.neoforge.common.util.LazyOptional;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -28,7 +25,7 @@ import java.util.List;
 
 /** Base for every block entity that exposes gas tanks. */
 public abstract class GasMachineBlockEntity extends BlockEntity {
-    private final LazyOptional<IGasHandler> gasCap = LazyOptional.of(() -> new IGasHandler() {
+    private final IGasHandler gasHandler = new IGasHandler() {
         @Override
         public @Nullable GasTank getTank(@Nullable Direction side) {
             return tankFor(side);
@@ -43,7 +40,7 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
         public boolean connectsTo(@Nullable Direction side) {
             return GasMachineBlockEntity.this.connectsOn(side);
         }
-    });
+    };
 
     protected GasMachineBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -106,9 +103,7 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
     /** Opens the gauge panel on the player's screen (see {@code GasPanelScreen}); it asks for fresh readings while open. */
     public InteractionResult onUse(Player player, InteractionHand hand, BlockHitResult hit) {
         if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
-            com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
-                    net.neoforged.neoforge.network.PacketDistributor.PLAYER.with(() -> sp),
-                    new com.jeladastudios.ftsgeology.network.TerminalPacket(worldPosition, panelData(), true));
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(sp, new com.jeladastudios.ftsgeology.network.TerminalPacket(worldPosition, panelData(), true));
         }
         return InteractionResult.CONSUME;
     }
@@ -278,13 +273,11 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
         return true;
     }
 
-    private final LazyOptional<IEnergyStorage> energyCap = LazyOptional.of(this::energy);
-
     /**
      * The same store as Electrodynamics' electricity, where it is installed, for a machine that takes power: its wires
      * feed it straight at 120 V; a higher voltage it refuses and says so, as the well pump does, rather than burning out.
      */
-    private final LazyOptional<Object> volts = com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower.receiver(
+    private final Object volts = com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower.receiver(
             () -> energy() == null ? 0 : energy().getEnergyStored(),
             () -> energy() == null ? 0 : energy().getMaxEnergyStored(),
             () -> energy() == null ? 0 : energy().room(),
@@ -296,7 +289,7 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
      * For a machine that makes power, the gas engine: Electrodynamics' wires take its output straight at 120 V, as they
      * take the geothermal turbine's (see {@link MachineEnergy#pushTo}).
      */
-    private final LazyOptional<Object> voltsOut = com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower.generator(
+    private final Object voltsOut = com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower.generator(
             () -> energy() == null ? 0 : energy().getEnergyStored(),
             () -> energy() == null ? 0 : energy().getMaxEnergyStored(),
             v -> {
@@ -312,29 +305,13 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
         if (level != null) refusedAt = level.getGameTime();
     }
 
-    @Override
-    public @NotNull <T> LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
-        if (cap == GasCapabilities.GAS_HANDLER) {
-            return side == null || connectsOn(side) ? gasCap.cast() : LazyOptional.empty();
-        }
-        if (cap == ForgeCapabilities.ENERGY && energy() != null) {
-            return energyOn(side) ? energyCap.cast() : LazyOptional.empty();
-        }
-        if (com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower.is(cap) && energy() != null && energy().canReceive()) {
-            return energyOn(side) ? volts.cast() : LazyOptional.empty();
-        }
-        if (com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower.is(cap) && energy() != null && energy().canExtract()) {
-            return energyOn(side) ? voltsOut.cast() : LazyOptional.empty();
-        }
-        return super.getCapability(cap, side);
+    /** Its gas handler on a side, for the capability registration; null where it does not connect. */
+    public @Nullable IGasHandler gasHandlerOn(@Nullable Direction side) {
+        return side == null || connectsOn(side) ? gasHandler : null;
     }
 
-    @Override
-    public void invalidateCaps() {
-        super.invalidateCaps();
-        gasCap.invalidate();
-        energyCap.invalidate();
-        volts.invalidate();
-        voltsOut.invalidate();
+    /** Its Forge Energy on a side, for the capability registration; null where it has none there. */
+    public @Nullable IEnergyStorage energyStorageOn(@Nullable Direction side) {
+        return energy() != null && energyOn(side) ? energy() : null;
     }
 }

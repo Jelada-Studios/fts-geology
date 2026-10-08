@@ -20,7 +20,7 @@ public final class OilReserves extends SavedData {
     private final Long2DoubleOpenHashMap taken = new Long2DoubleOpenHashMap();
 
     public static OilReserves of(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(OilReserves::load, OilReserves::new, "fts_geology_oil_reserves");
+        return level.getDataStorage().computeIfAbsent(new net.minecraft.world.level.saveddata.SavedData.Factory<>(OilReserves::new, OilReserves::load, null), "fts_geology_oil_reserves");
     }
 
     /** Millibuckets a field gives up in all, from the size of its oil column. */
@@ -49,7 +49,7 @@ public final class OilReserves extends SavedData {
         setDirty();
     }
 
-    static OilReserves load(CompoundTag tag) {
+    static OilReserves load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
         OilReserves r = new OilReserves();
         for (Tag t : tag.getList("Fields", Tag.TAG_COMPOUND)) {
             CompoundTag c = (CompoundTag) t;
@@ -59,7 +59,7 @@ public final class OilReserves extends SavedData {
     }
 
     @Override
-    public CompoundTag save(CompoundTag tag) {
+    public CompoundTag save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
         ListTag list = new ListTag();
         for (var e : taken.long2DoubleEntrySet()) {
             CompoundTag c = new CompoundTag();

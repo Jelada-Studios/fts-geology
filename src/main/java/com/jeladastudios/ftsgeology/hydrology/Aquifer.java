@@ -135,7 +135,7 @@ public final class Aquifer {
     static final class Wells extends SavedData {
         final Long2ObjectOpenHashMap<Well> byPos = new Long2ObjectOpenHashMap<>();
 
-        static Wells load(CompoundTag tag) {
+        static Wells load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             Wells w = new Wells();
             for (Tag t : tag.getList("wells", Tag.TAG_COMPOUND)) {
                 CompoundTag c = (CompoundTag) t;
@@ -153,7 +153,7 @@ public final class Aquifer {
         }
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public CompoundTag save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             ListTag list = new ListTag();
             for (var e : byPos.long2ObjectEntrySet()) {
                 Well w = e.getValue();
@@ -183,7 +183,7 @@ public final class Aquifer {
     }
 
     private static Wells wells(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(Wells::load, Wells::new, "fts_geology_wells");
+        return level.getDataStorage().computeIfAbsent(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Wells::new, Wells::load, null), "fts_geology_wells");
     }
 
     static double hours(ServerLevel level) {
@@ -217,7 +217,7 @@ public final class Aquifer {
      */
     public static void recharge(ServerLevel level, int x, int z, double cubicMetres) {
         if (!GeyserConfig.SOIL_WATER.get() || !Level.OVERWORLD.equals(level.dimension()) || cubicMetres <= 0) return;
-        Wells ws = level.getDataStorage().get(Wells::load, "fts_geology_wells");
+        Wells ws = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Wells::new, Wells::load, null), "fts_geology_wells");
         if (ws == null || ws.byPos.isEmpty()) return;
         Well near = null;
         long nearKey = 0;
@@ -250,7 +250,7 @@ public final class Aquifer {
         if (event.getServer() == null) return;
         ServerLevel level = event.getServer().overworld();
         if (level == null || level.getGameTime() % 20 != 0) return;
-        Wells ws = level.getDataStorage().get(Wells::load, "fts_geology_wells");
+        Wells ws = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Wells::new, Wells::load, null), "fts_geology_wells");
         if (ws == null || ws.byPos.isEmpty()) return;
         long now = level.getGameTime();
         double h = hours(level);
@@ -278,7 +278,7 @@ public final class Aquifer {
 
     /** A well found not drawing: its rate goes to nothing from now, as a stopped pump's does. */
     public static void stopped(ServerLevel level, BlockPos intake) {
-        Wells ws = level.getDataStorage().get(Wells::load, "fts_geology_wells");
+        Wells ws = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Wells::new, Wells::load, null), "fts_geology_wells");
         if (ws == null) return;
         Well w = ws.byPos.get(intake.asLong());
         if (w == null || w.rate == 0) return;
@@ -302,7 +302,7 @@ public final class Aquifer {
 
     /** Blocks the wells round a column have lowered its water table by, now. */
     public static double drawdown(ServerLevel level, double x, double z) {
-        Wells ws = level.getDataStorage().get(Wells::load, "fts_geology_wells");
+        Wells ws = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Wells::new, Wells::load, null), "fts_geology_wells");
         if (ws == null || ws.byPos.isEmpty()) return 0;
         double h = hours(level), s = 0;
         for (Well w : ws.byPos.values()) {
@@ -315,7 +315,7 @@ public final class Aquifer {
 
     /** How fast a well draws now, in cubic metres an hour of the ground's time, as last measured; 0 if not kept. */
     public static double rate(ServerLevel level, BlockPos intake) {
-        Wells ws = level.getDataStorage().get(Wells::load, "fts_geology_wells");
+        Wells ws = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Wells::new, Wells::load, null), "fts_geology_wells");
         if (ws == null) return 0;
         Well w = ws.byPos.get(intake.asLong());
         return w == null ? 0 : w.rate;
@@ -345,7 +345,7 @@ public final class Aquifer {
     }
 
     public static int count(ServerLevel level) {
-        Wells ws = level.getDataStorage().get(Wells::load, "fts_geology_wells");
+        Wells ws = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Wells::new, Wells::load, null), "fts_geology_wells");
         return ws == null ? 0 : ws.byPos.size();
     }
 }

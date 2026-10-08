@@ -3,7 +3,7 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.worldgen.lithology.LithologyRule;
-import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.levelgen.SurfaceRules;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -13,23 +13,23 @@ public final class ModSurfaceRules {
 
     private ModSurfaceRules() {}
 
-    public static final DeferredRegister<Codec<? extends SurfaceRules.RuleSource>> MATERIAL_RULES =
+    public static final DeferredRegister<MapCodec<? extends SurfaceRules.RuleSource>> MATERIAL_RULES =
             DeferredRegister.create(Registries.MATERIAL_RULE, GeysersMod.MODID);
 
     /** The rock under the ground, from the plates. See {@link LithologyRule}. */
-    public static final DeferredHolder<Codec<? extends SurfaceRules.RuleSource>, Codec<? extends SurfaceRules.RuleSource>> LITHOLOGY =
+    public static final DeferredHolder<MapCodec<? extends SurfaceRules.RuleSource>, MapCodec<? extends SurfaceRules.RuleSource>> LITHOLOGY =
             MATERIAL_RULES.register("lithology", () -> LithologyRule.CODEC.codec());
 
     /** The young basalt down a continental rift's axis. See {@link com.jeladastudios.ftsgeology.worldgen.lithology.RiftAxisRule}. */
-    public static final DeferredHolder<Codec<? extends SurfaceRules.RuleSource>, Codec<? extends SurfaceRules.RuleSource>> RIFT_AXIS =
+    public static final DeferredHolder<MapCodec<? extends SurfaceRules.RuleSource>, MapCodec<? extends SurfaceRules.RuleSource>> RIFT_AXIS =
             MATERIAL_RULES.register("rift_axis", () -> com.jeladastudios.ftsgeology.worldgen.lithology.RiftAxisRule.CODEC.codec());
 
     /** Another rule, only where a column passes a test. See {@link com.jeladastudios.ftsgeology.worldgen.lithology.ColumnTestRule}. */
-    public static final DeferredHolder<Codec<? extends SurfaceRules.RuleSource>, Codec<? extends SurfaceRules.RuleSource>> COLUMN_TEST =
+    public static final DeferredHolder<MapCodec<? extends SurfaceRules.RuleSource>, MapCodec<? extends SurfaceRules.RuleSource>> COLUMN_TEST =
             MATERIAL_RULES.register("column_test", () -> com.jeladastudios.ftsgeology.worldgen.lithology.ColumnTestRule.CODEC.codec());
 
     /** The overworld's surface where a mod changed it. See {@link com.jeladastudios.ftsgeology.worldgen.terrain.OverworldSurfaceRule}. */
-    public static final DeferredHolder<Codec<? extends SurfaceRules.RuleSource>, Codec<? extends SurfaceRules.RuleSource>> OVERWORLD_SURFACE =
+    public static final DeferredHolder<MapCodec<? extends SurfaceRules.RuleSource>, MapCodec<? extends SurfaceRules.RuleSource>> OVERWORLD_SURFACE =
             MATERIAL_RULES.register("overworld_surface",
                     () -> com.jeladastudios.ftsgeology.worldgen.terrain.OverworldSurfaceRule.CODEC.codec());
 }

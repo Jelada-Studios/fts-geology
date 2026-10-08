@@ -4,10 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.DistExecutor;
-import net.neoforged.neoforge.network.NetworkEvent;
 
-import java.util.function.Supplier;
 
 /**
  * A weather station terminal's screen contents, or a seismograph's (see {@code WeatherTerminalBlockEntity#data} and
@@ -15,7 +12,18 @@ import java.util.function.Supplier;
  *
  * @param open whether to open the screen, or only to bring an open one up to date
  */
-public record TerminalPacket(BlockPos pos, CompoundTag data, boolean open) {
+public record TerminalPacket(BlockPos pos, CompoundTag data, boolean open) implements net.minecraft.network.protocol.common.custom.CustomPacketPayload {
+
+    public static final Type<TerminalPacket> TYPE = new Type<>(
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(com.jeladastudios.ftsgeology.GeysersMod.MODID, "terminal"));
+    public static final net.minecraft.network.codec.StreamCodec<net.minecraft.network.FriendlyByteBuf, TerminalPacket> STREAM_CODEC =
+            net.minecraft.network.codec.StreamCodec.of((buf, p) -> encode(p, buf), TerminalPacket::decode);
+
+    @Override
+    public Type<TerminalPacket> type() {
+        return TYPE;
+    }
+
 
     public static void encode(TerminalPacket p, FriendlyByteBuf buf) {
         buf.writeBlockPos(p.pos);
@@ -27,14 +35,12 @@ public record TerminalPacket(BlockPos pos, CompoundTag data, boolean open) {
         return new TerminalPacket(buf.readBlockPos(), buf.readNbt(), buf.readBoolean());
     }
 
-    public static void handle(TerminalPacket p, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() ->
-                DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                        () -> () -> {
+    public static void handle(TerminalPacket p, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() ->
+                com.jeladastudios.ftsgeology.util.Sides.client(() -> {
                             if (p.data.getBoolean("Gas")) com.jeladastudios.ftsgeology.client.GasPanelScreen.receive(p);
                             else if (p.data.getBoolean("Seismo")) com.jeladastudios.ftsgeology.client.SeismographScreen.receive(p);
                             else com.jeladastudios.ftsgeology.client.WeatherTerminalScreen.receive(p);
                         }));
-        ctx.get().setPacketHandled(true);
     }
 }

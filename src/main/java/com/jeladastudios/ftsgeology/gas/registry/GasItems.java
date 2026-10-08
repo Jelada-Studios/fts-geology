@@ -10,7 +10,7 @@ import com.jeladastudios.ftsgeology.gas.item.GasDetectorItem;
 import com.jeladastudios.ftsgeology.gas.item.GasMaskItem;
 import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
 public final class GasItems {
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(BuiltInRegistries.ITEM, GeysersMod.MODID);

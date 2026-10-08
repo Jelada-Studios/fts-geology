@@ -204,7 +204,7 @@ public final class GasFields {
         private final Long2DoubleOpenHashMap taken = new Long2DoubleOpenHashMap();
 
         static Fields of(ServerLevel level) {
-            return level.getDataStorage().computeIfAbsent(Fields::load, Fields::new, "fts_geology_gas_fields");
+            return level.getDataStorage().computeIfAbsent(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Fields::new, Fields::load, null), "fts_geology_gas_fields");
         }
 
         double left(long field, double cap) {
@@ -227,7 +227,7 @@ public final class GasFields {
             setDirty();
         }
 
-        static Fields load(CompoundTag tag) {
+        static Fields load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             Fields f = new Fields();
             ListTag list = tag.getList("Fields", Tag.TAG_COMPOUND);
             for (int i = 0; i < list.size(); i++) {
@@ -239,7 +239,7 @@ public final class GasFields {
         }
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public CompoundTag save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             ListTag list = new ListTag();
             for (var e : total.long2DoubleEntrySet()) {
                 CompoundTag c = new CompoundTag();

@@ -79,7 +79,7 @@ public final class Aftershocks {
     static final class Schedule extends SavedData {
         final List<Shock> due = new ArrayList<>();
 
-        static Schedule load(CompoundTag tag) {
+        static Schedule load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             Schedule s = new Schedule();
             for (Tag t : tag.getList("Shocks", Tag.TAG_COMPOUND)) s.due.add(Shock.load((CompoundTag) t));
             s.due.sort(Comparator.comparingLong(Shock::at));
@@ -87,7 +87,7 @@ public final class Aftershocks {
         }
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public CompoundTag save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             ListTag list = new ListTag();
             for (Shock s : due) list.add(s.save());
             tag.put("Shocks", list);
@@ -102,7 +102,7 @@ public final class Aftershocks {
     }
 
     static Schedule of(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(Schedule::load, Schedule::new, "fts_geology_aftershocks");
+        return level.getDataStorage().computeIfAbsent(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Schedule::new, Schedule::load, null), "fts_geology_aftershocks");
     }
 
     /**
@@ -183,7 +183,7 @@ public final class Aftershocks {
     public static void tick(MinecraftServer server) {
         if (server.getTickCount() % 20 != 0) return;
         for (ServerLevel level : server.getAllLevels()) {
-            Schedule s = level.getDataStorage().get(Schedule::load, "fts_geology_aftershocks");
+            Schedule s = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Schedule::new, Schedule::load, null), "fts_geology_aftershocks");
             if (s == null || s.due.isEmpty()) continue;
             long now = level.getGameTime();
             // One a second at most: a burst of due shocks after a long absence comes as a quick swarm, not all at once.
@@ -222,13 +222,13 @@ public final class Aftershocks {
 
     /** The next shocks due in a dimension, for the command. */
     public static List<Shock> pending(ServerLevel level) {
-        Schedule s = level.getDataStorage().get(Schedule::load, "fts_geology_aftershocks");
+        Schedule s = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Schedule::new, Schedule::load, null), "fts_geology_aftershocks");
         return s == null ? List.of() : List.copyOf(s.due);
     }
 
     /** Forgets every scheduled shock in a dimension; how many there were. */
     public static int clear(ServerLevel level) {
-        Schedule s = level.getDataStorage().get(Schedule::load, "fts_geology_aftershocks");
+        Schedule s = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Schedule::new, Schedule::load, null), "fts_geology_aftershocks");
         if (s == null) return 0;
         int n = s.due.size();
         s.due.clear();

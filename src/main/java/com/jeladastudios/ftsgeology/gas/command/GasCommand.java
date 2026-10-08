@@ -234,8 +234,7 @@ public final class GasCommand {
             c.getSource().sendFailure(Component.literal("No gas machine there."));
             return 0;
         }
-        com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(net.neoforged.neoforge.network.PacketDistributor.PLAYER.with(() -> player),
-                new com.jeladastudios.ftsgeology.network.TerminalPacket(pos, m.panelData(), true));
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, new com.jeladastudios.ftsgeology.network.TerminalPacket(pos, m.panelData(), true));
         return 1;
     }
 

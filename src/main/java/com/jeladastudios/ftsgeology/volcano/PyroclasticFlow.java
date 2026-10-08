@@ -190,7 +190,7 @@ public final class PyroclasticFlow {
         f.frontY = g[pick];
         FLOWS.add(f);
 
-        level.playSound(null, summit.getX(), g[pick], summit.getZ(), SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS,
+        level.playSound(null, summit.getX(), g[pick], summit.getZ(), SoundEvents.GENERIC_EXPLODE.value(), SoundSource.BLOCKS,
                 6.0f, 0.35f);
         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, f.x, g[pick] + 2, f.z, 1, 0, 0, 0, 0);
         // Everyone within reach is told which way it is coming down, as an observatory would.

@@ -13,7 +13,7 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.MobSpawnSettings;
 import net.neoforged.neoforge.common.world.BiomeModifier;
 import net.neoforged.neoforge.common.world.ModifiableBiomeInfo;
-import net.neoforged.neoforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
 import java.util.List;
 
@@ -36,7 +36,7 @@ public record OptionalSpawns(HolderSet<Biome> biomes, List<Entry> spawns) implem
                 Codec.INT.fieldOf("max").forGetter(Entry::max)).apply(i, Entry::new));
     }
 
-    public static final Codec<OptionalSpawns> CODEC = RecordCodecBuilder.create(i -> i.group(
+    public static final com.mojang.serialization.MapCodec<OptionalSpawns> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             Biome.LIST_CODEC.fieldOf("biomes").forGetter(OptionalSpawns::biomes),
             Entry.CODEC.listOf().fieldOf("spawns").forGetter(OptionalSpawns::spawns)).apply(i, OptionalSpawns::new));
 
@@ -53,7 +53,7 @@ public record OptionalSpawns(HolderSet<Biome> biomes, List<Entry> spawns) implem
     }
 
     @Override
-    public Codec<? extends BiomeModifier> codec() {
+    public com.mojang.serialization.MapCodec<? extends BiomeModifier> codec() {
         return ModBiomeModifiers.OPTIONAL_SPAWNS.get();
     }
 }

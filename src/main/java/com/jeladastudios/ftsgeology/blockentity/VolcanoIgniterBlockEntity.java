@@ -48,7 +48,7 @@ public class VolcanoIgniterBlockEntity extends BlockEntity {
             int magnitude = 8 + server.random.nextInt(12); // 8–19
             boolean built = VolcanoBuilder.build(server, pos, magnitude);
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
-            server.playSound(null, pos, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 2.0f, 0.5f);
+            server.playSound(null, pos, SoundEvents.GENERIC_EXPLODE.value(), SoundSource.BLOCKS, 2.0f, 0.5f);
 
             Player near = server.getNearestPlayer(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, 64, false);
             if (near != null) {

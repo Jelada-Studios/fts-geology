@@ -2,10 +2,7 @@ package com.jeladastudios.ftsgeology.network;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.DistExecutor;
-import net.neoforged.neoforge.network.NetworkEvent;
 
-import java.util.function.Supplier;
 
 /**
  * The weather within sight of a player, for the clouds drawn over them (see {@code ClientSky}): the storms near them --
@@ -16,7 +13,18 @@ import java.util.function.Supplier;
  * @param storms  per storm: x, z, radius, strength now, drift x, drift z (blocks a tick), thunder (1 or 0), kind
  * @param systems per system: x, z, radius, depth now (hectopascals, below zero a low), drift x, drift z
  */
-public record SkyPacket(long time, float[] storms, float[] systems) {
+public record SkyPacket(long time, float[] storms, float[] systems) implements net.minecraft.network.protocol.common.custom.CustomPacketPayload {
+
+    public static final Type<SkyPacket> TYPE = new Type<>(
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(com.jeladastudios.ftsgeology.GeysersMod.MODID, "sky"));
+    public static final net.minecraft.network.codec.StreamCodec<net.minecraft.network.FriendlyByteBuf, SkyPacket> STREAM_CODEC =
+            net.minecraft.network.codec.StreamCodec.of((buf, p) -> encode(p, buf), SkyPacket::decode);
+
+    @Override
+    public Type<SkyPacket> type() {
+        return TYPE;
+    }
+
 
     public static final int STORM = 8, SYSTEM = 6;
 
@@ -39,10 +47,8 @@ public record SkyPacket(long time, float[] storms, float[] systems) {
         return new SkyPacket(time, storms, systems);
     }
 
-    public static void handle(SkyPacket p, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() ->
-                DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                        () -> () -> com.jeladastudios.ftsgeology.client.ClientSky.set(p)));
-        ctx.get().setPacketHandled(true);
+    public static void handle(SkyPacket p, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() ->
+                com.jeladastudios.ftsgeology.util.Sides.client(() -> com.jeladastudios.ftsgeology.client.ClientSky.set(p)));
     }
 }

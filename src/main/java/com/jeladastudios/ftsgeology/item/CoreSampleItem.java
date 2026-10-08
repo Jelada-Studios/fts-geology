@@ -46,7 +46,7 @@ public class CoreSampleItem extends Item {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @javax.annotation.Nullable Level level, List<Component> tooltip,
+    public void appendHoverText(ItemStack stack, net.minecraft.world.item.Item.TooltipContext context, List<Component> tooltip,
                                 TooltipFlag flag) {
         if (stack.getTagElement("Core") == null) {
             tooltip.add(Component.translatable("item.fts_geology.core_sample.blank").withStyle(ChatFormatting.GRAY));

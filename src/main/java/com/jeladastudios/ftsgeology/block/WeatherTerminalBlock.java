@@ -98,10 +98,11 @@ public class WeatherTerminalBlock extends BaseEntityBlock {
     }
 
     @Override
-    public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
+    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
+        InteractionHand hand = InteractionHand.MAIN_HAND;
         if (level.isClientSide) return InteractionResult.SUCCESS;
         if (level.getBlockEntity(pos) instanceof WeatherTerminalBlockEntity be && player instanceof ServerPlayer sp) {
-            ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> sp), new TerminalPacket(pos,
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(sp, new TerminalPacket(pos,
                     com.jeladastudios.ftsgeology.instrument.StationNetwork.decorate((ServerLevel) level, sp, pos, pos, be.data((ServerLevel) level)), true));
         }
         return InteractionResult.CONSUME;

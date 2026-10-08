@@ -32,7 +32,7 @@ public class BreathingApparatusItem extends ArmorItem {
     public static final double USE_PER_SECOND = 0.1;
 
     public BreathingApparatusItem(Properties props) {
-        super(GasArmorMaterials.BREATHING_APPARATUS, Type.CHESTPLATE, props);
+        super(GasArmorMaterials.BREATHING_APPARATUS, Type.CHESTPLATE, props.durability(GasArmorMaterials.BREATHING_APPARATUS_DURABILITY));
     }
 
     public static double getOxygen(ItemStack stack) {
@@ -93,7 +93,7 @@ public class BreathingApparatusItem extends ArmorItem {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, net.minecraft.world.item.Item.TooltipContext context, List<Component> tip, TooltipFlag flag) {
         double o2 = getOxygen(stack);
         int seconds = (int) (o2 / USE_PER_SECOND);
         tip.add(Component.translatable("item.fts_geology.breathing_apparatus.oxygen", GasText.mol(o2), seconds / 60, seconds % 60)

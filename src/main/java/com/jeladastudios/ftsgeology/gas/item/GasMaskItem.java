@@ -18,7 +18,7 @@ import java.util.List;
  */
 public class GasMaskItem extends ArmorItem {
     public GasMaskItem(Properties props) {
-        super(GasArmorMaterials.GAS_MASK, Type.HELMET, props);
+        super(GasArmorMaterials.GAS_MASK, Type.HELMET, props.durability(GasArmorMaterials.GAS_MASK_DURABILITY));
     }
 
     public static boolean hasFilter(ItemStack stack) {
@@ -32,7 +32,7 @@ public class GasMaskItem extends ArmorItem {
     }
 
     @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
+    public void appendHoverText(ItemStack stack, net.minecraft.world.item.Item.TooltipContext context, List<Component> tip, TooltipFlag flag) {
         int left = stack.getMaxDamage() - 1 - stack.getDamageValue();
         tip.add(Component.translatable("item.fts_geology.gas_mask.filter", left / 60, left % 60)
                 .withStyle(left > 0 ? ChatFormatting.GRAY : ChatFormatting.RED));

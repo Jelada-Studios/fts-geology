@@ -107,14 +107,14 @@ public final class Atmosphere {
     static final class Store extends SavedData {
         final List<Cell> all = new ArrayList<>();
 
-        static Store load(CompoundTag tag) {
+        static Store load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             Store s = new Store();
             for (Tag t : tag.getList("Cells", Tag.TAG_COMPOUND)) s.all.add(Cell.load((CompoundTag) t));
             return s;
         }
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public CompoundTag save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             ListTag list = new ListTag();
             for (Cell c : all) list.add(c.save());
             tag.put("Cells", list);
@@ -123,12 +123,12 @@ public final class Atmosphere {
     }
 
     static Store store(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(Store::load, Store::new, "fts_geology_atmosphere");
+        return level.getDataStorage().computeIfAbsent(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_atmosphere");
     }
 
     /** The systems, for the server thread's reads; empty where none have formed. */
     static List<Cell> cells(ServerLevel level) {
-        Store st = level.getDataStorage().get(Store::load, "fts_geology_atmosphere");
+        Store st = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_atmosphere");
         return st == null ? List.of() : st.all;
     }
 

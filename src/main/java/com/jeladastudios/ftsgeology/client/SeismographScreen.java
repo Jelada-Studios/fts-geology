@@ -115,7 +115,7 @@ public class SeismographScreen extends Screen {
                 StationUi.open(via, via);
                 return true;
             }
-            ModNetwork.CHANNEL.sendToServer(new TerminalRequestPacket(pos, true));
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(new TerminalRequestPacket(pos, true));
             onClose();
             return true;
         }

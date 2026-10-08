@@ -13,9 +13,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.common.capabilities.Capability;
-import net.neoforged.neoforge.common.capabilities.ForgeCapabilities;
-import net.neoforged.neoforge.common.util.LazyOptional;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
@@ -82,7 +80,6 @@ public class WellheadBlockEntity extends BlockEntity {
             return out;
         }
     };
-    private final LazyOptional<IFluidHandler> oil = LazyOptional.of(() -> outlet);
 
     /**
      * The gas that comes up with the oil, as out of a real well: dissolved in it down in the reservoir, it bubbles out as
@@ -93,7 +90,6 @@ public class WellheadBlockEntity extends BlockEntity {
     private static final double GAS_PER_MB = 0.1;
     private final com.jeladastudios.ftsgeology.gas.GasTank gas = new com.jeladastudios.ftsgeology.gas.GasTank(0.5, 20.0).onChange(this::setChanged);
     private final com.jeladastudios.ftsgeology.gas.IGasHandler gasPort = side -> side == Direction.DOWN ? null : gas;
-    private final LazyOptional<com.jeladastudios.ftsgeology.gas.IGasHandler> gasCap = LazyOptional.of(() -> gasPort);
 
     private int well, nextSurvey;
     @Nullable
@@ -207,7 +203,7 @@ public class WellheadBlockEntity extends BlockEntity {
             if (d == Direction.DOWN) continue;
             BlockEntity other = level.getBlockEntity(pos.relative(d));
             if (other == null) continue;
-            IFluidHandler into = other.getCapability(ForgeCapabilities.FLUID_HANDLER, d.getOpposite()).orElse(null);
+            IFluidHandler into = level.getCapability(Capabilities.FluidHandler.BLOCK, pos.relative(d), d.getOpposite());
             if (into == null) continue;
             int took = into.fill(tank.drain(PUSH_PER_TICK, IFluidHandler.FluidAction.SIMULATE), IFluidHandler.FluidAction.EXECUTE);
             if (took > 0) {
@@ -256,18 +252,14 @@ public class WellheadBlockEntity extends BlockEntity {
         nextSurvey = 1;
     }
 
-    @Override
-    public <T> @NotNull LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
-        if (cap == ForgeCapabilities.FLUID_HANDLER && side != Direction.DOWN) return oil.cast();
-        if (cap == com.jeladastudios.ftsgeology.gas.registry.GasCapabilities.GAS_HANDLER && side != Direction.DOWN) return gasCap.cast();
-        return super.getCapability(cap, side);
+    /** Its oil outlet on a side, for the capability registration: every side but its foot, the well. */
+    public @Nullable IFluidHandler fluidOn(@Nullable Direction side) {
+        return side != Direction.DOWN ? outlet : null;
     }
 
-    @Override
-    public void invalidateCaps() {
-        super.invalidateCaps();
-        oil.invalidate();
-        gasCap.invalidate();
+    /** Its gas port on a side, for the capability registration: every side but its foot. */
+    public @Nullable com.jeladastudios.ftsgeology.gas.IGasHandler gasOn(@Nullable Direction side) {
+        return side != Direction.DOWN ? gasPort : null;
     }
 
     @Override

@@ -3,7 +3,7 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyBiomeSource;
-import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -16,9 +16,9 @@ public final class ModBiomeSources {
 
     private ModBiomeSources() {}
 
-    public static final DeferredRegister<Codec<? extends BiomeSource>> BIOME_SOURCES =
+    public static final DeferredRegister<MapCodec<? extends BiomeSource>> BIOME_SOURCES =
             DeferredRegister.create(Registries.BIOME_SOURCE, GeysersMod.MODID);
 
-    public static final DeferredHolder<Codec<? extends BiomeSource>, Codec<? extends BiomeSource>> GEOLOGY =
+    public static final DeferredHolder<MapCodec<? extends BiomeSource>, MapCodec<? extends BiomeSource>> GEOLOGY =
             BIOME_SOURCES.register("geology", () -> GeologyBiomeSource.CODEC);
 }

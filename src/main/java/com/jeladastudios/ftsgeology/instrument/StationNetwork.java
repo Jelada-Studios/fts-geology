@@ -44,7 +44,7 @@ public final class StationNetwork {
     static final class Store extends SavedData {
         final Long2ObjectOpenHashMap<Entry> all = new Long2ObjectOpenHashMap<>();
 
-        static Store load(CompoundTag tag) {
+        static Store load(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             Store s = new Store();
             for (Tag t : tag.getList("Stations", Tag.TAG_COMPOUND)) {
                 CompoundTag c = (CompoundTag) t;
@@ -64,7 +64,7 @@ public final class StationNetwork {
         }
 
         @Override
-        public CompoundTag save(CompoundTag tag) {
+        public CompoundTag save(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
             ListTag list = new ListTag();
             for (var it = all.long2ObjectEntrySet().fastIterator(); it.hasNext(); ) {
                 var en = it.next();
@@ -84,7 +84,7 @@ public final class StationNetwork {
     }
 
     private static Store of(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(Store::load, Store::new, "fts_geology_stations");
+        return level.getDataStorage().computeIfAbsent(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), "fts_geology_stations");
     }
 
     /** A station set up: by whom, and named as the item it was set up from was, if it was named on an anvil. */

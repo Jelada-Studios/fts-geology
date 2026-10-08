@@ -20,11 +20,8 @@ import net.minecraft.world.level.block.CampfireBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
-import net.neoforged.neoforge.common.capabilities.Capability;
-import net.neoforged.neoforge.common.capabilities.ForgeCapabilities;
-import net.neoforged.neoforge.common.util.LazyOptional;
 import net.neoforged.neoforge.energy.IEnergyStorage;
-import net.neoforged.neoforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -49,8 +46,7 @@ public class ThermoelectricBlockEntity extends BlockEntity {
     private static final double COUPLE = 0.00035;
 
     private final MachineEnergy energy = new MachineEnergy(CAPACITY, 0, PUSH, this::setChanged);
-    private final LazyOptional<IEnergyStorage> fe = LazyOptional.of(() -> energy);
-    private final LazyOptional<Object> volts = com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower.generator(
+    private final Object volts = com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower.generator(
             energy::getEnergyStored, () -> CAPACITY, energy::set, this::setChanged);
 
     private double hot = Double.NaN, cold = Double.NaN;
@@ -140,19 +136,10 @@ public class ThermoelectricBlockEntity extends BlockEntity {
         return out;
     }
 
-    @Override
-    public <T> @NotNull LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
+    /** Its Forge Energy on a side, for the capability registration: every side but its hot and cold faces. */
+    public @Nullable IEnergyStorage energyOn(@Nullable Direction side) {
         boolean face = side != null && side.getAxis() == hotFace().getAxis();
-        if (cap == ForgeCapabilities.ENERGY && !face) return fe.cast();
-        if (com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower.is(cap) && !face) return volts.cast();
-        return super.getCapability(cap, side);
-    }
-
-    @Override
-    public void invalidateCaps() {
-        super.invalidateCaps();
-        fe.invalidate();
-        volts.invalidate();
+        return face ? null : energy;
     }
 
     @Override

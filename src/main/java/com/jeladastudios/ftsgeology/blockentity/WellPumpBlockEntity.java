@@ -15,9 +15,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluids;
-import net.neoforged.neoforge.common.capabilities.Capability;
-import net.neoforged.neoforge.common.capabilities.ForgeCapabilities;
-import net.neoforged.neoforge.common.util.LazyOptional;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.EnergyStorage;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -97,11 +95,9 @@ public class WellPumpBlockEntity extends BlockEntity {
             return out;
         }
     };
-    private final LazyOptional<IEnergyStorage> power = LazyOptional.of(() -> energy);
     /** The same store as Electrodynamics' electricity, where it is installed: its wires give nothing else. 120 V only. */
-    private final LazyOptional<Object> volts = ElectrodynamicsPower.receiver(energy::getEnergyStored, () -> STORE,
+    private final Object volts = ElectrodynamicsPower.receiver(energy::getEnergyStored, () -> STORE,
             () -> Math.min(TAKE_PER_TICK, STORE - energy.getEnergyStored()), energy::set, this::setChanged, this::tooHigh);
-    private final LazyOptional<IFluidHandler> water = LazyOptional.of(() -> outlet);
     /** The last voltage it refused, and when, for the reading. */
     private double refusedVolts;
     private long refusedAt = -1;
@@ -197,7 +193,7 @@ public class WellPumpBlockEntity extends BlockEntity {
             if (d == Direction.DOWN) continue;
             BlockEntity other = level.getBlockEntity(pos.relative(d));
             if (other == null) continue;
-            IFluidHandler into = other.getCapability(ForgeCapabilities.FLUID_HANDLER, d.getOpposite()).orElse(null);
+            IFluidHandler into = level.getCapability(Capabilities.FluidHandler.BLOCK, pos.relative(d), d.getOpposite());
             if (into == null) continue;
             int took = into.fill(tank.drain(PUSH_PER_TICK, IFluidHandler.FluidAction.SIMULATE), IFluidHandler.FluidAction.EXECUTE);
             if (took > 0) {
@@ -246,20 +242,14 @@ public class WellPumpBlockEntity extends BlockEntity {
         nextSurvey = 1;
     }
 
-    @Override
-    public <T> @NotNull LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
-        if (cap == ForgeCapabilities.ENERGY) return power.cast();
-        if (ElectrodynamicsPower.is(cap)) return volts.cast();
-        if (cap == ForgeCapabilities.FLUID_HANDLER && side != Direction.DOWN) return water.cast();
-        return super.getCapability(cap, side);
+    /** Its Forge Energy, for the capability registration: on every side. */
+    public IEnergyStorage energyOn(@Nullable Direction side) {
+        return energy;
     }
 
-    @Override
-    public void invalidateCaps() {
-        super.invalidateCaps();
-        power.invalidate();
-        volts.invalidate();
-        water.invalidate();
+    /** Its water outlet on a side, for the capability registration: every side but its foot, the well. */
+    public @Nullable IFluidHandler fluidOn(@Nullable Direction side) {
+        return side != Direction.DOWN ? outlet : null;
     }
 
     @Override

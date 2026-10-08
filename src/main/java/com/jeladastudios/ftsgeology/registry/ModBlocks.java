@@ -16,7 +16,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DropExperienceBlock;
 import net.minecraft.util.valueproviders.UniformInt;
-import net.minecraft.world.level.block.SandBlock;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.StairBlock;
@@ -24,7 +23,7 @@ import net.minecraft.world.level.block.WallBlock;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
 /** All blocks introduced by the mod. */
 public final class ModBlocks {
@@ -71,7 +70,7 @@ public final class ModBlocks {
     /** Sea water poured out of a bucket: water, but it waters no field; see {@link ModFluids#SEA_WATER}. */
     public static final DeferredHolder<Block, Block> SEA_WATER = BLOCKS.register("sea_water",
             () -> new net.minecraft.world.level.block.LiquidBlock(
-                    () -> (net.minecraft.world.level.material.FlowingFluid) ModFluids.SEA_WATER.get(),
+                    (net.minecraft.world.level.material.FlowingFluid) ModFluids.SEA_WATER.get(),
                     BlockBehaviour.Properties.ofLegacyCopy(Blocks.WATER).noLootTable()));
 
     /** A film of rain water in a hollow, laid and taken back by the ground's water; see {@code Puddles}. */
@@ -140,7 +139,7 @@ public final class ModBlocks {
     /** Crude oil poured out of a bucket. */
     public static final DeferredHolder<Block, Block> CRUDE_OIL = BLOCKS.register("crude_oil",
             () -> new net.minecraft.world.level.block.LiquidBlock(
-                    () -> (net.minecraft.world.level.material.FlowingFluid) ModFluids.CRUDE_OIL.get(),
+                    (net.minecraft.world.level.material.FlowingFluid) ModFluids.CRUDE_OIL.get(),
                     BlockBehaviour.Properties.ofLegacyCopy(Blocks.WATER).mapColor(MapColor.COLOR_BLACK).noLootTable()));
 
     /** Well casing: the steel pipe a turbine's well is lined with, down to the heat. */
@@ -301,7 +300,7 @@ public final class ModBlocks {
 
     /** Volcanic black sand: basalt shattered by the sea and ground down by waves, as on Hawaiian beaches. */
     public static final DeferredHolder<Block, Block> VOLCANIC_BLACK_SAND = BLOCKS.register("volcanic_black_sand",
-            () -> new SandBlock(0x141414, BlockBehaviour.Properties.ofLegacyCopy(Blocks.SAND)
+            () -> new net.minecraft.world.level.block.ColoredFallingBlock(new net.minecraft.util.ColorRGBA(0x141414), BlockBehaviour.Properties.ofLegacyCopy(Blocks.SAND)
                     .mapColor(MapColor.COLOR_BLACK)
                     .strength(0.5F)
                     .sound(SoundType.SAND)));
@@ -338,17 +337,17 @@ public final class ModBlocks {
 
     /** Quartz vein: white crystalline hydrothermal quartz seam cutting through grey host stone. */
     public static final DeferredHolder<Block, Block> QUARTZ_VEIN = BLOCKS.register("quartz_vein",
-            () -> new DropExperienceBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
+            () -> new DropExperienceBlock(UniformInt.of(2, 5), BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
                     .mapColor(MapColor.QUARTZ)
                     .strength(3.0F, 6.0F)
-                    .requiresCorrectToolForDrops(), UniformInt.of(2, 5)));
+                    .requiresCorrectToolForDrops()));
 
     /** Cinnabar: hydrothermal vermilion-red mercury sulfide ore. */
     public static final DeferredHolder<Block, Block> CINNABAR = BLOCKS.register("cinnabar",
-            () -> new DropExperienceBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
+            () -> new DropExperienceBlock(UniformInt.of(1, 5), BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
                     .mapColor(MapColor.COLOR_RED)
                     .strength(2.5F, 3.0F)
-                    .requiresCorrectToolForDrops(), UniformInt.of(1, 5)));
+                    .requiresCorrectToolForDrops()));
 
     /** Galena: primary lead sulfide ore with metallic lustre and stepped cubic cleavage. */
     public static final DeferredHolder<Block, Block> GALENA = BLOCKS.register("galena",
@@ -364,7 +363,7 @@ public final class ModBlocks {
     public static final DeferredHolder<Block, Block> TRAVERTINE_SLAB = BLOCKS.register("travertine_slab",
             () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(TRAVERTINE.get())));
     public static final DeferredHolder<Block, Block> TRAVERTINE_STAIRS = BLOCKS.register("travertine_stairs",
-            () -> new StairBlock(() -> TRAVERTINE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(TRAVERTINE.get())));
+            () -> new StairBlock(TRAVERTINE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(TRAVERTINE.get())));
     public static final DeferredHolder<Block, Block> TRAVERTINE_WALL = BLOCKS.register("travertine_wall",
             () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(TRAVERTINE.get())));
 
@@ -373,7 +372,7 @@ public final class ModBlocks {
     public static final DeferredHolder<Block, Block> RHYOLITE_SLAB = BLOCKS.register("rhyolite_slab",
             () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(RHYOLITE.get())));
     public static final DeferredHolder<Block, Block> RHYOLITE_STAIRS = BLOCKS.register("rhyolite_stairs",
-            () -> new StairBlock(() -> RHYOLITE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(RHYOLITE.get())));
+            () -> new StairBlock(RHYOLITE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(RHYOLITE.get())));
     public static final DeferredHolder<Block, Block> RHYOLITE_WALL = BLOCKS.register("rhyolite_wall",
             () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(RHYOLITE.get())));
 
@@ -382,7 +381,7 @@ public final class ModBlocks {
     public static final DeferredHolder<Block, Block> GABBRO_SLAB = BLOCKS.register("gabbro_slab",
             () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(GABBRO.get())));
     public static final DeferredHolder<Block, Block> GABBRO_STAIRS = BLOCKS.register("gabbro_stairs",
-            () -> new StairBlock(() -> GABBRO.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(GABBRO.get())));
+            () -> new StairBlock(GABBRO.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(GABBRO.get())));
     public static final DeferredHolder<Block, Block> GABBRO_WALL = BLOCKS.register("gabbro_wall",
             () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(GABBRO.get())));
 
@@ -391,7 +390,7 @@ public final class ModBlocks {
     public static final DeferredHolder<Block, Block> PERIDOTITE_SLAB = BLOCKS.register("peridotite_slab",
             () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(PERIDOTITE.get())));
     public static final DeferredHolder<Block, Block> PERIDOTITE_STAIRS = BLOCKS.register("peridotite_stairs",
-            () -> new StairBlock(() -> PERIDOTITE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(PERIDOTITE.get())));
+            () -> new StairBlock(PERIDOTITE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(PERIDOTITE.get())));
     public static final DeferredHolder<Block, Block> PERIDOTITE_WALL = BLOCKS.register("peridotite_wall",
             () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(PERIDOTITE.get())));
 
@@ -400,7 +399,7 @@ public final class ModBlocks {
     public static final DeferredHolder<Block, Block> SERPENTINITE_SLAB = BLOCKS.register("serpentinite_slab",
             () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(SERPENTINITE.get())));
     public static final DeferredHolder<Block, Block> SERPENTINITE_STAIRS = BLOCKS.register("serpentinite_stairs",
-            () -> new StairBlock(() -> SERPENTINITE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(SERPENTINITE.get())));
+            () -> new StairBlock(SERPENTINITE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(SERPENTINITE.get())));
     public static final DeferredHolder<Block, Block> SERPENTINITE_WALL = BLOCKS.register("serpentinite_wall",
             () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(SERPENTINITE.get())));
 
@@ -409,7 +408,7 @@ public final class ModBlocks {
     public static final DeferredHolder<Block, Block> SCHIST_SLAB = BLOCKS.register("schist_slab",
             () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(SCHIST.get())));
     public static final DeferredHolder<Block, Block> SCHIST_STAIRS = BLOCKS.register("schist_stairs",
-            () -> new StairBlock(() -> SCHIST.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(SCHIST.get())));
+            () -> new StairBlock(SCHIST.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(SCHIST.get())));
     public static final DeferredHolder<Block, Block> SCHIST_WALL = BLOCKS.register("schist_wall",
             () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(SCHIST.get())));
 
@@ -418,7 +417,7 @@ public final class ModBlocks {
     public static final DeferredHolder<Block, Block> GNEISS_SLAB = BLOCKS.register("gneiss_slab",
             () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(GNEISS.get())));
     public static final DeferredHolder<Block, Block> GNEISS_STAIRS = BLOCKS.register("gneiss_stairs",
-            () -> new StairBlock(() -> GNEISS.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(GNEISS.get())));
+            () -> new StairBlock(GNEISS.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(GNEISS.get())));
     public static final DeferredHolder<Block, Block> GNEISS_WALL = BLOCKS.register("gneiss_wall",
             () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(GNEISS.get())));
 
@@ -427,7 +426,7 @@ public final class ModBlocks {
     public static final DeferredHolder<Block, Block> SLATE_SLAB = BLOCKS.register("slate_slab",
             () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(SLATE.get())));
     public static final DeferredHolder<Block, Block> SLATE_STAIRS = BLOCKS.register("slate_stairs",
-            () -> new StairBlock(() -> SLATE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(SLATE.get())));
+            () -> new StairBlock(SLATE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(SLATE.get())));
     public static final DeferredHolder<Block, Block> SLATE_WALL = BLOCKS.register("slate_wall",
             () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(SLATE.get())));
 
@@ -436,7 +435,7 @@ public final class ModBlocks {
     public static final DeferredHolder<Block, Block> MARBLE_SLAB = BLOCKS.register("marble_slab",
             () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(MARBLE.get())));
     public static final DeferredHolder<Block, Block> MARBLE_STAIRS = BLOCKS.register("marble_stairs",
-            () -> new StairBlock(() -> MARBLE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(MARBLE.get())));
+            () -> new StairBlock(MARBLE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(MARBLE.get())));
     public static final DeferredHolder<Block, Block> MARBLE_WALL = BLOCKS.register("marble_wall",
             () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(MARBLE.get())));
 
@@ -445,7 +444,7 @@ public final class ModBlocks {
     public static final DeferredHolder<Block, Block> QUARTZITE_SLAB = BLOCKS.register("quartzite_slab",
             () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(QUARTZITE.get())));
     public static final DeferredHolder<Block, Block> QUARTZITE_STAIRS = BLOCKS.register("quartzite_stairs",
-            () -> new StairBlock(() -> QUARTZITE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(QUARTZITE.get())));
+            () -> new StairBlock(QUARTZITE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(QUARTZITE.get())));
     public static final DeferredHolder<Block, Block> QUARTZITE_WALL = BLOCKS.register("quartzite_wall",
             () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(QUARTZITE.get())));
 
@@ -454,7 +453,7 @@ public final class ModBlocks {
     public static final DeferredHolder<Block, Block> SHALE_SLAB = BLOCKS.register("shale_slab",
             () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(SHALE.get())));
     public static final DeferredHolder<Block, Block> SHALE_STAIRS = BLOCKS.register("shale_stairs",
-            () -> new StairBlock(() -> SHALE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(SHALE.get())));
+            () -> new StairBlock(SHALE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(SHALE.get())));
     public static final DeferredHolder<Block, Block> SHALE_WALL = BLOCKS.register("shale_wall",
             () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(SHALE.get())));
 
@@ -463,7 +462,7 @@ public final class ModBlocks {
     public static final DeferredHolder<Block, Block> CHERT_SLAB = BLOCKS.register("chert_slab",
             () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(CHERT.get())));
     public static final DeferredHolder<Block, Block> CHERT_STAIRS = BLOCKS.register("chert_stairs",
-            () -> new StairBlock(() -> CHERT.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(CHERT.get())));
+            () -> new StairBlock(CHERT.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(CHERT.get())));
     public static final DeferredHolder<Block, Block> CHERT_WALL = BLOCKS.register("chert_wall",
             () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(CHERT.get())));
 
