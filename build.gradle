@@ -61,16 +61,6 @@ dependencies {
     }
 }
 
-// The port goes a package at a time (docs/NEOFORGE_PORT_KURALLARI.md, section 13). A package not ported yet is left
-// out of the build here; the line comes out when it is ported.
-def notYetPorted = [
-        // Sodium 0.6 for NeoForge 1.21.1 (Embeddium's successor) is not on this machine: the river flow in its renderer waits.
-        'mixin/EmbeddiumRiverFlowMixin.java',
-]
-sourceSets.main.java {
-    notYetPorted.each { p -> exclude p.endsWith('.java') ? "com/jeladastudios/ftsgeology/${p}" : "com/jeladastudios/ftsgeology/${p}/**" }
-}
-
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.compilerArgs += ['-Xmaxerrs', '10000']

@@ -25,7 +25,7 @@
             "entity": "this",
             "predicate": {
               "location": {
-                "biome": "fts_geology:everest"
+                "biomes": "fts_geology:everest"
               }
             }
           }
@@ -41,7 +41,7 @@
             "entity": "this",
             "predicate": {
               "location": {
-                "biome": "fts_geology:k2"
+                "biomes": "fts_geology:k2"
               }
             }
           }
@@ -57,7 +57,7 @@
             "entity": "this",
             "predicate": {
               "location": {
-                "biome": "fts_geology:matterhorn"
+                "biomes": "fts_geology:matterhorn"
               }
             }
           }

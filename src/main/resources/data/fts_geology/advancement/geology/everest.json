@@ -25,7 +25,7 @@
             "entity": "this",
             "predicate": {
               "location": {
-                "biome": "fts_geology:everest"
+                "biomes": "fts_geology:everest"
               }
             }
           }

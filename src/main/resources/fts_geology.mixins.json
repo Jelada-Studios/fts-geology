@@ -30,6 +30,7 @@
     "RiverMudMixin",
     "SoundStreamsMixin",
     "RiverFlowRenderMixin",
+    "SodiumRiverFlowMixin",
         "GasFurnaceSmokeMixin"
   ],
   "injectors": {
