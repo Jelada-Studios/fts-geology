@@ -97,15 +97,15 @@ public class CrankshaftBlockEntity extends GeneratingKineticBlockEntity {
     }
 
     @Override
-    protected void write(CompoundTag tag, boolean clientPacket) {
-        super.write(tag, clientPacket);
+    protected void write(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
+        super.write(tag, registries, clientPacket);
         tag.putFloat("offered", offered);
         tag.putFloat("drawn", lastDrawn);
     }
 
     @Override
-    protected void read(CompoundTag tag, boolean clientPacket) {
-        super.read(tag, clientPacket);
+    protected void read(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
+        super.read(tag, registries, clientPacket);
         offered = tag.getFloat("offered");
         lastDrawn = tag.getFloat("drawn");
     }

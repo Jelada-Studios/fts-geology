@@ -51,13 +51,19 @@ repositories {
 dependencies {
     // Distant Horizons' API, for the optional far-terrain generator: platform-independent, compiled against, never shipped.
     compileOnly files('libs/DistantHorizonsApi-7.2.0.jar')
+    // Create (MIT), for the gas engine's crankshaft (compat.create, built only when Create's jar is in libs/, its
+    // Flywheel, Ponder and Registrate beside it out of its META-INF/jarjar): compiled against, never shipped.
+    if (file('libs/create-1.21.1-6.0.10.jar').exists()) {
+        compileOnly files('libs/create-1.21.1-6.0.10.jar', 'libs/flywheel-neoforge-1.21.1-1.0.6.jar',
+                'libs/ponder-neoforge-1.0.82+mc1.21.1.jar', 'libs/Registrate-MC1.21-1.3.0+67.jar')
+    } else {
+        sourceSets.main.java.exclude 'com/jeladastudios/ftsgeology/compat/create/**'
+    }
 }
 
 // The port goes a package at a time (docs/NEOFORGE_PORT_KURALLARI.md, section 13). A package not ported yet is left
 // out of the build here; the line comes out when it is ported.
 def notYetPorted = [
-        // Create 6 for NeoForge 1.21.1 is not on this machine yet: the crankshaft waits for its jar.
-        'compat/create',
         // Sodium 0.6 for NeoForge 1.21.1 (Embeddium's successor) is not on this machine: the river flow in its renderer waits.
         'mixin/EmbeddiumRiverFlowMixin.java',
 ]

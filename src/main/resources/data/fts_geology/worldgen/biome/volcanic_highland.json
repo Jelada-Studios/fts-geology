@@ -76,10 +76,10 @@
     ],
     [
       "minecraft:glow_lichen",
+      "minecraft:patch_grass_plain",
       "minecraft:trees_windswept_hills",
       "minecraft:trees_taiga",
-      "minecraft:flower_default",
-      "minecraft:patch_grass_plain"
+      "minecraft:flower_default"
     ],
     [
       "minecraft:freeze_top_layer"

@@ -21,7 +21,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class CreateHosePulleyMixin {
 
     @ModifyArg(method = {"pullNext", "getDrainableFluid"},
-            at = @At(value = "INVOKE", target = "Lnet/minecraftforge/fluids/FluidStack;<init>(Lnet/minecraft/world/level/material/Fluid;I)V", remap = false),
+            at = @At(value = "INVOKE", target = "Lnet/neoforged/neoforge/fluids/FluidStack;<init>(Lnet/minecraft/world/level/material/Fluid;I)V", remap = false),
             index = 0, require = 0, remap = false)
     private Fluid fts_geology$riverIsWater(Fluid fluid) {
         return CreateRivers.asWater(fluid);
