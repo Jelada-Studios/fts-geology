@@ -57,6 +57,17 @@ public final class ClientSoilWet {
         return wet >= (kind == 3 ? 8 : 13);
     }
 
+    /**
+     * Whether that mod may flood the open ground at sea level at {@code pos}: only where water stands on it, the cell's
+     * top soaked through; true where nothing is known, so that mod decides as it would.
+     */
+    public static boolean allowsFlood(Level level, BlockPos pos) {
+        byte[] w = WET.get(ChunkPos.asLong(pos.getX() >> 4, pos.getZ() >> 4));
+        if (w == null) return true;
+        int b = w[((pos.getZ() & 15) >> 2) * 4 + ((pos.getX() & 15) >> 2)];
+        return (b & 64) != 0;
+    }
+
     private static String name(BlockState s) {
         return net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock()).toString();
     }
