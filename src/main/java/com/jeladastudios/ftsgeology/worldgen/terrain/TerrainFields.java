@@ -87,6 +87,8 @@ public final class TerrainFields {
     private static final double SHOULDER_AT = 0.7, SHOULDER_HALF = 0.4;
     /** Where a rift's floor starts to take the ruggedness of its shoulders, and over how far. */
     private static final double RIFT_CALM_FROM = 0.1, RIFT_CALM_OVER = 0.6;
+    /** Over how far from the line, in the units of riftAcross, a rift against an ocean plate sinks to its graben. */
+    private static final double MARGIN_SINK = 0.2;
 
     /**
      * How much narrower a rift is than its first drawing, in both worlds: at full width it read as a lowland, and at
@@ -422,6 +424,11 @@ public final class TerrainFields {
             double slope = smooth(Mth.clamp(1.0 - across(s, p) / TRANSFORM_SEA_SLOPE, 0, 1));
             return quiet - belt(s, p) * TRANSFORM_RUGGED * slope;
         }
+        // A rift between an ocean plate and a continent is the continent's, its floor quiet down to the line; the ocean
+        // side took a spreading ridge's hills there and stood most of an erosion unit under it, so the biomes changed
+        // along the line as if cut with a ruler. That side keeps the quiet of any sea floor away from a ridge.
+        if (oceanic && k == FaultType.DIVERGENT && !s.neighbourKind().isOceanic()
+                && WorldgenRevision.has(WorldgenRevision.MARGIN_RIFTS)) return quiet;
         // A sea floor is flat except where it is being made or destroyed: the hills of a spreading ridge and the
         // islands of an arc are the exceptions.
         if (oceanic && !s.overridingSide() && k != FaultType.DIVERGENT) return quiet;
@@ -471,6 +478,13 @@ public final class TerrainFields {
                     : -0.25 * peak(a, TRENCH_AT, TRENCH_HALF);
             case DIVERGENT -> {
                 double r = riftAcross(s, p);
+                // Against an ocean plate the graben is the continent's alone, and the ocean's floor, across the line,
+                // is level with the ground there: the graben's deepest, on the line, met it as a wall of thirty
+                // blocks, straight as the line and with another biome on top. It sinks from the line inland instead.
+                if (WorldgenRevision.has(WorldgenRevision.MARGIN_RIFTS) && s.neighbourKind().isOceanic()) {
+                    double sunk = graben(r) + axisTrough(r, s);
+                    yield sunk * smooth(Math.min(1.0, r / MARGIN_SINK)) + SHOULDER_RISE * peak(r, SHOULDER_AT, SHOULDER_HALF);
+                }
                 double relief = graben(r) + SHOULDER_RISE * peak(r, SHOULDER_AT, SHOULDER_HALF);
                 if (WorldgenRevision.has(WorldgenRevision.DEEP_RIFTS)) relief += axisTrough(r, s);
                 yield relief;
@@ -715,6 +729,41 @@ public final class TerrainFields {
     /** One over the middle of a crop, nothing at its edge: the mountain has to meet the country it stands in. */
     private static double fade(double t) {
         return smooth(Mth.clamp((1.0 - t) / LANDMARK_FADE, 0, 1));
+    }
+
+    /** How high a named mountain's top stands over the ground it is laid on, in blocks, at a column of it; 0 off one. */
+    public static double landmarkTop(long seed, GeologyParams p, int x, int z) {
+        if (p.horizontal() < 1.5 || !DemLibrary.landmarksReady()) return 0.0;
+        LandmarkSites.Site s = LandmarkSites.near(seed, p, x, z);
+        if (s == null) return 0.0;
+        return LANDMARK_BLOCKS * landmarkCrest(s.which()) / DemLibrary.landmarkTallest();
+    }
+
+    /** Each named mountain's highest point as it is laid, in metres: worked out once, the crops never change. */
+    private static final java.util.concurrent.ConcurrentHashMap<Integer, Double> LANDMARK_CRESTS =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * The highest a named mountain stands as it is laid on the ground, in metres over its valley floor: the crop's own
+     * summit, read the way {@link #landmark} reads it, faded to its edges. The crop's recorded peak was a quarter over
+     * it, and a mountain made smaller by that measure came out a fifth lower than it needed to.
+     */
+    private static double landmarkCrest(int which) {
+        return LANDMARK_CRESTS.computeIfAbsent(which, w -> {
+            double halfAlong = DemLibrary.landmarkHalfAlong(w), halfAcross = DemLibrary.landmarkHalfAcross(w);
+            double top = 0.0;
+            int n = 400;
+            for (int i = 0; i <= n; i++) {
+                double along = -halfAlong + 2.0 * halfAlong * i / n;
+                for (int j = 0; j <= n; j++) {
+                    double across = -halfAcross + 2.0 * halfAcross * j / n;
+                    double env = fade(Math.abs(along) / halfAlong) * fade(Math.abs(across) / halfAcross);
+                    if (env <= 0.0) continue;
+                    top = Math.max(top, env * DemLibrary.landmark(w, along, across));
+                }
+            }
+            return top > 0.0 ? top : DemLibrary.landmarkPeak(w);
+        });
     }
 
     /** How much of a named mountain a column carries, for the biome to take its name from it. */

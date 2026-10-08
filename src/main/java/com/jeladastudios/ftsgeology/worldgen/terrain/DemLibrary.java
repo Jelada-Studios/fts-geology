@@ -78,6 +78,11 @@ public final class DemLibrary {
         return top;
     }
 
+    /** One named mountain's top over its own valley floor, in metres. */
+    public static double landmarkPeak(int which) {
+        return Holder.LANDMARK[which].peak;
+    }
+
     /** One named mountain's height in metres over its own valley floor, at a point measured from its middle. */
     public static double landmark(int which, double along, double across) {
         Crop c = Holder.LANDMARK[which];

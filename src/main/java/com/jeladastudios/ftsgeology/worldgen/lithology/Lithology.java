@@ -177,8 +177,8 @@ public final class Lithology {
             // the plutons that fed them.
             case ARC -> depth > c.plutonTop() ? c.pluton()
                     : depth < 22 + c.bedShift() * 2 ? pick(ARC_BEDS, salt ^ 0x60L, Math.floorDiv(depth + c.bedShift(), 4))
-                    : pick(ARC_ROOT, salt ^ 0x68L, SeedHash.hash(seed ^ 0x68L, x >> 3, z >> 3, y >> 3));
-            case PRISM -> body(seed, x, y, z, pick(PRISM_ROCKS, salt ^ 0x70L, SeedHash.hash(seed ^ 0x70L, x >> 3, z >> 3, y >> 2)));
+                    : pick(ARC_ROOT, salt ^ 0x68L, lump(seed, 0x68L, x, y, z, 3));
+            case PRISM -> body(seed, x, y, z, pick(PRISM_ROCKS, salt ^ 0x70L, lump(seed, 0x70L, x, y, z, 2)));
             case RIFT -> rift(seed, salt, c, x, y, z, depth);
             case SHEAR_ZONE -> depth > 40 ? basement(seed, c, x, y, z, depth - 40)
                     : pick(SHEAR_BANDS, salt ^ 0x90L, Math.floorDiv((int) Math.floor(c.folded()), 3));
@@ -186,7 +186,7 @@ public final class Lithology {
                     : body(seed, x, y, z, Rock.GABBRO);
             case OCEAN_FLOOR -> depth < 8 ? ((h >>> 5) & 3) == 0 ? Rock.SMOOTH_BASALT : Rock.BASALT
                     : depth < 30 ? body(seed, x, y, z, Rock.GABBRO)
-                    : body(seed, x, y, z, pick(MANTLE, salt ^ 0xB0L, SeedHash.hash(seed ^ 0xB0L, x >> 3, z >> 3, y >> 3)));
+                    : body(seed, x, y, z, pick(MANTLE, salt ^ 0xB0L, lump(seed, 0xB0L, x, y, z, 3)));
         });
     }
 
@@ -281,6 +281,27 @@ public final class Lithology {
      */
     private static Rock body(long seed, int x, int y, int z, Rock rock) {
         return ValueNoise.noise3D(x + shiftX(seed), y, z + shiftZ(seed), BODY_SCALE, BODY_SCALE) > BODY_CUT ? rock : Rock.KEEP;
+    }
+
+    /** How far, blocks, and over what distance the walls of the deep rock bodies wander. */
+    private static final double LUMP = 6.0, LUMP_SCALE = 10.0;
+
+    /**
+     * The body of deep rock a block is in: cells of eight blocks across ({@code 1 << yShift} down), each its own rock.
+     * Laid on the grid as it stands the cells were cubes, and a cave wall showed squares of granite and diorite side by
+     * side. Looked up at a point the noise pushes a few blocks about, the walls wander and the bodies come out as
+     * rounded lumps of different sizes, as dykes and pods are. Worlds made before round 142 keep the cubes.
+     */
+    private static long lump(long seed, long salt, int x, int y, int z, int yShift) {
+        if (com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.has(
+                com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.ROUND_BODIES)) {
+            int sx = shiftX(seed), sz = shiftZ(seed);
+            int wx = x + (int) Math.round(LUMP * ValueNoise.noise3D(x + sx + 1777, y, z + sz, LUMP_SCALE, LUMP_SCALE));
+            int wz = z + (int) Math.round(LUMP * ValueNoise.noise3D(x + sx, y + 913, z + sz + 2333, LUMP_SCALE, LUMP_SCALE));
+            int wy = y + (int) Math.round(0.6 * LUMP * ValueNoise.noise3D(x + sx + 4111, y, z + sz + 811, LUMP_SCALE, LUMP_SCALE));
+            return SeedHash.hash(seed ^ salt, wx >> 3, wz >> 3, wy >> yShift);
+        }
+        return SeedHash.hash(seed ^ salt, x >> 3, z >> 3, y >> yShift);
     }
 
     /** The noise is a function of position alone; the seed moves it. */
