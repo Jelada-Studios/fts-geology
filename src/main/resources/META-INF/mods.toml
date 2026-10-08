@@ -10,6 +10,7 @@ displayName = "FT's Geology"
 authors = "Jelada Studios"
 credits = "See CREDITS.md — community reports and questions that shaped the mod."
 displayURL = "https://jeladastudios.com/fts-geology/"
+updateJSONURL = "https://raw.githubusercontent.com/Jelada-Studios/fts-geology/main/update.json"
 description = '''
 A geology layer for Minecraft: real plate tectonics driving real landforms.
 
