@@ -152,7 +152,7 @@ public final class Seismogram {
         tag.putString("author", "Seismograph");
         tag.putBoolean("resolved", true);
         ListTag list = new ListTag();
-        for (Component p : pages) list.add(StringTag.valueOf(Component.Serializer.toJson(p)));
+        for (Component p : pages) list.add(StringTag.valueOf(Component.Serializer.toJson(p, net.minecraft.core.RegistryAccess.EMPTY)));
         tag.put("pages", list);
         return book;
     }

@@ -18,6 +18,13 @@ import org.jetbrains.annotations.Nullable;
  * placeable so players can build their own spa (put water on top for the effect).
  */
 public class HotSpringBlock extends BaseEntityBlock {
+    public static final com.mojang.serialization.MapCodec<HotSpringBlock> CODEC = simpleCodec(HotSpringBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
 
     public HotSpringBlock(Properties props) {
         super(props);

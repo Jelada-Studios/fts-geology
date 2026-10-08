@@ -31,6 +31,13 @@ import org.jetbrains.annotations.Nullable;
  * deepslate rather than carrying a texture of its own for exactly that reason.</p>
  */
 public class SpringSourceBlock extends BaseEntityBlock {
+    public static final com.mojang.serialization.MapCodec<SpringSourceBlock> CODEC = simpleCodec(SpringSourceBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
 
     public SpringSourceBlock(Properties props) {
         super(props);

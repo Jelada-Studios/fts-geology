@@ -90,7 +90,6 @@ public class WeatherTerminalScreen extends Screen {
     @Override
     public void tick() {
         if (++ticks % 40 == 0) StationUi.request(pos, data);
-        if (nameBox != null) nameBox.tick();
     }
 
     @Override
@@ -165,7 +164,7 @@ public class WeatherTerminalScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float partial) {
-        renderBackground(g);
+        renderBackground(g, mx, my, partial);
         g.fill(left, top, left + W, top + H, BG);
         frame(g, left, top, W, H, BORDER);
         g.fill(left + 1, top + 1, left + W - 1, top + 17, HEADER);

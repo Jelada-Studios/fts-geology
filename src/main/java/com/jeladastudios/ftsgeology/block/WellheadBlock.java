@@ -34,6 +34,13 @@ import org.jetbrains.annotations.Nullable;
  * fills the bucket with crude oil.
  */
 public class WellheadBlock extends BaseEntityBlock {
+    public static final com.mojang.serialization.MapCodec<WellheadBlock> CODEC = simpleCodec(WellheadBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
 
     /** Flange, the valve stack, and the side outlets. */
     private static final VoxelShape SHAPE = Shapes.or(Block.box(2, 0, 2, 14, 3, 14), Block.box(5, 3, 5, 11, 16, 11),

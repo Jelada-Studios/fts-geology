@@ -30,6 +30,13 @@ import org.jetbrains.annotations.Nullable;
  * faces -- the lava, the fire, the burner -- and its fins behind, into the cold. Right-click reads it.
  */
 public class ThermoelectricBlock extends BaseEntityBlock {
+    public static final com.mojang.serialization.MapCodec<ThermoelectricBlock> CODEC = simpleCodec(ThermoelectricBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
 
     public static final DirectionProperty FACING = HorizontalDirectionalBlock.FACING;
     public static final BooleanProperty LIT = BlockStateProperties.LIT;

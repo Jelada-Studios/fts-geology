@@ -13,8 +13,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.FarmBlock;
 import net.minecraft.world.level.block.StemBlock;
-import net.neoforged.neoforge.event.level.BlockEvent;
-import net.neoforged.bus.api.Event;
 
 /**
  * Crops grow faster on a floodplain.
@@ -32,8 +30,8 @@ public final class AlluvialSoil {
     private static final ResourceKey<Biome> ALLUVIAL_PLAIN =
             ResourceKey.create(Registries.BIOME, ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "alluvial_plain"));
 
-    public static void grow(BlockEvent.CropGrowEvent.Pre e) {
-        if (e.getResult() != Event.Result.DEFAULT || !(e.getLevel() instanceof ServerLevel level)) return;
+    public static void grow(net.neoforged.neoforge.event.level.block.CropGrowEvent.Pre e) {
+        if (e.getResult() != net.neoforged.neoforge.event.level.block.CropGrowEvent.Pre.Result.DEFAULT || !(e.getLevel() instanceof ServerLevel level)) return;
         double m = GeyserConfig.ALLUVIAL_CROP_GROWTH.get();
         if (m <= 1.0) return;
         Block block = e.getState().getBlock();
@@ -45,7 +43,7 @@ public final class AlluvialSoil {
         // chance q makes the two together m times that roll, whatever the field round it.
         double p = 1.0 / ((int) (25.0F / Speed.of(block, level, pos)) + 1);
         double q = Math.min(1.0, (m - 1.0) * p / (1.0 - p));
-        if (level.getRandom().nextDouble() < q) e.setResult(Event.Result.ALLOW);
+        if (level.getRandom().nextDouble() < q) e.setResult(net.neoforged.neoforge.event.level.block.CropGrowEvent.Pre.Result.GROW);
     }
 
     /** Reaches the game's own reckoning of how well a crop grows where it stands. Never made. */

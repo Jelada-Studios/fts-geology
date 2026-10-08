@@ -113,7 +113,7 @@ public final class ClientSoilTint {
     static net.minecraft.world.level.block.Block[] otherGrasses() {
         return java.util.stream.Stream.of("immersive_weathering:grassy_silt", "immersive_weathering:grassy_earthen_clay",
                         "immersive_weathering:grassy_sandy_dirt", "immersive_weathering:rooted_grass_block", "trmt:eroded_grass_block")
-                .map(net.minecraft.resources.ResourceLocation::new)
+                .map(net.minecraft.resources.ResourceLocation::parse)
                 .filter(net.minecraft.core.registries.BuiltInRegistries.BLOCK::containsKey)
                 .map(net.minecraft.core.registries.BuiltInRegistries.BLOCK::get)
                 .toArray(net.minecraft.world.level.block.Block[]::new);

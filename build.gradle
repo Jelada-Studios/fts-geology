@@ -50,6 +50,8 @@ dependencies {
 def notYetPorted = [
         // Create 6 for NeoForge 1.21.1 is not on this machine yet: the crankshaft waits for its jar.
         'compat/create',
+        // Sodium 0.6 for NeoForge 1.21.1 (Embeddium's successor) is not on this machine: the river flow in its renderer waits.
+        'mixin/EmbeddiumRiverFlowMixin.java',
 ]
 sourceSets.main.java {
     notYetPorted.each { p -> exclude p.endsWith('.java') ? "com/jeladastudios/ftsgeology/${p}" : "com/jeladastudios/ftsgeology/${p}/**" }

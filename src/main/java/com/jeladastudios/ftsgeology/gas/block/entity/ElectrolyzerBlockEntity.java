@@ -150,7 +150,7 @@ public class ElectrolyzerBlockEntity extends GasMachineBlockEntity {
         tag.put("h2", h2.save());
         tag.put("o2", o2.save());
         tag.putInt("energy", energy.getEnergyStored());
-        tag.put("water", water.writeToNBT(new CompoundTag()));
+        tag.put("water", water.writeToNBT(registries, new CompoundTag()));
         tag.putDouble("waterDebt", waterDebt);
     }
 
@@ -160,7 +160,7 @@ public class ElectrolyzerBlockEntity extends GasMachineBlockEntity {
         h2.load(tag.getCompound("h2"));
         o2.load(tag.getCompound("o2"));
         energy.set(tag.getInt("energy"));
-        water.readFromNBT(tag.getCompound("water"));
+        water.readFromNBT(registries, tag.getCompound("water"));
         waterDebt = tag.getDouble("waterDebt");
     }
 

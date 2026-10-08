@@ -10,7 +10,7 @@ import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.event.entity.SpawnPlacementRegisterEvent;
+import net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent;
 
 /**
  * Fish in the mod's own rivers.
@@ -30,7 +30,7 @@ public final class RiverSpawns {
     private RiverSpawns() {}
 
     /** Widens the fish rules once, while the game loads. */
-    public static void register(SpawnPlacementRegisterEvent event) {
+    public static void register(RegisterSpawnPlacementsEvent event) {
         also(event, EntityType.SALMON);
         also(event, EntityType.COD);
         also(event, EntityType.TROPICAL_FISH);
@@ -50,7 +50,7 @@ public final class RiverSpawns {
         return above.is(river) || above.is(Blocks.WATER);
     }
 
-    private static <T extends Entity> void also(SpawnPlacementRegisterEvent event, EntityType<T> type) {
-        event.register(type, RiverSpawns::inRiverWater, SpawnPlacementRegisterEvent.Operation.OR);
+    private static <T extends Entity> void also(RegisterSpawnPlacementsEvent event, EntityType<T> type) {
+        event.register(type, RiverSpawns::inRiverWater, RegisterSpawnPlacementsEvent.Operation.OR);
     }
 }

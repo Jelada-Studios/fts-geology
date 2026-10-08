@@ -257,18 +257,18 @@ final class CloudRenderer {
         y1 += lift;
         // Darker low down, where less light reaches: a side shades from its top to its foot.
         float foot = 0.78f;
-        b.vertex(xa, y0, za).uv(0.5f, 0.5f).color(r * foot, g * foot, bl * foot, a).normal(nx, 0, nz).endVertex();
-        b.vertex(xb, y0, zb).uv(0.5f, 0.5f).color(r * foot, g * foot, bl * foot, a).normal(nx, 0, nz).endVertex();
-        b.vertex(xb, y1, zb).uv(0.5f, 0.5f).color(r, g, bl, a).normal(nx, 0, nz).endVertex();
-        b.vertex(xa, y1, za).uv(0.5f, 0.5f).color(r, g, bl, a).normal(nx, 0, nz).endVertex();
+        b.addVertex(xa, y0, za).setUv(0.5f, 0.5f).setColor(r * foot, g * foot, bl * foot, a).setNormal(nx, 0, nz);
+        b.addVertex(xb, y0, zb).setUv(0.5f, 0.5f).setColor(r * foot, g * foot, bl * foot, a).setNormal(nx, 0, nz);
+        b.addVertex(xb, y1, zb).setUv(0.5f, 0.5f).setColor(r, g, bl, a).setNormal(nx, 0, nz);
+        b.addVertex(xa, y1, za).setUv(0.5f, 0.5f).setColor(r, g, bl, a).setNormal(nx, 0, nz);
     }
 
     private static void quad(BufferBuilder b, float x0, float y0, float z0, float x1, float y1, float z1, float x2, float y2, float z2,
                              float x3, float y3, float z3, float r, float g, float bl, float a, float nx, float ny, float nz) {
-        b.vertex(x0, y0, z0).uv(0.5f, 0.5f).color(r, g, bl, a).normal(nx, ny, nz).endVertex();
-        b.vertex(x1, y1, z1).uv(0.5f, 0.5f).color(r, g, bl, a).normal(nx, ny, nz).endVertex();
-        b.vertex(x2, y2, z2).uv(0.5f, 0.5f).color(r, g, bl, a).normal(nx, ny, nz).endVertex();
-        b.vertex(x3, y3, z3).uv(0.5f, 0.5f).color(r, g, bl, a).normal(nx, ny, nz).endVertex();
+        b.addVertex(x0, y0, z0).setUv(0.5f, 0.5f).setColor(r, g, bl, a).setNormal(nx, ny, nz);
+        b.addVertex(x1, y1, z1).setUv(0.5f, 0.5f).setColor(r, g, bl, a).setNormal(nx, ny, nz);
+        b.addVertex(x2, y2, z2).setUv(0.5f, 0.5f).setColor(r, g, bl, a).setNormal(nx, ny, nz);
+        b.addVertex(x3, y3, z3).setUv(0.5f, 0.5f).setColor(r, g, bl, a).setNormal(nx, ny, nz);
     }
 
     /** The lightning inside the clouds: the undersides and tops round each flash lit, added onto the cloud. */

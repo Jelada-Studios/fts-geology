@@ -143,12 +143,12 @@ public final class RiverParticles {
             float[][] corner = {{-c + d, -d - c}, {c + d, d - c}, {c - d, d + c}, {-c - d, -d + c}};
             float[][] uv = {{u1, v1}, {u1, v0}, {u0, v0}, {u0, v1}};
             for (int i = 0; i < 4; i++) {
-                buffer.vertex(px + corner[i][0], py, pz + corner[i][1]).uv(uv[i][0], uv[i][1])
-                        .color(this.rCol, this.gCol, this.bCol, this.alpha).uv2(light).endVertex();
+                buffer.addVertex(px + corner[i][0], py, pz + corner[i][1]).setUv(uv[i][0], uv[i][1])
+                        .setColor(this.rCol, this.gCol, this.bCol, this.alpha).setLight(light);
             }
             for (int i = 3; i >= 0; i--) {
-                buffer.vertex(px + corner[i][0], py, pz + corner[i][1]).uv(uv[i][0], uv[i][1])
-                        .color(this.rCol, this.gCol, this.bCol, this.alpha).uv2(light).endVertex();
+                buffer.addVertex(px + corner[i][0], py, pz + corner[i][1]).setUv(uv[i][0], uv[i][1])
+                        .setColor(this.rCol, this.gCol, this.bCol, this.alpha).setLight(light);
             }
         }
     }

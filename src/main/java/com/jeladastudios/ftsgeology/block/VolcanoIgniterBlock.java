@@ -14,6 +14,13 @@ import org.jetbrains.annotations.Nullable;
 
 /** Player-placeable seed that carves a volcano beneath it after a short charge. */
 public class VolcanoIgniterBlock extends BaseEntityBlock {
+    public static final com.mojang.serialization.MapCodec<VolcanoIgniterBlock> CODEC = simpleCodec(VolcanoIgniterBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
 
     public VolcanoIgniterBlock(Properties props) {
         super(props);

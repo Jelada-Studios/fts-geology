@@ -41,6 +41,13 @@ import java.util.List;
  * because the warning travels at the speed of light and the shaking does not.</p>
  */
 public class SeismographBlock extends BaseEntityBlock {
+    public static final com.mojang.serialization.MapCodec<SeismographBlock> CODEC = simpleCodec(SeismographBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
 
     public static final net.minecraft.world.level.block.state.properties.DirectionProperty FACING =
             HorizontalDirectionalBlock.FACING;
@@ -94,7 +101,7 @@ public class SeismographBlock extends BaseEntityBlock {
         super.setPlacedBy(level, pos, state, by, stack);
         if (level instanceof net.minecraft.server.level.ServerLevel sl) {
             com.jeladastudios.ftsgeology.instrument.StationNetwork.placed(sl, pos, com.jeladastudios.ftsgeology.instrument.StationNetwork.Kind.SEISMOGRAPH,
-                    stack.hasCustomHoverName() ? stack.getHoverName().getString() : "", by instanceof Player p ? p.getUUID() : null);
+                    stack.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME) ? stack.getHoverName().getString() : "", by instanceof Player p ? p.getUUID() : null);
         }
     }
 

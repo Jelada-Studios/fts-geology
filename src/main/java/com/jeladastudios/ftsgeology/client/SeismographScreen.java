@@ -66,7 +66,6 @@ public class SeismographScreen extends Screen {
     public void tick() {
         // Twice a second at the drum; once a second seen from afar through a terminal.
         if (++ticks % (remote() ? 20 : 10) == 0) StationUi.request(pos, data);
-        if (nameBox != null) nameBox.tick();
     }
 
     @Override
@@ -124,7 +123,7 @@ public class SeismographScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float partial) {
-        renderBackground(g);
+        renderBackground(g, mx, my, partial);
         g.fill(left, top, left + W, top + H, BG);
         frame(g, left, top, W, H, BORDER);
         g.fill(left + 1, top + 1, left + W - 1, top + 17, HEADER);
@@ -215,7 +214,7 @@ public class SeismographScreen extends Screen {
         // lost its end ("... may be close!").
         List<FormattedCharSequence> under = new ArrayList<>();
         for (int i = 0; i < extra.size(); i++) {
-            Component c = Component.Serializer.fromJson(extra.getString(i));
+            Component c = Component.Serializer.fromJson(extra.getString(i), net.minecraft.core.RegistryAccess.EMPTY);
             if (c == null) continue;
             List<FormattedCharSequence> wrapped = font.split(c, w - 8);
             under.addAll(wrapped.subList(0, Math.min(3, wrapped.size())));
@@ -244,7 +243,7 @@ public class SeismographScreen extends Screen {
             g.drawString(font, String.format(Locale.ROOT, r.getFloat("Amp") >= 1000 ? "%.0f mm" : "%.1f mm", r.getFloat("Amp")), cols[1], ry, color, false);
             g.drawString(font, r.getString("Dist"), cols[2], ry, color, false);
             g.drawString(font, String.format(Locale.ROOT, r.getBoolean("Clip") ? "%.1f+" : "%.1f", r.getFloat("M")), cols[3], ry, color, false);
-            Component from = Component.Serializer.fromJson(r.getString("From"));
+            Component from = Component.Serializer.fromJson(r.getString("From"), net.minecraft.core.RegistryAccess.EMPTY);
             if (from != null) {
                 List<FormattedCharSequence> cut = font.split(from, whenX - cols[4] - 4);
                 if (!cut.isEmpty()) g.drawString(font, cut.get(0), cols[4], ry, color, false);

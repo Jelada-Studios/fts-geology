@@ -82,7 +82,7 @@ public final class FaultMap {
                 }
             }
         }
-        stack.setHoverName(net.minecraft.network.chat.Component.translatable("command.fts_geology.fault_map_s_blocks_pixel", blocksPerPixel));
+        stack.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.translatable("command.fts_geology.fault_map_s_blocks_pixel", blocksPerPixel));
         return stack;
     }
 }

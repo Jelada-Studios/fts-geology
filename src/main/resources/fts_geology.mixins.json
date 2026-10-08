@@ -29,8 +29,7 @@
     "RiverMudMixin",
     "SoundStreamsMixin",
     "RiverFlowRenderMixin",
-    "EmbeddiumRiverFlowMixin",
-    "GasFurnaceSmokeMixin"
+        "GasFurnaceSmokeMixin"
   ],
   "injectors": {
     "defaultRequire": 1

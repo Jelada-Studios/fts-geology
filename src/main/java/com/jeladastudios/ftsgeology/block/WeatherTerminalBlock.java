@@ -36,6 +36,13 @@ import org.jetbrains.annotations.Nullable;
  * its screen -- the readings now, the day's record, the forecast, and the advice for the fields.
  */
 public class WeatherTerminalBlock extends BaseEntityBlock {
+    public static final com.mojang.serialization.MapCodec<WeatherTerminalBlock> CODEC = simpleCodec(WeatherTerminalBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
 
     public static final DirectionProperty FACING = HorizontalDirectionalBlock.FACING;
     private static final VoxelShape SHAPE = Shapes.or(Block.box(0, 0, 0, 16, 9, 16), Block.box(1, 9, 5, 15, 16, 12));
@@ -85,7 +92,7 @@ public class WeatherTerminalBlock extends BaseEntityBlock {
         super.setPlacedBy(level, pos, state, by, stack);
         if (level instanceof ServerLevel sl) {
             com.jeladastudios.ftsgeology.instrument.StationNetwork.placed(sl, pos, com.jeladastudios.ftsgeology.instrument.StationNetwork.Kind.TERMINAL,
-                    stack.hasCustomHoverName() ? stack.getHoverName().getString() : "", by instanceof Player p ? p.getUUID() : null);
+                    stack.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME) ? stack.getHoverName().getString() : "", by instanceof Player p ? p.getUUID() : null);
         }
     }
 

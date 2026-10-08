@@ -17,6 +17,13 @@ import org.jetbrains.annotations.Nullable;
  * charges), and it forms a full geyser system in the column below, then removes itself.
  */
 public class GeyserIgniterBlock extends BaseEntityBlock {
+    public static final com.mojang.serialization.MapCodec<GeyserIgniterBlock> CODEC = simpleCodec(GeyserIgniterBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
 
     public GeyserIgniterBlock(Properties props) {
         super(props);

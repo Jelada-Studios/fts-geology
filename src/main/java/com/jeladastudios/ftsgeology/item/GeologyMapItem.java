@@ -63,7 +63,7 @@ public class GeologyMapItem extends Item {
         MapItem.lockMap(level, map);
         if (level instanceof ServerLevel server) mark(server, map);
         map.getOrCreateTag().putBoolean(TAG, true);
-        map.setHoverName(Component.translatable("item.fts_geology.geology_map.filled").withStyle(style -> style.withItalic(false)));
+        map.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, Component.translatable("item.fts_geology.geology_map.filled").withStyle(style -> style.withItalic(false)));
         if (player instanceof ServerPlayer sp) GeologyTrigger.award(sp, "map_survey");
         level.playSound(null, player.blockPosition(), SoundEvents.UI_CARTOGRAPHY_TABLE_TAKE_RESULT,
                 net.minecraft.sounds.SoundSource.PLAYERS, 1.0f, 1.0f);

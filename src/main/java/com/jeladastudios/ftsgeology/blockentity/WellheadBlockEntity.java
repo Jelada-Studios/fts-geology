@@ -265,14 +265,14 @@ public class WellheadBlockEntity extends BlockEntity {
     @Override
     protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        tag.put("Tank", tank.writeToNBT(new CompoundTag()));
+        tag.put("Tank", tank.writeToNBT(registries, new CompoundTag()));
         tag.put("Gas", gas.save());
     }
 
     @Override
     protected void loadAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
-        tank.readFromNBT(tag.getCompound("Tank"));
+        tank.readFromNBT(registries, tag.getCompound("Tank"));
         gas.load(tag.getCompound("Gas"));
     }
 }

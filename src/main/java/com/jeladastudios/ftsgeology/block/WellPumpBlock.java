@@ -43,6 +43,13 @@ import java.util.Map;
  * all the same.</p>
  */
 public class WellPumpBlock extends BaseEntityBlock {
+    public static final com.mojang.serialization.MapCodec<WellPumpBlock> CODEC = simpleCodec(WellPumpBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
 
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
 

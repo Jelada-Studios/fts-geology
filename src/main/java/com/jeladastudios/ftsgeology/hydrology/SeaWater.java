@@ -23,7 +23,6 @@ import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.neoforge.common.FarmlandWaterManager;
-import net.neoforged.neoforge.event.entity.player.FillBucketEvent;
 import net.neoforged.bus.api.Event;
 import net.neoforged.bus.api.SubscribeEvent;
 /**
@@ -71,9 +70,11 @@ public final class SeaWater {
 
     /** An empty bucket dipped in the sea comes up with sea water. */
     @SubscribeEvent
-    public static void onFillBucket(FillBucketEvent event) {
-        if (!on() || !event.getEmptyBucket().is(Items.BUCKET)) return;
-        if (!(event.getTarget() instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) return;
+    public static void onFillBucket(net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickItem event) {
+        // NeoForge has no bucket-filling event: the empty bucket's use is answered here, before vanilla's.
+        if (!on() || !event.getItemStack().is(Items.BUCKET)) return;
+        Player player = event.getEntity();
+        if (!(player.pick(player.blockInteractionRange(), 1.0F, true) instanceof BlockHitResult hit) || hit.getType() != HitResult.Type.BLOCK) return;
         Level level = event.getLevel();
         BlockPos pos = hit.getBlockPos();
         FluidState fluid = level.getFluidState(pos);
@@ -81,13 +82,14 @@ public final class SeaWater {
         // Flowing Fluids fills a bucket from water of any level, and its own pickup below says whether there was enough.
         if (!(fluid.is(Fluids.WATER) || fluid.is(Fluids.FLOWING_WATER)) || !salty(level, pos, fluid)) return;
         BlockState state = level.getBlockState(pos);
-        Player player = event.getEntity();
-        if (player == null || !level.mayInteract(player, pos) || !(state.getBlock() instanceof BucketPickup pickup)) return;
-        ItemStack taken = pickup.pickupBlock(level, pos, state);
+        if (!level.mayInteract(player, pos) || !(state.getBlock() instanceof BucketPickup pickup)) return;
+        ItemStack taken = pickup.pickupBlock(player, level, pos, state);
         if (taken.isEmpty()) return;
         pickup.getPickupSound(state).ifPresent(sound -> player.playSound(sound, 1.0F, 1.0F));
         level.gameEvent(player, GameEvent.FLUID_PICKUP, pos);
-        event.setFilledBucket(new ItemStack(ModItems.SEA_WATER_BUCKET.get()));
-        event.setResult(Event.Result.ALLOW);
+        player.setItemInHand(event.getHand(), net.minecraft.world.item.ItemUtils.createFilledResult(event.getItemStack(), player,
+                new ItemStack(ModItems.SEA_WATER_BUCKET.get())));
+        event.setCanceled(true);
+        event.setCancellationResult(net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide));
     }
 }

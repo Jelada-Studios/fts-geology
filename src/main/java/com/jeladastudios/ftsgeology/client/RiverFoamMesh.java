@@ -355,7 +355,7 @@ public final class RiverFoamMesh {
     private static double layMs, drawMs;
 
     private static void vertex(BufferBuilder b, Matrix4f m, float x, float y, float z, float r, float g, float bl, float alpha, int light) {
-        b.vertex(m, x, y, z).uv(0.5f, 0.5f).color(r, g, bl, alpha).uv2(light).endVertex();
+        b.addVertex(m, x, y, z).setUv(0.5f, 0.5f).setColor(r, g, bl, alpha).setLight(light);
     }
 
     /**

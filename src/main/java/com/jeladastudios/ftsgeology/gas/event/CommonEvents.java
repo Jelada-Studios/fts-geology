@@ -32,7 +32,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.event.AttachCapabilitiesEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
@@ -46,7 +45,6 @@ import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 @EventBusSubscriber(modid = GeysersMod.MODID)
 public final class CommonEvents {
-    private static final ResourceLocation GAS_CAP_ID = ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "gas");
 
     private CommonEvents() {
     }
@@ -59,23 +57,14 @@ public final class CommonEvents {
     // ---------------------------------------------------------------- storage & ticking
 
     @SubscribeEvent
-    public static void attachChunkCaps(AttachCapabilitiesEvent<LevelChunk> event) {
-        LevelChunk chunk = event.getObject();
-        if (chunk.getLevel() == null || chunk.getLevel().isClientSide) return;
-        GasChunkData data = new GasChunkData(chunk);
-        event.addCapability(GAS_CAP_ID, data);
-        event.addListener(data::invalidate);
-    }
-
-    @SubscribeEvent
     public static void onChunkLoad(ChunkEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel level) || !(event.getChunk() instanceof LevelChunk chunk)) return;
-        chunk.getCapability(GasChunkData.CAPABILITY).ifPresent(d -> {
-            // Saved before the gases came: an old world's chunk keeps its air as it was.
-            java.util.Set<Long> old = OLD.get(level.dimension());
-            if (old != null && old.remove(chunk.getPos().toLong())) d.seeded = true;
-            GasManager.get(level).onChunkLoad(d);
-        });
+        GasChunkData d = chunk.getData(GasChunkData.TYPE);
+        d.chunk = chunk;
+        // Saved before the gases came: an old world's chunk keeps its air as it was.
+        java.util.Set<Long> old = OLD.get(level.dimension());
+        if (old != null && old.remove(chunk.getPos().toLong())) d.seeded = true;
+        GasManager.get(level).onChunkLoad(d);
     }
 
     /** Chunks read from disk without any gas data of theirs: saved before the gases were in the game. */
@@ -88,7 +77,7 @@ public final class CommonEvents {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         net.minecraft.nbt.CompoundTag tag = event.getData();
         if (!"minecraft:full".equals(tag.getString("Status")) && !"full".equals(tag.getString("Status"))) return;
-        if (tag.getCompound("ForgeCaps").contains(GAS_CAP_ID.toString())) return;
+        if (tag.getCompound("neoforge:attachments").contains("fts_geology:gas_chunk")) return;
         OLD.computeIfAbsent(level.dimension(), k -> java.util.concurrent.ConcurrentHashMap.newKeySet()).add(event.getChunk().getPos().toLong());
     }
 
@@ -123,7 +112,7 @@ public final class CommonEvents {
     }
 
     @SubscribeEvent
-    public static void onLivingTick(LivingEvent.LivingTickEvent event) {
+    public static void onLivingTick(net.neoforged.neoforge.event.tick.EntityTickEvent.Post event) {
         if (event.getEntity().level().isClientSide || !on()) return;
         GasHealth.tick(event.getEntity());
     }

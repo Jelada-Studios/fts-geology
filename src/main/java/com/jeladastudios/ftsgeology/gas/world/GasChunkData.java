@@ -10,11 +10,6 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.neoforged.neoforge.common.capabilities.Capability;
-import net.neoforged.neoforge.common.capabilities.CapabilityManager;
-import net.neoforged.neoforge.common.capabilities.CapabilityToken;
-import net.neoforged.neoforge.common.capabilities.ICapabilitySerializable;
-import net.neoforged.neoforge.common.util.LazyOptional;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -22,16 +17,22 @@ import org.jetbrains.annotations.Nullable;
  * Gas cells of one chunk, saved with the chunk. Only cells that differ from normal air are
  * stored; everything else is implicitly 1 atm of air.
  */
-public class GasChunkData implements ICapabilitySerializable<CompoundTag> {
-    public static final Capability<GasChunkData> CAPABILITY = CapabilityManager.get(new CapabilityToken<>() {
-    });
+public class GasChunkData implements net.neoforged.neoforge.common.util.INBTSerializable<CompoundTag> {
+    /** Kept on each chunk as a NeoForge data attachment, saved with it. */
+    public static final net.neoforged.neoforge.registries.DeferredRegister<net.neoforged.neoforge.attachment.AttachmentType<?>> ATTACHMENTS =
+            net.neoforged.neoforge.registries.DeferredRegister.create(net.neoforged.neoforge.registries.NeoForgeRegistries.ATTACHMENT_TYPES, com.jeladastudios.ftsgeology.GeysersMod.MODID);
+    public static final java.util.function.Supplier<net.neoforged.neoforge.attachment.AttachmentType<GasChunkData>> TYPE = ATTACHMENTS.register("gas_chunk",
+            () -> net.neoforged.neoforge.attachment.AttachmentType.serializable(() -> new GasChunkData()).build());
 
     public final Int2ObjectOpenHashMap<GasMix> cells = new Int2ObjectOpenHashMap<>();
     /** The cells still settling, which the sweeps go through; the rest sleep till something stirs them. */
     public final it.unimi.dsi.fastutil.ints.IntOpenHashSet awake = new it.unimi.dsi.fastutil.ints.IntOpenHashSet();
-    public final LevelChunk chunk;
+    /** The chunk it belongs to, set when the chunk loads (an attachment is made before its chunk is whole). */
+    public LevelChunk chunk;
     public boolean seeded;
-    private final LazyOptional<GasChunkData> holder = LazyOptional.of(() -> this);
+
+    public GasChunkData() {
+    }
 
     public GasChunkData(LevelChunk chunk) {
         this.chunk = chunk;
@@ -54,16 +55,11 @@ public class GasChunkData implements ICapabilitySerializable<CompoundTag> {
     }
 
     public void markDirty() {
-        chunk.setUnsaved(true);
+        if (chunk != null) chunk.setUnsaved(true);
     }
 
     @Override
-    public @NotNull <T> LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
-        return CAPABILITY.orEmpty(cap, holder);
-    }
-
-    @Override
-    public CompoundTag serializeNBT() {
+    public CompoundTag serializeNBT(net.minecraft.core.HolderLookup.Provider registries) {
         CompoundTag tag = new CompoundTag();
         tag.putBoolean("seeded", seeded);
         ListTag ids = new ListTag();
@@ -85,7 +81,7 @@ public class GasChunkData implements ICapabilitySerializable<CompoundTag> {
     }
 
     @Override
-    public void deserializeNBT(CompoundTag tag) {
+    public void deserializeNBT(net.minecraft.core.HolderLookup.Provider registries, CompoundTag tag) {
         cells.clear();
         awake.clear();
         seeded = tag.getBoolean("seeded");
@@ -114,7 +110,4 @@ public class GasChunkData implements ICapabilitySerializable<CompoundTag> {
         }
     }
 
-    public void invalidate() {
-        holder.invalidate();
-    }
 }

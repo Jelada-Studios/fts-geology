@@ -161,14 +161,14 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
                     float a = ((1f - d * d) * 0.5f + 0.5f) * alpha;
                     // Aslant in the wind: higher up, a drop is further upwind of where it lands.
                     double tx = -sx * (top - camY), tz = -sz * (top - camY), bx = -sx * (bottom - camY), bz = -sz * (bottom - camY);
-                    buffer.vertex(x - camX - hx + 0.5 + tx, top - camY, z - camZ - hz + 0.5 + tz).uv(0f, bottom * vScale + v)
-                            .color(1f, 1f, 1f, a).uv2(lightColor).endVertex();
-                    buffer.vertex(x - camX + hx + 0.5 + tx, top - camY, z - camZ + hz + 0.5 + tz).uv(1f, bottom * vScale + v)
-                            .color(1f, 1f, 1f, a).uv2(lightColor).endVertex();
-                    buffer.vertex(x - camX + hx + 0.5 + bx, bottom - camY, z - camZ + hz + 0.5 + bz).uv(1f, top * vScale + v)
-                            .color(1f, 1f, 1f, a).uv2(lightColor).endVertex();
-                    buffer.vertex(x - camX - hx + 0.5 + bx, bottom - camY, z - camZ - hz + 0.5 + bz).uv(0f, top * vScale + v)
-                            .color(1f, 1f, 1f, a).uv2(lightColor).endVertex();
+                    buffer.addVertex(x - camX - hx + 0.5 + tx, top - camY, z - camZ - hz + 0.5 + tz).setUv(0f, bottom * vScale + v)
+                            .setColor(1f, 1f, 1f, a).setLight(lightColor);
+                    buffer.addVertex(x - camX + hx + 0.5 + tx, top - camY, z - camZ + hz + 0.5 + tz).setUv(1f, bottom * vScale + v)
+                            .setColor(1f, 1f, 1f, a).setLight(lightColor);
+                    buffer.addVertex(x - camX + hx + 0.5 + bx, bottom - camY, z - camZ + hz + 0.5 + bz).setUv(1f, top * vScale + v)
+                            .setColor(1f, 1f, 1f, a).setLight(lightColor);
+                    buffer.addVertex(x - camX - hx + 0.5 + bx, bottom - camY, z - camZ - hz + 0.5 + bz).setUv(0f, top * vScale + v)
+                            .setColor(1f, 1f, 1f, a).setLight(lightColor);
                 } else if (fall == Biome.Precipitation.SNOW) {
                     if (drawing != 1) {
                         if (drawing >= 0) tesselator.end();
@@ -184,14 +184,14 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
                     float a = ((1f - d * d) * 0.3f + 0.5f) * f;
                     int sky = lightColor >> 16 & 65535, block = lightColor & 65535;
                     int sl = (sky * 3 + 240) / 4, bl = (block * 3 + 240) / 4;
-                    buffer.vertex(x - camX - hx + 0.5, top - camY, z - camZ - hz + 0.5).uv(0f + du, bottom * 0.25f + v + dv)
-                            .color(1f, 1f, 1f, a).uv2(bl, sl).endVertex();
-                    buffer.vertex(x - camX + hx + 0.5, top - camY, z - camZ + hz + 0.5).uv(1f + du, bottom * 0.25f + v + dv)
-                            .color(1f, 1f, 1f, a).uv2(bl, sl).endVertex();
-                    buffer.vertex(x - camX + hx + 0.5, bottom - camY, z - camZ + hz + 0.5).uv(1f + du, top * 0.25f + v + dv)
-                            .color(1f, 1f, 1f, a).uv2(bl, sl).endVertex();
-                    buffer.vertex(x - camX - hx + 0.5, bottom - camY, z - camZ - hz + 0.5).uv(0f + du, top * 0.25f + v + dv)
-                            .color(1f, 1f, 1f, a).uv2(bl, sl).endVertex();
+                    buffer.addVertex(x - camX - hx + 0.5, top - camY, z - camZ - hz + 0.5).setUv(0f + du, bottom * 0.25f + v + dv)
+                            .setColor(1f, 1f, 1f, a).setLight(bl, sl);
+                    buffer.addVertex(x - camX + hx + 0.5, top - camY, z - camZ + hz + 0.5).setUv(1f + du, bottom * 0.25f + v + dv)
+                            .setColor(1f, 1f, 1f, a).setLight(bl, sl);
+                    buffer.addVertex(x - camX + hx + 0.5, bottom - camY, z - camZ + hz + 0.5).setUv(1f + du, top * 0.25f + v + dv)
+                            .setColor(1f, 1f, 1f, a).setLight(bl, sl);
+                    buffer.addVertex(x - camX - hx + 0.5, bottom - camY, z - camZ - hz + 0.5).setUv(0f + du, top * 0.25f + v + dv)
+                            .setColor(1f, 1f, 1f, a).setLight(bl, sl);
                 }
             }
         }

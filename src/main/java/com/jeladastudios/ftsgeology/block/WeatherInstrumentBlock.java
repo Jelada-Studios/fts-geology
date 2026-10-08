@@ -39,6 +39,13 @@ import java.util.Locale;
  * the sky, a soil probe in the ground.
  */
 public class WeatherInstrumentBlock extends BaseEntityBlock {
+    public static final com.mojang.serialization.MapCodec<WeatherInstrumentBlock> CODEC = simpleCodec(WeatherInstrumentBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
 
     public static final DirectionProperty FACING = HorizontalDirectionalBlock.FACING;
 

@@ -14,6 +14,13 @@ import org.jetbrains.annotations.Nullable;
  * survives chunk save/load. The core reads/writes its {@link GeyserChamberBlockEntity}s.
  */
 public class GeyserChamberBlock extends BaseEntityBlock {
+    public static final com.mojang.serialization.MapCodec<GeyserChamberBlock> CODEC = simpleCodec(GeyserChamberBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
 
     public GeyserChamberBlock(Properties props) {
         super(props);

@@ -48,6 +48,7 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.gas.registry.GasBlocks.BLOCKS.register(modBus);
         com.jeladastudios.ftsgeology.gas.registry.GasItems.ITEMS.register(modBus);
         com.jeladastudios.ftsgeology.gas.item.GasArmorMaterials.MATERIALS.register(modBus);
+        com.jeladastudios.ftsgeology.gas.world.GasChunkData.ATTACHMENTS.register(modBus);
         com.jeladastudios.ftsgeology.gas.registry.GasBlockEntities.BLOCK_ENTITIES.register(modBus);
         com.jeladastudios.ftsgeology.gas.registry.GasTabs.TABS.register(modBus);
         modBus.addListener(com.jeladastudios.ftsgeology.gas.registry.GasCapabilities::register);

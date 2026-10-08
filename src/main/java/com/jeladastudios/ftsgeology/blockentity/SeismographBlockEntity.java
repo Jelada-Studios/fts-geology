@@ -540,7 +540,7 @@ public class SeismographBlockEntity extends BlockEntity {
             c.putString("Dist", DepthScale.format(r.distanceMetres()));
             c.putFloat("M", (float) r.magnitude());
             c.putBoolean("Clip", r.clipped());
-            c.putString("From", Component.Serializer.toJson(from(r)));
+            c.putString("From", Component.Serializer.toJson(from(r), net.minecraft.core.RegistryAccess.EMPTY));
             c.putString("Ago", ago(now - r.gameTime()));
             log.add(c);
         }
@@ -548,9 +548,9 @@ public class SeismographBlockEntity extends BlockEntity {
         net.minecraft.nbt.ListTag extra = new net.minecraft.nbt.ListTag();
         Component swarmed = swarmLine(now), blasted = blastLine(now);
         Component fixed = fixLine();
-        if (fixed != null) extra.add(net.minecraft.nbt.StringTag.valueOf(Component.Serializer.toJson(fixed)));
-        if (swarmed != null) extra.add(net.minecraft.nbt.StringTag.valueOf(Component.Serializer.toJson(swarmed)));
-        if (blasted != null) extra.add(net.minecraft.nbt.StringTag.valueOf(Component.Serializer.toJson(blasted)));
+        if (fixed != null) extra.add(net.minecraft.nbt.StringTag.valueOf(Component.Serializer.toJson(fixed, net.minecraft.core.RegistryAccess.EMPTY)));
+        if (swarmed != null) extra.add(net.minecraft.nbt.StringTag.valueOf(Component.Serializer.toJson(swarmed, net.minecraft.core.RegistryAccess.EMPTY)));
+        if (blasted != null) extra.add(net.minecraft.nbt.StringTag.valueOf(Component.Serializer.toJson(blasted, net.minecraft.core.RegistryAccess.EMPTY)));
         t.put("Extra", extra);
         return t;
     }
@@ -628,7 +628,7 @@ public class SeismographBlockEntity extends BlockEntity {
         }
         data.setDirty();
         long day = level.getDayTime() / 24000L + 1, t = (level.getDayTime() + 6000L) % 24000L;
-        map.setHoverName(Component.translatable("item.fts_geology.seismogram_map", worldPosition.getX(), worldPosition.getZ(),
+        map.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, Component.translatable("item.fts_geology.seismogram_map", worldPosition.getX(), worldPosition.getZ(),
                 day, String.format(Locale.ROOT, "%02d:%02d", t / 1000, t % 1000 * 60 / 1000)).withStyle(style -> style.withItalic(false)));
         return map;
     }

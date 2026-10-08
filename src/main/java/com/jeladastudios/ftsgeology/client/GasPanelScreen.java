@@ -62,7 +62,7 @@ public class GasPanelScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mx, int my, float partial) {
-        renderBackground(g);
+        renderBackground(g, mx, my, partial);
         boolean power = data.contains("EnergyMax"), refused = data.contains("Refused");
         ListTag ports = data.getList("Ports", Tag.TAG_COMPOUND);
         // A machine with its openings listed shows each of them; one without, its one tank as before.
@@ -71,7 +71,7 @@ public class GasPanelScreen extends Screen {
                 ? font.split(Component.translatable("gui.fts_geology.gas_panel.idle." + data.getString("Idle")), W - 16) : List.of();
         List<FormattedCharSequence> lines = new ArrayList<>();
         for (Tag t : data.getList("Status", Tag.TAG_STRING)) {
-            Component c = Component.Serializer.fromJson(t.getAsString());
+            Component c = Component.Serializer.fromJson(t.getAsString(), net.minecraft.core.RegistryAccess.EMPTY);
             if (c != null) lines.addAll(font.split(c, W - 16));
         }
         ListTag controls = data.getList("Controls", Tag.TAG_COMPOUND);
@@ -145,7 +145,7 @@ public class GasPanelScreen extends Screen {
         int n = controls.size(), gap = 4, narrow = 20, wide = 0;
         List<Component> labels = new ArrayList<>();
         for (int i = 0; i < n; i++) {
-            Component c = Component.Serializer.fromJson(controls.getCompound(i).getString("Text"));
+            Component c = Component.Serializer.fromJson(controls.getCompound(i).getString("Text"), net.minecraft.core.RegistryAccess.EMPTY);
             labels.add(c == null ? Component.empty() : c);
             if (labels.get(i).getString().length() > 1) wide++;
         }

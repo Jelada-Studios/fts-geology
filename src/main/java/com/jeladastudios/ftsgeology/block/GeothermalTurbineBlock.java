@@ -31,6 +31,13 @@ import org.jetbrains.annotations.Nullable;
  * the faster, the more it makes -- and steam comes off its top.
  */
 public class GeothermalTurbineBlock extends BaseEntityBlock {
+    public static final com.mojang.serialization.MapCodec<GeothermalTurbineBlock> CODEC = simpleCodec(GeothermalTurbineBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
 
     /** How hard it runs, in four steps: 0 stood still, 3 flat out. The rotor's speed and the steam follow it. */
     public static final IntegerProperty POWER = IntegerProperty.create("power", 0, 3);

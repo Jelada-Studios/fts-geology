@@ -13,6 +13,13 @@ import net.minecraft.core.BlockPos;
 import org.jetbrains.annotations.Nullable;
 
 public class GeyserCoreBlock extends BaseEntityBlock {
+    public static final com.mojang.serialization.MapCodec<GeyserCoreBlock> CODEC = simpleCodec(GeyserCoreBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
 
     public GeyserCoreBlock(Properties props) {
         super(props);

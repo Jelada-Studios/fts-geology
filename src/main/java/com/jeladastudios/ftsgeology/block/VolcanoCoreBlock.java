@@ -14,6 +14,13 @@ import org.jetbrains.annotations.Nullable;
 
 /** Technical block driving a volcano's eruption cycle (see {@link VolcanoCoreBlockEntity}). */
 public class VolcanoCoreBlock extends BaseEntityBlock {
+    public static final com.mojang.serialization.MapCodec<VolcanoCoreBlock> CODEC = simpleCodec(VolcanoCoreBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
 
     public VolcanoCoreBlock(Properties props) {
         super(props);

@@ -256,13 +256,13 @@ public class WellPumpBlockEntity extends BlockEntity {
     protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.putInt("Energy", energy.getEnergyStored());
-        tag.put("Tank", tank.writeToNBT(new CompoundTag()));
+        tag.put("Tank", tank.writeToNBT(registries, new CompoundTag()));
     }
 
     @Override
     protected void loadAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         energy.set(tag.getInt("Energy"));
-        tank.readFromNBT(tag.getCompound("Tank"));
+        tank.readFromNBT(registries, tag.getCompound("Tank"));
     }
 }

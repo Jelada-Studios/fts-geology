@@ -34,6 +34,13 @@ import org.jetbrains.annotations.Nullable;
  * and steel or a fire charge lights it, and so does anything that lights gas; a want of air puts it out.
  */
 public class GasSeepBlock extends BaseEntityBlock {
+    public static final com.mojang.serialization.MapCodec<GasSeepBlock> CODEC = simpleCodec(GasSeepBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
     public static final BooleanProperty LIT = BlockStateProperties.LIT;
 
     public GasSeepBlock(Properties props) {

@@ -1009,7 +1009,7 @@ public final class SoilWater {
      * by water beside it or by rain on it, is moist and grows as ever.
      */
     @SubscribeEvent(priority = net.neoforged.bus.api.EventPriority.LOW)
-    public static void onCropGrow(net.neoforged.neoforge.event.level.BlockEvent.CropGrowEvent.Pre event) {
+    public static void onCropGrow(net.neoforged.neoforge.event.level.block.CropGrowEvent.Pre event) {
         if (!(event.getLevel() instanceof ServerLevel level) || !GeyserConfig.SOIL_WATER_GROUND.get() || !enabled(level)) return;
         BlockPos pos = event.getPos();
         BlockState field = level.getBlockState(pos.below());

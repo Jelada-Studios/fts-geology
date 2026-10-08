@@ -117,7 +117,7 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
         t.putBoolean("Gas", true);
         t.putString("Name", getBlockState().getBlock().getDescriptionId());
         net.minecraft.nbt.ListTag lines = new net.minecraft.nbt.ListTag();
-        for (Component c : status()) lines.add(net.minecraft.nbt.StringTag.valueOf(Component.Serializer.toJson(c)));
+        for (Component c : status()) lines.add(net.minecraft.nbt.StringTag.valueOf(Component.Serializer.toJson(c, net.minecraft.core.RegistryAccess.EMPTY)));
         t.put("Status", lines);
         MachineEnergy e = energy();
         if (e != null) {
@@ -206,7 +206,7 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
     protected static void button(net.minecraft.nbt.ListTag out, String key, Component label) {
         net.minecraft.nbt.CompoundTag c = new net.minecraft.nbt.CompoundTag();
         c.putString("Key", key);
-        c.putString("Text", Component.Serializer.toJson(label));
+        c.putString("Text", Component.Serializer.toJson(label, net.minecraft.core.RegistryAccess.EMPTY));
         out.add(c);
     }
 
