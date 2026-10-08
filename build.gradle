@@ -22,10 +22,17 @@ neoForge {
         client {
             client()
             systemProperty 'neoforge.logging.console.level', 'debug'
+            // Test runs: a marker to find the process by, a folder of its own.
+            systemProperty 'ftstest', '74de3639'
+            gameDirectory = project.file('run/client')
         }
         server {
             server()
             systemProperty 'neoforge.logging.console.level', 'debug'
+            // Test runs: a marker to find the process by, a folder of its own, no window.
+            systemProperty 'ftstest', '74de3639'
+            gameDirectory = project.file('run/server')
+            programArgument '--nogui'
         }
     }
 

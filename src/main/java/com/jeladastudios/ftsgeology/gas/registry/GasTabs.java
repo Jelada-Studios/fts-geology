@@ -37,7 +37,7 @@ public final class GasTabs {
         mix.add(gas, atm * GasTankBlockEntity.VOLUME * Gas.MOL_PER_BLOCK);
         CompoundTag be = new CompoundTag();
         be.put("gas", mix.save());
-        com.jeladastudios.ftsgeology.util.ItemData.update(stack, t -> t.put("BlockEntityTag", be));
+        net.minecraft.world.item.BlockItem.setBlockEntityData(stack, GasBlockEntities.GAS_TANK.get(), be);
         return stack;
     }
 

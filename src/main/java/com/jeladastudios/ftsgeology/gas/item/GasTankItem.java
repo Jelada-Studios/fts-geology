@@ -23,8 +23,8 @@ public class GasTankItem extends BlockItem {
     }
 
     public static GasMix contents(ItemStack stack) {
-        CompoundTag be = com.jeladastudios.ftsgeology.util.ItemData.element(stack, "BlockEntityTag");
-        return be == null ? new GasMix() : GasMix.load(be.getCompound("gas"));
+        net.minecraft.world.item.component.CustomData be = stack.get(net.minecraft.core.component.DataComponents.BLOCK_ENTITY_DATA);
+        return be == null ? new GasMix() : GasMix.load(be.copyTag().getCompound("gas"));
     }
 
     @Override

@@ -262,7 +262,7 @@ public final class RiverWater {
         int placed = 0;
         for (RiverNetwork.Head head : RiverNetwork.headsNear(cx, cz, longest + 12.0)) {
             int hx = (int) Math.floor(head.x()), hzb = (int) Math.floor(head.z());
-            if (!level.getBiome(at.set(hx, (int) Math.floor(head.water()), hzb)).value().coldEnoughToSnow(at)) continue;
+            if (!com.jeladastudios.ftsgeology.util.GenBiomes.at(level, at.set(hx, (int) Math.floor(head.water()), hzb)).value().coldEnoughToSnow(at)) continue;
             long hash = SeedHash.hash(level.getSeed(), hx, hzb, 0x61AC1L);
             double grow = 1.0 + 0.4 * (hz - 1.0);
             double len = TONGUE_LONG * grow * (0.8 + 0.4 * SeedHash.rand01(hash));

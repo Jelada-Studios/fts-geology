@@ -35,7 +35,7 @@ import java.util.Set;
 /**
  * One ore of a kind. Several mods of a pack add the same metal's ore -- tin, lead, silver, uranium in four and five --
  * each its own block with its own look, placed by its own features: the same ground holds two tins, and twice as much
- * tin. The ores are grouped by Forge's {@code forge:ores/<metal>} tags, and by name ({@code tin_ore},
+ * tin. The ores are grouped by the common {@code c:ores/<metal>} tags, and by name ({@code tin_ore},
  * {@code deepslate_tin_ore}, {@code oretin}) for a mod that tags none, and in each group one mod's ore is kept, the first
  * of {@code oreUnifyOrder}, in each of its forms: stone, deepslate, or another rock named in the id (a mod's ore in
  * calcite or basalt is a form of its own, left alone).
@@ -125,7 +125,7 @@ public final class OreUnification {
         Map<String, Map<String, List<Block>>> metals = new java.util.TreeMap<>();
         BuiltInRegistries.BLOCK.getTagNames().forEach(tag -> {
             ResourceLocation id = tag.location();
-            if (!id.getNamespace().equals("forge") || !id.getPath().startsWith("ores/")) return;
+            if (!(id.getNamespace().equals("c") || id.getNamespace().equals("forge")) || !id.getPath().startsWith("ores/")) return;
             String metal = id.getPath().substring(5);
             for (Holder<Block> h : BuiltInRegistries.BLOCK.getTagOrEmpty(tag)) {
                 if (!grouped.add(h.value())) continue;          // in another group already: left to that one
@@ -183,9 +183,9 @@ public final class OreUnification {
         return out;
     }
 
-    private static final TagKey<Block> IN_STONE = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("forge", "ores_in_ground/stone"));
-    private static final TagKey<Block> IN_DEEPSLATE = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("forge", "ores_in_ground/deepslate"));
-    private static final TagKey<Block> IN_NETHERRACK = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("forge", "ores_in_ground/netherrack"));
+    private static final TagKey<Block> IN_STONE = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("c", "ores_in_ground/stone"));
+    private static final TagKey<Block> IN_DEEPSLATE = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("c", "ores_in_ground/deepslate"));
+    private static final TagKey<Block> IN_NETHERRACK = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("c", "ores_in_ground/netherrack"));
 
     /** Rocks an ore may sit in, by name: ores in different rock are different blocks on purpose, never made one. */
     private static final String[] ROCKS = {"deepslate", "blackstone", "basalt", "netherrack", "nether", "end_stone", "endstone",

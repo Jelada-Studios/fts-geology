@@ -8,7 +8,7 @@
         {
           "type": "minecraft:item",
           "name": "fts_geology:gas_tank",
-          "functions": [{"function": "minecraft:copy_nbt", "source": "block_entity", "ops": [{"source": "gas", "target": "BlockEntityTag.gas", "op": "replace"}]}]
+          "functions": [{"function": "minecraft:copy_components", "source": "block_entity", "include": ["minecraft:block_entity_data"]}]
         }
       ],
       "conditions": [{"condition": "minecraft:survives_explosion"}]

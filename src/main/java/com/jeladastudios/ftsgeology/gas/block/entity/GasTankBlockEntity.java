@@ -119,4 +119,15 @@ public class GasTankBlockEntity extends GasMachineBlockEntity {
         super.loadAdditional(tag, registries);
         tank.load(tag.getCompound("gas"));
     }
+
+    /** Broken and picked up, the tank keeps its gas: the loot table copies this onto the item, placing it puts it back. */
+    @Override
+    protected void collectImplicitComponents(net.minecraft.core.component.DataComponentMap.Builder components) {
+        super.collectImplicitComponents(components);
+        if (tank.gas.isEmpty()) return;
+        CompoundTag data = new CompoundTag();
+        data.put("gas", tank.save());
+        addEntityType(data, getType());
+        components.set(net.minecraft.core.component.DataComponents.BLOCK_ENTITY_DATA, net.minecraft.world.item.component.CustomData.of(data));
+    }
 }

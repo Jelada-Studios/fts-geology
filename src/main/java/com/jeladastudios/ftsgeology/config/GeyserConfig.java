@@ -1157,7 +1157,7 @@ public final class GeyserConfig {
                         o -> o instanceof String s && s.indexOf(':') > 0 && s.indexOf('=') > s.indexOf(':'));
         UNIFY_ORES = b
                 .comment("One ore of a kind: where several mods add the same ore (tin, lead, silver, uranium and so on, by the",
-                        "forge:ores/ tags), new chunks have only one of them, the first mod's in oreUnifyOrder, in its stone and",
+                        "c:ores/ tags), new chunks have only one of them, the first mod's in oreUnifyOrder, in its stone and",
                         "deepslate forms, and the others' ore of it is not placed a second time where that mod places its own,",
                         "so there is as much of it as one mod would put. What is mined drops that mod's ore. Ingots and the",
                         "like are not made one: a mod such as Almost Unified does that. Not in TerraFirmaCraft.")
