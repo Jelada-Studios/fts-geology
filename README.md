@@ -1,4 +1,4 @@
-# FT's Geology — Realistic Plate Tectonics, Landforms & Geophysics for Minecraft Forge 1.20.1
+# FT's Geology — Realistic Plate Tectonics, Landforms & Geophysics for Minecraft NeoForge 1.21.1
 
 A living geology layer for Minecraft: real plate tectonics driving real landforms.
 
@@ -17,4 +17,4 @@ Instead of scattering volcanoes, springs, and quakes by arbitrary chance, FT's G
 - **Living Geothermal Basins**: Evolving hot springs featuring 4 natural stages: nascent boiling pools, temperature-zoned microbial mats, travertine/sinter terraces with bubbling mud pots, and senescent fumarole chimneys venting steam with native sulfur deposits.
 - **Field Instruments**: Geologist's Hammer (rock classes & stratigraphic sections in real meters), Fault Compass (Brunton compass for strike, drift velocity & strain), Drum Seismograph (S-P distance & Richter magnitude), and the in-game **Geological Field Guide** book.
 - **Complete Localization**: Full English (`en_us`) and Turkish (`tr_tr`) translations for all blocks, items, messages, and the 18-page field guide.
-- **Zero Hard Dependencies**: Runs standalone on Minecraft Forge 1.20.1. Stacks seamlessly on top of Terralith and Tectonic, and detects Flowing Fluids (finite water) when present.
+- **Zero Hard Dependencies**: Runs standalone on Minecraft NeoForge 1.21.1. Stacks seamlessly on top of Terralith and Tectonic, and detects Flowing Fluids (finite water) when present.

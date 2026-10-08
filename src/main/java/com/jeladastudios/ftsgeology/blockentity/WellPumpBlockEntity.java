@@ -247,6 +247,11 @@ public class WellPumpBlockEntity extends BlockEntity {
         return energy;
     }
 
+    /** Electrodynamics' electricity on every side, where Voltaic is installed. */
+    public @Nullable Object voltsOn(@Nullable Direction side) {
+        return volts;
+    }
+
     /** Its water outlet on a side, for the capability registration: every side but its foot, the well. */
     public @Nullable IFluidHandler fluidOn(@Nullable Direction side) {
         return side != Direction.DOWN ? outlet : null;

@@ -1,6 +1,7 @@
 package com.jeladastudios.ftsgeology.gas.registry;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
+import com.jeladastudios.ftsgeology.compat.ElectrodynamicsPower;
 import com.jeladastudios.ftsgeology.gas.GasTank;
 import com.jeladastudios.ftsgeology.gas.IGasHandler;
 import com.jeladastudios.ftsgeology.gas.block.entity.GasMachineBlockEntity;
@@ -17,9 +18,9 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The gases' block capability, and every capability the mod's blocks offer: gas, Forge Energy, fluids and items. On
- * NeoForge a block entity no longer answers getCapability itself; each type is registered here with what it offers on
- * a side.
+ * The gases' block capability, and every capability the mod's blocks offer: gas, Forge Energy, fluids, items and,
+ * where Voltaic is installed, Electrodynamics' electricity. On NeoForge a block entity no longer answers getCapability
+ * itself; each type is registered here with what it offers on a side.
  */
 public final class GasCapabilities {
 
@@ -36,6 +37,7 @@ public final class GasCapabilities {
             if (type.get() == GasBlockEntities.GAS_SEEP.get()) continue;
             event.registerBlockEntity(GAS_HANDLER, machine, GasMachineBlockEntity::gasHandlerOn);
             event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, machine, GasMachineBlockEntity::energyStorageOn);
+            ElectrodynamicsPower.register(event, machine, GasMachineBlockEntity::voltsOn);
         }
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, GasBlockEntities.ELECTROLYZER.get(), (be, side) -> be.waterOn(side));
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, GasBlockEntities.BIOGAS_DIGESTER.get(), (be, side) -> be.itemsOn(side));
@@ -46,6 +48,10 @@ public final class GasCapabilities {
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ModBlockEntities.WELL_PUMP.get(), (be, side) -> be.fluidOn(side));
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ModBlockEntities.WELLHEAD.get(), (be, side) -> be.fluidOn(side));
         event.registerBlockEntity(GAS_HANDLER, ModBlockEntities.WELLHEAD.get(), (be, side) -> be.gasOn(side));
+        // Electrodynamics' electricity, where Voltaic is installed.
+        ElectrodynamicsPower.register(event, ModBlockEntities.GEOTHERMAL_TURBINE.get(), (be, side) -> be.voltsOn(side));
+        ElectrodynamicsPower.register(event, ModBlockEntities.THERMOELECTRIC.get(), (be, side) -> be.voltsOn(side));
+        ElectrodynamicsPower.register(event, ModBlockEntities.WELL_PUMP.get(), (be, side) -> be.voltsOn(side));
     }
 
     @Nullable

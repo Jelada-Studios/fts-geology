@@ -332,6 +332,11 @@ public class GeothermalTurbineBlockEntity extends BlockEntity {
         return side != Direction.DOWN ? energy : null;
     }
 
+    /** Electrodynamics' electricity on a side, where Voltaic is installed: the same sides as its energy. */
+    public @Nullable Object voltsOn(@Nullable Direction side) {
+        return side != Direction.DOWN ? volts : null;
+    }
+
     @Override
     protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);

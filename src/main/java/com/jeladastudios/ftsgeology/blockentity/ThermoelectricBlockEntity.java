@@ -142,6 +142,11 @@ public class ThermoelectricBlockEntity extends BlockEntity {
         return face ? null : energy;
     }
 
+    /** Electrodynamics' electricity on a side, where Voltaic is installed: the same sides as its energy. */
+    public @Nullable Object voltsOn(@Nullable Direction side) {
+        return energyOn(side) == null ? null : volts;
+    }
+
     @Override
     protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);

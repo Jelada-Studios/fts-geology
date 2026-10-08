@@ -314,4 +314,11 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
     public @Nullable IEnergyStorage energyStorageOn(@Nullable Direction side) {
         return energy() != null && energyOn(side) ? energy() : null;
     }
+
+    /** Electrodynamics' electricity on a side, where Voltaic is installed: taken by a machine that takes energy, given by one that gives it. */
+    public @Nullable Object voltsOn(@Nullable Direction side) {
+        if (energy() == null || !energyOn(side)) return null;
+        if (energy().canReceive()) return volts;
+        return energy().canExtract() ? voltsOut : null;
+    }
 }

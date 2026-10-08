@@ -39,14 +39,14 @@ earthquakes may deform player blocks at all, are config toggles.
 [[dependencies.fts_geology]]
     modId = "neoforge"
     type = "required"
-    versionRange = "[21.1,)"
+    versionRange = "[21.1.0,21.2)"
     ordering = "NONE"
     side = "BOTH"
 
 [[dependencies.fts_geology]]
     modId = "minecraft"
     type = "required"
-    versionRange = "[1.21.1,1.22)"
+    versionRange = "[1.21.1]"
     ordering = "NONE"
     side = "BOTH"
 
