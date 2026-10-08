@@ -275,7 +275,7 @@ public final class GeyserConfig {
         b.push("thermodynamics");
         HEAT_PER_LAVA_NEIGHBOR = b
                 .comment("Degrees Celsius added per tick for each adjacent lava/magma block.",
-                        "Lowered so setups don't boil almost instantly — gives time to react in a base.")
+                        "Lowered so setups don't boil almost instantly -- gives time to react in a base.")
                 .defineInRange("heatPerLavaNeighbor", 0.30D, 0.0D, 100.0D);
         AMBIENT_COOLING_PER_TICK = b
                 .comment("Passive heat loss per tick when no heat source is adjacent.")
@@ -440,7 +440,7 @@ public final class GeyserConfig {
                 .defineInRange("volcanoLavaBudget", 24, 0, 400);
         QUAKE_TRIGGERS_ERUPTIONS = b
                 .comment("A large earthquake can set off volcanoes around it once the ground has settled, as the",
-                        "1960 Chile earthquake did at Cordón Caulle. Only a volcano with magma to draw on erupts.")
+                        "1960 Chile earthquake did at Cordon Caulle. Only a volcano with magma to draw on erupts.")
                 .define("quakeTriggersEruptions", true);
         QUAKE_ERUPTION_CHANCE = b
                 .comment("Chance a volcano at the epicentre erupts after a magnitude 9 quake. Less for a smaller",
@@ -597,8 +597,8 @@ public final class GeyserConfig {
                 .defineInRange("waterSpoutMaxTicks", 2400, 100, 72000);
         TRAVERTINE_ENABLED = b
                 .comment("Precipitate Calcite/Tuff sinter terraces where erupted water pools on runoff.",
-                        "Deposits only under settled (source) water at pool edges — never the fast",
-                        "flowing channel — so it complements Water Erosion instead of fighting it.")
+                        "Deposits only under settled (source) water at pool edges -- never the fast",
+                        "flowing channel -- so it complements Water Erosion instead of fighting it.")
                 .define("travertineEnabled", true);
         TRAVERTINE_DEPOSIT_CHANCE = b
                 .comment("Per-second, per-column probability of a travertine deposit during eruption.",
@@ -618,7 +618,7 @@ public final class GeyserConfig {
         EMERGENT_ENABLED = b
                 .comment("Let PLAYER-BUILT water-over-rock-over-lava setups become live geysers.",
                         "ON by default. WARNING: with emergentDestructive=true this can blow up bases",
-                        "you didn't intend as geysers — set false (or emergentDestructive=false) to disable.")
+                        "you didn't intend as geysers -- set false (or emergentDestructive=false) to disable.")
                 .define("emergentEnabled", true);
         EMERGENT_DESTRUCTIVE = b
                 .comment("If true, emergent eruptions use a block-breaking explosion (the 'it blows up",
