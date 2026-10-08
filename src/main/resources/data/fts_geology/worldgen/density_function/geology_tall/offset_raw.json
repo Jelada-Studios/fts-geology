@@ -1,4 +1,4 @@
-{"type":"minecraft:flat_cache","argument":{"type":"minecraft:cache_2d","argument":{"type":"fts_geology:coast_cliffs","argument":
+{"type":"minecraft:flat_cache","argument":{"type":"minecraft:cache_2d","argument":{"type":"fts_geology:summit_ceiling","from_y":820,"to_y":876,"landmark_top_y":860,"argument":{"type":"fts_geology:coast_cliffs","argument":
 {
   "type": "minecraft:flat_cache",
   "argument": {
@@ -70,4 +70,4 @@
   }
 }
 
-}}}
+}}}}

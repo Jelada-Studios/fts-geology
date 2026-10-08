@@ -1,3 +1,3 @@
-{"type":"minecraft:flat_cache","argument":{"type":"minecraft:cache_2d","argument":{"type":"fts_geology:coast_cliffs","argument":
+{"type":"minecraft:flat_cache","argument":{"type":"minecraft:cache_2d","argument":{"type":"fts_geology:summit_ceiling","from_y":280,"to_y":320,"landmark_top_y":320,"argument":{"type":"fts_geology:coast_cliffs","argument":
 {"type":"minecraft:flat_cache","argument":{"type":"minecraft:cache_2d","argument":{"type":"minecraft:add","argument1":{"type":"minecraft:add","argument1":{"type":"minecraft:mul","argument1":"fts_geology:geology/offset_base","argument2":{"type":"minecraft:flat_cache","argument":{"type":"fts_geology:plate","field":"spline"}}},"argument2":{"type":"minecraft:flat_cache","argument":{"type":"fts_geology:plate","field":"relief"}}},"argument2":{"type":"minecraft:flat_cache","argument":{"type":"fts_geology:plate","field":"dem"}}}}}
-}}}
+}}}}

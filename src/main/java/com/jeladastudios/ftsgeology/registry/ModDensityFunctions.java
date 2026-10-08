@@ -27,6 +27,14 @@ public final class ModDensityFunctions {
     public static final RegistryObject<Codec<? extends DensityFunction>> COAST_CLIFFS =
             DENSITY_FUNCTIONS.register("coast_cliffs", () -> com.jeladastudios.ftsgeology.worldgen.terrain.CoastCliffs.CODEC.codec());
 
+    /** Caves kept shut above the snow line. See {@link com.jeladastudios.ftsgeology.worldgen.terrain.SummitShield}. */
+    public static final RegistryObject<Codec<? extends DensityFunction>> SUMMIT_SHIELD =
+            DENSITY_FUNCTIONS.register("summit_shield", () -> com.jeladastudios.ftsgeology.worldgen.terrain.SummitShield.CODEC.codec());
+
+    /** The highest summits rounded off under the top of the world. See {@link com.jeladastudios.ftsgeology.worldgen.terrain.SummitCeiling}. */
+    public static final RegistryObject<Codec<? extends DensityFunction>> SUMMIT_CEILING =
+            DENSITY_FUNCTIONS.register("summit_ceiling", () -> com.jeladastudios.ftsgeology.worldgen.terrain.SummitCeiling.CODEC.codec());
+
     /** The plate model's continents, erosion, ridge factor and relief. See {@link PlateDensity}. */
     public static final RegistryObject<Codec<? extends DensityFunction>> PLATE =
             DENSITY_FUNCTIONS.register("plate", () -> PlateDensity.CODEC.codec());

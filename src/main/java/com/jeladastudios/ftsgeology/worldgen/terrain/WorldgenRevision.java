@@ -63,8 +63,17 @@ public final class WorldgenRevision {
     public static final int BASALT_COASTS = 13;
     /** A named mountain the near ring has no room for looked for on from ten kilometres, the tall world too (round 138). */
     public static final int NEAR_LANDMARKS = 14;
+    /** Above the snow line no cave is carved: no shaft in a summit, no cavern in a peak (round 142). */
+    public static final int SOLID_SUMMITS = 15;
+    /** The deep rock of an arc, a prism and the mantle in rounded bodies, not in eight-block cubes (round 142). */
+    public static final int ROUND_BODIES = 15;
+    /** A summit kept under the top of the world's ground, a named mountain laid a little smaller, not cut flat (round 142). */
+    public static final int SOFT_SUMMITS = 15;
+    /** A rift between a continent and an ocean plate sinks inland from the line, the ocean side quiet up to it, not a wall
+     * on the line with another biome on top (round 142). */
+    public static final int MARGIN_RIFTS = 15;
     /** What a world made now gets. */
-    public static final int CURRENT = 14;
+    public static final int CURRENT = 15;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;

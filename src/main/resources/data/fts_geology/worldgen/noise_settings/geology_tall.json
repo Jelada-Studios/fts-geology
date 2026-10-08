@@ -70,7 +70,7 @@
                                                    "argument1" : "minecraft:overworld/caves/entrances",
                                                    "argument2" : {
                                                       "argument1" : 10,
-                                                      "argument2" : "fts_geology:geology_tall/river_near",
+                                                      "argument2" : "fts_geology:geology_tall/cave_shield",
                                                       "type" : "minecraft:mul"
                                                    },
                                                    "type" : "minecraft:add"
@@ -109,7 +109,7 @@
                                                                   },
                                                                   "argument2" : {
                                                                      "argument1" : 10,
-                                                                     "argument2" : "fts_geology:geology_tall/river_near",
+                                                                     "argument2" : "fts_geology:geology_tall/cave_shield",
                                                                      "type" : "minecraft:mul"
                                                                   },
                                                                   "type" : "minecraft:add"
@@ -142,7 +142,7 @@
                                                       "argument1" : "minecraft:overworld/caves/entrances",
                                                       "argument2" : {
                                                          "argument1" : 10,
-                                                         "argument2" : "fts_geology:geology_tall/river_near",
+                                                         "argument2" : "fts_geology:geology_tall/cave_shield",
                                                          "type" : "minecraft:mul"
                                                       },
                                                       "type" : "minecraft:add"
@@ -154,7 +154,7 @@
                                                       "argument1" : "minecraft:overworld/caves/spaghetti_2d",
                                                       "argument2" : {
                                                          "argument1" : 10,
-                                                         "argument2" : "fts_geology:geology_tall/river_near",
+                                                         "argument2" : "fts_geology:geology_tall/cave_shield",
                                                          "type" : "minecraft:mul"
                                                       },
                                                       "type" : "minecraft:add"
@@ -199,7 +199,7 @@
             "argument1" : "minecraft:overworld/caves/noodle",
             "argument2" : {
                "argument1" : 10,
-               "argument2" : "fts_geology:geology_tall/river_near",
+               "argument2" : "fts_geology:geology_tall/cave_shield",
                "type" : "minecraft:mul"
             },
             "type" : "minecraft:add"
