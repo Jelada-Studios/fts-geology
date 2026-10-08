@@ -721,7 +721,7 @@ public final class ShakingDamage {
     /** The ground a structure is built on and into, which the shaking leaves to the rupture. */
     static boolean ground(BlockState s) {
         return s.is(BlockTags.DIRT) || s.is(Blocks.DIRT_PATH) || s.is(Blocks.FARMLAND)
-                || s.is(BlockTags.BASE_STONE_OVERWORLD) || s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVEL)
+                || s.is(BlockTags.BASE_STONE_OVERWORLD) || s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVELS)
                 || s.is(BlockTags.LEAVES) || s.is(BlockTags.SNOW) || s.is(BlockTags.ICE)
                 || s.is(Blocks.CLAY) || s.is(Blocks.MUD) || TerrainProbe.isVegetation(s);
     }

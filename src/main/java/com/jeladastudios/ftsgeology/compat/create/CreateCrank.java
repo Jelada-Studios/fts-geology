@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.compat.create;
+import net.neoforged.neoforge.registries.DeferredHolder;
 
 
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -17,7 +18,6 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.ForgeRegistries;
-import net.neoforged.neoforge.registries.RegistryObject;
 
 /**
  * The blocks that join the gases to Create (MIT), registered only where Create is installed: this package is reached
@@ -33,12 +33,12 @@ public final class CreateCrank {
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
             DeferredRegister.create(BuiltInRegistries.BLOCK_ENTITY_TYPE, GeysersMod.MODID);
 
-    public static final RegistryObject<Block> CRANKSHAFT = BLOCKS.register("crankshaft", () -> new CrankshaftBlock(
+    public static final DeferredHolder<Block, Block> CRANKSHAFT = BLOCKS.register("crankshaft", () -> new CrankshaftBlock(
             BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.0f, 6.0f).sound(SoundType.METAL).noOcclusion()));
-    public static final RegistryObject<Item> CRANKSHAFT_ITEM = ITEMS.register("crankshaft",
+    public static final DeferredHolder<Item, Item> CRANKSHAFT_ITEM = ITEMS.register("crankshaft",
             () -> new DescribedBlockItem(CRANKSHAFT.get(), new Item.Properties(), 2));
     @SuppressWarnings("DataFlowIssue")
-    public static final RegistryObject<BlockEntityType<CrankshaftBlockEntity>> CRANKSHAFT_BE = BLOCK_ENTITIES.register("crankshaft",
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CrankshaftBlockEntity>> CRANKSHAFT_BE = BLOCK_ENTITIES.register("crankshaft",
             () -> BlockEntityType.Builder.of((pos, state) -> new CrankshaftBlockEntity(CreateCrank.CRANKSHAFT_BE.get(), pos, state),
                     CRANKSHAFT.get()).build(null));
 

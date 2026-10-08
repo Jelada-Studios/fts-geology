@@ -74,7 +74,7 @@ public final class EruptionHandler {
         AABB scaldZone = new AABB(mouth.above()).inflate(0.35, 0.75, 0.35);
         for (Entity e : level.getEntities((Entity) null, scaldZone, EruptionHandler::isScaldable)) {
             ((LivingEntity) e).hurt(level.damageSources().hotFloor(), dmg);
-            e.setSecondsOnFire(1);
+            e.igniteForSeconds(1);
             Vec3 v = e.getDeltaMovement();
             e.setDeltaMovement(v.x, Math.max(v.y, 0) + 0.35, v.z);
             e.hurtMarked = true;
@@ -183,7 +183,7 @@ public final class EruptionHandler {
             e.hurtMarked = true;
             e.fallDistance = 0;
             ((LivingEntity) e).hurt(level.damageSources().hotFloor(), (float) (3.0 + magnitude * 0.2));
-            e.setSecondsOnFire(2);
+            e.igniteForSeconds(2);
         }
 
         int scatter = (int) Math.round(GeyserConfig.ONSET_WATER_SCATTER.get() * sizeScale);
@@ -671,11 +671,11 @@ public final class EruptionHandler {
                 || s.is(BlockTags.TERRACOTTA)         // badlands
                 || s.is(BlockTags.STONE_ORE_REPLACEABLES)
                 || s.is(BlockTags.DEEPSLATE_ORE_REPLACEABLES)
-                || s.is(Tags.Blocks.STONE)            // Forge stone tag (broad modded coverage)
-                || s.is(Tags.Blocks.COBBLESTONE)      // the boulders of an old-growth taiga
-                || s.is(Tags.Blocks.GRAVEL)
-                || s.is(Tags.Blocks.SAND)
-                || s.is(Tags.Blocks.SANDSTONE)
+                || s.is(Tags.Blocks.STONES)            // Forge stone tag (broad modded coverage)
+                || s.is(Tags.Blocks.COBBLESTONES)      // the boulders of an old-growth taiga
+                || s.is(Tags.Blocks.GRAVELS)
+                || s.is(Tags.Blocks.SANDS)
+                || s.is(Tags.Blocks.SANDSTONE_BLOCKS)
                 || s.is(Tags.Blocks.NETHERRACK)
                 || s.is(Tags.Blocks.ORES)
                 || s.is(BlockTags.NYLIUM)

@@ -58,7 +58,7 @@ public final class SoilBlocks {
      */
     public static BlockState deadOf(BlockState s, BlockState under) {
         if (s.is(Blocks.GRASS_BLOCK)) {
-            if (under.is(BlockTags.SAND) || under.is(Tags.Blocks.GRAVEL)) {
+            if (under.is(BlockTags.SAND) || under.is(Tags.Blocks.GRAVELS)) {
                 BlockState sandy = block("immersive_weathering", "sandy_dirt");
                 return sandy != null ? sandy : Blocks.COARSE_DIRT.defaultBlockState();
             }
@@ -80,7 +80,7 @@ public final class SoilBlocks {
     public static BlockState grassOf(BlockState s, BlockState under) {
         if (s.is(Blocks.DIRT) || s.is(Blocks.COARSE_DIRT)) return Blocks.GRASS_BLOCK.defaultBlockState();
         String name = name(s);
-        if (name.equals("immersive_weathering:sandy_dirt") && (under.is(BlockTags.SAND) || under.is(Tags.Blocks.GRAVEL))) {
+        if (name.equals("immersive_weathering:sandy_dirt") && (under.is(BlockTags.SAND) || under.is(Tags.Blocks.GRAVELS))) {
             return Blocks.GRASS_BLOCK.defaultBlockState();
         }
         for (String[] pair : WEATHERING_GRASS) {

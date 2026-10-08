@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.client;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -15,7 +16,6 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import org.joml.Vector3f;
 import net.neoforged.api.distmarker.Dist;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 /**
  * Where a gas machine takes its gas in and gives it out, marked on its faces while the player looks at it with a gas
@@ -32,8 +32,7 @@ public final class ClientPortMarks {
     private static final DustParticleOptions BOTH = new DustParticleOptions(new Vector3f(0.56f, 0.79f, 0.90f), 1.0f);
 
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
+    public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null || mc.isPaused() || mc.level.getGameTime() % 4 != 0) return;
         if (!holdsGasTool(mc.player.getMainHandItem()) && !holdsGasTool(mc.player.getOffhandItem())) return;

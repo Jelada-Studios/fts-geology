@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.hydrology;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 
 
@@ -18,7 +19,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.neoforged.neoforge.common.Tags;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.List;
@@ -71,9 +71,9 @@ public final class Aquifer {
     }
 
     public static Rock rockOf(BlockState s) {
-        if (s.is(Tags.Blocks.GRAVEL)) return GRAVEL;
+        if (s.is(Tags.Blocks.GRAVELS)) return GRAVEL;
         if (s.is(BlockTags.SAND)) return SAND;
-        if (s.is(Tags.Blocks.SANDSTONE)) return SANDSTONE;
+        if (s.is(Tags.Blocks.SANDSTONE_BLOCKS)) return SANDSTONE;
         if (s.is(Blocks.CLAY) || s.is(Blocks.MUD) || s.is(BlockTags.TERRACOTTA)) return CLAY;
         if (s.is(Blocks.BASALT) || s.is(Blocks.SMOOTH_BASALT) || s.is(Blocks.TUFF)) return BASALT;
         if (s.is(Blocks.CALCITE) || s.is(Blocks.DRIPSTONE_BLOCK)) return KARST;
@@ -83,7 +83,7 @@ public final class Aquifer {
         if (path.contains("sandstone") || path.contains("conglomerate")) return SANDSTONE;
         if (path.contains("shale") || path.contains("mudstone") || path.contains("claystone")) return CLAY;
         if (s.is(BlockTags.DIRT)) return CLAY;
-        if (s.is(BlockTags.BASE_STONE_OVERWORLD) || s.is(Tags.Blocks.STONE)) return CRYSTALLINE;
+        if (s.is(BlockTags.BASE_STONE_OVERWORLD) || s.is(Tags.Blocks.STONES)) return CRYSTALLINE;
         return null;
     }
 
@@ -246,8 +246,8 @@ public final class Aquifer {
 
     /** Each window, a well's measured rate goes into its story where it has changed; wells long stopped are let go. */
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || event.getServer() == null) return;
+    public static void onServerTick(ServerTickEvent.Post event) {
+        if (event.getServer() == null) return;
         ServerLevel level = event.getServer().overworld();
         if (level == null || level.getGameTime() % 20 != 0) return;
         Wells ws = level.getDataStorage().get(Wells::load, "fts_geology_wells");

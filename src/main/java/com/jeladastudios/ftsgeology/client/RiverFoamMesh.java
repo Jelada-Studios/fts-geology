@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.client;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -31,7 +32,6 @@ import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import org.joml.Matrix4f;
 
@@ -90,8 +90,7 @@ public final class RiverFoamMesh {
     }
 
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
+    public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
         if (level == null || mc.player == null || !on()) {

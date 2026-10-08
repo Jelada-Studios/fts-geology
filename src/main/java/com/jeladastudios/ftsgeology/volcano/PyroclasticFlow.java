@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.volcano;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -40,7 +41,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.AABB;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
@@ -207,8 +207,8 @@ public final class PyroclasticFlow {
     }
 
     @SubscribeEvent
-    public static void onLevelTick(TickEvent.LevelTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || FLOWS.isEmpty() || !(event.level instanceof ServerLevel level)) return;
+    public static void onLevelTick(LevelTickEvent.Post event) {
+        if (FLOWS.isEmpty() || !(event.getLevel() instanceof ServerLevel level)) return;
         for (java.util.Iterator<Flow> it = FLOWS.iterator(); it.hasNext(); ) {
             Flow f = it.next();
             if (!f.dimension.equals(level.dimension())) continue;
@@ -440,7 +440,7 @@ public final class PyroclasticFlow {
         for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, box, LivingEntity::isAlive)) {
             if (e instanceof Player p && (p.isCreative() || p.isSpectator())) continue;
             if (e.hurt(source, amount)) {
-                e.setSecondsOnFire(8);
+                e.igniteForSeconds(8);
                 e.push(f.hx * 0.25, 0.08, f.hz * 0.25);
                 e.hurtMarked = true;
                 if (f.caught.add(e.getUUID())) f.burnt++;

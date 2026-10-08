@@ -236,7 +236,7 @@ public final class RemovedModBlocks {
 
     /** Country rock: what a hole in the ground is filled with. */
     static boolean isRock(BlockState s) {
-        return s.is(BlockTags.BASE_STONE_OVERWORLD) || s.is(Tags.Blocks.STONE) || TfcCompat.isRock(s)
+        return s.is(BlockTags.BASE_STONE_OVERWORLD) || s.is(Tags.Blocks.STONES) || TfcCompat.isRock(s)
                 || s.is(BlockTags.BASE_STONE_NETHER) || s.is(Blocks.END_STONE)
                 || s.is(Blocks.CALCITE) || s.is(Blocks.BASALT) || s.is(Blocks.SMOOTH_BASALT) || s.is(Blocks.BLACKSTONE)
                 || s.is(Blocks.SANDSTONE) || s.is(Blocks.RED_SANDSTONE) || s.is(BlockTags.TERRACOTTA);
@@ -420,7 +420,7 @@ public final class RemovedModBlocks {
     private static boolean natural(net.minecraft.server.level.ServerLevel level, net.minecraft.core.BlockPos q, BlockState s,
                                    Map<Long, it.unimi.dsi.fastutil.longs.LongSet> built) {
         if (!s.getFluidState().isEmpty()) return false;
-        if (!(isRock(s) || s.is(Tags.Blocks.ORES) || s.is(BlockTags.DIRT) || s.is(Tags.Blocks.GRAVEL)
+        if (!(isRock(s) || s.is(Tags.Blocks.ORES) || s.is(BlockTags.DIRT) || s.is(Tags.Blocks.GRAVELS)
                 || s.is(BlockTags.SAND) || s.is(Blocks.CLAY) || TfcCompat.isGround(s))) {
             return false;
         }

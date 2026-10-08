@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.gas.command;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 import com.jeladastudios.ftsgeology.gas.Combustion;
 import com.jeladastudios.ftsgeology.gas.Gas;
@@ -27,7 +28,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
 import java.util.Arrays;
@@ -292,8 +292,8 @@ public final class GasCommand {
     private static void ensureTicker() {
         if (tickerRegistered) return;
         tickerRegistered = true;
-        NeoForge.EVENT_BUS.addListener((TickEvent.PlayerTickEvent e) -> {
-            if (e.phase != TickEvent.Phase.END || !(e.player instanceof ServerPlayer sp)) return;
+        NeoForge.EVENT_BUS.addListener((PlayerTickEvent.Post e) -> {
+            if (!(e.getEntity() instanceof ServerPlayer sp)) return;
             if (!VIEWERS.contains(sp.getUUID()) || sp.level().getGameTime() % 4 != 0) return;
             GasVisuals.show(sp, GasManager.get(sp.serverLevel()), 20);
         });

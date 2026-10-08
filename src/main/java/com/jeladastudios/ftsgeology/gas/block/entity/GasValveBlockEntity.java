@@ -520,7 +520,7 @@ public class GasValveBlockEntity extends GasMachineBlockEntity {
             AABB box = new AABB(nozzle, end).inflate(0.45);
             for (LivingEntity e : sl.getEntitiesOfClass(LivingEntity.class, box)) {
                 if (e.fireImmune()) continue;
-                e.setSecondsOnFire(5);
+                e.igniteForSeconds(5);
                 e.hurt(GasDamageTypes.source(sl, GasDamageTypes.BURNER_FLAME), 3.0f + reach * 0.5f);
             }
         }
@@ -558,15 +558,15 @@ public class GasValveBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
+    protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
         tag.putInt("throttle", throttle);
         tag.putBoolean("powered", powered);
     }
 
     @Override
-    public void load(CompoundTag tag) {
-        super.load(tag);
+    protected void loadAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
         throttle = Math.max(1, Math.min(4, tag.getInt("throttle")));
         powered = tag.getBoolean("powered");
     }

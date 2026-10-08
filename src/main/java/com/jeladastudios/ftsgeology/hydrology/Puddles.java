@@ -130,7 +130,7 @@ public final class Puddles {
     /** Ground a puddle lies on: flat and firm on top, not sand or gravel, not tilled, not snow or ice, nothing that holds contents. */
     private static boolean holds(ServerLevel level, BlockPos pos, BlockState s) {
         if (s.isAir() || !s.getFluidState().isEmpty() || s.hasBlockEntity()) return false;
-        if (s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVEL) || s.is(Blocks.FARMLAND) || s.is(BlockTags.SNOW) || s.is(BlockTags.ICE)
+        if (s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVELS) || s.is(Blocks.FARMLAND) || s.is(BlockTags.SNOW) || s.is(BlockTags.ICE)
                 || s.is(BlockTags.LEAVES) || s.is(SoilBlocks.FARMLAND)) {
             return false;
         }

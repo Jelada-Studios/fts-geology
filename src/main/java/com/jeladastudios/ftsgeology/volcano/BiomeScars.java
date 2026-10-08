@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.volcano;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -16,7 +17,6 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
@@ -51,8 +51,8 @@ public final class BiomeScars {
     }
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || event.getServer().getTickCount() % EVERY != 0 || MARKED.isEmpty()) return;
+    public static void onServerTick(ServerTickEvent.Post event) {
+        if (event.getServer().getTickCount() % EVERY != 0 || MARKED.isEmpty()) return;
         for (Map.Entry<ServerLevel, Long2IntOpenHashMap> e : MARKED.entrySet()) write(e.getKey(), e.getValue());
         MARKED.clear();
     }

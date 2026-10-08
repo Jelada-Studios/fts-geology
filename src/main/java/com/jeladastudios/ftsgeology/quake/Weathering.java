@@ -1408,7 +1408,7 @@ public final class Weathering {
     /** Ground that slumps rather than stands: soil of any kind, sand, gravel, snow, clay. */
     private static boolean loose(BlockState s) {
         return s.is(net.minecraft.tags.BlockTags.DIRT) || s.is(net.minecraft.tags.BlockTags.SAND)
-                || s.is(net.neoforged.neoforge.common.Tags.Blocks.GRAVEL) || s.is(Blocks.CLAY) || s.is(Blocks.MUD)
+                || s.is(net.neoforged.neoforge.common.Tags.Blocks.GRAVELS) || s.is(Blocks.CLAY) || s.is(Blocks.MUD)
                 || s.is(Blocks.SNOW_BLOCK) || s.is(com.jeladastudios.ftsgeology.hydrology.SoilBlocks.NATURAL_GROUND);
     }
 

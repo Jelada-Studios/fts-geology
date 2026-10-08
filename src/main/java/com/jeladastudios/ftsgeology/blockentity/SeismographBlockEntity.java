@@ -498,14 +498,14 @@ public class SeismographBlockEntity extends BlockEntity {
     }
 
     private static boolean rock(BlockState s) {
-        return s.is(net.minecraft.tags.BlockTags.BASE_STONE_OVERWORLD) || s.is(net.neoforged.neoforge.common.Tags.Blocks.STONE)
+        return s.is(net.minecraft.tags.BlockTags.BASE_STONE_OVERWORLD) || s.is(net.neoforged.neoforge.common.Tags.Blocks.STONES)
                 || s.is(net.minecraft.tags.BlockTags.STONE_ORE_REPLACEABLES) || s.is(net.minecraft.world.level.block.Blocks.BEDROCK)
                 || com.jeladastudios.ftsgeology.instrument.RockTypes.isRock(s);
     }
 
     private static boolean loose(BlockState s) {
         return s.is(net.minecraft.tags.BlockTags.DIRT) || s.is(net.minecraft.tags.BlockTags.SAND)
-                || s.is(net.neoforged.neoforge.common.Tags.Blocks.GRAVEL) || s.is(net.minecraft.world.level.block.Blocks.CLAY)
+                || s.is(net.neoforged.neoforge.common.Tags.Blocks.GRAVELS) || s.is(net.minecraft.world.level.block.Blocks.CLAY)
                 || s.is(net.minecraft.world.level.block.Blocks.MUD);
     }
 
@@ -683,8 +683,8 @@ public class SeismographBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
+    protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
         tag.putLong("Seen", seen);
         tag.putInt("Shake", shake);
         tag.putInt("Signal", signal);
@@ -718,8 +718,8 @@ public class SeismographBlockEntity extends BlockEntity {
     }
 
     @Override
-    public void load(CompoundTag tag) {
-        super.load(tag);
+    protected void loadAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
         seen = tag.contains("Seen") ? tag.getLong("Seen") : -1L;
         shake = tag.getInt("Shake");
         signal = tag.getInt("Signal");

@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.gas;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -12,7 +13,6 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.neoforge.event.level.ChunkWatchEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -66,8 +66,8 @@ public final class GasFiredFurnaces {
     }
 
     @SubscribeEvent
-    public static void onTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || FIRED.isEmpty() || event.getServer().getTickCount() % 20 != 0) return;
+    public static void onTick(ServerTickEvent.Post event) {
+        if (FIRED.isEmpty() || event.getServer().getTickCount() % 20 != 0) return;
         for (Map.Entry<ResourceKey<Level>, Long2LongOpenHashMap> e : FIRED.entrySet()) {
             ServerLevel level = event.getServer().getLevel(e.getKey());
             if (level == null) continue;

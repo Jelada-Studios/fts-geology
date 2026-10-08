@@ -79,7 +79,7 @@ public class GasSeepBlockEntity extends BlockEntity {
     /** What stands in the flame burns. */
     private void burnAround(ServerLevel sl, BlockPos above) {
         for (LivingEntity e : sl.getEntitiesOfClass(LivingEntity.class, new AABB(above).inflate(0.1, 0.4, 0.1))) {
-            if (!e.fireImmune()) e.setSecondsOnFire(4);
+            if (!e.fireImmune()) e.igniteForSeconds(4);
         }
     }
 }

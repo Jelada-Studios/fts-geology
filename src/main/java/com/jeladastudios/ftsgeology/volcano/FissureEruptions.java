@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.volcano;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -51,7 +52,6 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FlowingFluid;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.saveddata.SavedData;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.List;
@@ -473,8 +473,8 @@ public final class FissureEruptions {
     // === Ticking ==========================================================
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || event.getServer() == null) return;
+    public static void onServerTick(ServerTickEvent.Post event) {
+        if (event.getServer() == null) return;
         ServerLevel level = event.getServer().overworld();
         if (level == null) return;
         long now = level.getGameTime();

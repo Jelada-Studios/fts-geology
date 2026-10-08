@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.registry;
+import net.neoforged.neoforge.registries.DeferredHolder;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyBiomeSource;
@@ -6,7 +7,6 @@ import com.mojang.serialization.Codec;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.RegistryObject;
 
 /**
  * Biome source types. The mod's world preset names {@code fts_geology:geology} and gives it the source it wraps,
@@ -19,6 +19,6 @@ public final class ModBiomeSources {
     public static final DeferredRegister<Codec<? extends BiomeSource>> BIOME_SOURCES =
             DeferredRegister.create(Registries.BIOME_SOURCE, GeysersMod.MODID);
 
-    public static final RegistryObject<Codec<? extends BiomeSource>> GEOLOGY =
+    public static final DeferredHolder<Codec<? extends BiomeSource>, Codec<? extends BiomeSource>> GEOLOGY =
             BIOME_SOURCES.register("geology", () -> GeologyBiomeSource.CODEC);
 }

@@ -157,8 +157,8 @@ public class GasSeparatorBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
+    protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
         tag.put("in", input.save());
         tag.put("target", target.save());
         tag.put("rest", rest.save());
@@ -167,8 +167,8 @@ public class GasSeparatorBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
-    public void load(CompoundTag tag) {
-        super.load(tag);
+    protected void loadAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
         input.load(tag.getCompound("in"));
         target.load(tag.getCompound("target"));
         rest.load(tag.getCompound("rest"));

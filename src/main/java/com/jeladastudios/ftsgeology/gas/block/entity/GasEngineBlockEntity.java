@@ -222,16 +222,16 @@ public class GasEngineBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
+    protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
         tag.put("fuel", fuel.save());
         tag.put("exhaust", exhaust.save());
         tag.putInt("energy", energy.getEnergyStored());
     }
 
     @Override
-    public void load(CompoundTag tag) {
-        super.load(tag);
+    protected void loadAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
         fuel.load(tag.getCompound("fuel"));
         exhaust.load(tag.getCompound("exhaust"));
         energy.set(tag.getInt("energy"));

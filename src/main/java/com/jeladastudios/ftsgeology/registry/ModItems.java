@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.registry;
+import net.neoforged.neoforge.registries.DeferredHolder;
 
 
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -11,7 +12,6 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.ForgeRegistries;
-import net.neoforged.neoforge.registries.RegistryObject;
 
 /**
  * BlockItems for the technical blocks. They aren't obtainable in survival (blocks are
@@ -24,229 +24,229 @@ public final class ModItems {
     public static final DeferredRegister<Item> ITEMS =
             DeferredRegister.create(BuiltInRegistries.ITEM, GeysersMod.MODID);
 
-    public static final RegistryObject<Item> GEYSER_CORE = ITEMS.register("geyser_core",
+    public static final DeferredHolder<Item, Item> GEYSER_CORE = ITEMS.register("geyser_core",
             () -> new BlockItem(ModBlocks.GEYSER_CORE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> GEYSER_CHAMBER = ITEMS.register("geyser_chamber",
+    public static final DeferredHolder<Item, Item> GEYSER_CHAMBER = ITEMS.register("geyser_chamber",
             () -> new BlockItem(ModBlocks.GEYSER_CHAMBER.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> GEYSER_IGNITER = ITEMS.register("geyser_igniter",
+    public static final DeferredHolder<Item, Item> GEYSER_IGNITER = ITEMS.register("geyser_igniter",
             () -> new BlockItem(ModBlocks.GEYSER_IGNITER.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> HOT_SPRING = ITEMS.register("hot_spring",
+    public static final DeferredHolder<Item, Item> HOT_SPRING = ITEMS.register("hot_spring",
             () -> new BlockItem(ModBlocks.HOT_SPRING.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> VOLCANO_IGNITER = ITEMS.register("volcano_igniter",
+    public static final DeferredHolder<Item, Item> VOLCANO_IGNITER = ITEMS.register("volcano_igniter",
             () -> new BlockItem(ModBlocks.VOLCANO_IGNITER.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> NATIVE_SULFUR = ITEMS.register("native_sulfur",
+    public static final DeferredHolder<Item, Item> NATIVE_SULFUR = ITEMS.register("native_sulfur",
             () -> new BlockItem(ModBlocks.NATIVE_SULFUR.get(), new Item.Properties()));
 
 
-    public static final RegistryObject<Item> SINTER = ITEMS.register("sinter",
+    public static final DeferredHolder<Item, Item> SINTER = ITEMS.register("sinter",
             () -> new BlockItem(ModBlocks.SINTER.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> SINTER_CRUST = ITEMS.register("sinter_crust",
+    public static final DeferredHolder<Item, Item> SINTER_CRUST = ITEMS.register("sinter_crust",
             () -> new BlockItem(ModBlocks.SINTER_CRUST.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> MUD_POT = ITEMS.register("mud_pot",
+    public static final DeferredHolder<Item, Item> MUD_POT = ITEMS.register("mud_pot",
             () -> new BlockItem(ModBlocks.MUD_POT.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> STEAM_VENT = ITEMS.register("steam_vent",
+    public static final DeferredHolder<Item, Item> STEAM_VENT = ITEMS.register("steam_vent",
             () -> new BlockItem(ModBlocks.STEAM_VENT.get(), new Item.Properties()));
-    public static final RegistryObject<Item> VOLCANIC_ASH = ITEMS.register("volcanic_ash",
+    public static final DeferredHolder<Item, Item> VOLCANIC_ASH = ITEMS.register("volcanic_ash",
             () -> new BlockItem(ModBlocks.VOLCANIC_ASH.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> TRAVERTINE = ITEMS.register("travertine",
+    public static final DeferredHolder<Item, Item> TRAVERTINE = ITEMS.register("travertine",
             () -> new BlockItem(ModBlocks.TRAVERTINE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> RHYOLITE = ITEMS.register("rhyolite",
+    public static final DeferredHolder<Item, Item> RHYOLITE = ITEMS.register("rhyolite",
             () -> new BlockItem(ModBlocks.RHYOLITE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> GABBRO = ITEMS.register("gabbro",
+    public static final DeferredHolder<Item, Item> GABBRO = ITEMS.register("gabbro",
             () -> new BlockItem(ModBlocks.GABBRO.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> PERIDOTITE = ITEMS.register("peridotite",
+    public static final DeferredHolder<Item, Item> PERIDOTITE = ITEMS.register("peridotite",
             () -> new BlockItem(ModBlocks.PERIDOTITE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> SERPENTINITE = ITEMS.register("serpentinite",
+    public static final DeferredHolder<Item, Item> SERPENTINITE = ITEMS.register("serpentinite",
             () -> new BlockItem(ModBlocks.SERPENTINITE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> SCHIST = ITEMS.register("schist",
+    public static final DeferredHolder<Item, Item> SCHIST = ITEMS.register("schist",
             () -> new BlockItem(ModBlocks.SCHIST.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> GNEISS = ITEMS.register("gneiss",
+    public static final DeferredHolder<Item, Item> GNEISS = ITEMS.register("gneiss",
             () -> new BlockItem(ModBlocks.GNEISS.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> SLATE = ITEMS.register("slate",
+    public static final DeferredHolder<Item, Item> SLATE = ITEMS.register("slate",
             () -> new BlockItem(ModBlocks.SLATE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> MARBLE = ITEMS.register("marble",
+    public static final DeferredHolder<Item, Item> MARBLE = ITEMS.register("marble",
             () -> new BlockItem(ModBlocks.MARBLE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> QUARTZITE = ITEMS.register("quartzite",
+    public static final DeferredHolder<Item, Item> QUARTZITE = ITEMS.register("quartzite",
             () -> new BlockItem(ModBlocks.QUARTZITE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> SHALE = ITEMS.register("shale",
+    public static final DeferredHolder<Item, Item> SHALE = ITEMS.register("shale",
             () -> new BlockItem(ModBlocks.SHALE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> OIL_SANDSTONE = ITEMS.register("oil_sandstone",
+    public static final DeferredHolder<Item, Item> OIL_SANDSTONE = ITEMS.register("oil_sandstone",
             () -> new BlockItem(ModBlocks.OIL_SANDSTONE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> CHERT = ITEMS.register("chert",
+    public static final DeferredHolder<Item, Item> CHERT = ITEMS.register("chert",
             () -> new BlockItem(ModBlocks.CHERT.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> BASALT_LAYER = ITEMS.register("basalt_layer",
+    public static final DeferredHolder<Item, Item> BASALT_LAYER = ITEMS.register("basalt_layer",
             () -> new BlockItem(ModBlocks.BASALT_LAYER.get(), new Item.Properties()));
-    public static final RegistryObject<Item> COOLING_LAVA_CRUST = ITEMS.register("cooling_lava_crust",
+    public static final DeferredHolder<Item, Item> COOLING_LAVA_CRUST = ITEMS.register("cooling_lava_crust",
             () -> new BlockItem(ModBlocks.COOLING_LAVA_CRUST.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> VOLCANIC_BLACK_SAND = ITEMS.register("volcanic_black_sand",
+    public static final DeferredHolder<Item, Item> VOLCANIC_BLACK_SAND = ITEMS.register("volcanic_black_sand",
             () -> new BlockItem(ModBlocks.VOLCANIC_BLACK_SAND.get(), new Item.Properties()));
 
     // --- Mineral blocks ------------------------------------------------------
 
-    public static final RegistryObject<Item> PYRITE = ITEMS.register("pyrite",
+    public static final DeferredHolder<Item, Item> PYRITE = ITEMS.register("pyrite",
             () -> new BlockItem(ModBlocks.PYRITE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> CHALCOPYRITE = ITEMS.register("chalcopyrite",
+    public static final DeferredHolder<Item, Item> CHALCOPYRITE = ITEMS.register("chalcopyrite",
             () -> new BlockItem(ModBlocks.CHALCOPYRITE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> MALACHITE = ITEMS.register("malachite",
+    public static final DeferredHolder<Item, Item> MALACHITE = ITEMS.register("malachite",
             () -> new BlockItem(ModBlocks.MALACHITE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> AZURITE = ITEMS.register("azurite",
+    public static final DeferredHolder<Item, Item> AZURITE = ITEMS.register("azurite",
             () -> new BlockItem(ModBlocks.AZURITE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> QUARTZ_VEIN = ITEMS.register("quartz_vein",
+    public static final DeferredHolder<Item, Item> QUARTZ_VEIN = ITEMS.register("quartz_vein",
             () -> new BlockItem(ModBlocks.QUARTZ_VEIN.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> CINNABAR = ITEMS.register("cinnabar",
+    public static final DeferredHolder<Item, Item> CINNABAR = ITEMS.register("cinnabar",
             () -> new BlockItem(ModBlocks.CINNABAR.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> GALENA = ITEMS.register("galena",
+    public static final DeferredHolder<Item, Item> GALENA = ITEMS.register("galena",
             () -> new BlockItem(ModBlocks.GALENA.get(), new Item.Properties()));
 
     // --- Worked rock forms (polished, slab, stairs, wall) -------------------
 
-    public static final RegistryObject<Item> POLISHED_TRAVERTINE = ITEMS.register("polished_travertine",
+    public static final DeferredHolder<Item, Item> POLISHED_TRAVERTINE = ITEMS.register("polished_travertine",
             () -> new BlockItem(ModBlocks.POLISHED_TRAVERTINE.get(), new Item.Properties()));
-    public static final RegistryObject<Item> TRAVERTINE_SLAB = ITEMS.register("travertine_slab",
+    public static final DeferredHolder<Item, Item> TRAVERTINE_SLAB = ITEMS.register("travertine_slab",
             () -> new BlockItem(ModBlocks.TRAVERTINE_SLAB.get(), new Item.Properties()));
-    public static final RegistryObject<Item> TRAVERTINE_STAIRS = ITEMS.register("travertine_stairs",
+    public static final DeferredHolder<Item, Item> TRAVERTINE_STAIRS = ITEMS.register("travertine_stairs",
             () -> new BlockItem(ModBlocks.TRAVERTINE_STAIRS.get(), new Item.Properties()));
-    public static final RegistryObject<Item> TRAVERTINE_WALL = ITEMS.register("travertine_wall",
+    public static final DeferredHolder<Item, Item> TRAVERTINE_WALL = ITEMS.register("travertine_wall",
             () -> new BlockItem(ModBlocks.TRAVERTINE_WALL.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> POLISHED_RHYOLITE = ITEMS.register("polished_rhyolite",
+    public static final DeferredHolder<Item, Item> POLISHED_RHYOLITE = ITEMS.register("polished_rhyolite",
             () -> new BlockItem(ModBlocks.POLISHED_RHYOLITE.get(), new Item.Properties()));
-    public static final RegistryObject<Item> RHYOLITE_SLAB = ITEMS.register("rhyolite_slab",
+    public static final DeferredHolder<Item, Item> RHYOLITE_SLAB = ITEMS.register("rhyolite_slab",
             () -> new BlockItem(ModBlocks.RHYOLITE_SLAB.get(), new Item.Properties()));
-    public static final RegistryObject<Item> RHYOLITE_STAIRS = ITEMS.register("rhyolite_stairs",
+    public static final DeferredHolder<Item, Item> RHYOLITE_STAIRS = ITEMS.register("rhyolite_stairs",
             () -> new BlockItem(ModBlocks.RHYOLITE_STAIRS.get(), new Item.Properties()));
-    public static final RegistryObject<Item> RHYOLITE_WALL = ITEMS.register("rhyolite_wall",
+    public static final DeferredHolder<Item, Item> RHYOLITE_WALL = ITEMS.register("rhyolite_wall",
             () -> new BlockItem(ModBlocks.RHYOLITE_WALL.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> POLISHED_GABBRO = ITEMS.register("polished_gabbro",
+    public static final DeferredHolder<Item, Item> POLISHED_GABBRO = ITEMS.register("polished_gabbro",
             () -> new BlockItem(ModBlocks.POLISHED_GABBRO.get(), new Item.Properties()));
-    public static final RegistryObject<Item> GABBRO_SLAB = ITEMS.register("gabbro_slab",
+    public static final DeferredHolder<Item, Item> GABBRO_SLAB = ITEMS.register("gabbro_slab",
             () -> new BlockItem(ModBlocks.GABBRO_SLAB.get(), new Item.Properties()));
-    public static final RegistryObject<Item> GABBRO_STAIRS = ITEMS.register("gabbro_stairs",
+    public static final DeferredHolder<Item, Item> GABBRO_STAIRS = ITEMS.register("gabbro_stairs",
             () -> new BlockItem(ModBlocks.GABBRO_STAIRS.get(), new Item.Properties()));
-    public static final RegistryObject<Item> GABBRO_WALL = ITEMS.register("gabbro_wall",
+    public static final DeferredHolder<Item, Item> GABBRO_WALL = ITEMS.register("gabbro_wall",
             () -> new BlockItem(ModBlocks.GABBRO_WALL.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> POLISHED_PERIDOTITE = ITEMS.register("polished_peridotite",
+    public static final DeferredHolder<Item, Item> POLISHED_PERIDOTITE = ITEMS.register("polished_peridotite",
             () -> new BlockItem(ModBlocks.POLISHED_PERIDOTITE.get(), new Item.Properties()));
-    public static final RegistryObject<Item> PERIDOTITE_SLAB = ITEMS.register("peridotite_slab",
+    public static final DeferredHolder<Item, Item> PERIDOTITE_SLAB = ITEMS.register("peridotite_slab",
             () -> new BlockItem(ModBlocks.PERIDOTITE_SLAB.get(), new Item.Properties()));
-    public static final RegistryObject<Item> PERIDOTITE_STAIRS = ITEMS.register("peridotite_stairs",
+    public static final DeferredHolder<Item, Item> PERIDOTITE_STAIRS = ITEMS.register("peridotite_stairs",
             () -> new BlockItem(ModBlocks.PERIDOTITE_STAIRS.get(), new Item.Properties()));
-    public static final RegistryObject<Item> PERIDOTITE_WALL = ITEMS.register("peridotite_wall",
+    public static final DeferredHolder<Item, Item> PERIDOTITE_WALL = ITEMS.register("peridotite_wall",
             () -> new BlockItem(ModBlocks.PERIDOTITE_WALL.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> POLISHED_SERPENTINITE = ITEMS.register("polished_serpentinite",
+    public static final DeferredHolder<Item, Item> POLISHED_SERPENTINITE = ITEMS.register("polished_serpentinite",
             () -> new BlockItem(ModBlocks.POLISHED_SERPENTINITE.get(), new Item.Properties()));
-    public static final RegistryObject<Item> SERPENTINITE_SLAB = ITEMS.register("serpentinite_slab",
+    public static final DeferredHolder<Item, Item> SERPENTINITE_SLAB = ITEMS.register("serpentinite_slab",
             () -> new BlockItem(ModBlocks.SERPENTINITE_SLAB.get(), new Item.Properties()));
-    public static final RegistryObject<Item> SERPENTINITE_STAIRS = ITEMS.register("serpentinite_stairs",
+    public static final DeferredHolder<Item, Item> SERPENTINITE_STAIRS = ITEMS.register("serpentinite_stairs",
             () -> new BlockItem(ModBlocks.SERPENTINITE_STAIRS.get(), new Item.Properties()));
-    public static final RegistryObject<Item> SERPENTINITE_WALL = ITEMS.register("serpentinite_wall",
+    public static final DeferredHolder<Item, Item> SERPENTINITE_WALL = ITEMS.register("serpentinite_wall",
             () -> new BlockItem(ModBlocks.SERPENTINITE_WALL.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> POLISHED_SCHIST = ITEMS.register("polished_schist",
+    public static final DeferredHolder<Item, Item> POLISHED_SCHIST = ITEMS.register("polished_schist",
             () -> new BlockItem(ModBlocks.POLISHED_SCHIST.get(), new Item.Properties()));
-    public static final RegistryObject<Item> SCHIST_SLAB = ITEMS.register("schist_slab",
+    public static final DeferredHolder<Item, Item> SCHIST_SLAB = ITEMS.register("schist_slab",
             () -> new BlockItem(ModBlocks.SCHIST_SLAB.get(), new Item.Properties()));
-    public static final RegistryObject<Item> SCHIST_STAIRS = ITEMS.register("schist_stairs",
+    public static final DeferredHolder<Item, Item> SCHIST_STAIRS = ITEMS.register("schist_stairs",
             () -> new BlockItem(ModBlocks.SCHIST_STAIRS.get(), new Item.Properties()));
-    public static final RegistryObject<Item> SCHIST_WALL = ITEMS.register("schist_wall",
+    public static final DeferredHolder<Item, Item> SCHIST_WALL = ITEMS.register("schist_wall",
             () -> new BlockItem(ModBlocks.SCHIST_WALL.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> POLISHED_GNEISS = ITEMS.register("polished_gneiss",
+    public static final DeferredHolder<Item, Item> POLISHED_GNEISS = ITEMS.register("polished_gneiss",
             () -> new BlockItem(ModBlocks.POLISHED_GNEISS.get(), new Item.Properties()));
-    public static final RegistryObject<Item> GNEISS_SLAB = ITEMS.register("gneiss_slab",
+    public static final DeferredHolder<Item, Item> GNEISS_SLAB = ITEMS.register("gneiss_slab",
             () -> new BlockItem(ModBlocks.GNEISS_SLAB.get(), new Item.Properties()));
-    public static final RegistryObject<Item> GNEISS_STAIRS = ITEMS.register("gneiss_stairs",
+    public static final DeferredHolder<Item, Item> GNEISS_STAIRS = ITEMS.register("gneiss_stairs",
             () -> new BlockItem(ModBlocks.GNEISS_STAIRS.get(), new Item.Properties()));
-    public static final RegistryObject<Item> GNEISS_WALL = ITEMS.register("gneiss_wall",
+    public static final DeferredHolder<Item, Item> GNEISS_WALL = ITEMS.register("gneiss_wall",
             () -> new BlockItem(ModBlocks.GNEISS_WALL.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> POLISHED_SLATE = ITEMS.register("polished_slate",
+    public static final DeferredHolder<Item, Item> POLISHED_SLATE = ITEMS.register("polished_slate",
             () -> new BlockItem(ModBlocks.POLISHED_SLATE.get(), new Item.Properties()));
-    public static final RegistryObject<Item> SLATE_SLAB = ITEMS.register("slate_slab",
+    public static final DeferredHolder<Item, Item> SLATE_SLAB = ITEMS.register("slate_slab",
             () -> new BlockItem(ModBlocks.SLATE_SLAB.get(), new Item.Properties()));
-    public static final RegistryObject<Item> SLATE_STAIRS = ITEMS.register("slate_stairs",
+    public static final DeferredHolder<Item, Item> SLATE_STAIRS = ITEMS.register("slate_stairs",
             () -> new BlockItem(ModBlocks.SLATE_STAIRS.get(), new Item.Properties()));
-    public static final RegistryObject<Item> SLATE_WALL = ITEMS.register("slate_wall",
+    public static final DeferredHolder<Item, Item> SLATE_WALL = ITEMS.register("slate_wall",
             () -> new BlockItem(ModBlocks.SLATE_WALL.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> POLISHED_MARBLE = ITEMS.register("polished_marble",
+    public static final DeferredHolder<Item, Item> POLISHED_MARBLE = ITEMS.register("polished_marble",
             () -> new BlockItem(ModBlocks.POLISHED_MARBLE.get(), new Item.Properties()));
-    public static final RegistryObject<Item> MARBLE_SLAB = ITEMS.register("marble_slab",
+    public static final DeferredHolder<Item, Item> MARBLE_SLAB = ITEMS.register("marble_slab",
             () -> new BlockItem(ModBlocks.MARBLE_SLAB.get(), new Item.Properties()));
-    public static final RegistryObject<Item> MARBLE_STAIRS = ITEMS.register("marble_stairs",
+    public static final DeferredHolder<Item, Item> MARBLE_STAIRS = ITEMS.register("marble_stairs",
             () -> new BlockItem(ModBlocks.MARBLE_STAIRS.get(), new Item.Properties()));
-    public static final RegistryObject<Item> MARBLE_WALL = ITEMS.register("marble_wall",
+    public static final DeferredHolder<Item, Item> MARBLE_WALL = ITEMS.register("marble_wall",
             () -> new BlockItem(ModBlocks.MARBLE_WALL.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> POLISHED_QUARTZITE = ITEMS.register("polished_quartzite",
+    public static final DeferredHolder<Item, Item> POLISHED_QUARTZITE = ITEMS.register("polished_quartzite",
             () -> new BlockItem(ModBlocks.POLISHED_QUARTZITE.get(), new Item.Properties()));
-    public static final RegistryObject<Item> QUARTZITE_SLAB = ITEMS.register("quartzite_slab",
+    public static final DeferredHolder<Item, Item> QUARTZITE_SLAB = ITEMS.register("quartzite_slab",
             () -> new BlockItem(ModBlocks.QUARTZITE_SLAB.get(), new Item.Properties()));
-    public static final RegistryObject<Item> QUARTZITE_STAIRS = ITEMS.register("quartzite_stairs",
+    public static final DeferredHolder<Item, Item> QUARTZITE_STAIRS = ITEMS.register("quartzite_stairs",
             () -> new BlockItem(ModBlocks.QUARTZITE_STAIRS.get(), new Item.Properties()));
-    public static final RegistryObject<Item> QUARTZITE_WALL = ITEMS.register("quartzite_wall",
+    public static final DeferredHolder<Item, Item> QUARTZITE_WALL = ITEMS.register("quartzite_wall",
             () -> new BlockItem(ModBlocks.QUARTZITE_WALL.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> POLISHED_SHALE = ITEMS.register("polished_shale",
+    public static final DeferredHolder<Item, Item> POLISHED_SHALE = ITEMS.register("polished_shale",
             () -> new BlockItem(ModBlocks.POLISHED_SHALE.get(), new Item.Properties()));
-    public static final RegistryObject<Item> SHALE_SLAB = ITEMS.register("shale_slab",
+    public static final DeferredHolder<Item, Item> SHALE_SLAB = ITEMS.register("shale_slab",
             () -> new BlockItem(ModBlocks.SHALE_SLAB.get(), new Item.Properties()));
-    public static final RegistryObject<Item> SHALE_STAIRS = ITEMS.register("shale_stairs",
+    public static final DeferredHolder<Item, Item> SHALE_STAIRS = ITEMS.register("shale_stairs",
             () -> new BlockItem(ModBlocks.SHALE_STAIRS.get(), new Item.Properties()));
-    public static final RegistryObject<Item> SHALE_WALL = ITEMS.register("shale_wall",
+    public static final DeferredHolder<Item, Item> SHALE_WALL = ITEMS.register("shale_wall",
             () -> new BlockItem(ModBlocks.SHALE_WALL.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> POLISHED_CHERT = ITEMS.register("polished_chert",
+    public static final DeferredHolder<Item, Item> POLISHED_CHERT = ITEMS.register("polished_chert",
             () -> new BlockItem(ModBlocks.POLISHED_CHERT.get(), new Item.Properties()));
-    public static final RegistryObject<Item> CHERT_SLAB = ITEMS.register("chert_slab",
+    public static final DeferredHolder<Item, Item> CHERT_SLAB = ITEMS.register("chert_slab",
             () -> new BlockItem(ModBlocks.CHERT_SLAB.get(), new Item.Properties()));
-    public static final RegistryObject<Item> CHERT_STAIRS = ITEMS.register("chert_stairs",
+    public static final DeferredHolder<Item, Item> CHERT_STAIRS = ITEMS.register("chert_stairs",
             () -> new BlockItem(ModBlocks.CHERT_STAIRS.get(), new Item.Properties()));
-    public static final RegistryObject<Item> CHERT_WALL = ITEMS.register("chert_wall",
+    public static final DeferredHolder<Item, Item> CHERT_WALL = ITEMS.register("chert_wall",
             () -> new BlockItem(ModBlocks.CHERT_WALL.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> MICROBIAL_MAT_ORANGE = ITEMS.register("microbial_mat_orange",
+    public static final DeferredHolder<Item, Item> MICROBIAL_MAT_ORANGE = ITEMS.register("microbial_mat_orange",
             () -> new BlockItem(ModBlocks.MICROBIAL_MAT_ORANGE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> MICROBIAL_MAT_YELLOW = ITEMS.register("microbial_mat_yellow",
+    public static final DeferredHolder<Item, Item> MICROBIAL_MAT_YELLOW = ITEMS.register("microbial_mat_yellow",
             () -> new BlockItem(ModBlocks.MICROBIAL_MAT_YELLOW.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> MICROBIAL_MAT_BROWN = ITEMS.register("microbial_mat_brown",
+    public static final DeferredHolder<Item, Item> MICROBIAL_MAT_BROWN = ITEMS.register("microbial_mat_brown",
             () -> new BlockItem(ModBlocks.MICROBIAL_MAT_BROWN.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> MICROBIAL_MAT_GREEN = ITEMS.register("microbial_mat_green",
+    public static final DeferredHolder<Item, Item> MICROBIAL_MAT_GREEN = ITEMS.register("microbial_mat_green",
             () -> new BlockItem(ModBlocks.MICROBIAL_MAT_GREEN.get(), new Item.Properties()));
 
     // --- Instruments ---------------------------------------------------------
@@ -256,16 +256,16 @@ public final class ModItems {
     // reachable only by someone who already knew the mod was there. An instrument makes the model
     // discoverable, and in a classroom it is the difference between a demonstration and a lesson.
 
-    public static final RegistryObject<Item> THERMOELECTRIC_GENERATOR = ITEMS.register("thermoelectric_generator",
+    public static final DeferredHolder<Item, Item> THERMOELECTRIC_GENERATOR = ITEMS.register("thermoelectric_generator",
             () -> new DescribedBlockItem(ModBlocks.THERMOELECTRIC_GENERATOR.get(), new Item.Properties(), 3, "electrodynamics"));
 
-    public static final RegistryObject<Item> GEOTHERMAL_TURBINE = ITEMS.register("geothermal_turbine",
+    public static final DeferredHolder<Item, Item> GEOTHERMAL_TURBINE = ITEMS.register("geothermal_turbine",
             () -> new DescribedBlockItem(ModBlocks.GEOTHERMAL_TURBINE.get(), new Item.Properties(), 3, "electrodynamics"));
 
-    public static final RegistryObject<Item> WELL_PUMP = ITEMS.register("well_pump",
+    public static final DeferredHolder<Item, Item> WELL_PUMP = ITEMS.register("well_pump",
             () -> new DescribedBlockItem(ModBlocks.WELL_PUMP.get(), new Item.Properties(), 3, "electrodynamics", "create"));
 
-    public static final RegistryObject<Item> WELLHEAD = ITEMS.register("wellhead",
+    public static final DeferredHolder<Item, Item> WELLHEAD = ITEMS.register("wellhead",
             () -> new DescribedBlockItem(ModBlocks.WELLHEAD.get(), new Item.Properties(), 2, "createdieselgenerators"));
 
     /** A bucket of crude oil from a well head. */
@@ -273,7 +273,7 @@ public final class ModItems {
      * A bucket of crude oil. It burns in a furnace -- smoky, but long: as long as a bucket of lava, less a fifth -- and the
      * empty bucket is left; refining it is Create Diesel Generators' work.
      */
-    public static final RegistryObject<Item> CRUDE_OIL_BUCKET = ITEMS.register("crude_oil_bucket",
+    public static final DeferredHolder<Item, Item> CRUDE_OIL_BUCKET = ITEMS.register("crude_oil_bucket",
             () -> new net.minecraft.world.item.BucketItem(ModFluids.CRUDE_OIL, new Item.Properties()
                     .craftRemainder(net.minecraft.world.item.Items.BUCKET).stacksTo(1)) {
                 @Override
@@ -284,7 +284,7 @@ public final class ModItems {
             });
 
     /** A bucket of sea water: it pours out as water that waters no field. */
-    public static final RegistryObject<Item> SEA_WATER_BUCKET = ITEMS.register("sea_water_bucket",
+    public static final DeferredHolder<Item, Item> SEA_WATER_BUCKET = ITEMS.register("sea_water_bucket",
             () -> new net.minecraft.world.item.BucketItem(ModFluids.SEA_WATER, new Item.Properties()
                     .craftRemainder(net.minecraft.world.item.Items.BUCKET).stacksTo(1)) {
                 @Override
@@ -295,25 +295,25 @@ public final class ModItems {
                 }
             });
 
-    public static final RegistryObject<Item> WELL_CASING = ITEMS.register("well_casing",
+    public static final DeferredHolder<Item, Item> WELL_CASING = ITEMS.register("well_casing",
             () -> new DescribedBlockItem(ModBlocks.WELL_CASING.get(), new Item.Properties(), 2));
 
-    public static final RegistryObject<Item> SEISMOGRAPH = ITEMS.register("seismograph",
+    public static final DeferredHolder<Item, Item> SEISMOGRAPH = ITEMS.register("seismograph",
             () -> new DescribedBlockItem(ModBlocks.SEISMOGRAPH.get(), new Item.Properties(), 3));
 
     // A weather station: each instrument says in its tooltip what it reads and where it wants to stand.
-    public static final RegistryObject<Item> BAROMETER = described("barometer", ModBlocks.BAROMETER, 2);
-    public static final RegistryObject<Item> ANEMOMETER = described("anemometer", ModBlocks.ANEMOMETER, 2);
-    public static final RegistryObject<Item> HYGROMETER = described("hygrometer", ModBlocks.HYGROMETER, 2);
-    public static final RegistryObject<Item> RAIN_GAUGE = described("rain_gauge", ModBlocks.RAIN_GAUGE, 2);
-    public static final RegistryObject<Item> THERMOMETER = described("thermometer", ModBlocks.THERMOMETER, 2);
-    public static final RegistryObject<Item> SOIL_PROBE = described("soil_probe", ModBlocks.SOIL_PROBE, 2);
-    public static final RegistryObject<Item> TILTMETER = described("tiltmeter", ModBlocks.TILTMETER, 2);
-    public static final RegistryObject<Item> GPS_STATION = described("gps_station", ModBlocks.GPS_STATION, 2);
-    public static final RegistryObject<Item> GAS_METER = described("gas_meter", ModBlocks.GAS_METER, 2);
-    public static final RegistryObject<Item> WEATHER_TERMINAL = described("weather_terminal", ModBlocks.WEATHER_TERMINAL, 3);
+    public static final DeferredHolder<Item, Item> BAROMETER = described("barometer", ModBlocks.BAROMETER, 2);
+    public static final DeferredHolder<Item, Item> ANEMOMETER = described("anemometer", ModBlocks.ANEMOMETER, 2);
+    public static final DeferredHolder<Item, Item> HYGROMETER = described("hygrometer", ModBlocks.HYGROMETER, 2);
+    public static final DeferredHolder<Item, Item> RAIN_GAUGE = described("rain_gauge", ModBlocks.RAIN_GAUGE, 2);
+    public static final DeferredHolder<Item, Item> THERMOMETER = described("thermometer", ModBlocks.THERMOMETER, 2);
+    public static final DeferredHolder<Item, Item> SOIL_PROBE = described("soil_probe", ModBlocks.SOIL_PROBE, 2);
+    public static final DeferredHolder<Item, Item> TILTMETER = described("tiltmeter", ModBlocks.TILTMETER, 2);
+    public static final DeferredHolder<Item, Item> GPS_STATION = described("gps_station", ModBlocks.GPS_STATION, 2);
+    public static final DeferredHolder<Item, Item> GAS_METER = described("gas_meter", ModBlocks.GAS_METER, 2);
+    public static final DeferredHolder<Item, Item> WEATHER_TERMINAL = described("weather_terminal", ModBlocks.WEATHER_TERMINAL, 3);
 
-    private static RegistryObject<Item> described(String name, RegistryObject<net.minecraft.world.level.block.Block> block, int lines) {
+    private static DeferredHolder<Item, Item> described(String name, DeferredHolder<Item, net.minecraft.world.level.block.Block> block, int lines) {
         return ITEMS.register(name, () -> new com.jeladastudios.ftsgeology.item.DescribedBlockItem(block.get(), new Item.Properties(), lines));
     }
 
@@ -326,31 +326,31 @@ public final class ModItems {
      * dedicated server rather than by the compiler, which is the argument for doing that every
      * time an item is added.</p>
      */
-    public static final RegistryObject<Item> GEOLOGISTS_HAMMER = ITEMS.register("geologists_hammer",
+    public static final DeferredHolder<Item, Item> GEOLOGISTS_HAMMER = ITEMS.register("geologists_hammer",
             () -> new GeologistsHammerItem(new Item.Properties().durability(256)));
 
     /** Strike of the nearest boundary, and what the two plates are doing across it. */
-    public static final RegistryObject<Item> FAULT_COMPASS = ITEMS.register("fault_compass",
+    public static final DeferredHolder<Item, Item> FAULT_COMPASS = ITEMS.register("fault_compass",
             () -> new FaultCompassItem(new Item.Properties().stacksTo(1)));
 
     /** In-game field guide documenting landscape reading, instruments, hydrothermal systems, volcanoes, earthquakes, and commands. */
-    public static final RegistryObject<Item> FIELD_GUIDE = ITEMS.register("field_guide",
+    public static final DeferredHolder<Item, Item> FIELD_GUIDE = ITEMS.register("field_guide",
             () -> new FieldGuideItem(new Item.Properties().stacksTo(1)));
 
     /** Bores down from a block and brings up the core: the beds under it, deposits named, the water table. */
-    public static final RegistryObject<Item> CORE_DRILL = ITEMS.register("core_drill",
+    public static final DeferredHolder<Item, Item> CORE_DRILL = ITEMS.register("core_drill",
             () -> new com.jeladastudios.ftsgeology.item.CoreDrillItem(new Item.Properties().durability(64)));
 
     /** What the core drill brings up. */
-    public static final RegistryObject<Item> CORE_SAMPLE = ITEMS.register("core_sample",
+    public static final DeferredHolder<Item, Item> CORE_SAMPLE = ITEMS.register("core_sample",
             () -> new com.jeladastudios.ftsgeology.item.CoreSampleItem(new Item.Properties().stacksTo(1)));
 
     /** Heat flow, geothermal suitability, and whether a well here would reach a reservoir. */
-    public static final RegistryObject<Item> GEOTHERMAL_PROBE = ITEMS.register("geothermal_probe",
+    public static final DeferredHolder<Item, Item> GEOTHERMAL_PROBE = ITEMS.register("geothermal_probe",
             () -> new com.jeladastudios.ftsgeology.item.GeothermalProbeItem(new Item.Properties().stacksTo(1)));
 
     /** A blank geological map; opened, it fills in with the rock and the faults as its holder walks. */
-    public static final RegistryObject<Item> GEOLOGY_MAP = ITEMS.register("geology_map",
+    public static final DeferredHolder<Item, Item> GEOLOGY_MAP = ITEMS.register("geology_map",
             () -> new com.jeladastudios.ftsgeology.item.GeologyMapItem(new Item.Properties()));
 
     private ModItems() {}

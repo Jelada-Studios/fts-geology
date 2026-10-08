@@ -103,7 +103,7 @@ public final class ClientSoilTint {
     }
 
     /** The blocks drawn this way: vanilla's grass-coloured ones. */
-    static final net.minecraft.world.level.block.Block[] GRASSES = {Blocks.GRASS_BLOCK, Blocks.GRASS, Blocks.TALL_GRASS,
+    static final net.minecraft.world.level.block.Block[] GRASSES = {Blocks.GRASS_BLOCK, Blocks.SHORT_GRASS, Blocks.TALL_GRASS,
             Blocks.FERN, Blocks.LARGE_FERN, Blocks.POTTED_FERN, Blocks.SUGAR_CANE};
 
     /**

@@ -667,8 +667,8 @@ public class SpringSourceBlockEntity extends BlockEntity {
     // === Persistence ========================================================
 
     @Override
-    protected void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
+    protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
         tag.putInt("OutletX", outletX);
         tag.putInt("OutletY", outletY);
         tag.putInt("OutletZ", outletZ);
@@ -690,8 +690,8 @@ public class SpringSourceBlockEntity extends BlockEntity {
     }
 
     @Override
-    public void load(CompoundTag tag) {
-        super.load(tag);
+    protected void loadAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
         outletX = tag.getInt("OutletX");
         outletZ = tag.getInt("OutletZ");
         outletY = tag.contains("OutletY") ? tag.getInt("OutletY") : Integer.MIN_VALUE;

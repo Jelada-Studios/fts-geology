@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.quake;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -18,7 +19,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -307,15 +307,15 @@ public final class Earthquake {
     // === Per-tick application ===============================================
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || event.getServer() == null) return;
+    public static void onServerTick(ServerTickEvent.Post event) {
+        if (event.getServer() == null) return;
         applyPending(event);
         FeltShaking.tick(event.getServer());
         Aftershocks.tick(event.getServer());
         tickAmbient(event);
     }
 
-    private static void applyPending(TickEvent.ServerTickEvent event) {
+    private static void applyPending(ServerTickEvent.Post event) {
         // Shares the whole mod's tick budget with retrogen and volcano construction; see TickBudget.
         com.jeladastudios.ftsgeology.util.TickBudget.open(event.getServer().getTickCount());
 
@@ -436,7 +436,7 @@ public final class Earthquake {
      * The world's own quakes: each stretch of boundary breaks on its own clock, felt wherever a player is near
      * enough and heard by the seismographs further out; see {@link FaultClocks}.
      */
-    private static void tickAmbient(TickEvent.ServerTickEvent event) {
+    private static void tickAmbient(ServerTickEvent.Post event) {
         FaultClocks.tick(event.getServer());
     }
 

@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.registry;
+import net.neoforged.neoforge.registries.DeferredHolder;
 
 
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -10,7 +11,6 @@ import net.neoforged.neoforge.common.ForgeMod;
 import net.neoforged.neoforge.fluids.ForgeFlowingFluid;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.ForgeRegistries;
-import net.neoforged.neoforge.registries.RegistryObject;
 
 /** The mod's fluids: the standing water of a traced river, and sea water carried off the sea in a bucket. */
 public final class ModFluids {
@@ -20,18 +20,18 @@ public final class ModFluids {
     public static final DeferredRegister<Fluid> FLUIDS =
             DeferredRegister.create(BuiltInRegistries.FLUID, GeysersMod.MODID);
 
-    public static final RegistryObject<Fluid> RIVER_WATER =
+    public static final DeferredHolder<Fluid, Fluid> RIVER_WATER =
             FLUIDS.register("river_water", () -> new RiverWaterFluid.Source(properties()));
-    public static final RegistryObject<Fluid> FLOWING_RIVER_WATER =
+    public static final DeferredHolder<Fluid, Fluid> FLOWING_RIVER_WATER =
             FLUIDS.register("flowing_river_water", () -> new RiverWaterFluid.Flowing(properties()));
 
     /**
      * Sea water, carried off the sea in a bucket: water in every way (water's own type, for the reasons below), and it
      * flows and spreads as water does, but it waters no field; see {@link com.jeladastudios.ftsgeology.hydrology.SeaWater}.
      */
-    public static final RegistryObject<Fluid> SEA_WATER =
+    public static final DeferredHolder<Fluid, Fluid> SEA_WATER =
             FLUIDS.register("sea_water", () -> new ForgeFlowingFluid.Source(seaProperties()));
-    public static final RegistryObject<Fluid> FLOWING_SEA_WATER =
+    public static final DeferredHolder<Fluid, Fluid> FLOWING_SEA_WATER =
             FLUIDS.register("flowing_sea_water", () -> new ForgeFlowingFluid.Flowing(seaProperties()));
 
     public static final DeferredRegister<net.neoforged.neoforge.fluids.FluidType> FLUID_TYPES =
@@ -42,7 +42,7 @@ public final class ModFluids {
      * {@code forge:crude_oil} tag, so another mod's refinery takes it (Create Diesel Generators' distillation does).
      * Drawn with water's own textures, darkened: no texture of its own.
      */
-    public static final RegistryObject<net.neoforged.neoforge.fluids.FluidType> CRUDE_OIL_TYPE = FLUID_TYPES.register("crude_oil",
+    public static final DeferredHolder<net.neoforged.neoforge.fluids.FluidType, net.neoforged.neoforge.fluids.FluidType> CRUDE_OIL_TYPE = FLUID_TYPES.register("crude_oil",
             () -> new net.neoforged.neoforge.fluids.FluidType(net.neoforged.neoforge.fluids.FluidType.Properties.create()
                     .descriptionId("fluid_type.fts_geology.crude_oil")
                     .density(870).viscosity(8000).temperature(300)
@@ -76,9 +76,9 @@ public final class ModFluids {
                 }
             });
 
-    public static final RegistryObject<Fluid> CRUDE_OIL =
+    public static final DeferredHolder<Fluid, Fluid> CRUDE_OIL =
             FLUIDS.register("crude_oil", () -> new ForgeFlowingFluid.Source(oilProperties()));
-    public static final RegistryObject<Fluid> FLOWING_CRUDE_OIL =
+    public static final DeferredHolder<Fluid, Fluid> FLOWING_CRUDE_OIL =
             FLUIDS.register("flowing_crude_oil", () -> new ForgeFlowingFluid.Flowing(oilProperties()));
 
     private static ForgeFlowingFluid.Properties oilProperties() {

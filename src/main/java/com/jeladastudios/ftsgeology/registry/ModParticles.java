@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.registry;
+import net.neoforged.neoforge.registries.DeferredHolder;
 
 
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -7,7 +8,6 @@ import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.ForgeRegistries;
-import net.neoforged.neoforge.registries.RegistryObject;
 
 /**
  * The mod's own particles.
@@ -37,48 +37,48 @@ public final class ModParticles {
             DeferredRegister.create(BuiltInRegistries.PARTICLE_TYPE, GeysersMod.MODID);
 
     /** Water atomised by pressure: fires upward hard, slows, and spreads into fog at the top. */
-    public static final RegistryObject<SimpleParticleType> GEYSER_MIST =
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> GEYSER_MIST =
             PARTICLES.register("geyser_mist", () -> new SimpleParticleType(false));
 
     /** A gobbet of hot mud: heavy, arcing, and gone as soon as it lands. */
-    public static final RegistryObject<SimpleParticleType> MUD_BLOB =
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> MUD_BLOB =
             PARTICLES.register("mud_blob", () -> new SimpleParticleType(false));
 
     /** Sulfurous vapour, denser than air: creeps along the ground rather than rising. */
-    public static final RegistryObject<SimpleParticleType> SULFUR_HAZE =
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> SULFUR_HAZE =
             PARTICLES.register("sulfur_haze", () -> new SimpleParticleType(false));
 
     // The volcano's smoke joined these once the whole eruption column moved to the client: black
     // throat smoke lit by the lava, and pale ash high up, are two more things vanilla has no word for.
 
     /** Black eruption smoke, glowing for its first moments. Also the throat while it rumbles. */
-    public static final RegistryObject<SimpleParticleType> VOLCANIC_SMOKE =
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> VOLCANIC_SMOKE =
             PARTICLES.register("volcanic_smoke", () -> new SimpleParticleType(false));
 
     /** The pale, slow cloud high in the column. */
-    public static final RegistryObject<SimpleParticleType> ASH_CLOUD =
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> ASH_CLOUD =
             PARTICLES.register("ash_cloud", () -> new SimpleParticleType(false));
 
     /** Ash falling through the air downwind. */
-    public static final RegistryObject<SimpleParticleType> ASH_FLAKE =
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> ASH_FLAKE =
             PARTICLES.register("ash_flake", () -> new SimpleParticleType(false));
 
     /** Black smoke out of a flank chimney while the mountain erupts. */
-    public static final RegistryObject<SimpleParticleType> VENT_SMOKE =
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> VENT_SMOKE =
             PARTICLES.register("vent_smoke", () -> new SimpleParticleType(false));
 
     // What a river carries on its surface (see client.particle.RiverParticles): flat on the water and moved with it,
     // which no vanilla particle is.
 
     /** Foam where a river comes down a step. */
-    public static final RegistryObject<SimpleParticleType> RIVER_FOAM =
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> RIVER_FOAM =
             PARTICLES.register("river_foam", () -> new SimpleParticleType(false));
 
     /** A leaf drifting down a river. */
-    public static final RegistryObject<SimpleParticleType> RIVER_LEAF =
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> RIVER_LEAF =
             PARTICLES.register("river_leaf", () -> new SimpleParticleType(false));
 
     /** A bit of twig drifting down a river. */
-    public static final RegistryObject<SimpleParticleType> RIVER_TWIG =
+    public static final DeferredHolder<ParticleType<?>, SimpleParticleType> RIVER_TWIG =
             PARTICLES.register("river_twig", () -> new SimpleParticleType(false));
 }

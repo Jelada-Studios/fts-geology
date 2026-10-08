@@ -37,7 +37,7 @@ public final class TerrainProbe {
                 || s.is(BlockTags.SMALL_FLOWERS)
                 || s.is(BlockTags.TALL_FLOWERS)
                 || s.is(BlockTags.REPLACEABLE_BY_TREES)
-                || s.is(Blocks.GRASS) || s.is(Blocks.TALL_GRASS)
+                || s.is(Blocks.SHORT_GRASS) || s.is(Blocks.TALL_GRASS)
                 || s.is(Blocks.FERN) || s.is(Blocks.LARGE_FERN)
                 || s.is(Blocks.DEAD_BUSH) || s.is(Blocks.VINE) || s.is(Blocks.GLOW_LICHEN)
                 || s.is(Blocks.MOSS_CARPET) || s.is(Blocks.SNOW)

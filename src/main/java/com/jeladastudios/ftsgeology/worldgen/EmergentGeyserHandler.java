@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.worldgen;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -15,7 +16,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -45,10 +45,9 @@ public final class EmergentGeyserHandler {
     private static final int WATER_COUNT_CAP = 64;
 
     @SubscribeEvent
-    public static void onLevelTick(TickEvent.LevelTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
+    public static void onLevelTick(LevelTickEvent.Post event) {
         if (!GeyserConfig.EMERGENT_ENABLED.get()) return;
-        if (!(event.level instanceof ServerLevel level)) return;
+        if (!(event.getLevel() instanceof ServerLevel level)) return;
         if (level.getGameTime() % GeyserConfig.EMERGENT_SCAN_INTERVAL_TICKS.get() != 0L) return;
 
         for (ServerPlayer player : level.players()) {

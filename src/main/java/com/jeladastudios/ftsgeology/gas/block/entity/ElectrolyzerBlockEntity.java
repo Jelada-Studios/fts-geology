@@ -156,8 +156,8 @@ public class ElectrolyzerBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
+    protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
         tag.put("h2", h2.save());
         tag.put("o2", o2.save());
         tag.putInt("energy", energy.getEnergyStored());
@@ -166,8 +166,8 @@ public class ElectrolyzerBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
-    public void load(CompoundTag tag) {
-        super.load(tag);
+    protected void loadAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
         h2.load(tag.getCompound("h2"));
         o2.load(tag.getCompound("o2"));
         energy.set(tag.getInt("energy"));

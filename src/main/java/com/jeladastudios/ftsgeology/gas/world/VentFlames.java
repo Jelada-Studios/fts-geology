@@ -305,7 +305,7 @@ public final class VentFlames {
             AABB column = new AABB(p.getX() - 0.2, p.getY(), p.getZ() - 0.2, p.getX() + 1.2, p.getY() + h + 0.5, p.getZ() + 1.2);
             for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, column)) {
                 if (e.fireImmune()) continue;
-                e.setSecondsOnFire(8);
+                e.igniteForSeconds(8);
                 e.hurt(level.damageSources().inFire(), (float) Math.min(8.0, 2.0 + f.kw / 200.0));
             }
         }

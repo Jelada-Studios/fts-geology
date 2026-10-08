@@ -147,8 +147,8 @@ public class BiogasDigesterBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
+    protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
         tag.put("items", items.serializeNBT());
         tag.put("gas", out.save());
         tag.putDouble("pending", pending);
@@ -156,8 +156,8 @@ public class BiogasDigesterBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
-    public void load(CompoundTag tag) {
-        super.load(tag);
+    protected void loadAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
         items.deserializeNBT(tag.getCompound("items"));
         out.load(tag.getCompound("gas"));
         pending = tag.getDouble("pending");

@@ -41,15 +41,15 @@ repositories {
 }
 
 dependencies {
+    // Distant Horizons' API, for the optional far-terrain generator: platform-independent, compiled against, never shipped.
+    compileOnly files('libs/DistantHorizonsApi-7.2.0.jar')
 }
 
 // The port goes a package at a time (docs/NEOFORGE_PORT_KURALLARI.md, section 13). A package not ported yet is left
 // out of the build here; the line comes out when it is ported.
 def notYetPorted = [
-        'GeysersMod.java',
-        'advancement', 'api', 'block', 'blockentity', 'client', 'command', 'compat', 'config', 'eruption', 'fluid',
-        'gas', 'hydrology', 'instrument', 'item', 'mixin', 'network', 'quake', 'registry', 'volcano', 'weather',
-        'worldgen',
+        // Create 6 for NeoForge 1.21.1 is not on this machine yet: the crankshaft waits for its jar.
+        'compat/create',
 ]
 sourceSets.main.java {
     notYetPorted.each { p -> exclude p.endsWith('.java') ? "com/jeladastudios/ftsgeology/${p}" : "com/jeladastudios/ftsgeology/${p}/**" }
@@ -57,6 +57,7 @@ sourceSets.main.java {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xmaxerrs', '10000']
 }
 
 tasks.named('jar', Jar).configure {

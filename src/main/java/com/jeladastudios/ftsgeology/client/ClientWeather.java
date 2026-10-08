@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.client;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -19,7 +20,6 @@ import net.minecraft.world.level.material.FogType;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 /**
  * The player's own weather on the client: what the server says of the storm over them, eased in and out a tick at a
@@ -66,8 +66,7 @@ public final class ClientWeather {
     }
 
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
+    public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
         LocalPlayer player = mc.player;

@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.item;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -26,7 +27,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -94,8 +94,8 @@ public class GeologyMapItem extends Item {
     }
 
     @SubscribeEvent
-    public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || !(event.player instanceof ServerPlayer player)) return;
+    public static void onPlayerTick(PlayerTickEvent.Post event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (player.tickCount % 10 != 0) return;
         for (ItemStack stack : new ItemStack[]{player.getMainHandItem(), player.getOffhandItem()}) {
             if (stack.is(Items.FILLED_MAP) && stack.getTag() != null && stack.getTag().getBoolean(TAG)) {

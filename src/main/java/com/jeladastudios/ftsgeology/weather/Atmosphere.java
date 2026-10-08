@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.weather;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -13,7 +14,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.saveddata.SavedData;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.List;
@@ -320,8 +320,8 @@ public final class Atmosphere {
     private static long formed;
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || event.getServer() == null) return;
+    public static void onServerTick(ServerTickEvent.Post event) {
+        if (event.getServer() == null) return;
         ServerLevel level = event.getServer().overworld();
         if (level == null || !Storms.on(level)) return;
         long now = level.getGameTime();

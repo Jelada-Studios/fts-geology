@@ -28,7 +28,7 @@ public class GeyserChamberBlockEntity extends BlockEntity {
 
     @Override
     protected void saveAdditional(net.minecraft.nbt.CompoundTag tag) {
-        super.saveAdditional(tag);
+        super.saveAdditional(tag, registries);
         if (corePos != null) {
             tag.putLong("CorePos", corePos.asLong());
         }
@@ -36,7 +36,7 @@ public class GeyserChamberBlockEntity extends BlockEntity {
 
     @Override
     public void load(net.minecraft.nbt.CompoundTag tag) {
-        super.load(tag);
+        super.loadAdditional(tag, registries);
         if (tag.contains("CorePos")) {
             this.corePos = BlockPos.of(tag.getLong("CorePos"));
         }

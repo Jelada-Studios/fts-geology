@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.gas.event;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -33,7 +34,6 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.event.AttachCapabilitiesEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
 import net.neoforged.neoforge.event.entity.living.LivingEvent;
@@ -99,8 +99,8 @@ public final class CommonEvents {
     }
 
     @SubscribeEvent
-    public static void onLevelTick(TickEvent.LevelTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || !(event.level instanceof ServerLevel level) || !on()) return;
+    public static void onLevelTick(LevelTickEvent.Post event) {
+        if (!(event.getLevel() instanceof ServerLevel level) || !on()) return;
         GasManager.get(level).tick();
     }
 

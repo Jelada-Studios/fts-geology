@@ -796,8 +796,8 @@ public class GeyserCoreBlockEntity extends BlockEntity {
     // === Persistence ========================================================
 
     @Override
-    protected void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
+    protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
         tag.putDouble("Temperature", temperatureC);
         tag.putDouble("WaterVolume", waterVolume);
         tag.putDouble("RoomVolume", roomVolume);
@@ -829,8 +829,8 @@ public class GeyserCoreBlockEntity extends BlockEntity {
     }
 
     @Override
-    public void load(CompoundTag tag) {
-        super.load(tag);
+    protected void loadAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
         temperatureC = tag.getDouble("Temperature");
         waterVolume = tag.getDouble("WaterVolume");
         roomVolume = Math.max(1.0, tag.getDouble("RoomVolume"));

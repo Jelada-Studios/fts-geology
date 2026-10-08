@@ -216,8 +216,8 @@ public class WeatherTerminalBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
+    protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
         tag.putLong("Slot", lastSlot);
         for (Series s : Series.values()) {
             int[] bits = new int[SLOTS];
@@ -227,8 +227,8 @@ public class WeatherTerminalBlockEntity extends BlockEntity {
     }
 
     @Override
-    public void load(CompoundTag tag) {
-        super.load(tag);
+    protected void loadAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
         lastSlot = tag.contains("Slot") ? tag.getLong("Slot") : Long.MIN_VALUE;
         for (Series s : Series.values()) {
             int[] bits = tag.getIntArray(s.name());

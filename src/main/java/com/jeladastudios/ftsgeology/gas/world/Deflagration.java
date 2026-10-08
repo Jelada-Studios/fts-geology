@@ -168,7 +168,7 @@ public class Deflagration {
             double cx = b.sx / b.n, cy = b.sy / b.n, cz = b.sz / b.n;
             AABB box = new AABB(b.minX - 0.5, b.minY - 0.5, b.minZ - 0.5, b.maxX + 0.5, b.maxY + 0.5, b.maxZ + 0.5);
             for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, box)) {
-                if (!e.fireImmune()) e.setSecondsOnFire(6);
+                if (!e.fireImmune()) e.igniteForSeconds(6);
             }
             // Confined gas explodes; an unconfined cloud mostly just flashes.
             double confinement = 0.35 + 0.65 * b.enclosed / b.n;

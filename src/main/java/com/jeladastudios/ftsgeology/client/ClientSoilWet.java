@@ -47,7 +47,7 @@ public final class ClientSoilWet {
         BlockState ground = level.getBlockState(pos.below());
         if (ground.is(Blocks.SNOW) || ground.is(Blocks.SNOW_BLOCK)) return true;
         // Sand and gravel drink the rain; soil takes it until its top is soaked; hard, trodden and tilled ground none.
-        boolean drinks = ground.is(BlockTags.SAND) || ground.is(Tags.Blocks.GRAVEL);
+        boolean drinks = ground.is(BlockTags.SAND) || ground.is(Tags.Blocks.GRAVELS);
         boolean soil = drinks || (ground.is(BlockTags.DIRT) && !ground.is(Blocks.MUD) && !ground.is(Blocks.PACKED_MUD)
                 && !name(ground).startsWith("trmt:eroded"));
         if (!soil) return true;

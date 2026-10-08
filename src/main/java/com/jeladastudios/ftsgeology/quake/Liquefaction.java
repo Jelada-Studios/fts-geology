@@ -260,7 +260,7 @@ public final class Liquefaction {
             BlockState s = chunk.getBlockState(m.set(x, y, z));
             if (loose(s)) {
                 loose++;
-                if (s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVEL) || s.is(Blocks.MUD)) sandy = true;
+                if (s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVELS) || s.is(Blocks.MUD)) sandy = true;
             } else if (!s.isAir() && s.getFluidState().isEmpty()) {
                 if (y >= top - 1) return false;       // rock at the surface
             }
@@ -271,7 +271,7 @@ public final class Liquefaction {
 
     /** Sand, silt, gravel and soil: grains that can float apart. Clay holds together; rock does not move. */
     private static boolean loose(BlockState s) {
-        return s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVEL) || s.is(Blocks.MUD) || s.is(Blocks.DIRT)
+        return s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVELS) || s.is(Blocks.MUD) || s.is(Blocks.DIRT)
                 || s.is(Blocks.GRASS_BLOCK) || s.is(Blocks.COARSE_DIRT) || s.is(Blocks.PODZOL) || s.is(Blocks.ROOTED_DIRT)
                 || s.is(Blocks.MUDDY_MANGROVE_ROOTS) || s.is(Blocks.DIRT_PATH) || s.is(Blocks.FARMLAND)
                 || s.is(Blocks.SUSPICIOUS_SAND) || s.is(Blocks.SUSPICIOUS_GRAVEL);

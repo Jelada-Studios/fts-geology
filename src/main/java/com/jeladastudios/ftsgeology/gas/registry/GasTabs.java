@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.gas.registry;
+import net.neoforged.neoforge.registries.DeferredHolder;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.gas.block.entity.GasTankBlockEntity;
@@ -11,16 +12,15 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.RegistryObject;
 
 public final class GasTabs {
     public static final DeferredRegister<CreativeModeTab> TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, GeysersMod.MODID);
 
-    public static final RegistryObject<CreativeModeTab> MAIN = TABS.register("main", () -> CreativeModeTab.builder()
+    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> MAIN = TABS.register("main", () -> CreativeModeTab.builder()
             .title(Component.translatable("itemGroup.fts_geology.gases"))
             .icon(() -> new ItemStack(GasItems.GAS_DETECTOR.get()))
             .displayItems((params, out) -> {
-                for (RegistryObject<net.minecraft.world.item.Item> item : GasItems.ITEMS.getEntries()) out.accept(item.get());
+                for (DeferredHolder<net.minecraft.world.item.Item, ? extends net.minecraft.world.item.Item> item : GasItems.ITEMS.getEntries()) out.accept(item.get());
                 ItemStack scba = new ItemStack(GasItems.BREATHING_APPARATUS.get());
                 BreathingApparatusItem.setOxygen(scba, BreathingApparatusItem.CAPACITY);
                 out.accept(scba);

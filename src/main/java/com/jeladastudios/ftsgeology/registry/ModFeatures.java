@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.registry;
+import net.neoforged.neoforge.registries.DeferredHolder;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.worldgen.GeologyFeature;
@@ -6,7 +7,6 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
 import net.neoforged.neoforge.registries.DeferredRegister;
-import net.neoforged.neoforge.registries.RegistryObject;
 
 /**
  * World generation features.
@@ -23,14 +23,14 @@ public final class ModFeatures {
             DeferredRegister.create(Registries.FEATURE, GeysersMod.MODID);
 
     /** The deep geology of a chunk, written while it is generated. See {@link GeologyFeature}. */
-    public static final RegistryObject<Feature<NoneFeatureConfiguration>> GEOLOGY =
+    public static final DeferredHolder<Feature<?>, Feature<NoneFeatureConfiguration>> GEOLOGY =
             FEATURES.register("geology", () -> new GeologyFeature(NoneFeatureConfiguration.CODEC));
 
     /**
      * Large volcanoes, raised a chunk at a time as terrain generates. See
      * {@link com.jeladastudios.ftsgeology.worldgen.VolcanoFieldFeature}.
      */
-    public static final RegistryObject<Feature<NoneFeatureConfiguration>> VOLCANO_FIELD =
+    public static final DeferredHolder<Feature<?>, Feature<NoneFeatureConfiguration>> VOLCANO_FIELD =
             FEATURES.register("volcano_field", () -> new com.jeladastudios.ftsgeology.worldgen
                     .VolcanoFieldFeature(NoneFeatureConfiguration.CODEC));
 
@@ -38,7 +38,7 @@ public final class ModFeatures {
      * Geothermal ground and soil colour, painted while a chunk generates. See
      * {@link com.jeladastudios.ftsgeology.worldgen.GeologySurfaceFeature}.
      */
-    public static final RegistryObject<Feature<NoneFeatureConfiguration>> GEOLOGY_SURFACE =
+    public static final DeferredHolder<Feature<?>, Feature<NoneFeatureConfiguration>> GEOLOGY_SURFACE =
             FEATURES.register("geology_surface", () -> new com.jeladastudios.ftsgeology.worldgen
                     .GeologySurfaceFeature(NoneFeatureConfiguration.CODEC));
 }

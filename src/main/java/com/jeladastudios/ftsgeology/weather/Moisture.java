@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.weather;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -10,7 +11,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import java.util.Locale;
 
@@ -121,8 +121,8 @@ public final class Moisture {
     }
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || event.getServer() == null) return;
+    public static void onServerTick(ServerTickEvent.Post event) {
+        if (event.getServer() == null) return;
         ServerLevel level = event.getServer().overworld();
         if (level == null || !Storms.on(level) || level.players().isEmpty()) return;
         long now = level.getGameTime();

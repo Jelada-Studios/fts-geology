@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.client;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -6,7 +7,6 @@ import com.jeladastudios.ftsgeology.GeysersMod;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.client.event.ViewportEvent;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 /**
  * The ground moving, as the person standing on it sees it.
@@ -61,8 +61,7 @@ public final class ClientShake {
     }
 
     @SubscribeEvent
-    public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
+    public static void onClientTick(ClientTickEvent.Post event) {
         // A paused single-player game should not go on shaking behind the menu, and a player who
         // has left the world must not carry it into the next one.
         if (Minecraft.getInstance().level == null) { clear(); return; }

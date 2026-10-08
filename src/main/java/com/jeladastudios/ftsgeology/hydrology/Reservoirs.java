@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.hydrology;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 
 
@@ -35,7 +36,6 @@ import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.Tags;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
@@ -213,8 +213,8 @@ public final class Reservoirs {
     }
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || event.getServer() == null) return;
+    public static void onServerTick(ServerTickEvent.Post event) {
+        if (event.getServer() == null) return;
         ServerLevel level = event.getServer().overworld();
         if (level == null || !on(level)) return;
         long now = level.getGameTime();
@@ -837,7 +837,7 @@ public final class Reservoirs {
                 || name.contains("reinforced") || s.is(Blocks.IRON_BLOCK)) {
             return 0.6;
         }
-        if (s.is(BlockTags.DIRT) || s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVEL) || s.is(Blocks.CLAY) || s.is(Blocks.MUD)
+        if (s.is(BlockTags.DIRT) || s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVELS) || s.is(Blocks.CLAY) || s.is(Blocks.MUD)
                 || s.is(Blocks.PACKED_MUD) || s.is(Blocks.SNOW_BLOCK)) {
             return EARTH;
         }

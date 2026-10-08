@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.volcano;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -27,7 +28,6 @@ import net.minecraft.world.level.block.CampfireBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
@@ -197,8 +197,8 @@ public final class VolcanicGas {
     }
 
     @SubscribeEvent
-    public static void onLevelTick(TickEvent.LevelTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || FIELDS.isEmpty() || !(event.level instanceof ServerLevel level)) return;
+    public static void onLevelTick(LevelTickEvent.Post event) {
+        if (FIELDS.isEmpty() || !(event.getLevel() instanceof ServerLevel level)) return;
         long now = level.getGameTime();
         if (now % 20L != 0L) return;
         boolean douse = now % 100L == 0L;

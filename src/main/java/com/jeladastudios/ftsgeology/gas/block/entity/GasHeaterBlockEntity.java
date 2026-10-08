@@ -179,8 +179,8 @@ public class GasHeaterBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
+    protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
         tag.put("fuel", fuel.save());
         tag.put("flue", flue.save());
         tag.put("draft", draft.save());
@@ -188,8 +188,8 @@ public class GasHeaterBlockEntity extends GasMachineBlockEntity {
     }
 
     @Override
-    public void load(CompoundTag tag) {
-        super.load(tag);
+    protected void loadAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
         fuel.load(tag.getCompound("fuel"));
         flue.load(tag.getCompound("flue"));
         draft.clear();

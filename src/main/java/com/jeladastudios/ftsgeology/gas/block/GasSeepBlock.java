@@ -84,7 +84,7 @@ public class GasSeepBlock extends BaseEntityBlock {
     /** Standing on a lit seep is standing in its flame. */
     @Override
     public void stepOn(Level level, BlockPos pos, BlockState state, Entity entity) {
-        if (state.getValue(LIT) && !entity.fireImmune() && !entity.isSteppingCarefully()) entity.setSecondsOnFire(3);
+        if (state.getValue(LIT) && !entity.fireImmune() && !entity.isSteppingCarefully()) entity.igniteForSeconds(3);
         super.stepOn(level, pos, state, entity);
     }
 

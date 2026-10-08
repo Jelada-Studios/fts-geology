@@ -112,7 +112,7 @@ public final class Structural {
         if (sound == SoundType.GLASS || s.is(BlockTags.ICE) || s.is(BlockTags.WOOL) || s.is(BlockTags.LEAVES)
                 || s.is(Blocks.HAY_BLOCK)) return Fabric.FRAIL;
         String name = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath();
-        if (s.is(BlockTags.DIRT) || s.is(Blocks.CLAY) || s.is(Tags.Blocks.COBBLESTONE) || name.contains("cobble")
+        if (s.is(BlockTags.DIRT) || s.is(Blocks.CLAY) || s.is(Tags.Blocks.COBBLESTONES) || name.contains("cobble")
                 || name.contains("mud") || name.contains("rubble") || name.contains("adobe")) return Fabric.A;
         if (s.is(BlockTags.PLANKS) || s.is(BlockTags.LOGS) || sound == SoundType.WOOD || sound == SoundType.BAMBOO_WOOD
                 || sound == SoundType.CHERRY_WOOD || sound == SoundType.NETHER_WOOD) return Fabric.D;
@@ -350,7 +350,7 @@ public final class Structural {
             }
         }
         BlockState under = chunk.getBlockState(m.set(x, ground, z));
-        boolean rock = under.is(BlockTags.BASE_STONE_OVERWORLD) || under.is(Tags.Blocks.STONE);
+        boolean rock = under.is(BlockTags.BASE_STONE_OVERWORLD) || under.is(Tags.Blocks.STONES);
         if (footing > 0) {
             work -= PER_FOOTING * Math.min(footing, FOOTING_MOST) * (concrete ? CONCRETE : 1.0);
             if (rock) work -= ON_ROCK;
@@ -377,7 +377,7 @@ public final class Structural {
 
     /** Ground that gives way under a wall: sand, gravel, mud, clay, snow, ash. */
     private static boolean loose(BlockState s) {
-        return s.getBlock() instanceof FallingBlock || s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVEL) || s.is(Blocks.MUD)
+        return s.getBlock() instanceof FallingBlock || s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVELS) || s.is(Blocks.MUD)
                 || s.is(Blocks.CLAY) || s.is(BlockTags.SNOW) || s.is(Blocks.SOUL_SAND) || s.is(Blocks.SOUL_SOIL)
                 || s.is(com.jeladastudios.ftsgeology.registry.ModBlocks.VOLCANIC_ASH.get());
     }

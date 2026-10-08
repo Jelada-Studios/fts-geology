@@ -188,7 +188,7 @@ public final class OceanColumn {
                     continue;
                 }
                 int roll = rng.nextInt(12);
-                if (roll < 2) level.setBlock(ground.above(), TfcCompat.translate(level, ground.above(), Blocks.GRASS.defaultBlockState()), Block.UPDATE_CLIENTS);
+                if (roll < 2) level.setBlock(ground.above(), TfcCompat.translate(level, ground.above(), Blocks.SHORT_GRASS.defaultBlockState()), Block.UPDATE_CLIENTS);
                 else if (roll == 2 && k.seaTemp > -0.15) {
                     level.setBlock(ground.above(), TfcCompat.translate(level, ground.above(), Blocks.FERN.defaultBlockState()), Block.UPDATE_CLIENTS);
                 }

@@ -267,7 +267,7 @@ public final class Landslides {
     }
 
     private static boolean loose(BlockState s) {
-        return s.is(BlockTags.DIRT) && !DynamicTreesFelling.isRooty(s) || s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVEL)
+        return s.is(BlockTags.DIRT) && !DynamicTreesFelling.isRooty(s) || s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVELS)
                 || s.is(Blocks.SNOW_BLOCK) || s.is(Blocks.POWDER_SNOW) || s.is(Blocks.CLAY) || s.is(Blocks.MUD)
                 || s.is(Blocks.COARSE_DIRT) || s.is(Blocks.DIRT_PATH) || s.is(Blocks.PACKED_MUD)
                 || s.is(com.jeladastudios.ftsgeology.registry.ModBlocks.VOLCANIC_ASH.get());

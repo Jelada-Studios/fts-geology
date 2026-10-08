@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.hydrology;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -22,7 +23,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.neoforge.common.Tags;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.neoforge.event.level.ChunkDataEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
@@ -339,8 +339,8 @@ public final class SoilWater {
     // === Looking in turn ==================================================
 
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || event.getServer() == null) return;
+    public static void onServerTick(ServerTickEvent.Post event) {
+        if (event.getServer() == null) return;
         MinecraftServer server = event.getServer();
         ServerLevel level = server.overworld();
         if (level == null || !enabled(level)) return;
@@ -974,7 +974,7 @@ public final class SoilWater {
         if (s.is(Blocks.TALL_GRASS) || s.is(Blocks.LARGE_FERN)) {
             level.setBlock(over.above(), Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
             level.setBlock(over, Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
-        } else if (s.is(Blocks.GRASS) || s.is(Blocks.FERN)) {
+        } else if (s.is(Blocks.SHORT_GRASS) || s.is(Blocks.FERN)) {
             level.setBlock(over, level.random.nextInt(10) == 0 ? Blocks.DEAD_BUSH.defaultBlockState()
                     : Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
         }
@@ -1162,7 +1162,7 @@ public final class SoilWater {
         if (top.is(SoilBlocks.CLAY_SOIL)) return Soil.CLAY;
         if (top.is(SoilBlocks.SANDY_SOIL)) return Soil.SAND;
         if (top.is(SoilBlocks.FARMLAND)) return Soil.LOAM;
-        if (top.is(BlockTags.SAND) || top.is(Tags.Blocks.GRAVEL) || top.is(Tags.Blocks.SANDSTONE)) return Soil.SAND;
+        if (top.is(BlockTags.SAND) || top.is(Tags.Blocks.GRAVELS) || top.is(Tags.Blocks.SANDSTONE_BLOCKS)) return Soil.SAND;
         if (top.is(Blocks.CLAY) || top.is(Blocks.MUD) || top.is(Blocks.MUDDY_MANGROVE_ROOTS)
                 || top.is(BlockTags.TERRACOTTA)) {
             return Soil.CLAY;
@@ -1171,7 +1171,7 @@ public final class SoilWater {
                 || top.is(Blocks.POWDER_SNOW)) {
             return Soil.LOAM;
         }
-        if (top.is(BlockTags.BASE_STONE_OVERWORLD) || top.is(Tags.Blocks.STONE) || top.is(Blocks.CALCITE)
+        if (top.is(BlockTags.BASE_STONE_OVERWORLD) || top.is(Tags.Blocks.STONES) || top.is(Blocks.CALCITE)
                 || top.is(Blocks.BASALT) || top.is(Blocks.SMOOTH_BASALT) || top.is(Blocks.BLACKSTONE)
                 || top.is(BlockTags.ICE)) {
             return Soil.ROCK;

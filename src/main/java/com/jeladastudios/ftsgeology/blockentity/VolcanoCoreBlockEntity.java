@@ -612,8 +612,8 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
+    protected void saveAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
         tag.putInt("Phase", phase.ordinal());
         tag.putInt("Timer", timer);
         tag.putInt("EruptionTicks", eruptionTicks);
@@ -637,8 +637,8 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
     }
 
     @Override
-    public void load(CompoundTag tag) {
-        super.load(tag);
+    protected void loadAdditional(CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
         phase = Phase.values()[Math.floorMod(tag.getInt("Phase"), Phase.values().length)];
         timer = tag.getInt("Timer");
         eruptionTicks = tag.getInt("EruptionTicks");

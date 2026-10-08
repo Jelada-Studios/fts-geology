@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.registry;
+import net.neoforged.neoforge.registries.DeferredHolder;
 
 
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -24,7 +25,6 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.ForgeRegistries;
-import net.neoforged.neoforge.registries.RegistryObject;
 
 /** All blocks introduced by the mod. */
 public final class ModBlocks {
@@ -33,28 +33,28 @@ public final class ModBlocks {
             DeferredRegister.create(BuiltInRegistries.BLOCK, GeysersMod.MODID);
 
     /** The thermodynamic brain: holds temperature/pressure state and ticks. */
-    public static final RegistryObject<Block> GEYSER_CORE = BLOCKS.register("geyser_core",
-            () -> new GeyserCoreBlock(BlockBehaviour.Properties.copy(Blocks.DEEPSLATE)
+    public static final DeferredHolder<Block, Block> GEYSER_CORE = BLOCKS.register("geyser_core",
+            () -> new GeyserCoreBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.DEEPSLATE)
                     .mapColor(MapColor.COLOR_BLACK)
                     .lightLevel(s -> 6)          // faint glow so you can find it when digging down
                     .strength(-1.0F, 3600000.0F) // unbreakable by hand; technical block
                     .noLootTable()));
 
     /** Marks the water/steam accumulation chamber volume around the core. */
-    public static final RegistryObject<Block> GEYSER_CHAMBER = BLOCKS.register("geyser_chamber",
-            () -> new GeyserChamberBlock(BlockBehaviour.Properties.copy(Blocks.DEEPSLATE)
+    public static final DeferredHolder<Block, Block> GEYSER_CHAMBER = BLOCKS.register("geyser_chamber",
+            () -> new GeyserChamberBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.DEEPSLATE)
                     .strength(-1.0F, 3600000.0F)
                     .noLootTable()));
 
     /** Player-placeable "seed" that forms a geyser below it after a short delay. */
-    public static final RegistryObject<Block> GEYSER_IGNITER = BLOCKS.register("geyser_igniter",
-            () -> new GeyserIgniterBlock(BlockBehaviour.Properties.copy(Blocks.MAGMA_BLOCK)
+    public static final DeferredHolder<Block, Block> GEYSER_IGNITER = BLOCKS.register("geyser_igniter",
+            () -> new GeyserIgniterBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.MAGMA_BLOCK)
                     .lightLevel(s -> 7)
                     .strength(1.5F)));
 
     /** Warm bed of a hot spring — put water on top for a cosy, snow-melting, freeze-proof pool. */
-    public static final RegistryObject<Block> HOT_SPRING = BLOCKS.register("hot_spring",
-            () -> new HotSpringBlock(BlockBehaviour.Properties.copy(Blocks.CALCITE)
+    public static final DeferredHolder<Block, Block> HOT_SPRING = BLOCKS.register("hot_spring",
+            () -> new HotSpringBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.CALCITE)
                     .lightLevel(s -> 4)
                     .strength(1.2F)));
 
@@ -63,105 +63,105 @@ public final class ModBlocks {
      * The water standing in a traced river. Water in every way a player can feel, but it never moves, so a river's
      * surface may come down a valley a block at a time; see {@link com.jeladastudios.ftsgeology.registry.ModFluids}.
      */
-    public static final RegistryObject<Block> RIVER_WATER = BLOCKS.register("river_water",
+    public static final DeferredHolder<Block, Block> RIVER_WATER = BLOCKS.register("river_water",
             () -> new com.jeladastudios.ftsgeology.block.RiverWaterBlock(
                     () -> (net.minecraft.world.level.material.FlowingFluid) ModFluids.RIVER_WATER.get(),
-                    BlockBehaviour.Properties.copy(Blocks.WATER).noLootTable()));
+                    BlockBehaviour.Properties.ofLegacyCopy(Blocks.WATER).noLootTable()));
 
     /** Sea water poured out of a bucket: water, but it waters no field; see {@link ModFluids#SEA_WATER}. */
-    public static final RegistryObject<Block> SEA_WATER = BLOCKS.register("sea_water",
+    public static final DeferredHolder<Block, Block> SEA_WATER = BLOCKS.register("sea_water",
             () -> new net.minecraft.world.level.block.LiquidBlock(
                     () -> (net.minecraft.world.level.material.FlowingFluid) ModFluids.SEA_WATER.get(),
-                    BlockBehaviour.Properties.copy(Blocks.WATER).noLootTable()));
+                    BlockBehaviour.Properties.ofLegacyCopy(Blocks.WATER).noLootTable()));
 
     /** A film of rain water in a hollow, laid and taken back by the ground's water; see {@code Puddles}. */
-    public static final RegistryObject<Block> PUDDLE = BLOCKS.register("puddle",
+    public static final DeferredHolder<Block, Block> PUDDLE = BLOCKS.register("puddle",
             () -> new com.jeladastudios.ftsgeology.block.PuddleBlock(BlockBehaviour.Properties.of()
                     .mapColor(net.minecraft.world.level.material.MapColor.WATER).replaceable().noCollission().instabreak()
                     .noLootTable().noOcclusion().pushReaction(net.minecraft.world.level.material.PushReaction.DESTROY)
                     .sound(net.minecraft.world.level.block.SoundType.WET_GRASS)));
 
-    public static final RegistryObject<Block> SPRING_SOURCE = BLOCKS.register("spring_source",
-            () -> new SpringSourceBlock(BlockBehaviour.Properties.copy(Blocks.DEEPSLATE)
+    public static final DeferredHolder<Block, Block> SPRING_SOURCE = BLOCKS.register("spring_source",
+            () -> new SpringSourceBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.DEEPSLATE)
                     .strength(-1.0F, 3600000.0F)
                     .noLootTable()));
 
     /** Technical block driving a volcano's eruption cycle. */
-    public static final RegistryObject<Block> VOLCANO_CORE = BLOCKS.register("volcano_core",
-            () -> new VolcanoCoreBlock(BlockBehaviour.Properties.copy(Blocks.BASALT)
+    public static final DeferredHolder<Block, Block> VOLCANO_CORE = BLOCKS.register("volcano_core",
+            () -> new VolcanoCoreBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.BASALT)
                     .strength(-1.0F, 3600000.0F)
                     .noLootTable()));
 
     /** Player-placeable seed that carves a whole volcano below it after a short delay. */
-    public static final RegistryObject<Block> VOLCANO_IGNITER = BLOCKS.register("volcano_igniter",
-            () -> new VolcanoIgniterBlock(BlockBehaviour.Properties.copy(Blocks.MAGMA_BLOCK)
+    public static final DeferredHolder<Block, Block> VOLCANO_IGNITER = BLOCKS.register("volcano_igniter",
+            () -> new VolcanoIgniterBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.MAGMA_BLOCK)
                     .lightLevel(s -> 9)
                     .strength(2.0F)));
 
     /** A seismograph station: one gives distance but not direction; see {@code SeismographBlockEntity}. */
-    public static final RegistryObject<Block> SEISMOGRAPH = BLOCKS.register("seismograph",
-            () -> new SeismographBlock(BlockBehaviour.Properties.copy(Blocks.LODESTONE)
+    public static final DeferredHolder<Block, Block> SEISMOGRAPH = BLOCKS.register("seismograph",
+            () -> new SeismographBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.LODESTONE)
                     .mapColor(MapColor.COLOR_LIGHT_GRAY)
                     .strength(2.5F)
                     .noOcclusion()));
 
     /** A thermoelectric generator: Forge Energy from a hot plate against a cold side, nothing moving. */
-    public static final RegistryObject<Block> THERMOELECTRIC_GENERATOR = BLOCKS.register("thermoelectric_generator",
-            () -> new com.jeladastudios.ftsgeology.block.ThermoelectricBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)
+    public static final DeferredHolder<Block, Block> THERMOELECTRIC_GENERATOR = BLOCKS.register("thermoelectric_generator",
+            () -> new com.jeladastudios.ftsgeology.block.ThermoelectricBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.IRON_BLOCK)
                     .mapColor(MapColor.METAL)
                     .strength(3.0F, 6.0F)
                     .requiresCorrectToolForDrops()
                     .noOcclusion()));
 
     /** A geothermal turbine: Forge Energy from the heat a well under it reaches. */
-    public static final RegistryObject<Block> GEOTHERMAL_TURBINE = BLOCKS.register("geothermal_turbine",
-            () -> new com.jeladastudios.ftsgeology.block.GeothermalTurbineBlock(BlockBehaviour.Properties.copy(Blocks.COPPER_BLOCK)
+    public static final DeferredHolder<Block, Block> GEOTHERMAL_TURBINE = BLOCKS.register("geothermal_turbine",
+            () -> new com.jeladastudios.ftsgeology.block.GeothermalTurbineBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.COPPER_BLOCK)
                     .mapColor(MapColor.COLOR_ORANGE)
                     .strength(3.0F, 6.0F)
                     .requiresCorrectToolForDrops()
                     .noOcclusion()));
 
     /** A well pump: groundwater up a well casing, on Forge Energy. */
-    public static final RegistryObject<Block> WELL_PUMP = BLOCKS.register("well_pump",
-            () -> new com.jeladastudios.ftsgeology.block.WellPumpBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)
+    public static final DeferredHolder<Block, Block> WELL_PUMP = BLOCKS.register("well_pump",
+            () -> new com.jeladastudios.ftsgeology.block.WellPumpBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.IRON_BLOCK)
                     .mapColor(MapColor.METAL)
                     .strength(3.0F, 6.0F)
                     .requiresCorrectToolForDrops()
                     .noOcclusion()));
 
     /** A well head on a well cased down into an oil field's oil: crude oil up the casing; see {@code WellheadBlockEntity}. */
-    public static final RegistryObject<Block> WELLHEAD = BLOCKS.register("wellhead",
-            () -> new com.jeladastudios.ftsgeology.block.WellheadBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)
+    public static final DeferredHolder<Block, Block> WELLHEAD = BLOCKS.register("wellhead",
+            () -> new com.jeladastudios.ftsgeology.block.WellheadBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.IRON_BLOCK)
                     .mapColor(MapColor.METAL)
                     .strength(3.0F, 6.0F)
                     .requiresCorrectToolForDrops()
                     .noOcclusion()));
 
     /** Crude oil poured out of a bucket. */
-    public static final RegistryObject<Block> CRUDE_OIL = BLOCKS.register("crude_oil",
+    public static final DeferredHolder<Block, Block> CRUDE_OIL = BLOCKS.register("crude_oil",
             () -> new net.minecraft.world.level.block.LiquidBlock(
                     () -> (net.minecraft.world.level.material.FlowingFluid) ModFluids.CRUDE_OIL.get(),
-                    BlockBehaviour.Properties.copy(Blocks.WATER).mapColor(MapColor.COLOR_BLACK).noLootTable()));
+                    BlockBehaviour.Properties.ofLegacyCopy(Blocks.WATER).mapColor(MapColor.COLOR_BLACK).noLootTable()));
 
     /** Well casing: the steel pipe a turbine's well is lined with, down to the heat. */
-    public static final RegistryObject<Block> WELL_CASING = BLOCKS.register("well_casing",
-            () -> new com.jeladastudios.ftsgeology.block.WellCasingBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BARS)
+    public static final DeferredHolder<Block, Block> WELL_CASING = BLOCKS.register("well_casing",
+            () -> new com.jeladastudios.ftsgeology.block.WellCasingBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.IRON_BARS)
                     .mapColor(MapColor.METAL)
                     .strength(3.0F, 6.0F)
                     .requiresCorrectToolForDrops()
                     .noOcclusion()));
 
     /** Native sulfur: the yellow crust around fumaroles, the acidic counterpart to calcite and travertine. */
-    public static final RegistryObject<Block> NATIVE_SULFUR = BLOCKS.register("native_sulfur",
+    public static final DeferredHolder<Block, Block> NATIVE_SULFUR = BLOCKS.register("native_sulfur",
             () -> new com.jeladastudios.ftsgeology.block.NativeSulfurBlock(
-                    BlockBehaviour.Properties.copy(Blocks.CALCITE)
+                    BlockBehaviour.Properties.ofLegacyCopy(Blocks.CALCITE)
                     .mapColor(MapColor.COLOR_YELLOW)
                     .strength(0.8F)
                     .requiresCorrectToolForDrops()));
 
     /** Sinter: the pale silica shelf a hot spring builds at its own lip as its water cools. */
-    public static final RegistryObject<Block> SINTER = BLOCKS.register("sinter",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.CALCITE)
+    public static final DeferredHolder<Block, Block> SINTER = BLOCKS.register("sinter",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.CALCITE)
                     .mapColor(MapColor.TERRACOTTA_WHITE)
                     .strength(0.9F)));
 
@@ -170,32 +170,32 @@ public final class ModBlocks {
     // Terrain blocks forming the floor of active geothermal fields and thermal basins.
 
     /** Sinter crust: pale, cracked, thin mineral crust over dead geothermal ground. */
-    public static final RegistryObject<Block> SINTER_CRUST = BLOCKS.register("sinter_crust",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.CALCITE)
+    public static final DeferredHolder<Block, Block> SINTER_CRUST = BLOCKS.register("sinter_crust",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.CALCITE)
                     .mapColor(MapColor.TERRACOTTA_WHITE)
                     .strength(1.0F, 2.0F)
                     .requiresCorrectToolForDrops()));
 
     /** Mud pot: viscous grey-brown bubbling geothermal mud slurry. */
-    public static final RegistryObject<Block> MUD_POT = BLOCKS.register("mud_pot",
+    public static final DeferredHolder<Block, Block> MUD_POT = BLOCKS.register("mud_pot",
             () -> new com.jeladastudios.ftsgeology.block.MudPotBlock(
-                    BlockBehaviour.Properties.copy(Blocks.MUD)
+                    BlockBehaviour.Properties.ofLegacyCopy(Blocks.MUD)
                     .mapColor(MapColor.DIRT)
                     .strength(0.8F)));
 
     /** Volcanic ash, laid in layers like snow: soft, dug by hand, and holds no torch. */
-    public static final RegistryObject<Block> VOLCANIC_ASH = BLOCKS.register("volcanic_ash",
+    public static final DeferredHolder<Block, Block> VOLCANIC_ASH = BLOCKS.register("volcanic_ash",
             () -> new com.jeladastudios.ftsgeology.block.VolcanicAshBlock(
-                    BlockBehaviour.Properties.copy(Blocks.SNOW)
+                    BlockBehaviour.Properties.ofLegacyCopy(Blocks.SNOW)
                             .mapColor(MapColor.COLOR_GRAY)
                             .strength(0.4F)
                             .sound(net.minecraft.world.level.block.SoundType.SAND)
                             .noOcclusion()));
 
     /** Steam vent: dark hydrothermal rock with a degassing orifice, mineral staining, and faint glow. */
-    public static final RegistryObject<Block> STEAM_VENT = BLOCKS.register("steam_vent",
+    public static final DeferredHolder<Block, Block> STEAM_VENT = BLOCKS.register("steam_vent",
             () -> new com.jeladastudios.ftsgeology.block.SteamVentBlock(
-                    BlockBehaviour.Properties.copy(Blocks.BASALT)
+                    BlockBehaviour.Properties.ofLegacyCopy(Blocks.BASALT)
                             .mapColor(MapColor.COLOR_BLACK)
                             .lightLevel(s -> 3)
                             .strength(2.0F, 6.0F)
@@ -207,101 +207,101 @@ public final class ModBlocks {
     // --- Geological rock blocks ---------------------------------------------
 
     /** Travertine: banded carbonate deposited around hot spring terraces. */
-    public static final RegistryObject<Block> TRAVERTINE = BLOCKS.register("travertine",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.CALCITE)
+    public static final DeferredHolder<Block, Block> TRAVERTINE = BLOCKS.register("travertine",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.CALCITE)
                     .mapColor(MapColor.TERRACOTTA_LIGHT_GRAY)
                     .strength(1.0F, 3.0F)));
 
     /** Rhyolite: pale pinkish-grey fine-grained silicic volcanic rock. */
-    public static final RegistryObject<Block> RHYOLITE = BLOCKS.register("rhyolite",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+    public static final DeferredHolder<Block, Block> RHYOLITE = BLOCKS.register("rhyolite",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
                     .mapColor(MapColor.TERRACOTTA_PINK)
                     .strength(1.5F, 6.0F)));
 
     /** Gabbro: coarse dark intrusive ocean-crust rock, speckled black-green. */
-    public static final RegistryObject<Block> GABBRO = BLOCKS.register("gabbro",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+    public static final DeferredHolder<Block, Block> GABBRO = BLOCKS.register("gabbro",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
                     .mapColor(MapColor.COLOR_BLACK)
                     .strength(2.2F, 6.0F)));
 
     /** Peridotite: dense dark olive-green granular mantle rock. */
-    public static final RegistryObject<Block> PERIDOTITE = BLOCKS.register("peridotite",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+    public static final DeferredHolder<Block, Block> PERIDOTITE = BLOCKS.register("peridotite",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
                     .mapColor(MapColor.TERRACOTTA_GREEN)
                     .strength(2.2F, 6.0F)));
 
     /** Serpentinite: altered peridotite; waxy mottled green. */
-    public static final RegistryObject<Block> SERPENTINITE = BLOCKS.register("serpentinite",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+    public static final DeferredHolder<Block, Block> SERPENTINITE = BLOCKS.register("serpentinite",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
                     .mapColor(MapColor.COLOR_GREEN)
                     .strength(1.8F, 6.0F)));
 
     /** Schist: foliated metamorphic rock with glittering layers. */
-    public static final RegistryObject<Block> SCHIST = BLOCKS.register("schist",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+    public static final DeferredHolder<Block, Block> SCHIST = BLOCKS.register("schist",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
                     .mapColor(MapColor.COLOR_GRAY)
                     .strength(2.0F, 6.0F)));
 
     /** Gneiss: high-grade banded metamorphic rock with light and dark bands. */
-    public static final RegistryObject<Block> GNEISS = BLOCKS.register("gneiss",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+    public static final DeferredHolder<Block, Block> GNEISS = BLOCKS.register("gneiss",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
                     .mapColor(MapColor.STONE)
                     .strength(2.4F, 6.0F)));
 
     /** Slate: fine dark cleaved metamorphic rock. */
-    public static final RegistryObject<Block> SLATE = BLOCKS.register("slate",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.DEEPSLATE)
+    public static final DeferredHolder<Block, Block> SLATE = BLOCKS.register("slate",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.DEEPSLATE)
                     .mapColor(MapColor.DEEPSLATE)
                     .strength(2.0F, 6.0F)));
 
     /** Marble: metamorphosed limestone, white with subtle grey veins. */
-    public static final RegistryObject<Block> MARBLE = BLOCKS.register("marble",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.CALCITE)
+    public static final DeferredHolder<Block, Block> MARBLE = BLOCKS.register("marble",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.CALCITE)
                     .mapColor(MapColor.QUARTZ)
                     .strength(1.8F, 6.0F)));
 
     /** Quartzite: hard pale recrystallised quartz sandstone. */
-    public static final RegistryObject<Block> QUARTZITE = BLOCKS.register("quartzite",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+    public static final DeferredHolder<Block, Block> QUARTZITE = BLOCKS.register("quartzite",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
                     .mapColor(MapColor.TERRACOTTA_WHITE)
                     .strength(2.5F, 6.0F)));
 
     /** Shale: soft fine dark sedimentary rock with thin fissile laminations. */
-    public static final RegistryObject<Block> SHALE = BLOCKS.register("shale",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.TUFF)
+    public static final DeferredHolder<Block, Block> SHALE = BLOCKS.register("shale",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.TUFF)
                     .mapColor(MapColor.COLOR_GRAY)
                     .strength(0.8F, 3.0F)));
 
     /** Reservoir sandstone soaked with oil, in a field's dome (see PetroleumFields). */
-    public static final RegistryObject<Block> OIL_SANDSTONE = BLOCKS.register("oil_sandstone",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.SANDSTONE)
+    public static final DeferredHolder<Block, Block> OIL_SANDSTONE = BLOCKS.register("oil_sandstone",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.SANDSTONE)
                     .mapColor(MapColor.COLOR_BLACK)
                     .strength(0.8F, 0.8F)));
 
     /** Chert: brittle, fine-grained nodular cryptocrystalline silica. */
-    public static final RegistryObject<Block> CHERT = BLOCKS.register("chert",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+    public static final DeferredHolder<Block, Block> CHERT = BLOCKS.register("chert",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
                     .mapColor(MapColor.TERRACOTTA_BROWN)
                     .strength(1.0F, 3.0F)));
 
     /** Cooling lava crust: basalt-dark crust with glowing orange-red fissures, like a skinned-over lava flow still hot underneath. */
-    public static final RegistryObject<Block> COOLING_LAVA_CRUST = BLOCKS.register("cooling_lava_crust",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.BASALT)
+    public static final DeferredHolder<Block, Block> COOLING_LAVA_CRUST = BLOCKS.register("cooling_lava_crust",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.BASALT)
                     .mapColor(MapColor.COLOR_BLACK)
                     .lightLevel(s -> 7)
                     .strength(2.0F, 6.0F)
                     .requiresCorrectToolForDrops()));
 
     /** A thin sheet of basalt, one to eight layers: lava that ran out thin and set where it lay. */
-    public static final RegistryObject<Block> BASALT_LAYER = BLOCKS.register("basalt_layer",
-            () -> new com.jeladastudios.ftsgeology.block.BasaltLayerBlock(BlockBehaviour.Properties.copy(Blocks.BASALT)
+    public static final DeferredHolder<Block, Block> BASALT_LAYER = BLOCKS.register("basalt_layer",
+            () -> new com.jeladastudios.ftsgeology.block.BasaltLayerBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.BASALT)
                     .mapColor(MapColor.COLOR_BLACK)
                     .forceSolidOn()
                     .isViewBlocking((s, l, p) -> s.getValue(com.jeladastudios.ftsgeology.block.BasaltLayerBlock.LAYERS) >= 8)));
 
     /** Volcanic black sand: basalt shattered by the sea and ground down by waves, as on Hawaiian beaches. */
-    public static final RegistryObject<Block> VOLCANIC_BLACK_SAND = BLOCKS.register("volcanic_black_sand",
-            () -> new SandBlock(0x141414, BlockBehaviour.Properties.copy(Blocks.SAND)
+    public static final DeferredHolder<Block, Block> VOLCANIC_BLACK_SAND = BLOCKS.register("volcanic_black_sand",
+            () -> new SandBlock(0x141414, BlockBehaviour.Properties.ofLegacyCopy(Blocks.SAND)
                     .mapColor(MapColor.COLOR_BLACK)
                     .strength(0.5F)
                     .sound(SoundType.SAND)));
@@ -311,161 +311,161 @@ public final class ModBlocks {
     // Real geological minerals and hydrothermal vein deposits.
 
     /** Pyrite: brassy metallic iron sulfide cubes in dark rock. */
-    public static final RegistryObject<Block> PYRITE = BLOCKS.register("pyrite",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.IRON_ORE)
+    public static final DeferredHolder<Block, Block> PYRITE = BLOCKS.register("pyrite",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.IRON_ORE)
                     .strength(3.0F, 3.0F)
                     .requiresCorrectToolForDrops()));
 
     /** Chalcopyrite: copper-iron sulfide displaying vibrant iridescent blue-gold tarnish. */
-    public static final RegistryObject<Block> CHALCOPYRITE = BLOCKS.register("chalcopyrite",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.COPPER_ORE)
+    public static final DeferredHolder<Block, Block> CHALCOPYRITE = BLOCKS.register("chalcopyrite",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.COPPER_ORE)
                     .strength(3.0F, 3.0F)
                     .requiresCorrectToolForDrops()));
 
     /** Malachite: hydrated copper carbonate with rich concentric green banding. */
-    public static final RegistryObject<Block> MALACHITE = BLOCKS.register("malachite",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+    public static final DeferredHolder<Block, Block> MALACHITE = BLOCKS.register("malachite",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
                     .mapColor(MapColor.COLOR_GREEN)
                     .strength(2.5F, 3.0F)
                     .requiresCorrectToolForDrops()));
 
     /** Azurite: deep royal-blue basic copper carbonate, commonly associated with malachite. */
-    public static final RegistryObject<Block> AZURITE = BLOCKS.register("azurite",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+    public static final DeferredHolder<Block, Block> AZURITE = BLOCKS.register("azurite",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
                     .mapColor(MapColor.COLOR_BLUE)
                     .strength(2.5F, 3.0F)
                     .requiresCorrectToolForDrops()));
 
     /** Quartz vein: white crystalline hydrothermal quartz seam cutting through grey host stone. */
-    public static final RegistryObject<Block> QUARTZ_VEIN = BLOCKS.register("quartz_vein",
-            () -> new DropExperienceBlock(BlockBehaviour.Properties.copy(Blocks.STONE)
+    public static final DeferredHolder<Block, Block> QUARTZ_VEIN = BLOCKS.register("quartz_vein",
+            () -> new DropExperienceBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
                     .mapColor(MapColor.QUARTZ)
                     .strength(3.0F, 6.0F)
                     .requiresCorrectToolForDrops(), UniformInt.of(2, 5)));
 
     /** Cinnabar: hydrothermal vermilion-red mercury sulfide ore. */
-    public static final RegistryObject<Block> CINNABAR = BLOCKS.register("cinnabar",
-            () -> new DropExperienceBlock(BlockBehaviour.Properties.copy(Blocks.STONE)
+    public static final DeferredHolder<Block, Block> CINNABAR = BLOCKS.register("cinnabar",
+            () -> new DropExperienceBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
                     .mapColor(MapColor.COLOR_RED)
                     .strength(2.5F, 3.0F)
                     .requiresCorrectToolForDrops(), UniformInt.of(1, 5)));
 
     /** Galena: primary lead sulfide ore with metallic lustre and stepped cubic cleavage. */
-    public static final RegistryObject<Block> GALENA = BLOCKS.register("galena",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.STONE)
+    public static final DeferredHolder<Block, Block> GALENA = BLOCKS.register("galena",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
                     .mapColor(MapColor.COLOR_GRAY)
                     .strength(3.0F, 3.0F)
                     .requiresCorrectToolForDrops()));
 
     // --- Worked rock forms (polished, slab, stairs, wall) -------------------
 
-    public static final RegistryObject<Block> POLISHED_TRAVERTINE = BLOCKS.register("polished_travertine",
-            () -> new Block(BlockBehaviour.Properties.copy(TRAVERTINE.get())));
-    public static final RegistryObject<Block> TRAVERTINE_SLAB = BLOCKS.register("travertine_slab",
-            () -> new SlabBlock(BlockBehaviour.Properties.copy(TRAVERTINE.get())));
-    public static final RegistryObject<Block> TRAVERTINE_STAIRS = BLOCKS.register("travertine_stairs",
-            () -> new StairBlock(() -> TRAVERTINE.get().defaultBlockState(), BlockBehaviour.Properties.copy(TRAVERTINE.get())));
-    public static final RegistryObject<Block> TRAVERTINE_WALL = BLOCKS.register("travertine_wall",
-            () -> new WallBlock(BlockBehaviour.Properties.copy(TRAVERTINE.get())));
+    public static final DeferredHolder<Block, Block> POLISHED_TRAVERTINE = BLOCKS.register("polished_travertine",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(TRAVERTINE.get())));
+    public static final DeferredHolder<Block, Block> TRAVERTINE_SLAB = BLOCKS.register("travertine_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(TRAVERTINE.get())));
+    public static final DeferredHolder<Block, Block> TRAVERTINE_STAIRS = BLOCKS.register("travertine_stairs",
+            () -> new StairBlock(() -> TRAVERTINE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(TRAVERTINE.get())));
+    public static final DeferredHolder<Block, Block> TRAVERTINE_WALL = BLOCKS.register("travertine_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(TRAVERTINE.get())));
 
-    public static final RegistryObject<Block> POLISHED_RHYOLITE = BLOCKS.register("polished_rhyolite",
-            () -> new Block(BlockBehaviour.Properties.copy(RHYOLITE.get())));
-    public static final RegistryObject<Block> RHYOLITE_SLAB = BLOCKS.register("rhyolite_slab",
-            () -> new SlabBlock(BlockBehaviour.Properties.copy(RHYOLITE.get())));
-    public static final RegistryObject<Block> RHYOLITE_STAIRS = BLOCKS.register("rhyolite_stairs",
-            () -> new StairBlock(() -> RHYOLITE.get().defaultBlockState(), BlockBehaviour.Properties.copy(RHYOLITE.get())));
-    public static final RegistryObject<Block> RHYOLITE_WALL = BLOCKS.register("rhyolite_wall",
-            () -> new WallBlock(BlockBehaviour.Properties.copy(RHYOLITE.get())));
+    public static final DeferredHolder<Block, Block> POLISHED_RHYOLITE = BLOCKS.register("polished_rhyolite",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(RHYOLITE.get())));
+    public static final DeferredHolder<Block, Block> RHYOLITE_SLAB = BLOCKS.register("rhyolite_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(RHYOLITE.get())));
+    public static final DeferredHolder<Block, Block> RHYOLITE_STAIRS = BLOCKS.register("rhyolite_stairs",
+            () -> new StairBlock(() -> RHYOLITE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(RHYOLITE.get())));
+    public static final DeferredHolder<Block, Block> RHYOLITE_WALL = BLOCKS.register("rhyolite_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(RHYOLITE.get())));
 
-    public static final RegistryObject<Block> POLISHED_GABBRO = BLOCKS.register("polished_gabbro",
-            () -> new Block(BlockBehaviour.Properties.copy(GABBRO.get())));
-    public static final RegistryObject<Block> GABBRO_SLAB = BLOCKS.register("gabbro_slab",
-            () -> new SlabBlock(BlockBehaviour.Properties.copy(GABBRO.get())));
-    public static final RegistryObject<Block> GABBRO_STAIRS = BLOCKS.register("gabbro_stairs",
-            () -> new StairBlock(() -> GABBRO.get().defaultBlockState(), BlockBehaviour.Properties.copy(GABBRO.get())));
-    public static final RegistryObject<Block> GABBRO_WALL = BLOCKS.register("gabbro_wall",
-            () -> new WallBlock(BlockBehaviour.Properties.copy(GABBRO.get())));
+    public static final DeferredHolder<Block, Block> POLISHED_GABBRO = BLOCKS.register("polished_gabbro",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(GABBRO.get())));
+    public static final DeferredHolder<Block, Block> GABBRO_SLAB = BLOCKS.register("gabbro_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(GABBRO.get())));
+    public static final DeferredHolder<Block, Block> GABBRO_STAIRS = BLOCKS.register("gabbro_stairs",
+            () -> new StairBlock(() -> GABBRO.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(GABBRO.get())));
+    public static final DeferredHolder<Block, Block> GABBRO_WALL = BLOCKS.register("gabbro_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(GABBRO.get())));
 
-    public static final RegistryObject<Block> POLISHED_PERIDOTITE = BLOCKS.register("polished_peridotite",
-            () -> new Block(BlockBehaviour.Properties.copy(PERIDOTITE.get())));
-    public static final RegistryObject<Block> PERIDOTITE_SLAB = BLOCKS.register("peridotite_slab",
-            () -> new SlabBlock(BlockBehaviour.Properties.copy(PERIDOTITE.get())));
-    public static final RegistryObject<Block> PERIDOTITE_STAIRS = BLOCKS.register("peridotite_stairs",
-            () -> new StairBlock(() -> PERIDOTITE.get().defaultBlockState(), BlockBehaviour.Properties.copy(PERIDOTITE.get())));
-    public static final RegistryObject<Block> PERIDOTITE_WALL = BLOCKS.register("peridotite_wall",
-            () -> new WallBlock(BlockBehaviour.Properties.copy(PERIDOTITE.get())));
+    public static final DeferredHolder<Block, Block> POLISHED_PERIDOTITE = BLOCKS.register("polished_peridotite",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(PERIDOTITE.get())));
+    public static final DeferredHolder<Block, Block> PERIDOTITE_SLAB = BLOCKS.register("peridotite_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(PERIDOTITE.get())));
+    public static final DeferredHolder<Block, Block> PERIDOTITE_STAIRS = BLOCKS.register("peridotite_stairs",
+            () -> new StairBlock(() -> PERIDOTITE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(PERIDOTITE.get())));
+    public static final DeferredHolder<Block, Block> PERIDOTITE_WALL = BLOCKS.register("peridotite_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(PERIDOTITE.get())));
 
-    public static final RegistryObject<Block> POLISHED_SERPENTINITE = BLOCKS.register("polished_serpentinite",
-            () -> new Block(BlockBehaviour.Properties.copy(SERPENTINITE.get())));
-    public static final RegistryObject<Block> SERPENTINITE_SLAB = BLOCKS.register("serpentinite_slab",
-            () -> new SlabBlock(BlockBehaviour.Properties.copy(SERPENTINITE.get())));
-    public static final RegistryObject<Block> SERPENTINITE_STAIRS = BLOCKS.register("serpentinite_stairs",
-            () -> new StairBlock(() -> SERPENTINITE.get().defaultBlockState(), BlockBehaviour.Properties.copy(SERPENTINITE.get())));
-    public static final RegistryObject<Block> SERPENTINITE_WALL = BLOCKS.register("serpentinite_wall",
-            () -> new WallBlock(BlockBehaviour.Properties.copy(SERPENTINITE.get())));
+    public static final DeferredHolder<Block, Block> POLISHED_SERPENTINITE = BLOCKS.register("polished_serpentinite",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(SERPENTINITE.get())));
+    public static final DeferredHolder<Block, Block> SERPENTINITE_SLAB = BLOCKS.register("serpentinite_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(SERPENTINITE.get())));
+    public static final DeferredHolder<Block, Block> SERPENTINITE_STAIRS = BLOCKS.register("serpentinite_stairs",
+            () -> new StairBlock(() -> SERPENTINITE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(SERPENTINITE.get())));
+    public static final DeferredHolder<Block, Block> SERPENTINITE_WALL = BLOCKS.register("serpentinite_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(SERPENTINITE.get())));
 
-    public static final RegistryObject<Block> POLISHED_SCHIST = BLOCKS.register("polished_schist",
-            () -> new Block(BlockBehaviour.Properties.copy(SCHIST.get())));
-    public static final RegistryObject<Block> SCHIST_SLAB = BLOCKS.register("schist_slab",
-            () -> new SlabBlock(BlockBehaviour.Properties.copy(SCHIST.get())));
-    public static final RegistryObject<Block> SCHIST_STAIRS = BLOCKS.register("schist_stairs",
-            () -> new StairBlock(() -> SCHIST.get().defaultBlockState(), BlockBehaviour.Properties.copy(SCHIST.get())));
-    public static final RegistryObject<Block> SCHIST_WALL = BLOCKS.register("schist_wall",
-            () -> new WallBlock(BlockBehaviour.Properties.copy(SCHIST.get())));
+    public static final DeferredHolder<Block, Block> POLISHED_SCHIST = BLOCKS.register("polished_schist",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(SCHIST.get())));
+    public static final DeferredHolder<Block, Block> SCHIST_SLAB = BLOCKS.register("schist_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(SCHIST.get())));
+    public static final DeferredHolder<Block, Block> SCHIST_STAIRS = BLOCKS.register("schist_stairs",
+            () -> new StairBlock(() -> SCHIST.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(SCHIST.get())));
+    public static final DeferredHolder<Block, Block> SCHIST_WALL = BLOCKS.register("schist_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(SCHIST.get())));
 
-    public static final RegistryObject<Block> POLISHED_GNEISS = BLOCKS.register("polished_gneiss",
-            () -> new Block(BlockBehaviour.Properties.copy(GNEISS.get())));
-    public static final RegistryObject<Block> GNEISS_SLAB = BLOCKS.register("gneiss_slab",
-            () -> new SlabBlock(BlockBehaviour.Properties.copy(GNEISS.get())));
-    public static final RegistryObject<Block> GNEISS_STAIRS = BLOCKS.register("gneiss_stairs",
-            () -> new StairBlock(() -> GNEISS.get().defaultBlockState(), BlockBehaviour.Properties.copy(GNEISS.get())));
-    public static final RegistryObject<Block> GNEISS_WALL = BLOCKS.register("gneiss_wall",
-            () -> new WallBlock(BlockBehaviour.Properties.copy(GNEISS.get())));
+    public static final DeferredHolder<Block, Block> POLISHED_GNEISS = BLOCKS.register("polished_gneiss",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(GNEISS.get())));
+    public static final DeferredHolder<Block, Block> GNEISS_SLAB = BLOCKS.register("gneiss_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(GNEISS.get())));
+    public static final DeferredHolder<Block, Block> GNEISS_STAIRS = BLOCKS.register("gneiss_stairs",
+            () -> new StairBlock(() -> GNEISS.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(GNEISS.get())));
+    public static final DeferredHolder<Block, Block> GNEISS_WALL = BLOCKS.register("gneiss_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(GNEISS.get())));
 
-    public static final RegistryObject<Block> POLISHED_SLATE = BLOCKS.register("polished_slate",
-            () -> new Block(BlockBehaviour.Properties.copy(SLATE.get())));
-    public static final RegistryObject<Block> SLATE_SLAB = BLOCKS.register("slate_slab",
-            () -> new SlabBlock(BlockBehaviour.Properties.copy(SLATE.get())));
-    public static final RegistryObject<Block> SLATE_STAIRS = BLOCKS.register("slate_stairs",
-            () -> new StairBlock(() -> SLATE.get().defaultBlockState(), BlockBehaviour.Properties.copy(SLATE.get())));
-    public static final RegistryObject<Block> SLATE_WALL = BLOCKS.register("slate_wall",
-            () -> new WallBlock(BlockBehaviour.Properties.copy(SLATE.get())));
+    public static final DeferredHolder<Block, Block> POLISHED_SLATE = BLOCKS.register("polished_slate",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(SLATE.get())));
+    public static final DeferredHolder<Block, Block> SLATE_SLAB = BLOCKS.register("slate_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(SLATE.get())));
+    public static final DeferredHolder<Block, Block> SLATE_STAIRS = BLOCKS.register("slate_stairs",
+            () -> new StairBlock(() -> SLATE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(SLATE.get())));
+    public static final DeferredHolder<Block, Block> SLATE_WALL = BLOCKS.register("slate_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(SLATE.get())));
 
-    public static final RegistryObject<Block> POLISHED_MARBLE = BLOCKS.register("polished_marble",
-            () -> new Block(BlockBehaviour.Properties.copy(MARBLE.get())));
-    public static final RegistryObject<Block> MARBLE_SLAB = BLOCKS.register("marble_slab",
-            () -> new SlabBlock(BlockBehaviour.Properties.copy(MARBLE.get())));
-    public static final RegistryObject<Block> MARBLE_STAIRS = BLOCKS.register("marble_stairs",
-            () -> new StairBlock(() -> MARBLE.get().defaultBlockState(), BlockBehaviour.Properties.copy(MARBLE.get())));
-    public static final RegistryObject<Block> MARBLE_WALL = BLOCKS.register("marble_wall",
-            () -> new WallBlock(BlockBehaviour.Properties.copy(MARBLE.get())));
+    public static final DeferredHolder<Block, Block> POLISHED_MARBLE = BLOCKS.register("polished_marble",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(MARBLE.get())));
+    public static final DeferredHolder<Block, Block> MARBLE_SLAB = BLOCKS.register("marble_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(MARBLE.get())));
+    public static final DeferredHolder<Block, Block> MARBLE_STAIRS = BLOCKS.register("marble_stairs",
+            () -> new StairBlock(() -> MARBLE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(MARBLE.get())));
+    public static final DeferredHolder<Block, Block> MARBLE_WALL = BLOCKS.register("marble_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(MARBLE.get())));
 
-    public static final RegistryObject<Block> POLISHED_QUARTZITE = BLOCKS.register("polished_quartzite",
-            () -> new Block(BlockBehaviour.Properties.copy(QUARTZITE.get())));
-    public static final RegistryObject<Block> QUARTZITE_SLAB = BLOCKS.register("quartzite_slab",
-            () -> new SlabBlock(BlockBehaviour.Properties.copy(QUARTZITE.get())));
-    public static final RegistryObject<Block> QUARTZITE_STAIRS = BLOCKS.register("quartzite_stairs",
-            () -> new StairBlock(() -> QUARTZITE.get().defaultBlockState(), BlockBehaviour.Properties.copy(QUARTZITE.get())));
-    public static final RegistryObject<Block> QUARTZITE_WALL = BLOCKS.register("quartzite_wall",
-            () -> new WallBlock(BlockBehaviour.Properties.copy(QUARTZITE.get())));
+    public static final DeferredHolder<Block, Block> POLISHED_QUARTZITE = BLOCKS.register("polished_quartzite",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(QUARTZITE.get())));
+    public static final DeferredHolder<Block, Block> QUARTZITE_SLAB = BLOCKS.register("quartzite_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(QUARTZITE.get())));
+    public static final DeferredHolder<Block, Block> QUARTZITE_STAIRS = BLOCKS.register("quartzite_stairs",
+            () -> new StairBlock(() -> QUARTZITE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(QUARTZITE.get())));
+    public static final DeferredHolder<Block, Block> QUARTZITE_WALL = BLOCKS.register("quartzite_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(QUARTZITE.get())));
 
-    public static final RegistryObject<Block> POLISHED_SHALE = BLOCKS.register("polished_shale",
-            () -> new Block(BlockBehaviour.Properties.copy(SHALE.get())));
-    public static final RegistryObject<Block> SHALE_SLAB = BLOCKS.register("shale_slab",
-            () -> new SlabBlock(BlockBehaviour.Properties.copy(SHALE.get())));
-    public static final RegistryObject<Block> SHALE_STAIRS = BLOCKS.register("shale_stairs",
-            () -> new StairBlock(() -> SHALE.get().defaultBlockState(), BlockBehaviour.Properties.copy(SHALE.get())));
-    public static final RegistryObject<Block> SHALE_WALL = BLOCKS.register("shale_wall",
-            () -> new WallBlock(BlockBehaviour.Properties.copy(SHALE.get())));
+    public static final DeferredHolder<Block, Block> POLISHED_SHALE = BLOCKS.register("polished_shale",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(SHALE.get())));
+    public static final DeferredHolder<Block, Block> SHALE_SLAB = BLOCKS.register("shale_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(SHALE.get())));
+    public static final DeferredHolder<Block, Block> SHALE_STAIRS = BLOCKS.register("shale_stairs",
+            () -> new StairBlock(() -> SHALE.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(SHALE.get())));
+    public static final DeferredHolder<Block, Block> SHALE_WALL = BLOCKS.register("shale_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(SHALE.get())));
 
-    public static final RegistryObject<Block> POLISHED_CHERT = BLOCKS.register("polished_chert",
-            () -> new Block(BlockBehaviour.Properties.copy(CHERT.get())));
-    public static final RegistryObject<Block> CHERT_SLAB = BLOCKS.register("chert_slab",
-            () -> new SlabBlock(BlockBehaviour.Properties.copy(CHERT.get())));
-    public static final RegistryObject<Block> CHERT_STAIRS = BLOCKS.register("chert_stairs",
-            () -> new StairBlock(() -> CHERT.get().defaultBlockState(), BlockBehaviour.Properties.copy(CHERT.get())));
-    public static final RegistryObject<Block> CHERT_WALL = BLOCKS.register("chert_wall",
-            () -> new WallBlock(BlockBehaviour.Properties.copy(CHERT.get())));
+    public static final DeferredHolder<Block, Block> POLISHED_CHERT = BLOCKS.register("polished_chert",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(CHERT.get())));
+    public static final DeferredHolder<Block, Block> CHERT_SLAB = BLOCKS.register("chert_slab",
+            () -> new SlabBlock(BlockBehaviour.Properties.ofLegacyCopy(CHERT.get())));
+    public static final DeferredHolder<Block, Block> CHERT_STAIRS = BLOCKS.register("chert_stairs",
+            () -> new StairBlock(() -> CHERT.get().defaultBlockState(), BlockBehaviour.Properties.ofLegacyCopy(CHERT.get())));
+    public static final DeferredHolder<Block, Block> CHERT_WALL = BLOCKS.register("chert_wall",
+            () -> new WallBlock(BlockBehaviour.Properties.ofLegacyCopy(CHERT.get())));
 
     // --- Microbial mats ------------------------------------------------------
     //
@@ -473,51 +473,51 @@ public final class ModBlocks {
     // around a pool read as a thermometer.
 
     /** Orange microbial mat. */
-    public static final RegistryObject<Block> MICROBIAL_MAT_ORANGE = BLOCKS.register("microbial_mat_orange",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.MUD)
+    public static final DeferredHolder<Block, Block> MICROBIAL_MAT_ORANGE = BLOCKS.register("microbial_mat_orange",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.MUD)
                     .mapColor(MapColor.COLOR_ORANGE)
                     .strength(0.6F)));
 
     /** Yellow microbial mat. */
-    public static final RegistryObject<Block> MICROBIAL_MAT_YELLOW = BLOCKS.register("microbial_mat_yellow",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.MUD)
+    public static final DeferredHolder<Block, Block> MICROBIAL_MAT_YELLOW = BLOCKS.register("microbial_mat_yellow",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.MUD)
                     .mapColor(MapColor.COLOR_YELLOW)
                     .strength(0.6F)));
 
     /** Brown microbial mat, at the dry outer edge. */
-    public static final RegistryObject<Block> MICROBIAL_MAT_BROWN = BLOCKS.register("microbial_mat_brown",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.MUD)
+    public static final DeferredHolder<Block, Block> MICROBIAL_MAT_BROWN = BLOCKS.register("microbial_mat_brown",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.MUD)
                     .mapColor(MapColor.TERRACOTTA_BROWN)
                     .strength(0.6F)));
 
     /** Green microbial mat, the narrow fringe at the water's edge. */
-    public static final RegistryObject<Block> MICROBIAL_MAT_GREEN = BLOCKS.register("microbial_mat_green",
-            () -> new Block(BlockBehaviour.Properties.copy(Blocks.MUD)
+    public static final DeferredHolder<Block, Block> MICROBIAL_MAT_GREEN = BLOCKS.register("microbial_mat_green",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.MUD)
                     .mapColor(MapColor.COLOR_GREEN)
                     .strength(0.6F)));
 
     // === A weather station: its instruments, each its own block, and the terminal they are read at ===
 
-    public static final RegistryObject<Block> BAROMETER = instrument("barometer", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.BAROMETER, Blocks.DARK_OAK_PLANKS, MapColor.COLOR_BROWN);
-    public static final RegistryObject<Block> ANEMOMETER = instrument("anemometer", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.ANEMOMETER, Blocks.IRON_BARS, MapColor.METAL);
-    public static final RegistryObject<Block> HYGROMETER = instrument("hygrometer", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.HYGROMETER, Blocks.SPRUCE_PLANKS, MapColor.PODZOL);
-    public static final RegistryObject<Block> RAIN_GAUGE = instrument("rain_gauge", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.RAIN_GAUGE, Blocks.COPPER_BLOCK, MapColor.COLOR_ORANGE);
-    public static final RegistryObject<Block> THERMOMETER = instrument("thermometer", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.THERMOMETER, Blocks.BIRCH_PLANKS, MapColor.SAND);
-    public static final RegistryObject<Block> SOIL_PROBE = instrument("soil_probe", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.SOIL_PROBE, Blocks.IRON_BARS, MapColor.METAL);
-    public static final RegistryObject<Block> TILTMETER = instrument("tiltmeter", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.TILTMETER, Blocks.POLISHED_ANDESITE, MapColor.STONE);
-    public static final RegistryObject<Block> GPS_STATION = instrument("gps_station", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.GPS, Blocks.IRON_BARS, MapColor.METAL);
-    public static final RegistryObject<Block> GAS_METER = instrument("gas_meter", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.GAS_METER, Blocks.COPPER_BLOCK, MapColor.COLOR_CYAN);
+    public static final DeferredHolder<Block, Block> BAROMETER = instrument("barometer", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.BAROMETER, Blocks.DARK_OAK_PLANKS, MapColor.COLOR_BROWN);
+    public static final DeferredHolder<Block, Block> ANEMOMETER = instrument("anemometer", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.ANEMOMETER, Blocks.IRON_BARS, MapColor.METAL);
+    public static final DeferredHolder<Block, Block> HYGROMETER = instrument("hygrometer", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.HYGROMETER, Blocks.SPRUCE_PLANKS, MapColor.PODZOL);
+    public static final DeferredHolder<Block, Block> RAIN_GAUGE = instrument("rain_gauge", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.RAIN_GAUGE, Blocks.COPPER_BLOCK, MapColor.COLOR_ORANGE);
+    public static final DeferredHolder<Block, Block> THERMOMETER = instrument("thermometer", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.THERMOMETER, Blocks.BIRCH_PLANKS, MapColor.SAND);
+    public static final DeferredHolder<Block, Block> SOIL_PROBE = instrument("soil_probe", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.SOIL_PROBE, Blocks.IRON_BARS, MapColor.METAL);
+    public static final DeferredHolder<Block, Block> TILTMETER = instrument("tiltmeter", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.TILTMETER, Blocks.POLISHED_ANDESITE, MapColor.STONE);
+    public static final DeferredHolder<Block, Block> GPS_STATION = instrument("gps_station", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.GPS, Blocks.IRON_BARS, MapColor.METAL);
+    public static final DeferredHolder<Block, Block> GAS_METER = instrument("gas_meter", com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument.GAS_METER, Blocks.COPPER_BLOCK, MapColor.COLOR_CYAN);
 
     /** A weather station's terminal: the instruments round it read, kept, and turned into a forecast. */
-    public static final RegistryObject<Block> WEATHER_TERMINAL = BLOCKS.register("weather_terminal",
-            () -> new com.jeladastudios.ftsgeology.block.WeatherTerminalBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK)
+    public static final DeferredHolder<Block, Block> WEATHER_TERMINAL = BLOCKS.register("weather_terminal",
+            () -> new com.jeladastudios.ftsgeology.block.WeatherTerminalBlock(BlockBehaviour.Properties.ofLegacyCopy(Blocks.IRON_BLOCK)
                     .mapColor(MapColor.COLOR_GRAY)
                     .strength(3.0F, 6.0F)
                     .noOcclusion()));
 
-    private static RegistryObject<Block> instrument(String name, com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument kind, Block like, MapColor color) {
+    private static DeferredHolder<Block, Block> instrument(String name, com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock.Instrument kind, Block like, MapColor color) {
         return BLOCKS.register(name, () -> new com.jeladastudios.ftsgeology.block.WeatherInstrumentBlock(kind,
-                BlockBehaviour.Properties.copy(like).mapColor(color).strength(1.5F, 3.0F).noOcclusion()));
+                BlockBehaviour.Properties.ofLegacyCopy(like).mapColor(color).strength(1.5F, 3.0F).noOcclusion()));
     }
 
     private ModBlocks() {}

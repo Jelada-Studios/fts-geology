@@ -1,4 +1,5 @@
 package com.jeladastudios.ftsgeology.volcano;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -6,7 +7,6 @@ import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import java.util.Set;
@@ -37,8 +37,8 @@ public final class VolcanoCellPrewarm {
     });
 
     @SubscribeEvent
-    public static void onTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END || event.getServer().getTickCount() % EVERY != 0) return;
+    public static void onTick(ServerTickEvent.Post event) {
+        if (event.getServer().getTickCount() % EVERY != 0) return;
         if (!GeyserConfig.LARGE_VOLCANOES.get()) return;
         ServerLevel level = event.getServer().overworld();
         int cell = VolcanoField.cell();
