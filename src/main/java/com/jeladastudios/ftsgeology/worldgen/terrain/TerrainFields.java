@@ -428,7 +428,14 @@ public final class TerrainFields {
         // side took a spreading ridge's hills there and stood most of an erosion unit under it, so the biomes changed
         // along the line as if cut with a ruler. That side keeps the quiet of any sea floor away from a ridge.
         if (oceanic && k == FaultType.DIVERGENT && !s.neighbourKind().isOceanic()
-                && WorldgenRevision.has(WorldgenRevision.MARGIN_RIFTS)) return quiet;
+                && WorldgenRevision.has(WorldgenRevision.MARGIN_RIFTS)) {
+            // Quiet all the way out it was one erosion over the whole plate, and land the plate carried came out one
+            // biome a few hundred blocks across, windswept savanna through a birch country. The ruggedness comes in
+            // from the line as it does over the rift on the continent's side.
+            if (!WorldgenRevision.has(WorldgenRevision.RUGGED_MARGINS)) return quiet;
+            double calm = smooth(Mth.clamp((riftAcross(s, p) - RIFT_CALM_FROM) / RIFT_CALM_OVER, 0, 1));
+            return quiet - belt(s, p) * calm * 0.9;
+        }
         // A sea floor is flat except where it is being made or destroyed: the hills of a spreading ridge and the
         // islands of an arc are the exceptions.
         if (oceanic && !s.overridingSide() && k != FaultType.DIVERGENT) return quiet;
