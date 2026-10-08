@@ -24,7 +24,7 @@
 
 [thermodynamics]
 	#Degrees Celsius added per tick for each adjacent lava/magma block.
-	#Lowered so setups don't boil almost instantly â€” gives time to react in a base.
+	#Lowered so setups don't boil almost instantly -- gives time to react in a base.
 	#Range: 0.0 ~ 100.0
 	heatPerLavaNeighbor = 0.3
 	#Passive heat loss per tick when no heat source is adjacent.
@@ -179,7 +179,7 @@
 	#Range: 0 ~ 400
 	volcanoLavaBudget = 24
 	#A large earthquake can set off volcanoes around it once the ground has settled, as the
-	#1960 Chile earthquake did at CordÃ³n Caulle. Only a volcano with magma to draw on erupts.
+	#1960 Chile earthquake did at Cordon Caulle. Only a volcano with magma to draw on erupts.
 	quakeTriggersEruptions = true
 	#Chance a volcano at the epicentre erupts after a magnitude 9 quake. Less for a smaller
 	#quake (none under 6.5) and further away (none past twice the rupture length plus 200 blocks).
@@ -324,8 +324,8 @@
 	#Range: 100 ~ 72000
 	waterSpoutMaxTicks = 2400
 	#Precipitate Calcite/Tuff sinter terraces where erupted water pools on runoff.
-	#Deposits only under settled (source) water at pool edges â€” never the fast
-	#flowing channel â€” so it complements Water Erosion instead of fighting it.
+	#Deposits only under settled (source) water at pool edges -- never the fast
+	#flowing channel -- so it complements Water Erosion instead of fighting it.
 	travertineEnabled = true
 	#Per-second, per-column probability of a travertine deposit during eruption.
 	#Raised so terraces are visible quickly.
@@ -343,7 +343,7 @@
 [emergent]
 	#Let PLAYER-BUILT water-over-rock-over-lava setups become live geysers.
 	#ON by default. WARNING: with emergentDestructive=true this can blow up bases
-	#you didn't intend as geysers â€” set false (or emergentDestructive=false) to disable.
+	#you didn't intend as geysers -- set false (or emergentDestructive=false) to disable.
 	emergentEnabled = true
 	#If true, emergent eruptions use a block-breaking explosion (the 'it blows up
 	#your house' behaviour). If false they vent harmlessly like natural geysers.
