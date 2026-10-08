@@ -26,6 +26,7 @@
     "OculusBlockIdsMixin",
     "OculusRainMixin",
     "PuddleRainMixin",
+    "PuddleFloodMixin",
     "RiverMudMixin",
     "SoundStreamsMixin",
     "RiverFlowRenderMixin",
