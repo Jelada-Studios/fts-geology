@@ -3,7 +3,6 @@
   "minVersion": "0.8",
   "package": "com.jeladastudios.ftsgeology.mixin",
   "compatibilityLevel": "JAVA_21",
-  "refmap": "fts_geology.refmap.json",
   "mixins": [
     "WorldDimensionsMixin",
     "CreateOpenPipeMixin",
