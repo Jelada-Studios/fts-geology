@@ -67,6 +67,8 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 tasks.named('jar', Jar).configure {
+    // The licence goes with the jar, as the GPL asks of whoever passes the mod on.
+    from('LICENSE') { rename { 'LICENSE_fts_geology' } }
     manifest {
         attributes([
             'Specification-Title'     : 'fts_geology',
