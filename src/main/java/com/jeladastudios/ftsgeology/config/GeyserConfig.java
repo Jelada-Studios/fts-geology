@@ -956,9 +956,10 @@ public final class GeyserConfig {
                 .defineInRange("quakeDamageRange", 6000, 64, 20000);
         QUAKE_LIQUEFACTION = b
                 .comment("Strong shaking (about Mercalli VII and up) liquefies loose wet ground: sand, silt, gravel and",
-                        "soil by a river, lake or sea, on a floodplain, or over a high water table. Sand boils open,",
-                        "what players and villages built on it settles a block into it -- unevenly, so a house can",
-                        "crack across -- and whoever stands on it is held fast for a few seconds.")
+                        "soil by a river, lake or sea, on a floodplain, or over a high water table. Here and there a sand",
+                        "boil opens; what players and villages built on it settles into it, up to four blocks and more",
+                        "on one side than the other, so a house leans; whoever stands on it is held fast for a few",
+                        "seconds. Most sand boils heal within the hour, as the water goes back into the ground.")
                 .define("quakeLiquefaction", true);
         QUAKE_LANDSLIDES = b
                 .comment("Strong shaking (about Mercalli VI and up) brings down the loose cover of steep natural slopes:",

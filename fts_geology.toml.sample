@@ -646,9 +646,10 @@
 	#Range: 64 ~ 20000
 	quakeDamageRange = 6000
 	#Strong shaking (about Mercalli VII and up) liquefies loose wet ground: sand, silt, gravel and
-	#soil by a river, lake or sea, on a floodplain, or over a high water table. Sand boils open,
-	#what players and villages built on it settles a block into it -- unevenly, so a house can
-	#crack across -- and whoever stands on it is held fast for a few seconds.
+	#soil by a river, lake or sea, on a floodplain, or over a high water table. Here and there a sand
+	#boil opens; what players and villages built on it settles into it, up to four blocks and more
+	#on one side than the other, so a house leans; whoever stands on it is held fast for a few
+	#seconds. Most sand boils heal within the hour, as the water goes back into the ground.
 	quakeLiquefaction = true
 	#Strong shaking (about Mercalli VI and up) brings down the loose cover of steep natural slopes:
 	#soil, scree, sand and snow slide down as one mass, trees and all, heap up at the foot and leave
