@@ -150,6 +150,13 @@ public final class TectonicCommands {
                                 .then(Commands.literal("here").executes(TerrainCommands::terrainHere))
                                 // The router's density down this column: a cliff in the offset, or a lump of noise.
                                 .then(Commands.literal("column").executes(TerrainCommands::terrainColumn))
+                                // Where the ground jumps at a plate's edge, for a test.
+                                .then(Commands.literal("seams")
+                                        .then(Commands.argument("half", IntegerArgumentType.integer(64, 8000))
+                                                .then(Commands.argument("step", IntegerArgumentType.integer(4, 64))
+                                                        .executes(ctx -> TerrainCommands.terrainSeams(ctx,
+                                                                IntegerArgumentType.getInteger(ctx, "half"),
+                                                                IntegerArgumentType.getInteger(ctx, "step"))))))
                                 // The traced river nearest here: where its channel runs and what its pool holds.
                                 .then(Commands.literal("trace").executes(TerrainCommands::terrainTrace)
                                         .then(Commands.argument("half", IntegerArgumentType.integer(64, 8000))

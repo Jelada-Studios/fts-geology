@@ -69,6 +69,90 @@ public final class TerrainCommands {
      * between two heights is {@code -4 * factor / 128}, so the factor the column is actually being built with
      * can be read off it, and that is the number that decides how far the noise may move the surface.</p>
      */
+    /**
+     * Where the ground jumps at a plate's edge, for a test. Over a square round here, every place two samples
+     * {@code step} apart stand on different plates is walked across a block at a time, and the biggest rise between two
+     * neighbouring columns there is set against the ground's own slope just beyond, on both sides. A field that does not
+     * meet itself across the line -- the rift of round 142, sunk on the continent's side and level on the ocean's --
+     * shows as a jump many times the slope round it. Rivers cut their own walls and are left out. The worst go to the
+     * log, with the kind of boundary and of the plates either side.
+     */
+    static int terrainSeams(CommandContext<CommandSourceStack> ctx, int half, int step) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        record Pos(int blockX, int blockY, int blockZ) implements net.minecraft.world.level.levelgen.DensityFunction.FunctionContext {}
+        var router = level.getChunkSource().randomState().router();
+        double span = level.getMaxBuildHeight() - level.getMinBuildHeight();
+        double grad = 1.5 - (64.0 - level.getMinBuildHeight()) * (8.0 / span);
+        long seed = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed();
+        var params = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params();
+        java.util.function.IntBinaryOperator ground = (x, z) ->
+                (int) Math.round(128.0 + 128.0 * (router.depth().compute(new Pos(x, 64, z)) - grad));
+        int n = 2 * (half / step) + 1;
+        long[][] plate = new long[n][n];
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                plate[i][j] = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.sampleAt(seed, params,
+                        at.getX() + (i - n / 2) * step, at.getZ() + (j - n / 2) * step).plateId();
+            }
+        }
+        record Seam(int x, int z, int jump, double slope, String kind) {}
+        List<Seam> seams = new ArrayList<>();
+        int pad = 8, crossings = 0, rivers = 0;
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                for (int[] d : new int[][] {{1, 0}, {0, 1}}) {
+                    int a = i + d[0], b = j + d[1];
+                    if (a >= n || b >= n || plate[i][j] == plate[a][b]) continue;
+                    crossings++;
+                    int x0 = at.getX() + (i - n / 2) * step, z0 = at.getZ() + (j - n / 2) * step;
+                    int[] h = new int[step + 2 * pad + 1];
+                    for (int t = 0; t < h.length; t++) h[t] = ground.applyAsInt(x0 + d[0] * (t - pad), z0 + d[1] * (t - pad));
+                    int jump = 0, jt = pad;
+                    for (int t = pad; t < pad + step; t++) {
+                        int r = Math.abs(h[t + 1] - h[t]);
+                        if (r > jump) { jump = r; jt = t; }
+                    }
+                    double outside = 0;
+                    for (int t = 0; t < pad; t++) outside += Math.abs(h[t + 1] - h[t]);
+                    for (int t = pad + step; t < h.length - 1; t++) outside += Math.abs(h[t + 1] - h[t]);
+                    double slope = outside / (2.0 * pad);
+                    int jx = x0 + d[0] * (jt - pad), jz = z0 + d[1] * (jt - pad);
+                    if (com.jeladastudios.ftsgeology.hydrology.RiverNetwork.near(jx, jz) > 0.0) { rivers++; continue; }
+                    var s = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields.sampleAt(seed, params, jx, jz);
+                    String kind = s.boundaryType() + " " + s.plateKind() + "/" + s.neighbourKind();
+                    seams.add(new Seam(jx, jz, jump, slope, kind));
+                }
+            }
+        }
+        seams.sort((p, q) -> Double.compare(q.jump() - 3 * q.slope(), p.jump() - 3 * p.slope()));
+        int over6 = 0, over12 = 0, over20 = 0;
+        java.util.Map<String, int[]> byKind = new java.util.TreeMap<>();
+        for (Seam s : seams) {
+            double excess = s.jump() - 3 * s.slope();
+            if (excess > 6) over6++;
+            if (excess > 12) over12++;
+            if (excess > 20) over20++;
+            int[] k = byKind.computeIfAbsent(s.kind(), x -> new int[2]);
+            k[0]++;
+            if (excess > 6) k[1]++;
+        }
+        String line = String.format(Locale.ROOT,
+                "terrain seams at %d,%d, half %d every %d: %d crossings, %d by a river left out, jump over 3x the slope by 6+ %d, 12+ %d, 20+ %d",
+                at.getX(), at.getZ(), half, step, crossings, rivers, over6, over12, over20);
+        source.sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.GOLD), false);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", line);
+        byKind.forEach((k, v) -> com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("terrain seams kind {}: {} crossings, {} jumps", k, v[0], v[1]));
+        for (int i = 0; i < Math.min(15, seams.size()); i++) {
+            Seam s = seams.get(i);
+            String row = String.format(Locale.ROOT, "terrain seam %d,%d jump %d slope %.1f %s", s.x(), s.z(), s.jump(), s.slope(), s.kind());
+            source.sendSuccess(() -> Component.literal(row).withStyle(ChatFormatting.GRAY), false);
+            com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info("{}", row);
+        }
+        return 1;
+    }
+
     static int terrainColumn(CommandContext<CommandSourceStack> ctx) {
         CommandSourceStack source = ctx.getSource();
         ServerLevel level = source.getLevel();
