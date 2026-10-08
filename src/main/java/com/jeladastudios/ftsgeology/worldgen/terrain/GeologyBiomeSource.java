@@ -220,6 +220,13 @@ public class GeologyBiomeSource extends BiomeSource {
                 // have their say over it as over any land. Left a river, it was a dry river among a coast's beaches
                 // and in the middle of a geothermal basin, where /locate sent a player to find no water.
                 base = TfcCompat.river(land) ? inland(qx, qy, qz, sampler, land) : land;
+                // The land round a climate's river near the climate's coast is its beach, and up a mountain's flank by
+                // the sea that was sand at a hundred and fifty blocks: ground high and dry is the climate's own land.
+                if ((TfcCompat.beach(base) || TfcCompat.ocean(base) || TfcCompat.river(base))
+                        && WorldgenRevision.has(WorldgenRevision.INLAND_CLIMATE)) {
+                    Holder<Biome> dry = highBeach(qx, qz, sampler);
+                    if (dry != null) base = dry;
+                }
             }
         }
         Role role = GeologyRoles.roleAt(bx, bz);
@@ -372,7 +379,8 @@ public class GeologyBiomeSource extends BiomeSource {
     /**
      * The land biome for a column the climate calls sea but whose ground stands out of the water, or null. Dry is the
      * built column's own answer ({@link RawGround#wet}), asked only where the offset alone could put ground near the
-     * surface. The land is the nearest column round it the parent calls land, read at the ground's height.
+     * surface. The land is the nearest column round it the parent calls land, read at the ground's height; in worlds
+     * made since {@link WorldgenRevision#INLAND_CLIMATE}, the land the climate itself has there (see {@link #inlandClimate}).
      */
     private Holder<Biome> dryCoast(int qx, int qz, Climate.Sampler sampler) {
         long key = com.jeladastudios.ftsgeology.util.ColumnCache.key(qx, qz);
@@ -382,10 +390,68 @@ public class GeologyBiomeSource extends BiomeSource {
         int bx = QuartPos.toBlock(qx) + 2, bz = QuartPos.toBlock(qz) + 2;
         if (RawGround.ready()) {
             double h = RawGround.heightAt(bx, bz);
-            if (h > COAST_LOW && !RawGround.wet(bx, bz)) land = landBeside(qx, qz, h, sampler);
+            if (h > COAST_LOW && !RawGround.wet(bx, bz)) {
+                land = WorldgenRevision.has(WorldgenRevision.INLAND_CLIMATE)
+                        ? inlandClimate(qx, qz, h, sampler) : landBeside(qx, qz, h, sampler);
+            }
         }
         coasts.put(key, new Coast(land));
         return land;
+    }
+
+    /**
+     * Where the climate's continentalness is read for dry ground it calls sea: just inland of the coast's band. The
+     * temperature, the humidity and the rest stay the column's own, and the erosion no higher than a continent's quiet
+     * interior: an ocean plate's is a flat sea floor's, and read as land it gave windswept savanna across a temperate
+     * birch country, a third of the plateau.
+     */
+    private static final double[] INLAND_CONTINENTS = {-0.05, 0.15, 0.45};
+    private static final double INLAND_EROSION_MAX = 0.4;
+    /** The world's sampler, and the same sampler with its continentalness set inland at each depth; made once per world. */
+    private volatile Climate.Sampler inlandFrom;
+    private volatile Climate.Sampler[] inlandSamplers;
+
+    /**
+     * The land biome the climate has for dry ground it calls sea, asked again with the column's continentalness moved
+     * inland. Ground an ocean plate carries up out of the sea -- the flank of a range beside it -- kept the sea's
+     * continentalness, and the biome was the deep ocean over a grass plateau three hundred blocks across: no herds, a
+     * shipwreck on a hill. Asking for the nearest land round it reached a quarter of a kilometre and left the middle
+     * the sea, inside a line drawn at that distance. The climate's own land for the place has no reach to run out of.
+     */
+    private Holder<Biome> inlandClimate(int qx, int qz, double h, Climate.Sampler sampler) {
+        Climate.Sampler[] inlands = inlandSamplers;
+        if (inlandFrom != sampler || inlands == null) {
+            inlands = new Climate.Sampler[INLAND_CONTINENTS.length];
+            for (int i = 0; i < inlands.length; i++) {
+                inlands[i] = new Climate.Sampler(sampler.temperature(), sampler.humidity(),
+                        net.minecraft.world.level.levelgen.DensityFunctions.constant(INLAND_CONTINENTS[i]),
+                        sampler.erosion().clamp(-1.0, INLAND_EROSION_MAX),
+                        sampler.depth(), sampler.weirdness(), sampler.spawnTarget());
+            }
+            inlandSamplers = inlands;
+            inlandFrom = sampler;
+        }
+        int qy = QuartPos.fromBlock((int) Math.max(h, SEA_LEVEL) + 2);
+        // Just inland first; a climate whose beaches reach further in -- up a mountain's flank by the sea -- further on.
+        for (Climate.Sampler inlandAt : inlands) {
+            Holder<Biome> land = parent.getNoiseBiome(qx, qy, qz, inlandAt);
+            if (plainLand(land)) return land;
+        }
+        Climate.Sampler inland = inlands[0];
+        // The climate's own river or beach there, with no channel and no shore under it: the land beside it in the same
+        // inland climate, as a climate's river with no channel is given the land round it.
+        for (int r : RIVER_LAND) {
+            for (int[] w : WAYS) {
+                Holder<Biome> near = parent.getNoiseBiome(qx + w[0] * r, qy, qz + w[1] * r, inland);
+                if (plainLand(near)) return near;
+            }
+        }
+        return landBeside(qx, qz, h, sampler);
+    }
+
+    /** A land biome of the surface: not the sea, a river, a beach or a cave. */
+    private boolean plainLand(Holder<Biome> b) {
+        return !TfcCompat.ocean(b) && !TfcCompat.river(b) && !TfcCompat.beach(b) && !underground(b);
     }
 
     /** How far over the sea, in blocks, the climate's beach may stand and still be a beach. */
@@ -405,7 +471,12 @@ public class GeologyBiomeSource extends BiomeSource {
         int bx = QuartPos.toBlock(qx) + 2, bz = QuartPos.toBlock(qz) + 2;
         if (RawGround.ready()) {
             double h = RawGround.heightAt(bx, bz);
-            if (h >= SEA_LEVEL + BEACH_RISE && !RawGround.wet(bx, bz)) land = landBeside(qx, qz, h, sampler);
+            // A beach the climate lays a long way up a mountain had no land round it the search could reach, and stayed
+            // sand at a hundred and eighty blocks: the climate's own land there, as for dry ground it calls sea.
+            if (h >= SEA_LEVEL + BEACH_RISE && !RawGround.wet(bx, bz)) {
+                land = WorldgenRevision.has(WorldgenRevision.INLAND_CLIMATE)
+                        ? inlandClimate(qx, qz, h, sampler) : landBeside(qx, qz, h, sampler);
+            }
         }
         beaches.put(key, new Coast(land));
         return land;

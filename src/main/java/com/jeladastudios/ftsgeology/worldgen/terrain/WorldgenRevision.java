@@ -72,8 +72,12 @@ public final class WorldgenRevision {
     /** A rift between a continent and an ocean plate sinks inland from the line, the ocean side quiet up to it, not a wall
      * on the line with another biome on top (round 142). */
     public static final int MARGIN_RIFTS = 15;
+    /** Dry ground the climate calls sea takes the climate's own land there, however far from a coast (round 144). */
+    public static final int INLAND_CLIMATE = 16;
+    /** The ocean side of a rift against a continent rugged away from the line as the rift is, not quiet throughout (round 144). */
+    public static final int RUGGED_MARGINS = 16;
     /** What a world made now gets. */
-    public static final int CURRENT = 15;
+    public static final int CURRENT = 16;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;
