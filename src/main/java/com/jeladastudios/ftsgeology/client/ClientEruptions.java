@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.client;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.network.EruptionPacket;
 import com.jeladastudios.ftsgeology.registry.ModParticles;
@@ -11,12 +13,10 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.material.FogType;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ViewportEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.ViewportEvent;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
@@ -34,7 +34,7 @@ import java.util.Map;
  * <p>Particles are added with force, which skips vanilla's 32-block cut-off: a column meant to be
  * seen from three hundred blocks is useless if it is only drawn from thirty.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
 public final class ClientEruptions {
 
     private ClientEruptions() {}

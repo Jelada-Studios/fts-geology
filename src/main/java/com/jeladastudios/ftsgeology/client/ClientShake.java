@@ -1,13 +1,13 @@
 package com.jeladastudios.ftsgeology.client;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import net.minecraft.client.Minecraft;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ViewportEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.ViewportEvent;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 /**
  * The ground moving, as the person standing on it sees it.
  *
@@ -15,7 +15,7 @@ import net.minecraftforge.fml.common.Mod;
  * being drawn: the view shakes, the crosshair stays on target, and nothing goes back to the server.
  * Per frame, so the jitter is smooth at any frame rate.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
 public final class ClientShake {
 
     private ClientShake() {}

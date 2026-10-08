@@ -15,8 +15,8 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.GenerationStep;
-import net.minecraftforge.common.world.BiomeModifier;
-import net.minecraftforge.common.world.ModifiableBiomeInfo;
+import net.neoforged.neoforge.common.world.BiomeModifier;
+import net.neoforged.neoforge.common.world.ModifiableBiomeInfo;
 
 import java.io.Reader;
 import java.util.ArrayList;
@@ -92,7 +92,7 @@ public final class FossilBeds {
             if (stages != null) return stages;
             Map<Age, Stage> out = new EnumMap<>(Age.class);
             for (Age a : Age.values()) out.put(a, new Stage());
-            MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+            MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
             if (server != null && present()) {
                 var found = server.getResourceManager().listResources("worldgen/placed_feature",
                         rl -> rl.getNamespace().equals(JR) && rl.getPath().endsWith("_fossil_placed.json"));
@@ -107,7 +107,7 @@ public final class FossilBeds {
                     if (name.equals("flora")) continue;
                     Block block = block(name + "_fossil");
                     if (block == null) continue;
-                    int[] band = band(found.get(new ResourceLocation(JR, "worldgen/placed_feature/" + name + "_fossil_placed.json")));
+                    int[] band = band(found.get(ResourceLocation.fromNamespaceAndPath(JR, "worldgen/placed_feature/" + name + "_fossil_placed.json")));
                     if (band == null) continue;
                     boolean marine = false;
                     for (String m : MARINE) if (name.startsWith(m)) marine = true;
@@ -165,7 +165,7 @@ public final class FossilBeds {
     }
 
     static boolean present() {
-        return net.minecraftforge.fml.ModList.get().isLoaded(JR);
+        return net.neoforged.fml.ModList.get().isLoaded(JR);
     }
 
     /** Whether the fossils are laid by the geology: the setting on, Jurassic Reborn there, the mod's own world type. */
@@ -173,7 +173,7 @@ public final class FossilBeds {
         Boolean g = geological;
         if (g != null) return g;
         if (!present() || !GeyserConfig.FOSSIL_BEDS.get() || com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.active()) return false;
-        MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+        MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
         if (server == null) return false;
         var stem = server.registryAccess().registryOrThrow(Registries.LEVEL_STEM).get(net.minecraft.world.level.dimension.LevelStem.OVERWORLD);
         boolean own = stem != null && com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(stem.generator());
@@ -183,7 +183,7 @@ public final class FossilBeds {
 
     /** One of Jurassic Reborn's blocks by name, or null. */
     static Block block(String name) {
-        Block b = BuiltInRegistries.BLOCK.get(new ResourceLocation(JR, name));
+        Block b = BuiltInRegistries.BLOCK.get(ResourceLocation.fromNamespaceAndPath(JR, name));
         return b == Blocks.AIR ? null : b;
     }
 

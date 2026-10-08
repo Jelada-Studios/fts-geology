@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.eruption;
 
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 
 import com.jeladastudios.ftsgeology.blockentity.GeyserCoreBlockEntity;
@@ -23,7 +25,7 @@ import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.common.Tags;
+import net.neoforged.neoforge.common.Tags;
 
 /**
  * The physical side effects of a geyser eruption, as stateless helpers; {@link GeyserCoreBlockEntity}
@@ -297,7 +299,7 @@ public final class EruptionHandler {
 
     public static boolean hasFiniteWater() {
         if (finiteWater == null) {
-            finiteWater = net.minecraftforge.fml.ModList.get().isLoaded("flowing_fluids");
+            finiteWater = net.neoforged.fml.ModList.get().isLoaded("flowing_fluids");
         }
         return finiteWater;
     }
@@ -557,7 +559,7 @@ public final class EruptionHandler {
 
     /** Single blocks a pack names as made things, for what the building mods' list does not reach. */
     public static final net.minecraft.tags.TagKey<Block> BUILT = net.minecraft.tags.TagKey.create(
-            net.minecraft.core.registries.Registries.BLOCK, new net.minecraft.resources.ResourceLocation(com.jeladastudios.ftsgeology.GeysersMod.MODID, "built"));
+            net.minecraft.core.registries.Registries.BLOCK, net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(com.jeladastudios.ftsgeology.GeysersMod.MODID, "built"));
 
     private static volatile java.util.List<? extends String> buildingModsRead;
     private static volatile java.util.Set<String> buildingMods = java.util.Set.of();

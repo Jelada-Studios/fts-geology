@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "fts_geology:gas_mask"
+    },
+    {
+      "item": "fts_geology:gas_filter"
+    }
+  ],
+  "result": {
+    "id": "fts_geology:gas_mask",
+    "count": 1
+  }
+}

@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.gas.registry;
 
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.gas.block.entity.BiogasDigesterBlockEntity;
 import com.jeladastudios.ftsgeology.gas.block.entity.ElectrolyzerBlockEntity;
@@ -15,15 +17,15 @@ import com.jeladastudios.ftsgeology.gas.block.entity.VentilationFanBlockEntity;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.registries.RegistryObject;
 
 import java.util.function.Supplier;
 
 public final class GasBlockEntities {
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
-            DeferredRegister.create(ForgeRegistries.BLOCK_ENTITY_TYPES, GeysersMod.MODID);
+            DeferredRegister.create(BuiltInRegistries.BLOCK_ENTITY_TYPE, GeysersMod.MODID);
 
     public static final RegistryObject<BlockEntityType<GasPipeBlockEntity>> GAS_PIPE =
             register("gas_pipe", GasPipeBlockEntity::new, GasBlocks.GAS_PIPE);

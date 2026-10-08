@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.util;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import net.minecraft.ChatFormatting;
@@ -11,12 +13,11 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.saveddata.SavedData;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.event.server.ServerStartedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.VersionChecker;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModList;
+import net.neoforged.fml.VersionChecker;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 
 import java.util.Set;
@@ -34,7 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>Only to a world's owner in single player and to operators on a server; both can be turned off.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class JoinNotices {
 
     private JoinNotices() {}

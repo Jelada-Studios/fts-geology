@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.volcano;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.network.FlowPacket;
@@ -38,11 +40,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.AABB;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -67,13 +67,13 @@ import java.util.UUID;
  *
  * <p>Nothing of a flow is saved: one lasts seconds, and a restart simply ends it.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class PyroclasticFlow {
 
     private PyroclasticFlow() {}
 
     public static final ResourceKey<DamageType> DAMAGE = ResourceKey.create(Registries.DAMAGE_TYPE,
-            new ResourceLocation(GeysersMod.MODID, "pyroclastic_flow"));
+            ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "pyroclastic_flow"));
 
     /** The energy line's fall per block of run. */
     private static final double HEIM = 0.22;

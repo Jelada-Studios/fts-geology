@@ -1,10 +1,10 @@
 package com.jeladastudios.ftsgeology.weather;
 
-import com.jeladastudios.ftsgeology.GeysersMod;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
+import net.neoforged.fml.common.EventBusSubscriber;
+import com.jeladastudios.ftsgeology.GeysersMod;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.Arrays;
 
 /**
@@ -16,7 +16,7 @@ import java.util.Arrays;
  *
  * <p>The server's own thread only; the client's weather is the player's already.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class RainContext {
 
     private RainContext() {}

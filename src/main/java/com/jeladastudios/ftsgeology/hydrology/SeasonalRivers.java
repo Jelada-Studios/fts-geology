@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.hydrology;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.compat.SereneSeasons;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
@@ -15,10 +17,8 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -35,7 +35,7 @@ import java.util.Locale;
  * season does and goes back down after. Only round the players, a few chunks at a look; a creek of a few blocks rises one
  * block at most.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class SeasonalRivers {
 
     private SeasonalRivers() {}

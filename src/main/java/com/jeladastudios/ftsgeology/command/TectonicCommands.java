@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.command;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -23,9 +25,8 @@ import com.jeladastudios.ftsgeology.volcano.VolcanoType;
 import com.jeladastudios.ftsgeology.worldgen.HotSpringShape;
 import com.jeladastudios.ftsgeology.worldgen.SurfaceFeatures;
 import com.jeladastudios.ftsgeology.worldgen.HotSpringSites;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.Locale;
 import static com.jeladastudios.ftsgeology.command.InspectCommands.*;
 import static com.jeladastudios.ftsgeology.command.FindCommands.*;
@@ -34,7 +35,7 @@ import static com.jeladastudios.ftsgeology.command.FindCommands.*;
  * The {@code /geology} command tree. Inspection and search live in {@link InspectCommands} and
  * {@link FindCommands}; quakes and placement are here.
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class TectonicCommands {
 
     private TectonicCommands() {}
@@ -44,7 +45,7 @@ public final class TectonicCommands {
 
     /** The mod's own commands read the river network exactly, and may wait for it; see RiverNetwork.mayWait. */
     @SubscribeEvent
-    public static void onCommand(net.minecraftforge.event.CommandEvent event) {
+    public static void onCommand(net.neoforged.neoforge.event.CommandEvent event) {
         String cmd = event.getParseResults().getReader().getString();
         if (cmd.startsWith("geology") || cmd.startsWith("/geology")) {
             com.jeladastudios.ftsgeology.hydrology.RiverNetwork.mayWaitThisTick(
@@ -386,7 +387,7 @@ public final class TectonicCommands {
         if (via == null && level.getBlockEntity(pos) instanceof com.jeladastudios.ftsgeology.blockentity.WeatherTerminalBlockEntity) via = pos;
         data = com.jeladastudios.ftsgeology.instrument.StationNetwork.decorate(level, player, via, pos, data);
         data.putInt("Tab", tab);
-        com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player),
+        com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(net.neoforged.neoforge.network.PacketDistributor.PLAYER.with(() -> player),
                 new com.jeladastudios.ftsgeology.network.TerminalPacket(pos, data, true));
         return 1;
     }

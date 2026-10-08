@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.quake;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.eruption.EruptionHandler;
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
@@ -16,10 +18,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.Comparator;
 import java.util.List;
 import java.util.PriorityQueue;
@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.LongAdder;
  * lands; past as many as the tick can afford to show, the rest breaks where it stood and drops what it is made of.
  * Anything with contents, and every ornament, is broken where it stands and drops, contents and all.
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class Collapse {
 
     private Collapse() {}

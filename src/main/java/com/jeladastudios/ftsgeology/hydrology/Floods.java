@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.hydrology;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.fluid.RiverWaterFluid;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
@@ -18,10 +20,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.saveddata.SavedData;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -36,7 +36,7 @@ import java.util.Locale;
  * leaves some of it mud, which dries as the mud of a hollow does (with {@code soilWaterChangesGround}; see
  * {@link SoilWater#floodMud}). The ground is not moved: a flood leaves a little mud and nothing else.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class Floods {
 
     private Floods() {}

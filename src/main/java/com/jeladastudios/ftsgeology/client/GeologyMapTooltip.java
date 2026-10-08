@@ -1,17 +1,17 @@
 package com.jeladastudios.ftsgeology.client;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.item.GeologyMapItem;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Items;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.event.entity.player.ItemTooltipEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 /** The key to a geological map's colours, under its name. */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
 public final class GeologyMapTooltip {
 
     private GeologyMapTooltip() {}

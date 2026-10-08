@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": {
+    "item": "fts_geology:peridotite"
+  },
+  "result": {
+    "id": "fts_geology:peridotite_stairs",
+    "count": 1
+  }
+}

@@ -1,7 +1,7 @@
 package com.jeladastudios.ftsgeology.mixin;
 
 import com.jeladastudios.ftsgeology.compat.CreateRivers;
-import net.minecraftforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.FluidStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;

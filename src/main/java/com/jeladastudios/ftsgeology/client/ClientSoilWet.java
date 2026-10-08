@@ -1,5 +1,9 @@
 package com.jeladastudios.ftsgeology.client;
 
+
+
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.network.SoilWetPacket;
 import net.minecraft.core.BlockPos;
@@ -8,13 +12,11 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
-import net.minecraftforge.common.Tags;
-import net.minecraftforge.event.level.ChunkEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.common.Tags;
+import net.neoforged.neoforge.event.level.ChunkEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -24,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * at once on clay, but hardly ever on sand, which drinks it. The server says how wet each cell's top is
  * ({@link SoilWetPacket}); where it has said nothing, the puddles are that mod's own.
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
 public final class ClientSoilWet {
 
     private ClientSoilWet() {}

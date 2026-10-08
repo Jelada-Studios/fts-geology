@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.client;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.gas.block.entity.GasMachineBlockEntity;
 import com.jeladastudios.ftsgeology.gas.registry.GasBlocks;
@@ -12,17 +14,15 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import org.joml.Vector3f;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 /**
  * Where a gas machine takes its gas in and gives it out, marked on its faces while the player looks at it with a gas
  * pipe or the gas detector in hand: green dots on an inlet, orange on an outlet, blue on a tank, which is both. The
  * panel names them; this shows which face is which without opening it.
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
 public final class ClientPortMarks {
 
     private ClientPortMarks() {}

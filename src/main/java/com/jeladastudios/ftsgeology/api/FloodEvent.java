@@ -2,7 +2,7 @@ package com.jeladastudios.ftsgeology.api;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraftforge.eventbus.api.Event;
+import net.neoforged.bus.api.Event;
 
 /**
  * A river round a chunk would go over its banks in the mod's own reckoning -- a heavy rain on soaked ground -- or has

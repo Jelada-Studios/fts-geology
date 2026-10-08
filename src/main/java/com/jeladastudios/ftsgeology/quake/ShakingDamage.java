@@ -1,5 +1,9 @@
 package com.jeladastudios.ftsgeology.quake;
 
+
+
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.compat.DynamicTreesFelling;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
@@ -27,11 +31,9 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.StructurePiece;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
-import net.minecraftforge.common.Tags;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.common.Tags;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -53,7 +55,7 @@ import java.util.concurrent.atomic.LongAdder;
  * <p>The chunks within reach of the rupture are gone through a few per tick while the ground shakes, and what is
  * shaken loose falls at a random moment of the shaking, so a wall sheds its blocks over tens of seconds.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class ShakingDamage {
 
     private ShakingDamage() {}
@@ -638,7 +640,7 @@ public final class ShakingDamage {
 
     /** The tags behind what a block is may change with a data pack reload. */
     @SubscribeEvent
-    public static void onTagsUpdated(net.minecraftforge.event.TagsUpdatedEvent event) {
+    public static void onTagsUpdated(net.neoforged.neoforge.event.TagsUpdatedEvent event) {
         KINDS.clear();
     }
 

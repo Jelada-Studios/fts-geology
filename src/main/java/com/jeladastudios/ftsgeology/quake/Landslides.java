@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.quake;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.compat.DynamicTreesFelling;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
@@ -23,11 +25,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.common.Tags;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.common.Tags;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -45,7 +45,7 @@ import java.util.concurrent.atomic.LongAdder;
  * water, so a slide does not dam a river in a way nothing ever clears. The steeper, the harder shaken and the wetter
  * the slope, the likelier; once a slope goes, the ground round it on the same slope goes with it.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class Landslides {
 
     private Landslides() {}

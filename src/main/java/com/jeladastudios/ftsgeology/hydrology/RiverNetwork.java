@@ -352,7 +352,7 @@ public final class RiverNetwork {
     }
 
     private static boolean mustNotWait() {
-        net.minecraft.server.MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+        net.minecraft.server.MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
         if (server == null || !server.isSameThread() || MAY_WAIT.get()) return false;
         return server.getTickCount() != waitTick;
     }

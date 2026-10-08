@@ -1,13 +1,13 @@
 package com.jeladastudios.ftsgeology.client;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.client.particle.GeothermalParticles;
 import com.jeladastudios.ftsgeology.registry.ModParticles;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RegisterParticleProvidersEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.RegisterParticleProvidersEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 /**
  * Everything the mod does that only exists on a client.
  *
@@ -16,15 +16,14 @@ import net.minecraftforge.fml.common.Mod;
  * that so much as loads it crashes. Keeping the client half behind one {@code Dist.CLIENT}
  * subscriber makes that boundary a thing you can see rather than a thing you have to remember.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT,
-        bus = Mod.EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
 public final class ClientSetup {
 
     private ClientSetup() {}
 
     /** The overworld's rain drawn where it falls (see {@link SkyEffects}); vanilla's where the rain is not regional. */
     @SubscribeEvent
-    public static void skyEffects(net.minecraftforge.client.event.RegisterDimensionSpecialEffectsEvent event) {
+    public static void skyEffects(net.neoforged.neoforge.client.event.RegisterDimensionSpecialEffectsEvent event) {
         event.register(net.minecraft.world.level.dimension.BuiltinDimensionTypes.OVERWORLD_EFFECTS, new SkyEffects());
     }
 
@@ -33,7 +32,7 @@ public final class ClientSetup {
      * comes out as a blue wall: opaque, unlit underneath and with nothing visible through it.
      */
     @SubscribeEvent
-    public static void clientSetup(net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent event) {
+    public static void clientSetup(net.neoforged.fml.event.lifecycle.FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
             net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
                     com.jeladastudios.ftsgeology.registry.ModFluids.RIVER_WATER.get(),
@@ -61,7 +60,7 @@ public final class ClientSetup {
      * the untinted water texture.
      */
     @SubscribeEvent
-    public static void blockColors(net.minecraftforge.client.event.RegisterColorHandlersEvent.Block event) {
+    public static void blockColors(net.neoforged.neoforge.client.event.RegisterColorHandlersEvent.Block event) {
         event.register((state, level, pos, tint) -> level != null && pos != null
                         ? net.minecraft.client.renderer.BiomeColors.getAverageWaterColor(level, pos) : 0x3F76E4,
                 com.jeladastudios.ftsgeology.registry.ModBlocks.RIVER_WATER.get(), com.jeladastudios.ftsgeology.registry.ModBlocks.SEA_WATER.get(),
@@ -74,7 +73,7 @@ public final class ClientSetup {
 
     /** The geothermal turbine's rotor turns: a renderer for it, and its model baked though no block names it. */
     @SubscribeEvent
-    public static void registerRenderers(net.minecraftforge.client.event.EntityRenderersEvent.RegisterRenderers event) {
+    public static void registerRenderers(net.neoforged.neoforge.client.event.EntityRenderersEvent.RegisterRenderers event) {
         event.registerBlockEntityRenderer(com.jeladastudios.ftsgeology.registry.ModBlockEntities.GEOTHERMAL_TURBINE.get(),
                 TurbineRenderer::new);
         event.registerBlockEntityRenderer(com.jeladastudios.ftsgeology.registry.ModBlockEntities.INSTRUMENT.get(),
@@ -87,7 +86,7 @@ public final class ClientSetup {
     }
 
     @SubscribeEvent
-    public static void registerModels(net.minecraftforge.client.event.ModelEvent.RegisterAdditional event) {
+    public static void registerModels(net.neoforged.neoforge.client.event.ModelEvent.RegisterAdditional event) {
         event.register(TurbineRenderer.ROTOR);
         event.register(AnemometerRenderer.CUPS);
         event.register(SpinningPartRenderer.FAN_BLADES);

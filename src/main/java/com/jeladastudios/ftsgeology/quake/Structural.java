@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.quake;
 
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
@@ -15,7 +17,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
-import net.minecraftforge.common.Tags;
+import net.neoforged.neoforge.common.Tags;
 
 import java.util.List;
 import java.util.concurrent.atomic.LongAdder;

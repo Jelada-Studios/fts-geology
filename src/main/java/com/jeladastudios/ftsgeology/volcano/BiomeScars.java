@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.volcano;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld;
@@ -14,11 +16,9 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -30,13 +30,13 @@ import java.util.Map;
  * ground, as {@code /fillbiome} would set it, and the players near are sent the change. Only in the mod's own world
  * types, where that biome is part of the land.
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class BiomeScars {
 
     private BiomeScars() {}
 
     private static final ResourceKey<Biome> HIGHLAND = ResourceKey.create(Registries.BIOME,
-            new ResourceLocation(GeysersMod.MODID, "volcanic_highland"));
+            ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "volcanic_highland"));
     /** How often the marks are written, ticks. */
     private static final int EVERY = 40;
 

@@ -10,8 +10,8 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.level.ServerLevelAccessor;
-import net.minecraftforge.event.entity.living.MobSpawnEvent;
-import net.minecraftforge.eventbus.api.Event;
+import net.neoforged.neoforge.event.entity.living.MobSpawnEvent;
+import net.neoforged.bus.api.Event;
 
 import java.util.concurrent.atomic.LongAdder;
 
@@ -31,7 +31,7 @@ public final class SnowLineSpawns {
 
     /** The animals that live above the snow line. Another mod's are named as optional entries. */
     public static final TagKey<EntityType<?>> ABOVE_SNOW_LINE =
-            TagKey.create(Registries.ENTITY_TYPE, new ResourceLocation(GeysersMod.MODID, "above_snow_line"));
+            TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "above_snow_line"));
 
     private static final LongAdder KEPT_DOWN = new LongAdder();
 

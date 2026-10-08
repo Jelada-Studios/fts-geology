@@ -138,7 +138,7 @@ public class SeismographBlock extends BaseEntityBlock {
         }
         if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
             com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
-                    net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> sp),
+                    net.neoforged.neoforge.network.PacketDistributor.PLAYER.with(() -> sp),
                     new com.jeladastudios.ftsgeology.network.TerminalPacket(pos, com.jeladastudios.ftsgeology.instrument.StationNetwork.decorate(
                             (net.minecraft.server.level.ServerLevel) level, sp, null, pos, be.data((net.minecraft.server.level.ServerLevel) level)), true));
         }

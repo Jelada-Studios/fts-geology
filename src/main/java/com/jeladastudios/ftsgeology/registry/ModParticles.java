@@ -1,11 +1,13 @@
 package com.jeladastudios.ftsgeology.registry;
 
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.SimpleParticleType;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.registries.RegistryObject;
 
 /**
  * The mod's own particles.
@@ -32,7 +34,7 @@ public final class ModParticles {
     private ModParticles() {}
 
     public static final DeferredRegister<ParticleType<?>> PARTICLES =
-            DeferredRegister.create(ForgeRegistries.PARTICLE_TYPES, GeysersMod.MODID);
+            DeferredRegister.create(BuiltInRegistries.PARTICLE_TYPE, GeysersMod.MODID);
 
     /** Water atomised by pressure: fires upward hard, slows, and spreads into fog at the top. */
     public static final RegistryObject<SimpleParticleType> GEYSER_MIST =

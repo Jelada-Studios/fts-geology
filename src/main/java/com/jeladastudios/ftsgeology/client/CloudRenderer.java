@@ -31,7 +31,7 @@ import org.joml.Matrix4f;
 final class CloudRenderer {
 
     private static final int CELL = 12, R = 40, N = 2 * R + 1;
-    private static final ResourceLocation WHITE = new ResourceLocation("textures/misc/white.png");
+    private static final ResourceLocation WHITE = ResourceLocation.parse("textures/misc/white.png");
 
     private VertexBuffer clouds, glow;
     /** The cloud field last worked out: its corner cell, when, and each cell's underside and top over the cloud height (NaN where clear). */

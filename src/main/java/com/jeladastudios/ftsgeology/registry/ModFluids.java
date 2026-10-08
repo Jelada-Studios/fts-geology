@@ -1,14 +1,16 @@
 package com.jeladastudios.ftsgeology.registry;
 
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.fluid.RiverWaterFluid;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.material.Fluid;
-import net.minecraftforge.common.ForgeMod;
-import net.minecraftforge.fluids.ForgeFlowingFluid;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.neoforge.common.ForgeMod;
+import net.neoforged.neoforge.fluids.ForgeFlowingFluid;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.registries.RegistryObject;
 
 /** The mod's fluids: the standing water of a traced river, and sea water carried off the sea in a bucket. */
 public final class ModFluids {
@@ -16,7 +18,7 @@ public final class ModFluids {
     private ModFluids() {}
 
     public static final DeferredRegister<Fluid> FLUIDS =
-            DeferredRegister.create(ForgeRegistries.FLUIDS, GeysersMod.MODID);
+            DeferredRegister.create(BuiltInRegistries.FLUID, GeysersMod.MODID);
 
     public static final RegistryObject<Fluid> RIVER_WATER =
             FLUIDS.register("river_water", () -> new RiverWaterFluid.Source(properties()));
@@ -32,29 +34,29 @@ public final class ModFluids {
     public static final RegistryObject<Fluid> FLOWING_SEA_WATER =
             FLUIDS.register("flowing_sea_water", () -> new ForgeFlowingFluid.Flowing(seaProperties()));
 
-    public static final DeferredRegister<net.minecraftforge.fluids.FluidType> FLUID_TYPES =
-            DeferredRegister.create(net.minecraftforge.registries.ForgeRegistries.Keys.FLUID_TYPES, GeysersMod.MODID);
+    public static final DeferredRegister<net.neoforged.neoforge.fluids.FluidType> FLUID_TYPES =
+            DeferredRegister.create(net.neoforged.neoforge.registries.ForgeRegistries.Keys.FLUID_TYPES, GeysersMod.MODID);
 
     /**
      * Crude oil from a well head on an oil field: heavy, slow, black, burning rather than putting a fire out. In the
      * {@code forge:crude_oil} tag, so another mod's refinery takes it (Create Diesel Generators' distillation does).
      * Drawn with water's own textures, darkened: no texture of its own.
      */
-    public static final RegistryObject<net.minecraftforge.fluids.FluidType> CRUDE_OIL_TYPE = FLUID_TYPES.register("crude_oil",
-            () -> new net.minecraftforge.fluids.FluidType(net.minecraftforge.fluids.FluidType.Properties.create()
+    public static final RegistryObject<net.neoforged.neoforge.fluids.FluidType> CRUDE_OIL_TYPE = FLUID_TYPES.register("crude_oil",
+            () -> new net.neoforged.neoforge.fluids.FluidType(net.neoforged.neoforge.fluids.FluidType.Properties.create()
                     .descriptionId("fluid_type.fts_geology.crude_oil")
                     .density(870).viscosity(8000).temperature(300)
                     .motionScale(0.002).canSwim(false).canExtinguish(false).canHydrate(false).supportsBoating(false)
                     .fallDistanceModifier(0.5F)
-                    .sound(net.minecraftforge.common.SoundActions.BUCKET_FILL, net.minecraft.sounds.SoundEvents.BUCKET_FILL)
-                    .sound(net.minecraftforge.common.SoundActions.BUCKET_EMPTY, net.minecraft.sounds.SoundEvents.BUCKET_EMPTY)) {
+                    .sound(net.neoforged.neoforge.common.SoundActions.BUCKET_FILL, net.minecraft.sounds.SoundEvents.BUCKET_FILL)
+                    .sound(net.neoforged.neoforge.common.SoundActions.BUCKET_EMPTY, net.minecraft.sounds.SoundEvents.BUCKET_EMPTY)) {
                 @Override
-                public void initializeClient(java.util.function.Consumer<net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions> consumer) {
-                    consumer.accept(new net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions() {
+                public void initializeClient(java.util.function.Consumer<net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions> consumer) {
+                    consumer.accept(new net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions() {
                         private static final net.minecraft.resources.ResourceLocation STILL =
-                                new net.minecraft.resources.ResourceLocation("minecraft", "block/water_still");
+                                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_still");
                         private static final net.minecraft.resources.ResourceLocation FLOW =
-                                new net.minecraft.resources.ResourceLocation("minecraft", "block/water_flow");
+                                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_flow");
 
                         @Override
                         public net.minecraft.resources.ResourceLocation getStillTexture() {

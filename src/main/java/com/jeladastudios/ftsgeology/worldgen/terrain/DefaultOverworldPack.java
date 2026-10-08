@@ -1,16 +1,16 @@
 package com.jeladastudios.ftsgeology.worldgen.terrain;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.PathPackResources;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.repository.PackSource;
-import net.minecraftforge.event.AddPackFindersEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.AddPackFindersEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModList;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -24,7 +24,7 @@ import java.util.List;
  * Tectonic brings a terrain of its own; TerraBlender, Biomes O' Plenty and BYG keep the mod's preset a choice under
  * World Type beside theirs.
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID, bus = Mod.EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class DefaultOverworldPack {
 
     private DefaultOverworldPack() {}

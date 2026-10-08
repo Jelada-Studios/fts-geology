@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.hydrology;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
@@ -19,15 +21,13 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraftforge.common.Tags;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.level.ChunkDataEvent;
-import net.minecraftforge.event.level.ChunkEvent;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.event.server.ServerStoppingEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.common.Tags;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.neoforge.event.level.ChunkDataEvent;
+import net.neoforged.neoforge.event.level.ChunkEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -54,7 +54,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * with {@code soilWaterChangesGround} farmland over wet soil stays moist, grass dies back in a long drought and
  * standing water turns hollows to mud.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class SoilWater {
 
     private SoilWater() {}
@@ -613,7 +613,7 @@ public final class SoilWater {
         if (hours > 0) soakIn(level, chunk, c, hours);
         if (changed) {
             com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
-                    net.minecraftforge.network.PacketDistributor.TRACKING_CHUNK.with(() -> chunk),
+                    net.neoforged.neoforge.network.PacketDistributor.TRACKING_CHUNK.with(() -> chunk),
                     new com.jeladastudios.ftsgeology.network.SoilTintPacket(p.x, p.z, c.tint.clone()));
         }
     }
@@ -709,7 +709,7 @@ public final class SoilWater {
 
     /** Whether water is finite, every level of it real water, as Flowing Fluids makes it; the game's own runs off its sources. */
     private static boolean finite() {
-        return net.minecraftforge.fml.ModList.get().isLoaded("flowing_fluids");
+        return net.neoforged.fml.ModList.get().isLoaded("flowing_fluids");
     }
 
     /** A cell whose ground takes no more: the groundwater up at the surface, or every layer full. */
@@ -838,7 +838,7 @@ public final class SoilWater {
         if (!changed) return;
         ChunkPos p = chunk.getPos();
         com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
-                net.minecraftforge.network.PacketDistributor.TRACKING_CHUNK.with(() -> chunk),
+                net.neoforged.neoforge.network.PacketDistributor.TRACKING_CHUNK.with(() -> chunk),
                 new com.jeladastudios.ftsgeology.network.SoilWetPacket(p.x, p.z, c.wet.clone()));
     }
 
@@ -856,7 +856,7 @@ public final class SoilWater {
 
     /** A player starts watching a chunk: how wet its ground is, and how dry its grass looks if it looks dry at all. */
     @SubscribeEvent
-    public static void onWatch(net.minecraftforge.event.level.ChunkWatchEvent.Watch event) {
+    public static void onWatch(net.neoforged.neoforge.event.level.ChunkWatchEvent.Watch event) {
         ServerLevel level = event.getLevel();
         if (!enabled(level)) return;
         ChunkPos p = event.getPos();
@@ -864,7 +864,7 @@ public final class SoilWater {
         if (c == null) return;
         if (c.last >= 0) {
             com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
-                    net.minecraftforge.network.PacketDistributor.PLAYER.with(event::getPlayer),
+                    net.neoforged.neoforge.network.PacketDistributor.PLAYER.with(event::getPlayer),
                     new com.jeladastudios.ftsgeology.network.SoilWetPacket(p.x, p.z, c.wet.clone()));
         }
         if (!GeyserConfig.SOIL_WATER_TINT.get()) return;
@@ -872,7 +872,7 @@ public final class SoilWater {
         for (byte b : c.tint) any |= b != 0;
         if (!any) return;
         com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
-                net.minecraftforge.network.PacketDistributor.PLAYER.with(event::getPlayer),
+                net.neoforged.neoforge.network.PacketDistributor.PLAYER.with(event::getPlayer),
                 new com.jeladastudios.ftsgeology.network.SoilTintPacket(p.x, p.z, c.tint.clone()));
     }
 
@@ -1016,8 +1016,8 @@ public final class SoilWater {
      * A crop on a dry field grows slower as the root zone dries, and not at all at the wilting point. A watered field,
      * by water beside it or by rain on it, is moist and grows as ever.
      */
-    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.LOW)
-    public static void onCropGrow(net.minecraftforge.event.level.BlockEvent.CropGrowEvent.Pre event) {
+    @SubscribeEvent(priority = net.neoforged.bus.api.EventPriority.LOW)
+    public static void onCropGrow(net.neoforged.neoforge.event.level.BlockEvent.CropGrowEvent.Pre event) {
         if (!(event.getLevel() instanceof ServerLevel level) || !GeyserConfig.SOIL_WATER_GROUND.get() || !enabled(level)) return;
         BlockPos pos = event.getPos();
         BlockState field = level.getBlockState(pos.below());
@@ -1027,7 +1027,7 @@ public final class SoilWater {
         Cells c = CELLS.get(key(level, pos.getX() >> 4, pos.getZ() >> 4));
         if (c == null || c.last < 0) return;
         double deny = Mth.clamp((CROP_THIRST - c.usable[cell(pos.getX(), pos.getZ())]) / CROP_THIRST, 0.0, 1.0);
-        if (deny > 0 && level.random.nextDouble() < deny) event.setResult(net.minecraftforge.eventbus.api.Event.Result.DENY);
+        if (deny > 0 && level.random.nextDouble() < deny) event.setResult(net.neoforged.bus.api.Event.Result.DENY);
     }
 
     /** A cell never looked at: the ground as the place's weather keeps it, a few weeks of it on average. */

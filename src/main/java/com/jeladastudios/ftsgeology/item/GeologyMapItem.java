@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.item;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.advancement.GeologyTrigger;
 import com.jeladastudios.ftsgeology.instrument.RockTypes;
@@ -24,10 +26,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -39,7 +39,7 @@ import java.util.List;
  * they are doing. A vanilla map underneath, locked so the game never paints its own terrain over it, and so it hangs
  * in a frame and copies at a cartography table like any other.
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public class GeologyMapItem extends Item {
 
     /** The mark a survey map carries. */
@@ -197,7 +197,7 @@ public class GeologyMapItem extends Item {
     private static MapColor rock(ServerLevel level, int x, int z, int top) {
         var biome = level.getBiome(new BlockPos(x, top, z));
         if (biome.is(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.BIOME,
-                new net.minecraft.resources.ResourceLocation(GeysersMod.MODID, "alluvial_plain")))) return MapColor.SAND;
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "alluvial_plain")))) return MapColor.SAND;
         if (com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level)) {
             long seed = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed();
             var params = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params();

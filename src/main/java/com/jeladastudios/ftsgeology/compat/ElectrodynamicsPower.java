@@ -3,9 +3,9 @@ package com.jeladastudios.ftsgeology.compat;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraftforge.common.capabilities.Capability;
-import net.minecraftforge.common.util.LazyOptional;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.neoforge.common.capabilities.Capability;
+import net.neoforged.neoforge.common.util.LazyOptional;
+import net.neoforged.fml.ModList;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;

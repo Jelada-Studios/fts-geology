@@ -12,7 +12,7 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraftforge.client.model.data.ModelData;
+import net.neoforged.neoforge.client.model.data.ModelData;
 
 /**
  * Turns a geothermal turbine's rotor. The frame and the generator are the block's own model, drawn with the chunk; the
@@ -21,7 +21,7 @@ import net.minecraftforge.client.model.data.ModelData;
  */
 public class TurbineRenderer implements BlockEntityRenderer<GeothermalTurbineBlockEntity> {
 
-    public static final ResourceLocation ROTOR = new ResourceLocation(GeysersMod.MODID, "block/geothermal_turbine_rotor");
+    public static final ResourceLocation ROTOR = ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "block/geothermal_turbine_rotor");
 
     public TurbineRenderer(BlockEntityRendererProvider.Context ctx) {}
 

@@ -141,7 +141,7 @@ public record ColumnTestRule(Test test, SurfaceRules.RuleSource thenRun) impleme
         }
 
         private static ServerLevel overworld() {
-            var server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+            var server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
             return server == null ? null : server.overworld();
         }
     }

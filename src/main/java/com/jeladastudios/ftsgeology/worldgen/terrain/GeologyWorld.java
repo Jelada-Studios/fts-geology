@@ -22,10 +22,10 @@ public final class GeologyWorld {
     private GeologyWorld() {}
 
     public static final ResourceKey<NoiseGeneratorSettings> SETTINGS =
-            ResourceKey.create(Registries.NOISE_SETTINGS, new ResourceLocation(GeysersMod.MODID, "geology"));
+            ResourceKey.create(Registries.NOISE_SETTINGS, ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "geology"));
     /** The tall world type: the same terrain with its belts scaled up into an 864-block world. */
     public static final ResourceKey<NoiseGeneratorSettings> SETTINGS_TALL =
-            ResourceKey.create(Registries.NOISE_SETTINGS, new ResourceLocation(GeysersMod.MODID, "geology_tall"));
+            ResourceKey.create(Registries.NOISE_SETTINGS, ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "geology_tall"));
 
     private static final Map<String, Boolean> OWN = new ConcurrentHashMap<>();
 
@@ -66,7 +66,7 @@ public final class GeologyWorld {
         // What the default preset and ours would build, as the registry holds them now.
         level.registryAccess().registry(Registries.WORLD_PRESET).ifPresent(presets -> {
             for (String id : new String[] {"minecraft:normal", GeysersMod.MODID + ":geology_tall"}) {
-                var preset = presets.get(new ResourceLocation(id));
+                var preset = presets.get(ResourceLocation.parse(id));
                 if (preset == null) {
                     s.append("; preset ").append(id).append(" missing");
                     continue;

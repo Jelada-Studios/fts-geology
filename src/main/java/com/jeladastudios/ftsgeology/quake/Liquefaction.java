@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.quake;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.instrument.SeismicWave;
@@ -26,11 +28,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
-import net.minecraftforge.common.Tags;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.common.Tags;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.Deque;
@@ -50,7 +50,7 @@ import java.util.concurrent.atomic.LongAdder;
  * settle a block into it, and not all together, so a house on half-sound ground cracks and leans; and whoever stands
  * on it is held fast for a few seconds.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class Liquefaction {
 
     private Liquefaction() {}
@@ -296,7 +296,7 @@ public final class Liquefaction {
         var biome = level.getBiome(m.set(x, top, z));
         boolean wetland = biome.is(BiomeTags.IS_RIVER) || biome.is(BiomeTags.IS_BEACH) || biome.is(Tags.Biomes.IS_SWAMP)
                 || biome.is(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.BIOME,
-                        new net.minecraft.resources.ResourceLocation(GeysersMod.MODID, "alluvial_plain")));
+                        net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "alluvial_plain")));
         if (wetland) return true;
         if (!sandy) return false;
         // Out of time for working the table out here, the ground counts as dry this once.

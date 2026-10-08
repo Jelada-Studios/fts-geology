@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.worldgen;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.util.TickBudget;
@@ -11,10 +13,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraftforge.event.level.ChunkDataEvent;
-import net.minecraftforge.event.level.ChunkEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.neoforge.event.level.ChunkDataEvent;
+import net.neoforged.neoforge.event.level.ChunkEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -31,7 +32,7 @@ import static com.jeladastudios.ftsgeology.worldgen.HotSpringSites.*;
  * so a chunk gets its surface features once. Deep work stays below
  * {@link GeyserConfig#RETROGEN_MAX_Y} and never replaces player blocks.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class RetrogenHandler {
 
     private RetrogenHandler() {}
@@ -204,14 +205,14 @@ public final class RetrogenHandler {
      * is being prepared, so this naturally holds everything back until world creation has finished.
      */
     @SubscribeEvent
-    public static void onServerTick(net.minecraftforge.event.TickEvent.ServerTickEvent event) {
-        if (event.phase != net.minecraftforge.event.TickEvent.Phase.END) return;
+    public static void onServerTick(net.neoforged.neoforge.event.TickEvent.ServerTickEvent event) {
+        if (event.phase != net.neoforged.neoforge.event.TickEvent.Phase.END) return;
         if (event.getServer() == null) return;
         // Retrogen places features by the river network, so it waits for a square rather than read it as empty.
         com.jeladastudios.ftsgeology.hydrology.RiverNetwork.mayWait(() -> retrogenTick(event));
     }
 
-    private static void retrogenTick(net.minecraftforge.event.TickEvent.ServerTickEvent event) {
+    private static void retrogenTick(net.neoforged.neoforge.event.TickEvent.ServerTickEvent event) {
 
         // One budget for the whole mod; these shares are small so the earthquake handler still gets
         // its turn. See TickBudget.

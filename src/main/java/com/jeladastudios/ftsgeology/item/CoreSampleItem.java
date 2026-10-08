@@ -100,7 +100,7 @@ public class CoreSampleItem extends Item {
                 out.accept(Component.translatable("item.fts_geology.core_sample.void", from,
                         DepthScale.format(blocks * DepthScale.metresPerBlock())).withStyle(ChatFormatting.DARK_GRAY));
             } else {
-                Block b = BuiltInRegistries.BLOCK.get(new ResourceLocation(id));
+                Block b = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(id));
                 RockTypes.Rock rock = RockTypes.classify(b.defaultBlockState());
                 out.accept(Component.translatable("item.fts_geology.core_sample.bed", from,
                         DepthScale.format(blocks * DepthScale.metresPerBlock()), b.getName(),
@@ -114,7 +114,7 @@ public class CoreSampleItem extends Item {
             out.accept(Component.translatable("item.fts_geology.core_sample.deposits").withStyle(ChatFormatting.GOLD));
             for (Tag t : deposits) {
                 CompoundTag d = (CompoundTag) t;
-                Block b = BuiltInRegistries.BLOCK.get(new ResourceLocation(d.getString("Block")));
+                Block b = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(d.getString("Block")));
                 String at = DepthScale.format(d.getInt("Depth") * DepthScale.metresPerBlock());
                 out.accept((d.contains("Genesis")
                         ? Component.translatable("item.fts_geology.core_sample.deposit", at, b.getName(),

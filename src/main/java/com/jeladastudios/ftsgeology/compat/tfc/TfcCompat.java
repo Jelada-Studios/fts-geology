@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.compat.tfc;
 
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import net.minecraft.core.BlockPos;
@@ -14,8 +16,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.fml.ModList;
+import net.neoforged.neoforge.registries.ForgeRegistries;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -52,8 +54,8 @@ public final class TfcCompat {
 
     // === Biomes =============================================================
 
-    private static final TagKey<Biome> TFC_OCEAN = TagKey.create(Registries.BIOME, new ResourceLocation("tfc", "is_ocean"));
-    private static final TagKey<Biome> TFC_RIVER = TagKey.create(Registries.BIOME, new ResourceLocation("tfc", "is_river"));
+    private static final TagKey<Biome> TFC_OCEAN = TagKey.create(Registries.BIOME, ResourceLocation.fromNamespaceAndPath("tfc", "is_ocean"));
+    private static final TagKey<Biome> TFC_RIVER = TagKey.create(Registries.BIOME, ResourceLocation.fromNamespaceAndPath("tfc", "is_river"));
 
     /** Sea, by vanilla's tags or TFC's. */
     public static boolean ocean(Holder<Biome> b) {
@@ -160,7 +162,7 @@ public final class TfcCompat {
         }
         if (id.contains("%s")) id = id.replace("%s", localSoil(level, pos.getX(), pos.getZ()));
         Block t = RESOLVED.computeIfAbsent(id, k -> {
-            Block b = ForgeRegistries.BLOCKS.getValue(new ResourceLocation("tfc", k));
+            Block b = BuiltInRegistries.BLOCK.get(ResourceLocation.fromNamespaceAndPath("tfc", k));
             return b == null ? Blocks.AIR : b;
         });
         return t == Blocks.AIR ? state : t.defaultBlockState();
@@ -169,7 +171,7 @@ public final class TfcCompat {
     /** Whether a block is one of TFC's raw or hardened rocks: the country rock of a TFC world. */
     public static boolean isRock(BlockState state) {
         if (!active()) return false;
-        ResourceLocation id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         return id != null && id.getNamespace().equals("tfc")
                 && (id.getPath().startsWith("rock/raw/") || id.getPath().startsWith("rock/hardened/"));
     }
@@ -181,7 +183,7 @@ public final class TfcCompat {
      */
     public static boolean isGround(BlockState state) {
         if (!active()) return false;
-        ResourceLocation id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         if (id == null || !id.getNamespace().equals("tfc")) return false;
         String p = id.getPath();
         return p.startsWith("rock/raw/") || p.startsWith("rock/hardened/") || p.startsWith("rock/magma/")
@@ -194,14 +196,14 @@ public final class TfcCompat {
     /** TFC's snow and ice that a hot spring melts: its snow pile, ice pile and sea ice. */
     public static boolean meltsToAir(BlockState state) {
         if (!active()) return false;
-        ResourceLocation id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         return id != null && id.getNamespace().equals("tfc") && id.getPath().equals("snow_pile");
     }
 
     /** TFC's ice, which a hot spring melts to water. */
     public static boolean meltsToWater(BlockState state) {
         if (!active()) return false;
-        ResourceLocation id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         return id != null && id.getNamespace().equals("tfc")
                 && (id.getPath().equals("ice_pile") || id.getPath().equals("sea_ice"));
     }
@@ -226,7 +228,7 @@ public final class TfcCompat {
         int top = level.getHeight(Heightmap.Types.WORLD_SURFACE_WG, lx, lz);
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         for (int y = top; y >= Math.max(level.getMinBuildHeight(), top - 60) && !(rockFound && soilFound); y--) {
-            ResourceLocation id = ForgeRegistries.BLOCKS.getKey(level.getBlockState(m.set(lx, y, lz)).getBlock());
+            ResourceLocation id = BuiltInRegistries.BLOCK.getKey(level.getBlockState(m.set(lx, y, lz)).getBlock());
             if (id == null || !id.getNamespace().equals("tfc")) continue;
             String path = id.getPath();
             if (!rockFound && (path.startsWith("rock/raw/") || path.startsWith("rock/hardened/"))) {

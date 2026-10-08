@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.hydrology;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.registry.ModFluids;
@@ -20,12 +22,10 @@ import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
-import net.minecraftforge.common.FarmlandWaterManager;
-import net.minecraftforge.event.entity.player.FillBucketEvent;
-import net.minecraftforge.eventbus.api.Event;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.common.FarmlandWaterManager;
+import net.neoforged.neoforge.event.entity.player.FillBucketEvent;
+import net.neoforged.bus.api.Event;
+import net.neoforged.bus.api.SubscribeEvent;
 /**
  * The sea is salt, and salt water grows nothing.
  *
@@ -36,7 +36,7 @@ import net.minecraftforge.fml.common.Mod;
  * fresh water -- rivers, lakes, wells, springs, rain -- waters fields as ever, and so does a pond dug by the sea above
  * its level.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class SeaWater {
 
     private SeaWater() {}

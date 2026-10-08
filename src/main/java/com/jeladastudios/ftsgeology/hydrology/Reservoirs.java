@@ -1,5 +1,9 @@
 package com.jeladastudios.ftsgeology.hydrology;
 
+
+
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.fluid.RiverWaterFluid;
@@ -30,12 +34,10 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.common.Tags;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.level.BlockEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.common.Tags;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -57,7 +59,7 @@ import java.util.Locale;
  * it, the reservoir runs out a layer at a time, and the river finds its way through the gap again (the rivers' upkeep
  * lays it back). While it fills, and once full, the dam is looked at again every few seconds.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class Reservoirs {
 
     private Reservoirs() {}

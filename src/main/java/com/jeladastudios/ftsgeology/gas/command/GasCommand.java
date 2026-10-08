@@ -27,8 +27,8 @@ import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.common.MinecraftForge;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.neoforge.common.NeoForge;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -234,7 +234,7 @@ public final class GasCommand {
             c.getSource().sendFailure(Component.literal("No gas machine there."));
             return 0;
         }
-        com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player),
+        com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(net.neoforged.neoforge.network.PacketDistributor.PLAYER.with(() -> player),
                 new com.jeladastudios.ftsgeology.network.TerminalPacket(pos, m.panelData(), true));
         return 1;
     }
@@ -292,7 +292,7 @@ public final class GasCommand {
     private static void ensureTicker() {
         if (tickerRegistered) return;
         tickerRegistered = true;
-        MinecraftForge.EVENT_BUS.addListener((TickEvent.PlayerTickEvent e) -> {
+        NeoForge.EVENT_BUS.addListener((TickEvent.PlayerTickEvent e) -> {
             if (e.phase != TickEvent.Phase.END || !(e.player instanceof ServerPlayer sp)) return;
             if (!VIEWERS.contains(sp.getUUID()) || sp.level().getGameTime() % 4 != 0) return;
             GasVisuals.show(sp, GasManager.get(sp.serverLevel()), 20);

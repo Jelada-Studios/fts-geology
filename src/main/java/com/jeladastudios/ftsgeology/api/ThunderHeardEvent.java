@@ -1,10 +1,10 @@
 package com.jeladastudios.ftsgeology.api;
 
-import net.minecraftforge.eventbus.api.Event;
+import net.neoforged.bus.api.Event;
 
 /**
  * A peal of the mod's thunder is played on the client: the flash it belongs to, how long after the flash it is heard,
- * and how loud. Posted on {@link net.minecraftforge.common.MinecraftForge#EVENT_BUS} on the client thread, as the sound
+ * and how loud. Posted on {@link net.neoforged.neoforge.common.MinecraftForge#EVENT_BUS} on the client thread, as the sound
  * starts, so an addon can duck its other sounds under it for a moment. Client only.
  */
 public class ThunderHeardEvent extends Event {

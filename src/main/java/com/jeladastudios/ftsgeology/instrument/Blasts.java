@@ -1,14 +1,14 @@
 package com.jeladastudios.ftsgeology.instrument;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraftforge.event.level.ExplosionEvent;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.level.ExplosionEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 /**
  * Explosions, for the seismographs: TNT in a quarry, a creeper, a bed in the Nether's way. The ground takes the shock as
  * it takes a quake's, and a station near enough draws it (see {@link SeismicNetwork#recordBlast}).
@@ -16,7 +16,7 @@ import net.minecraftforge.fml.common.Mod;
  * <p>How big, from how much the blast broke: a charge that shattered sixty blocks of rock is a magnitude of about one, one
  * that went off in water hardly anything. A chain of charges going off together is one blast on the paper.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class Blasts {
 
     private Blasts() {}

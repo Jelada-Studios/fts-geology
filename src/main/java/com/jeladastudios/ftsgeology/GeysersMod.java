@@ -1,19 +1,21 @@
 package com.jeladastudios.ftsgeology;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.registry.ModBlockEntities;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.registry.ModItems;
 import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 import net.minecraft.world.item.CreativeModeTabs;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModLoadingContext;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +54,7 @@ public class GeysersMod {
         modBus.addListener(com.jeladastudios.ftsgeology.gas.registry.GasCapabilities::register);
         // Where Create is installed, a gas engine's crankshaft turns its shafts (compat.create, reached by name: it is built on
         // Create's classes, and left out of a build made without Create's jar).
-        if (net.minecraftforge.fml.ModList.get().isLoaded("create")) {
+        if (net.neoforged.fml.ModList.get().isLoaded("create")) {
             try {
                 Class.forName("com.jeladastudios.ftsgeology.compat.create.CreateCrank").getMethod("register", IEventBus.class).invoke(null, modBus);
             } catch (ReflectiveOperationException | LinkageError e) {
@@ -68,14 +70,14 @@ public class GeysersMod {
 
         // The mod's first packet. Registered in common setup because the channel has to exist on
         // both sides before anybody joins, and the handler itself is guarded for physical side.
-        modBus.addListener((net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent e) ->
+        modBus.addListener((net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent e) ->
                 e.enqueueWork(com.jeladastudios.ftsgeology.network.ModNetwork::register));
 
         // Distant Horizons' far terrain from the plate model, when it is installed.
-        modBus.addListener((net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent e) ->
+        modBus.addListener((net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent e) ->
                 e.enqueueWork(com.jeladastudios.ftsgeology.compat.dh.DhTerrain::init));
         // A gas burner under a Create boiler heats it, where Create is installed.
-        modBus.addListener((net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent e) ->
+        modBus.addListener((net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent e) ->
                 e.enqueueWork(com.jeladastudios.ftsgeology.compat.CreateBoiler::register));
 
         // SERVER, not COMMON: every setting decides what the world does, and SERVER configs are synced
@@ -91,13 +93,13 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.advancement.GeologyTrigger.init();
 
         // Above the snow line only the animals of the high snow are born (game bus event).
-        MinecraftForge.EVENT_BUS.addListener(com.jeladastudios.ftsgeology.worldgen.SnowLineSpawns::check);
+        NeoForge.EVENT_BUS.addListener(com.jeladastudios.ftsgeology.worldgen.SnowLineSpawns::check);
 
         // Crops ripen faster on the floodplain's silt (game bus event).
-        MinecraftForge.EVENT_BUS.addListener(com.jeladastudios.ftsgeology.hydrology.AlluvialSoil::grow);
+        NeoForge.EVENT_BUS.addListener(com.jeladastudios.ftsgeology.hydrology.AlluvialSoil::grow);
 
         // RetrogenHandler registers itself through @EventBusSubscriber.
-        MinecraftForge.EVENT_BUS.register(this);
+        NeoForge.EVENT_BUS.register(this);
 
         LOGGER.info("FTs Geology initialised.");
     }
@@ -108,7 +110,7 @@ public class GeysersMod {
      * reusing stale answers.
      */
     @SubscribeEvent
-    public void onServerStopped(net.minecraftforge.event.server.ServerStoppedEvent event) {
+    public void onServerStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent event) {
         com.jeladastudios.ftsgeology.tectonics.TectonicMap.clearCache();
         com.jeladastudios.ftsgeology.tectonics.HotspotMap.clearCache();
         com.jeladastudios.ftsgeology.hydrology.WaterTable.clearCache();
@@ -167,7 +169,7 @@ public class GeysersMod {
      * dependencies; vanilla water cannot drain an infinite source, which Flowing Fluids fixes.
      */
     @SubscribeEvent
-    public void onPlayerJoin(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
+    public void onPlayerJoin(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
         if (!GeyserConfig.SUGGEST_OPTIONAL_MODS.get()) return;
         if (com.jeladastudios.ftsgeology.eruption.EruptionHandler.hasFiniteWater()) return;
         event.getEntity().sendSystemMessage(

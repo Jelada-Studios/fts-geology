@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": {
+    "item": "fts_geology:quartzite"
+  },
+  "result": {
+    "id": "fts_geology:quartzite_wall",
+    "count": 1
+  }
+}

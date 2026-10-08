@@ -13,8 +13,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.FarmBlock;
 import net.minecraft.world.level.block.StemBlock;
-import net.minecraftforge.event.level.BlockEvent;
-import net.minecraftforge.eventbus.api.Event;
+import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.bus.api.Event;
 
 /**
  * Crops grow faster on a floodplain.
@@ -30,7 +30,7 @@ public final class AlluvialSoil {
     private AlluvialSoil() {}
 
     private static final ResourceKey<Biome> ALLUVIAL_PLAIN =
-            ResourceKey.create(Registries.BIOME, new ResourceLocation(GeysersMod.MODID, "alluvial_plain"));
+            ResourceKey.create(Registries.BIOME, ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "alluvial_plain"));
 
     public static void grow(BlockEvent.CropGrowEvent.Pre e) {
         if (e.getResult() != Event.Result.DEFAULT || !(e.getLevel() instanceof ServerLevel level)) return;

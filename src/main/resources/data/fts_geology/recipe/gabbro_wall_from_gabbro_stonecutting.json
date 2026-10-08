@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": {
+    "item": "fts_geology:gabbro"
+  },
+  "result": {
+    "id": "fts_geology:gabbro_wall",
+    "count": 1
+  }
+}

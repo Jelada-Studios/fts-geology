@@ -1,5 +1,9 @@
 package com.jeladastudios.ftsgeology.compat;
 
+
+
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
@@ -13,12 +17,11 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraftforge.common.Tags;
-import net.minecraftforge.event.level.ChunkDataEvent;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.common.Tags;
+import net.neoforged.neoforge.event.level.ChunkDataEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.registries.ForgeRegistries;
 
 import java.util.HashMap;
 import java.util.List;
@@ -41,7 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Only what the chunk still has on disk can come back: ground loaded and saved without the mod has lost it, and
  * {@code /geology fillvoids} closes the small holes it left.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class RemovedModBlocks {
 
     private RemovedModBlocks() {}
@@ -250,7 +253,7 @@ public final class RemovedModBlocks {
                 case LEAVE -> "goes, as a build or a plant";
                 case ROCK -> "comes back as the rock round it";
                 case CLOSED -> "comes back as rock where rock closes round it";
-                case GIVEN -> "comes back as " + ForgeRegistries.BLOCKS.getKey(c.given().getBlock());
+                case GIVEN -> "comes back as " + BuiltInRegistries.BLOCK.getKey(c.given().getBlock());
                 default -> "";
             });
         }
@@ -259,7 +262,7 @@ public final class RemovedModBlocks {
 
     private static Choice decide(String name) {
         ResourceLocation id = ResourceLocation.tryParse(name);
-        if (id == null || ForgeRegistries.BLOCKS.containsKey(id)) return KNOWN;
+        if (id == null || BuiltInRegistries.BLOCK.containsKey(id)) return KNOWN;
         Map<String, Choice> r = rules();
         Choice given = r.get(id.toString());
         if (given == null) given = r.get(id.getNamespace() + ":*");
@@ -287,11 +290,11 @@ public final class RemovedModBlocks {
                 c = ROCK;
             } else {
                 ResourceLocation t = ResourceLocation.tryParse(to);
-                if (t == null || !ForgeRegistries.BLOCKS.containsKey(t)) {
+                if (t == null || !BuiltInRegistries.BLOCK.containsKey(t)) {
                     GeysersMod.LOGGER.warn("removedModBlockRules: {} is not a block; {} is left to the rules", to, block);
                     continue;
                 }
-                c = new Choice(Way.GIVEN, ForgeRegistries.BLOCKS.getValue(t).defaultBlockState());
+                c = new Choice(Way.GIVEN, BuiltInRegistries.BLOCK.get(t).defaultBlockState());
             }
             r.put(block, c);
         }

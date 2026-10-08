@@ -14,7 +14,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraftforge.common.Tags;
+import net.neoforged.neoforge.common.Tags;
 
 import java.util.Locale;
 
@@ -41,7 +41,7 @@ public final class Puddles {
 
     /** Whether puddles are the mod's to lay: the setting on, and Puddles &amp; Floods not installed. */
     static boolean on() {
-        if (otherMod == null) otherMod = net.minecraftforge.fml.ModList.get().isLoaded("puddleflood");
+        if (otherMod == null) otherMod = net.neoforged.fml.ModList.get().isLoaded("puddleflood");
         return GeyserConfig.PUDDLES.get() && !otherMod;
     }
 

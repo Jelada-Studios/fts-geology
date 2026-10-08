@@ -220,7 +220,7 @@ public final class DemLibrary {
         String path = "data/fts_geology/dem/" + name + ".dem";
         InputStream in = DemLibrary.class.getResourceAsStream("/" + path);
         if (in != null) return in;
-        var file = net.minecraftforge.fml.ModList.get().getModFileById("fts_geology");
+        var file = net.neoforged.fml.ModList.get().getModFileById("fts_geology");
         if (file == null) return null;
         java.nio.file.Path p = file.getFile().findResource(path);
         return java.nio.file.Files.exists(p) ? java.nio.file.Files.newInputStream(p) : null;

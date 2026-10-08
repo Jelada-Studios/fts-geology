@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " G ",
+    "BGB",
+    "BRB"
+  ],
+  "key": {
+    "B": {
+      "tag": "minecraft:planks"
+    },
+    "G": {
+      "item": "minecraft:glass_pane"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    }
+  },
+  "result": {
+    "id": "fts_geology:thermometer",
+    "count": 1
+  }
+}

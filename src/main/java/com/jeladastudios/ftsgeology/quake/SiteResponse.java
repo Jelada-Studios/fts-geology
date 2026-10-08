@@ -65,7 +65,7 @@ public final class SiteResponse {
     }
 
     private static boolean loose(BlockState s) {
-        return s.is(BlockTags.DIRT) || s.is(BlockTags.SAND) || s.is(net.minecraftforge.common.Tags.Blocks.GRAVEL)
+        return s.is(BlockTags.DIRT) || s.is(BlockTags.SAND) || s.is(net.neoforged.neoforge.common.Tags.Blocks.GRAVEL)
                 || s.is(Blocks.CLAY) || s.is(Blocks.MUD) || s.is(Blocks.SNOW_BLOCK)
                 || s.is(com.jeladastudios.ftsgeology.hydrology.SoilBlocks.NATURAL_GROUND);
     }

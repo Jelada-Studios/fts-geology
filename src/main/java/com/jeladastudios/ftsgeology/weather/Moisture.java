@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.weather;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.core.BlockPos;
@@ -8,10 +10,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.Locale;
 
 /**
@@ -29,7 +29,7 @@ import java.util.Locale;
  * low ground, by water -- a fog lies until the morning sun warms it off. The weather instruments read the humidity from
  * here. The rain itself is still the storms' (the vapour does not yet make it).</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class Moisture {
 
     private Moisture() {}
@@ -316,7 +316,7 @@ public final class Moisture {
     }
 
     @SubscribeEvent
-    public static void onServerStopped(net.minecraftforge.event.server.ServerStoppedEvent event) {
+    public static void onServerStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent event) {
         clear();
         RainClimate.clear();
     }

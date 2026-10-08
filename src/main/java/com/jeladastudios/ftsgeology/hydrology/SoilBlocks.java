@@ -11,7 +11,7 @@ import net.minecraft.world.level.block.FarmBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.block.state.properties.Property;
-import net.minecraftforge.common.Tags;
+import net.neoforged.neoforge.common.Tags;
 
 /**
  * The ground's blocks as the water in it sees them, other mods' soils among them.
@@ -39,7 +39,7 @@ public final class SoilBlocks {
     public static final TagKey<Block> MULCH = tag("mulch");
 
     private static TagKey<Block> tag(String path) {
-        return BlockTags.create(new ResourceLocation(GeysersMod.MODID, path));
+        return BlockTags.create(ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, path));
     }
 
     /** Tilled ground with the game's moisture on it. */
@@ -126,7 +126,7 @@ public final class SoilBlocks {
     }
 
     static BlockState block(String mod, String path) {
-        Block b = BuiltInRegistries.BLOCK.get(new ResourceLocation(mod, path));
+        Block b = BuiltInRegistries.BLOCK.get(ResourceLocation.fromNamespaceAndPath(mod, path));
         return b == Blocks.AIR ? null : b.defaultBlockState();
     }
 

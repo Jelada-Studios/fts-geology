@@ -14,7 +14,7 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
-import net.minecraftforge.client.model.data.ModelData;
+import net.neoforged.neoforge.client.model.data.ModelData;
 
 /**
  * Turns an anemometer's cups: the mast is the block's own model, the cups a model of their own drawn here at the angle
@@ -22,7 +22,7 @@ import net.minecraftforge.client.model.data.ModelData;
  */
 public class AnemometerRenderer implements BlockEntityRenderer<InstrumentBlockEntity> {
 
-    public static final ResourceLocation CUPS = new ResourceLocation(GeysersMod.MODID, "block/anemometer_cups");
+    public static final ResourceLocation CUPS = ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "block/anemometer_cups");
 
     public AnemometerRenderer(BlockEntityRendererProvider.Context ctx) {}
 

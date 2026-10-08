@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.weather;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.network.LocalWeatherPacket;
@@ -20,10 +22,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.storage.ServerLevelData;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.network.PacketDistributor;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,7 +48,7 @@ import java.util.Locale;
  * over the players, {@code /weather clear} and sleeping through a night clear the sky over them. Not in
  * TerraFirmaCraft, which keeps its own climate; {@code regionalRain} turns it off.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class Storms {
 
     private Storms() {}
@@ -619,12 +620,12 @@ public final class Storms {
      * their client drew the world's one weather, rain if a storm was out anywhere.
      */
     @SubscribeEvent
-    public static void onLoggedIn(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
+    public static void onLoggedIn(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer p && p.level() instanceof ServerLevel level && on(level)) tell(level, List.of(p));
     }
 
     @SubscribeEvent
-    public static void onChangedDimension(net.minecraftforge.event.entity.player.PlayerEvent.PlayerChangedDimensionEvent event) {
+    public static void onChangedDimension(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerChangedDimensionEvent event) {
         if (event.getEntity() instanceof ServerPlayer p && p.level() instanceof ServerLevel level && on(level)) tell(level, List.of(p));
     }
 

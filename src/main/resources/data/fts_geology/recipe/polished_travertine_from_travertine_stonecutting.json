@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": {
+    "item": "fts_geology:travertine"
+  },
+  "result": {
+    "id": "fts_geology:polished_travertine",
+    "count": 1
+  }
+}

@@ -5,8 +5,8 @@ import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyChunkGenerator;
 import com.mojang.serialization.Codec;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.chunk.ChunkGenerator;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.RegistryObject;
 
 /** Chunk generator types, referenced from the mod's world presets by id. */
 public final class ModChunkGenerators {

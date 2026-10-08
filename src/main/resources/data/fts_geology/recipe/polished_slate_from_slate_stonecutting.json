@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": {
+    "item": "fts_geology:slate"
+  },
+  "result": {
+    "id": "fts_geology:polished_slate",
+    "count": 1
+  }
+}

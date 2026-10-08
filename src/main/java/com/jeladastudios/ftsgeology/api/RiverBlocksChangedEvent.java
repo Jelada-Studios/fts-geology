@@ -2,7 +2,7 @@ package com.jeladastudios.ftsgeology.api;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraftforge.eventbus.api.Event;
+import net.neoforged.bus.api.Event;
 
 import java.util.Collection;
 import java.util.List;
@@ -14,7 +14,7 @@ import java.util.List;
  * The water is carried with the ground, not drawn afresh, and water left hanging over nothing is taken away. Read the
  * chunks again.
  *
- * <p>Posted on {@link net.minecraftforge.common.MinecraftForge#EVENT_BUS} on the server thread, once the writes of a
+ * <p>Posted on {@link net.neoforged.neoforge.common.MinecraftForge#EVENT_BUS} on the server thread, once the writes of a
  * cause have stopped for a second, with every chunk they touched. An earthquake works through its loaded chunks over a
  * few ticks and leaves the chunks not loaded till they load: those come in an event of their own then.</p>
  */

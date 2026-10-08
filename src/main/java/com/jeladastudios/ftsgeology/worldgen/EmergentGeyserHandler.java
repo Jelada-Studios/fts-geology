@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.worldgen;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.blockentity.GeyserCoreBlockEntity;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
@@ -13,10 +15,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashSet;
@@ -36,7 +36,7 @@ import java.util.Set;
  * once every {@code emergentScanIntervalTicks}, and a section with no lava in its palette is passed
  * over without reading a cell.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class EmergentGeyserHandler {
 
     private EmergentGeyserHandler() {}

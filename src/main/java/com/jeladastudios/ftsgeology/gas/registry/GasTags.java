@@ -35,7 +35,7 @@ public final class GasTags {
     }
 
     private static ResourceLocation id(String name) {
-        return new ResourceLocation(GeysersMod.MODID, name);
+        return ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, name);
     }
 
     private GasTags() {

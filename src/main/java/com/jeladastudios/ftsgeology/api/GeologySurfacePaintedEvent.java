@@ -2,11 +2,11 @@ package com.jeladastudios.ftsgeology.api;
 
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelAccessor;
-import net.minecraftforge.eventbus.api.Event;
+import net.neoforged.bus.api.Event;
 
 /**
  * The mod has finished the ground of a chunk: its fumarole fields, geothermal basin floor, soil, rift steps, snow cover
- * and river banks are laid. Posted on {@link net.minecraftforge.common.MinecraftForge#EVENT_BUS}, once a chunk, both
+ * and river banks are laid. Posted on {@link net.neoforged.neoforge.common.MinecraftForge#EVENT_BUS}, once a chunk, both
  * when the chunk is generated and when an older chunk is brought up to date.
  *
  * <p>An addon may lay its own ground over the mod's here. Write only inside {@link #chunk()}: at generation the level

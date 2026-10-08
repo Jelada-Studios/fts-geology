@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.registry;
 
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.block.GeyserChamberBlock;
 import com.jeladastudios.ftsgeology.block.GeyserCoreBlock;
@@ -20,15 +22,15 @@ import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.WallBlock;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.registries.RegistryObject;
 
 /** All blocks introduced by the mod. */
 public final class ModBlocks {
 
     public static final DeferredRegister<Block> BLOCKS =
-            DeferredRegister.create(ForgeRegistries.BLOCKS, GeysersMod.MODID);
+            DeferredRegister.create(BuiltInRegistries.BLOCK, GeysersMod.MODID);
 
     /** The thermodynamic brain: holds temperature/pressure state and ticks. */
     public static final RegistryObject<Block> GEYSER_CORE = BLOCKS.register("geyser_core",

@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.registry;
 
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.item.DescribedBlockItem;
 import com.jeladastudios.ftsgeology.item.FaultCompassItem;
@@ -7,9 +9,9 @@ import com.jeladastudios.ftsgeology.item.FieldGuideItem;
 import com.jeladastudios.ftsgeology.item.GeologistsHammerItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.registries.RegistryObject;
 
 /**
  * BlockItems for the technical blocks. They aren't obtainable in survival (blocks are
@@ -20,7 +22,7 @@ import net.minecraftforge.registries.RegistryObject;
 public final class ModItems {
 
     public static final DeferredRegister<Item> ITEMS =
-            DeferredRegister.create(ForgeRegistries.ITEMS, GeysersMod.MODID);
+            DeferredRegister.create(BuiltInRegistries.ITEM, GeysersMod.MODID);
 
     public static final RegistryObject<Item> GEYSER_CORE = ITEMS.register("geyser_core",
             () -> new BlockItem(ModBlocks.GEYSER_CORE.get(), new Item.Properties()));

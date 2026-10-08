@@ -1,6 +1,6 @@
 package com.jeladastudios.ftsgeology.config;
 
-import net.minecraftforge.common.ForgeConfigSpec;
+import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
  * Central, hot-reloadable configuration backed by {@code fts_geology.toml}.
@@ -11,266 +11,266 @@ import net.minecraftforge.common.ForgeConfigSpec;
  */
 public final class GeyserConfig {
 
-    public static final ForgeConfigSpec SPEC;
+    public static final ModConfigSpec SPEC;
 
     // --- Thermodynamics -----------------------------------------------------
-    public static final ForgeConfigSpec.DoubleValue HEAT_PER_LAVA_NEIGHBOR;
-    public static final ForgeConfigSpec.DoubleValue AMBIENT_COOLING_PER_TICK;
-    public static final ForgeConfigSpec.DoubleValue BOILING_POINT_C;
-    public static final ForgeConfigSpec.DoubleValue MAX_TEMPERATURE_C;
-    public static final ForgeConfigSpec.IntValue STEAM_EXPANSION_RATIO; // water:steam volume, ~1:1600
+    public static final ModConfigSpec.DoubleValue HEAT_PER_LAVA_NEIGHBOR;
+    public static final ModConfigSpec.DoubleValue AMBIENT_COOLING_PER_TICK;
+    public static final ModConfigSpec.DoubleValue BOILING_POINT_C;
+    public static final ModConfigSpec.DoubleValue MAX_TEMPERATURE_C;
+    public static final ModConfigSpec.IntValue STEAM_EXPANSION_RATIO; // water:steam volume, ~1:1600
 
     // --- Pressure / eruption thresholds ------------------------------------
-    public static final ForgeConfigSpec.DoubleValue PRESSURE_ERUPTION_THRESHOLD;
-    public static final ForgeConfigSpec.DoubleValue PRESSURE_SAFE_THRESHOLD;
-    public static final ForgeConfigSpec.DoubleValue CRUST_EROSION_PRESSURE;
-    public static final ForgeConfigSpec.DoubleValue EXPLOSION_POWER;
-    public static final ForgeConfigSpec.DoubleValue JET_UPWARD_VELOCITY;       // sustained flow
-    public static final ForgeConfigSpec.DoubleValue JET_BURST_VELOCITY;        // extra kick at onset
-    public static final ForgeConfigSpec.IntValue JET_BURST_DECAY_TICKS;        // how fast the burst fades
-    public static final ForgeConfigSpec.DoubleValue ONSET_LAUNCH_VELOCITY;     // one-time blast at breakthrough
-    public static final ForgeConfigSpec.IntValue ONSET_WATER_SCATTER;          // pool cells flung at onset
-    public static final ForgeConfigSpec.BooleanValue VENT_BREAKS_OBSTRUCTIONS;  // blast through deliberate caps
-    public static final ForgeConfigSpec.BooleanValue ERUPTIONS_START_FIRES;     // default ON
-    public static final ForgeConfigSpec.DoubleValue VENT_FORCE_BREACH_PRESSURE; // P needed to blast a hard cap
+    public static final ModConfigSpec.DoubleValue PRESSURE_ERUPTION_THRESHOLD;
+    public static final ModConfigSpec.DoubleValue PRESSURE_SAFE_THRESHOLD;
+    public static final ModConfigSpec.DoubleValue CRUST_EROSION_PRESSURE;
+    public static final ModConfigSpec.DoubleValue EXPLOSION_POWER;
+    public static final ModConfigSpec.DoubleValue JET_UPWARD_VELOCITY;       // sustained flow
+    public static final ModConfigSpec.DoubleValue JET_BURST_VELOCITY;        // extra kick at onset
+    public static final ModConfigSpec.IntValue JET_BURST_DECAY_TICKS;        // how fast the burst fades
+    public static final ModConfigSpec.DoubleValue ONSET_LAUNCH_VELOCITY;     // one-time blast at breakthrough
+    public static final ModConfigSpec.IntValue ONSET_WATER_SCATTER;          // pool cells flung at onset
+    public static final ModConfigSpec.BooleanValue VENT_BREAKS_OBSTRUCTIONS;  // blast through deliberate caps
+    public static final ModConfigSpec.BooleanValue ERUPTIONS_START_FIRES;     // default ON
+    public static final ModConfigSpec.DoubleValue VENT_FORCE_BREACH_PRESSURE; // P needed to blast a hard cap
 
     // --- Retrogen / worldgen ------------------------------------------------
-    public static final ForgeConfigSpec.IntValue RETROGEN_MAX_Y;      // never touch above this
-    public static final ForgeConfigSpec.IntValue RETROGEN_MIN_Y;      // deepest scan level
-    public static final ForgeConfigSpec.IntValue CHAMBER_TARGET_HEIGHT;
-    public static final ForgeConfigSpec.DoubleValue CHAMBER_SPAWN_CHANCE; // per candidate column
-    public static final ForgeConfigSpec.BooleanValue RETROGEN_ENABLED;
-    public static final ForgeConfigSpec.IntValue RETROGEN_CHUNKS_PER_TICK;
-    public static final ForgeConfigSpec.IntValue IGNITER_DELAY_TICKS;      // placed igniter -> geyser delay
+    public static final ModConfigSpec.IntValue RETROGEN_MAX_Y;      // never touch above this
+    public static final ModConfigSpec.IntValue RETROGEN_MIN_Y;      // deepest scan level
+    public static final ModConfigSpec.IntValue CHAMBER_TARGET_HEIGHT;
+    public static final ModConfigSpec.DoubleValue CHAMBER_SPAWN_CHANCE; // per candidate column
+    public static final ModConfigSpec.BooleanValue RETROGEN_ENABLED;
+    public static final ModConfigSpec.IntValue RETROGEN_CHUNKS_PER_TICK;
+    public static final ModConfigSpec.IntValue IGNITER_DELAY_TICKS;      // placed igniter -> geyser delay
 
     // --- Basin water budget -------------------------------------------------
-    public static final ForgeConfigSpec.IntValue CHAMBER_DRAIN_INTERVAL_TICKS; // 1 water cell lost per N ticks while erupting
-    public static final ForgeConfigSpec.IntValue CHAMBER_REFILL_INTERVAL_TICKS; // 1 water cell regained per N ticks while recharging/cooling
+    public static final ModConfigSpec.IntValue CHAMBER_DRAIN_INTERVAL_TICKS; // 1 water cell lost per N ticks while erupting
+    public static final ModConfigSpec.IntValue CHAMBER_REFILL_INTERVAL_TICKS; // 1 water cell regained per N ticks while recharging/cooling
 
     // --- Emergent (player-built) geysers -----------------------------------
-    public static final ForgeConfigSpec.BooleanValue EMERGENT_ENABLED;
-    public static final ForgeConfigSpec.BooleanValue EMERGENT_DESTRUCTIVE;
-    public static final ForgeConfigSpec.IntValue EMERGENT_SCAN_INTERVAL_TICKS;
-    public static final ForgeConfigSpec.IntValue EMERGENT_SCAN_RADIUS;
-    public static final ForgeConfigSpec.IntValue EMERGENT_MIN_WATER;
-    public static final ForgeConfigSpec.IntValue EMERGENT_LAVA_DEPTH;
-    public static final ForgeConfigSpec.IntValue EMERGENT_MIN_SPACING;   // don't place cores this close together
-    public static final ForgeConfigSpec.IntValue EMERGENT_DESTROY_RADIUS; // base block-break radius on eruption
+    public static final ModConfigSpec.BooleanValue EMERGENT_ENABLED;
+    public static final ModConfigSpec.BooleanValue EMERGENT_DESTRUCTIVE;
+    public static final ModConfigSpec.IntValue EMERGENT_SCAN_INTERVAL_TICKS;
+    public static final ModConfigSpec.IntValue EMERGENT_SCAN_RADIUS;
+    public static final ModConfigSpec.IntValue EMERGENT_MIN_WATER;
+    public static final ModConfigSpec.IntValue EMERGENT_LAVA_DEPTH;
+    public static final ModConfigSpec.IntValue EMERGENT_MIN_SPACING;   // don't place cores this close together
+    public static final ModConfigSpec.IntValue EMERGENT_DESTROY_RADIUS; // base block-break radius on eruption
 
     // --- Branching root-vents ----------------------------------------------
-    public static final ForgeConfigSpec.BooleanValue BRANCHING_VENTS_ENABLED;
-    public static final ForgeConfigSpec.IntValue BRANCH_MAX_COUNT;
-    public static final ForgeConfigSpec.IntValue BRANCH_MAX_LENGTH;
-    public static final ForgeConfigSpec.IntValue BRANCH_CARVE_BUDGET;  // total cells across all branches
-    public static final ForgeConfigSpec.DoubleValue BRANCH_SPLIT_CHANCE;
+    public static final ModConfigSpec.BooleanValue BRANCHING_VENTS_ENABLED;
+    public static final ModConfigSpec.IntValue BRANCH_MAX_COUNT;
+    public static final ModConfigSpec.IntValue BRANCH_MAX_LENGTH;
+    public static final ModConfigSpec.IntValue BRANCH_CARVE_BUDGET;  // total cells across all branches
+    public static final ModConfigSpec.DoubleValue BRANCH_SPLIT_CHANCE;
 
     // --- Hot springs --------------------------------------------------------
-    public static final ForgeConfigSpec.DoubleValue HOT_SPRING_SPAWN_CHANCE; // per-chunk surface pool
-    public static final ForgeConfigSpec.IntValue HOT_SPRING_RADIUS;          // warmth / melt radius
-    public static final ForgeConfigSpec.BooleanValue HOT_SPRING_REGEN;       // grant regeneration while soaking
+    public static final ModConfigSpec.DoubleValue HOT_SPRING_SPAWN_CHANCE; // per-chunk surface pool
+    public static final ModConfigSpec.IntValue HOT_SPRING_RADIUS;          // warmth / melt radius
+    public static final ModConfigSpec.BooleanValue HOT_SPRING_REGEN;       // grant regeneration while soaking
 
     // --- Volcanoes ----------------------------------------------------------
-    public static final ForgeConfigSpec.IntValue VOLCANO_DORMANT_MIN_TICKS; // quiet time between eruptions
-    public static final ForgeConfigSpec.IntValue VOLCANO_DORMANT_MAX_TICKS;
-    public static final ForgeConfigSpec.IntValue VOLCANO_RUMBLE_TICKS;      // black-smoke warning before it blows
-    public static final ForgeConfigSpec.IntValue VOLCANO_ERUPT_TICKS;       // how long lava fountains
-    public static final ForgeConfigSpec.IntValue VOLCANO_BOMBS_PER_ERUPTION;
-    public static final ForgeConfigSpec.IntValue VOLCANO_RESERVOIR_RADIUS;  // deep magma-chamber radius
-    public static final ForgeConfigSpec.DoubleValue VOLCANO_BOMB_REACH;
-    public static final ForgeConfigSpec.BooleanValue VOLCANO_BOMBS_MELT_IN_LAVA;
-    public static final ForgeConfigSpec.IntValue VOLCANO_CRATER_RADIUS;     // summit crater/lava-pool radius
-    public static final ForgeConfigSpec.IntValue VOLCANO_LAVA_BUDGET;       // lava cells per eruption
-    public static final ForgeConfigSpec.BooleanValue QUAKE_TRIGGERS_ERUPTIONS; // big quakes set nearby volcanoes off
-    public static final ForgeConfigSpec.DoubleValue QUAKE_ERUPTION_CHANCE;
-    public static final ForgeConfigSpec.IntValue QUAKE_ERUPTION_DELAY_MIN_TICKS;
-    public static final ForgeConfigSpec.IntValue QUAKE_ERUPTION_DELAY_MAX_TICKS;
-    public static final ForgeConfigSpec.DoubleValue DORMANT_VOLCANO_QUIET_FACTOR; // how much longer a dormant one sleeps
-    public static final ForgeConfigSpec.BooleanValue VOLCANIC_ASHFALL;      // default ON
-    public static final ForgeConfigSpec.BooleanValue VOLCANO_GROUND_BIOME;
-    public static final ForgeConfigSpec.BooleanValue ASHFALL_BURIES_CROPS;  // default ON
-    public static final ForgeConfigSpec.BooleanValue VOLCANO_UNREST;        // swarm, warming springs before an eruption
-    public static final ForgeConfigSpec.IntValue VOLCANO_UNREST_TICKS;
-    public static final ForgeConfigSpec.BooleanValue FISSURE_ERUPTIONS;     // Reykjanes-style events on rifts
-    public static final ForgeConfigSpec.DoubleValue FISSURE_ERUPTION_DAYS;
-    public static final ForgeConfigSpec.IntValue FISSURE_UNREST_TICKS;
-    public static final ForgeConfigSpec.IntValue FISSURE_LAVA;
-    public static final ForgeConfigSpec.IntValue PYROCLASTIC_FLOWS;         // per eruption of an explosive volcano
-    public static final ForgeConfigSpec.DoubleValue PYROCLASTIC_FLOW_REACH;
-    public static final ForgeConfigSpec.BooleanValue VOLCANIC_GAS;          // CO2 in hollows while restless
-    public static final ForgeConfigSpec.DoubleValue ASH_WEATHERING;         // how fast ash washes off, 0 never
-    public static final ForgeConfigSpec.BooleanValue ASH_LOAD_COLLAPSES_ROOFS;
-    public static final ForgeConfigSpec.BooleanValue SOIL_FROM_BEDROCK;     // default ON
-    public static final ForgeConfigSpec.BooleanValue SOIL_UNDER_GRASS;      // that soil under its turf, by the climate
+    public static final ModConfigSpec.IntValue VOLCANO_DORMANT_MIN_TICKS; // quiet time between eruptions
+    public static final ModConfigSpec.IntValue VOLCANO_DORMANT_MAX_TICKS;
+    public static final ModConfigSpec.IntValue VOLCANO_RUMBLE_TICKS;      // black-smoke warning before it blows
+    public static final ModConfigSpec.IntValue VOLCANO_ERUPT_TICKS;       // how long lava fountains
+    public static final ModConfigSpec.IntValue VOLCANO_BOMBS_PER_ERUPTION;
+    public static final ModConfigSpec.IntValue VOLCANO_RESERVOIR_RADIUS;  // deep magma-chamber radius
+    public static final ModConfigSpec.DoubleValue VOLCANO_BOMB_REACH;
+    public static final ModConfigSpec.BooleanValue VOLCANO_BOMBS_MELT_IN_LAVA;
+    public static final ModConfigSpec.IntValue VOLCANO_CRATER_RADIUS;     // summit crater/lava-pool radius
+    public static final ModConfigSpec.IntValue VOLCANO_LAVA_BUDGET;       // lava cells per eruption
+    public static final ModConfigSpec.BooleanValue QUAKE_TRIGGERS_ERUPTIONS; // big quakes set nearby volcanoes off
+    public static final ModConfigSpec.DoubleValue QUAKE_ERUPTION_CHANCE;
+    public static final ModConfigSpec.IntValue QUAKE_ERUPTION_DELAY_MIN_TICKS;
+    public static final ModConfigSpec.IntValue QUAKE_ERUPTION_DELAY_MAX_TICKS;
+    public static final ModConfigSpec.DoubleValue DORMANT_VOLCANO_QUIET_FACTOR; // how much longer a dormant one sleeps
+    public static final ModConfigSpec.BooleanValue VOLCANIC_ASHFALL;      // default ON
+    public static final ModConfigSpec.BooleanValue VOLCANO_GROUND_BIOME;
+    public static final ModConfigSpec.BooleanValue ASHFALL_BURIES_CROPS;  // default ON
+    public static final ModConfigSpec.BooleanValue VOLCANO_UNREST;        // swarm, warming springs before an eruption
+    public static final ModConfigSpec.IntValue VOLCANO_UNREST_TICKS;
+    public static final ModConfigSpec.BooleanValue FISSURE_ERUPTIONS;     // Reykjanes-style events on rifts
+    public static final ModConfigSpec.DoubleValue FISSURE_ERUPTION_DAYS;
+    public static final ModConfigSpec.IntValue FISSURE_UNREST_TICKS;
+    public static final ModConfigSpec.IntValue FISSURE_LAVA;
+    public static final ModConfigSpec.IntValue PYROCLASTIC_FLOWS;         // per eruption of an explosive volcano
+    public static final ModConfigSpec.DoubleValue PYROCLASTIC_FLOW_REACH;
+    public static final ModConfigSpec.BooleanValue VOLCANIC_GAS;          // CO2 in hollows while restless
+    public static final ModConfigSpec.DoubleValue ASH_WEATHERING;         // how fast ash washes off, 0 never
+    public static final ModConfigSpec.BooleanValue ASH_LOAD_COLLAPSES_ROOFS;
+    public static final ModConfigSpec.BooleanValue SOIL_FROM_BEDROCK;     // default ON
+    public static final ModConfigSpec.BooleanValue SOIL_UNDER_GRASS;      // that soil under its turf, by the climate
 
     // --- Cooldown / recharge cycle -----------------------------------------
-    public static final ForgeConfigSpec.IntValue COOLDOWN_TICKS_MIN;  // e.g. 5 min = 6000
-    public static final ForgeConfigSpec.IntValue COOLDOWN_TICKS_MAX;  // e.g. 10 min = 12000
-    public static final ForgeConfigSpec.DoubleValue RECHARGE_INTAKE_FRACTION; // % of surface water sucked back (0.20)
-    public static final ForgeConfigSpec.IntValue CONE_BUILD_ERUPTIONS; // eruptions before cone forms
-    public static final ForgeConfigSpec.IntValue ERUPTION_TICKS_PER_MAGNITUDE; // spout duration per size unit
-    public static final ForgeConfigSpec.IntValue WATER_SPOUT_MAX_TICKS;         // hard cap on the water phase
-    public static final ForgeConfigSpec.BooleanValue TRAVERTINE_ENABLED;        // sinter terraces on runoff
-    public static final ForgeConfigSpec.DoubleValue TRAVERTINE_DEPOSIT_CHANCE;  // per-attempt deposit odds
+    public static final ModConfigSpec.IntValue COOLDOWN_TICKS_MIN;  // e.g. 5 min = 6000
+    public static final ModConfigSpec.IntValue COOLDOWN_TICKS_MAX;  // e.g. 10 min = 12000
+    public static final ModConfigSpec.DoubleValue RECHARGE_INTAKE_FRACTION; // % of surface water sucked back (0.20)
+    public static final ModConfigSpec.IntValue CONE_BUILD_ERUPTIONS; // eruptions before cone forms
+    public static final ModConfigSpec.IntValue ERUPTION_TICKS_PER_MAGNITUDE; // spout duration per size unit
+    public static final ModConfigSpec.IntValue WATER_SPOUT_MAX_TICKS;         // hard cap on the water phase
+    public static final ModConfigSpec.BooleanValue TRAVERTINE_ENABLED;        // sinter terraces on runoff
+    public static final ModConfigSpec.DoubleValue TRAVERTINE_DEPOSIT_CHANCE;  // per-attempt deposit odds
 
 
     // --- Tectonics (plate + fault-line model) -------------------------------
-    public static final ForgeConfigSpec.BooleanValue TECTONICS_ENABLED;
-    public static final ForgeConfigSpec.DoubleValue PLATE_SCALE;  // blocks per plate cell
-    public static final ForgeConfigSpec.DoubleValue PLATE_JITTER; // 0 = square grid, 1 = very irregular
-    public static final ForgeConfigSpec.DoubleValue FAULT_WIDTH;  // blocks either side counted as "on the fault"
+    public static final ModConfigSpec.BooleanValue TECTONICS_ENABLED;
+    public static final ModConfigSpec.DoubleValue PLATE_SCALE;  // blocks per plate cell
+    public static final ModConfigSpec.DoubleValue PLATE_JITTER; // 0 = square grid, 1 = very irregular
+    public static final ModConfigSpec.DoubleValue FAULT_WIDTH;  // blocks either side counted as "on the fault"
 
     // --- Hotspots (intraplate mantle plumes) --------------------------------
-    public static final ForgeConfigSpec.BooleanValue HOTSPOTS_ENABLED;
-    public static final ForgeConfigSpec.DoubleValue HOTSPOT_SCALE;        // grid cell size, blocks
-    public static final ForgeConfigSpec.DoubleValue HOTSPOT_DENSITY;      // fraction of cells with a plume
-    public static final ForgeConfigSpec.DoubleValue HOTSPOT_RADIUS;       // active dome radius, blocks
-    public static final ForgeConfigSpec.DoubleValue HOTSPOT_TRAIL_LENGTH; // extinct chain length, blocks
-    public static final ForgeConfigSpec.BooleanValue BIOME_ANCHORING;      // settle on thermal biomes
-    public static final ForgeConfigSpec.DoubleValue HOTSPOT_FEATURE_BOOST; // geyser-basin density multiplier
-    public static final ForgeConfigSpec.DoubleValue HOTSPOT_BASIN_SCALE;   // geyser basin grid, blocks
-    public static final ForgeConfigSpec.DoubleValue HOTSPOT_BASIN_DENSITY; // fraction of cells that are basins
+    public static final ModConfigSpec.BooleanValue HOTSPOTS_ENABLED;
+    public static final ModConfigSpec.DoubleValue HOTSPOT_SCALE;        // grid cell size, blocks
+    public static final ModConfigSpec.DoubleValue HOTSPOT_DENSITY;      // fraction of cells with a plume
+    public static final ModConfigSpec.DoubleValue HOTSPOT_RADIUS;       // active dome radius, blocks
+    public static final ModConfigSpec.DoubleValue HOTSPOT_TRAIL_LENGTH; // extinct chain length, blocks
+    public static final ModConfigSpec.BooleanValue BIOME_ANCHORING;      // settle on thermal biomes
+    public static final ModConfigSpec.DoubleValue HOTSPOT_FEATURE_BOOST; // geyser-basin density multiplier
+    public static final ModConfigSpec.DoubleValue HOTSPOT_BASIN_SCALE;   // geyser basin grid, blocks
+    public static final ModConfigSpec.DoubleValue HOTSPOT_BASIN_DENSITY; // fraction of cells that are basins
 
     // --- Depth scale (blocks to real metres) --------------------------------
-    public static final ForgeConfigSpec.DoubleValue METRES_PER_BLOCK;
-    public static final ForgeConfigSpec.DoubleValue METRES_PER_BLOCK_HORIZONTAL;
+    public static final ModConfigSpec.DoubleValue METRES_PER_BLOCK;
+    public static final ModConfigSpec.DoubleValue METRES_PER_BLOCK_HORIZONTAL;
 
     // --- Tectonic feature placement ----------------------------------------
-    public static final ForgeConfigSpec.BooleanValue TECTONIC_PLACEMENT;   // gate geysers/springs on geology
-    public static final ForgeConfigSpec.DoubleValue VOLCANO_SPAWN_CHANCE;  // per-chunk, before suitability
-    public static final ForgeConfigSpec.BooleanValue LARGE_VOLCANOES;      // raised with new terrain
-    public static final ForgeConfigSpec.DoubleValue LARGE_VOLCANO_CHANCE;  // share of suitable sites
-    public static final ForgeConfigSpec.BooleanValue OCEAN_VOLCANOES;      // islands, atolls, guyots
+    public static final ModConfigSpec.BooleanValue TECTONIC_PLACEMENT;   // gate geysers/springs on geology
+    public static final ModConfigSpec.DoubleValue VOLCANO_SPAWN_CHANCE;  // per-chunk, before suitability
+    public static final ModConfigSpec.BooleanValue LARGE_VOLCANOES;      // raised with new terrain
+    public static final ModConfigSpec.DoubleValue LARGE_VOLCANO_CHANCE;  // share of suitable sites
+    public static final ModConfigSpec.BooleanValue OCEAN_VOLCANOES;      // islands, atolls, guyots
 
-    public static final ForgeConfigSpec.DoubleValue OCEAN_TRAIL_LENGTH;    // a plume's track through the sea, blocks
-    public static final ForgeConfigSpec.BooleanValue DEEP_STRUCTURE_ENABLED;
-    public static final ForgeConfigSpec.BooleanValue DEEP_SURFACE_OUTCROP;  // boundary rock reaches daylight
-    public static final ForgeConfigSpec.IntValue DEEP_SOIL_DEPTH;           // topsoil left untouched
-    public static final ForgeConfigSpec.BooleanValue OCEANIC_RIDGE_ENABLED;
-    public static final ForgeConfigSpec.BooleanValue GEOLOGY_AT_GENERATION; // deep geology written as chunks generate
-    public static final ForgeConfigSpec.BooleanValue ORE_GENESIS_ENABLED;   // ore laid down by tectonic setting
-    public static final ForgeConfigSpec.BooleanValue PETROLEUM;             // oil and gas fields in the basins
-    public static final ForgeConfigSpec.DoubleValue PETROLEUM_CHANCE;       // share of basin grid cells with a field
-    public static final ForgeConfigSpec.BooleanValue FOSSIL_BEDS;            // Jurassic Reborn fossils laid by the geology
+    public static final ModConfigSpec.DoubleValue OCEAN_TRAIL_LENGTH;    // a plume's track through the sea, blocks
+    public static final ModConfigSpec.BooleanValue DEEP_STRUCTURE_ENABLED;
+    public static final ModConfigSpec.BooleanValue DEEP_SURFACE_OUTCROP;  // boundary rock reaches daylight
+    public static final ModConfigSpec.IntValue DEEP_SOIL_DEPTH;           // topsoil left untouched
+    public static final ModConfigSpec.BooleanValue OCEANIC_RIDGE_ENABLED;
+    public static final ModConfigSpec.BooleanValue GEOLOGY_AT_GENERATION; // deep geology written as chunks generate
+    public static final ModConfigSpec.BooleanValue ORE_GENESIS_ENABLED;   // ore laid down by tectonic setting
+    public static final ModConfigSpec.BooleanValue PETROLEUM;             // oil and gas fields in the basins
+    public static final ModConfigSpec.DoubleValue PETROLEUM_CHANCE;       // share of basin grid cells with a field
+    public static final ModConfigSpec.BooleanValue FOSSIL_BEDS;            // Jurassic Reborn fossils laid by the geology
 
     // --- Earthquakes --------------------------------------------------------
-    public static final ForgeConfigSpec.BooleanValue QUAKES_ENABLED;
-    public static final ForgeConfigSpec.BooleanValue QUAKES_BREAK_BUILDS;  // default OFF
-    public static final ForgeConfigSpec.BooleanValue UNSUPPORTED_BLOCKS_FALL;   // default ON
-    public static final ForgeConfigSpec.BooleanValue FALLING_INCLUDES_BUILDS;   // default ON
-    public static final ForgeConfigSpec.BooleanValue QUAKE_CAVE_COLLAPSE;       // cave roofs come down
-    public static final ForgeConfigSpec.BooleanValue QUAKE_PRESERVES_ORES;      // ore stays put in a quake
-    public static final ForgeConfigSpec.IntValue CAVE_COLLAPSE_DEPTH;           // how deep a probe looks
-    public static final ForgeConfigSpec.IntValue QUAKE_BLOCKS_PER_TICK;    // main-thread apply budget
-    public static final ForgeConfigSpec.IntValue QUAKE_WARNING_TICKS;      // alert window before the ground moves
-    public static final ForgeConfigSpec.BooleanValue QUAKE_CHAT;           // quake alerts in chat, not over the hotbar
-    public static final ForgeConfigSpec.IntValue QUAKE_FELT_RANGE;         // farthest a quake's shaking is felt
-    public static final ForgeConfigSpec.IntValue QUAKE_DAMAGE_RANGE;       // farthest the shaking loosens builds
-    public static final ForgeConfigSpec.BooleanValue QUAKE_AFTERSHOCKS;
-    public static final ForgeConfigSpec.BooleanValue QUAKE_LIQUEFACTION;
-    public static final ForgeConfigSpec.BooleanValue QUAKE_LANDSLIDES;
-    public static final ForgeConfigSpec.BooleanValue RAIN_LANDSLIDES;
-    public static final ForgeConfigSpec.DoubleValue RAIN_LANDSLIDE_RATE;
-    public static final ForgeConfigSpec.DoubleValue AFTERSHOCK_RATE;
-    public static final ForgeConfigSpec.IntValue AFTERSHOCK_MAX;
-    public static final ForgeConfigSpec.DoubleValue AFTERSHOCK_DAYS;
-    public static final ForgeConfigSpec.DoubleValue FORESHOCK_SHARE;
-    public static final ForgeConfigSpec.IntValue QUAKE_AMBIENT_INTERVAL;   // ticks between ambient rolls
-    public static final ForgeConfigSpec.DoubleValue QUAKE_RECURRENCE_DAYS; // mean interval between ruptures
-    public static final ForgeConfigSpec.BooleanValue SMALL_QUAKES;         // magnitude 2.5 to 5 on the faults
-    public static final ForgeConfigSpec.BooleanValue INDUCED_QUAKES;       // small quakes under a producing oil field
-    public static final ForgeConfigSpec.DoubleValue INDUCED_QUAKE_RATE;
-    public static final ForgeConfigSpec.DoubleValue SMALL_QUAKE_RATE;      // small quakes a day per stretch
-    public static final ForgeConfigSpec.DoubleValue QUAKE_FELT_FLOOR;      // the faintest shaking felt
-    public static final ForgeConfigSpec.BooleanValue QUAKE_INFO_NEEDS_INSTRUMENT; // size and place only off an instrument
-    public static final ForgeConfigSpec.IntValue QUAKE_MAX_FISSURE_DEPTH;  // divergent rift depth cap
-    public static final ForgeConfigSpec.IntValue QUAKE_MAX_RUPTURE;        // cap on rupture length, blocks
-    public static final ForgeConfigSpec.IntValue QUAKE_PENDING_LIMIT;      // deferred edits held for unloaded chunks
-    public static final ForgeConfigSpec.IntValue QUAKE_MAX_EDITS;          // hard cap on one quake
-    public static final ForgeConfigSpec.IntValue TICK_BUDGET_MS;           // wall-clock brake, whole mod
-    public static final ForgeConfigSpec.BooleanValue QUAKE_LAYERED;        // move the whole fault at once
-    public static final ForgeConfigSpec.IntValue DEEP_STRUCTURE_BUDGET;    // block edits per chunk
+    public static final ModConfigSpec.BooleanValue QUAKES_ENABLED;
+    public static final ModConfigSpec.BooleanValue QUAKES_BREAK_BUILDS;  // default OFF
+    public static final ModConfigSpec.BooleanValue UNSUPPORTED_BLOCKS_FALL;   // default ON
+    public static final ModConfigSpec.BooleanValue FALLING_INCLUDES_BUILDS;   // default ON
+    public static final ModConfigSpec.BooleanValue QUAKE_CAVE_COLLAPSE;       // cave roofs come down
+    public static final ModConfigSpec.BooleanValue QUAKE_PRESERVES_ORES;      // ore stays put in a quake
+    public static final ModConfigSpec.IntValue CAVE_COLLAPSE_DEPTH;           // how deep a probe looks
+    public static final ModConfigSpec.IntValue QUAKE_BLOCKS_PER_TICK;    // main-thread apply budget
+    public static final ModConfigSpec.IntValue QUAKE_WARNING_TICKS;      // alert window before the ground moves
+    public static final ModConfigSpec.BooleanValue QUAKE_CHAT;           // quake alerts in chat, not over the hotbar
+    public static final ModConfigSpec.IntValue QUAKE_FELT_RANGE;         // farthest a quake's shaking is felt
+    public static final ModConfigSpec.IntValue QUAKE_DAMAGE_RANGE;       // farthest the shaking loosens builds
+    public static final ModConfigSpec.BooleanValue QUAKE_AFTERSHOCKS;
+    public static final ModConfigSpec.BooleanValue QUAKE_LIQUEFACTION;
+    public static final ModConfigSpec.BooleanValue QUAKE_LANDSLIDES;
+    public static final ModConfigSpec.BooleanValue RAIN_LANDSLIDES;
+    public static final ModConfigSpec.DoubleValue RAIN_LANDSLIDE_RATE;
+    public static final ModConfigSpec.DoubleValue AFTERSHOCK_RATE;
+    public static final ModConfigSpec.IntValue AFTERSHOCK_MAX;
+    public static final ModConfigSpec.DoubleValue AFTERSHOCK_DAYS;
+    public static final ModConfigSpec.DoubleValue FORESHOCK_SHARE;
+    public static final ModConfigSpec.IntValue QUAKE_AMBIENT_INTERVAL;   // ticks between ambient rolls
+    public static final ModConfigSpec.DoubleValue QUAKE_RECURRENCE_DAYS; // mean interval between ruptures
+    public static final ModConfigSpec.BooleanValue SMALL_QUAKES;         // magnitude 2.5 to 5 on the faults
+    public static final ModConfigSpec.BooleanValue INDUCED_QUAKES;       // small quakes under a producing oil field
+    public static final ModConfigSpec.DoubleValue INDUCED_QUAKE_RATE;
+    public static final ModConfigSpec.DoubleValue SMALL_QUAKE_RATE;      // small quakes a day per stretch
+    public static final ModConfigSpec.DoubleValue QUAKE_FELT_FLOOR;      // the faintest shaking felt
+    public static final ModConfigSpec.BooleanValue QUAKE_INFO_NEEDS_INSTRUMENT; // size and place only off an instrument
+    public static final ModConfigSpec.IntValue QUAKE_MAX_FISSURE_DEPTH;  // divergent rift depth cap
+    public static final ModConfigSpec.IntValue QUAKE_MAX_RUPTURE;        // cap on rupture length, blocks
+    public static final ModConfigSpec.IntValue QUAKE_PENDING_LIMIT;      // deferred edits held for unloaded chunks
+    public static final ModConfigSpec.IntValue QUAKE_MAX_EDITS;          // hard cap on one quake
+    public static final ModConfigSpec.IntValue TICK_BUDGET_MS;           // wall-clock brake, whole mod
+    public static final ModConfigSpec.BooleanValue QUAKE_LAYERED;        // move the whole fault at once
+    public static final ModConfigSpec.IntValue DEEP_STRUCTURE_BUDGET;    // block edits per chunk
 
     // --- Sulfur -------------------------------------------------------------
-    public static final ForgeConfigSpec.BooleanValue SULFUR_ENABLED;
-    public static final ForgeConfigSpec.DoubleValue SULFUR_DEPOSIT_CHANCE;
+    public static final ModConfigSpec.BooleanValue SULFUR_ENABLED;
+    public static final ModConfigSpec.DoubleValue SULFUR_DEPOSIT_CHANCE;
 
     // --- Integration with other mods ----------------------------------------
-    public static final ForgeConfigSpec.BooleanValue SUGGEST_OPTIONAL_MODS;   // default ON
-    public static final ForgeConfigSpec.BooleanValue TFC_COMPAT;             // write TFC blocks on a TFC world
-    public static final ForgeConfigSpec.IntValue STALL_REPORT_SECONDS;       // default 30, 0 = off
-    public static final ForgeConfigSpec.BooleanValue UPDATE_NOTICE;
-    public static final ForgeConfigSpec.BooleanValue OLDER_WORLD_NOTICE;
-    public static final ForgeConfigSpec.BooleanValue DH_TERRAIN;
-    public static final ForgeConfigSpec.BooleanValue REMOVED_MOD_BLOCKS;     // a removed mod's rock stays rock
-    public static final ForgeConfigSpec.ConfigValue<java.util.List<? extends String>> REMOVED_MOD_BLOCK_RULES;
-    public static final ForgeConfigSpec.BooleanValue UNIFY_ORES;                 // one ore of a kind in new chunks
-    public static final ForgeConfigSpec.ConfigValue<java.util.List<? extends String>> UNIFY_ORES_ORDER;
-    public static final ForgeConfigSpec.BooleanValue UNIFY_EXISTING_CHUNKS;
-    public static final ForgeConfigSpec.BooleanValue GEOLOGICAL_MOD_ORES;         // mod ores in their deposits
-    public static final ForgeConfigSpec.BooleanValue VERBOSE_LOG;            // default OFF
+    public static final ModConfigSpec.BooleanValue SUGGEST_OPTIONAL_MODS;   // default ON
+    public static final ModConfigSpec.BooleanValue TFC_COMPAT;             // write TFC blocks on a TFC world
+    public static final ModConfigSpec.IntValue STALL_REPORT_SECONDS;       // default 30, 0 = off
+    public static final ModConfigSpec.BooleanValue UPDATE_NOTICE;
+    public static final ModConfigSpec.BooleanValue OLDER_WORLD_NOTICE;
+    public static final ModConfigSpec.BooleanValue DH_TERRAIN;
+    public static final ModConfigSpec.BooleanValue REMOVED_MOD_BLOCKS;     // a removed mod's rock stays rock
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> REMOVED_MOD_BLOCK_RULES;
+    public static final ModConfigSpec.BooleanValue UNIFY_ORES;                 // one ore of a kind in new chunks
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> UNIFY_ORES_ORDER;
+    public static final ModConfigSpec.BooleanValue UNIFY_EXISTING_CHUNKS;
+    public static final ModConfigSpec.BooleanValue GEOLOGICAL_MOD_ORES;         // mod ores in their deposits
+    public static final ModConfigSpec.BooleanValue VERBOSE_LOG;            // default OFF
 
     // --- Hydrology (groundwater) ---------------------------------------------
-    public static final ForgeConfigSpec.BooleanValue RIVERS;                 // default ON, experimental
-    public static final ForgeConfigSpec.BooleanValue RIVERS_REFILL;          // lost river water comes back
-    public static final ForgeConfigSpec.BooleanValue SOIL_WATER;             // the ground's water, kept per chunk
-    public static final ForgeConfigSpec.BooleanValue SOIL_WATER_TINT;        // grass coloured by the water in the ground
-    public static final ForgeConfigSpec.BooleanValue SOIL_WATER_GROUND;      // grass dying back, mud, rain-fed farmland
-    public static final ForgeConfigSpec.BooleanValue SEA_WATER_SALTY;        // sea water waters no field
-    public static final ForgeConfigSpec.BooleanValue DAMS;                   // dammed rivers fill; weak dams break
-    public static final ForgeConfigSpec.BooleanValue WATER_LOAD_COLLAPSE;    // cave roofs under new water, drained karst
-    public static final ForgeConfigSpec.DoubleValue SINKHOLE_WARNING_DAYS;    // days a drawn-down karst roof takes to fall
-    public static final ForgeConfigSpec.DoubleValue SUBSIDENCE;               // clay settling over ground the wells drew down
-    public static final ForgeConfigSpec.BooleanValue REGIONAL_RAIN;           // storms instead of one weather for the world
-    public static final ForgeConfigSpec.DoubleValue RAIN_AMOUNT;              // how much of the land the weather keeps under rain
-    public static final ForgeConfigSpec.DoubleValue RAIN_STRENGTH;            // how hard the storms rain
-    public static final ForgeConfigSpec.DoubleValue STORM_LENGTH;             // how long the storms last
-    public static final ForgeConfigSpec.DoubleValue STORM_SIZE;               // how wide the storms are
-    public static final ForgeConfigSpec.BooleanValue PUDDLES;                 // the mod's own puddles, without Puddles & Floods
-    public static final ForgeConfigSpec.BooleanValue RIVER_SPILLS;            // a river runs out through a bank taken away
-    public static final ForgeConfigSpec.BooleanValue STREAMS_DRY_UP;          // a well's cone dries the small streams over it
-    public static final ForgeConfigSpec.BooleanValue RIVER_FLOODS;            // rivers over their banks in heavy rain on soaked ground
-    public static final ForgeConfigSpec.BooleanValue SEASONAL_RIVERS;         // the rivers' high water of their season (Serene Seasons)
-    public static final ForgeConfigSpec.BooleanValue HOLLOW_PONDS;            // rain running off into closed hollows stands there as ponds
-    public static final ForgeConfigSpec.BooleanValue LAKE_LEVELS;             // lakes down a block in a long drought
-    public static final ForgeConfigSpec.BooleanValue KARST;                  // rivers sink, caves, sinkholes
-    public static final ForgeConfigSpec.BooleanValue WATER_TABLE_ENABLED;
-    public static final ForgeConfigSpec.DoubleValue WATER_TABLE_SUBDUAL;      // relief it copies, 0..1
-    public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_TEMPERATE; // blocks below the land
-    public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_ARID;
-    public static final ForgeConfigSpec.IntValue WATER_TABLE_DEPTH_HUMID;
-    public static final ForgeConfigSpec.BooleanValue SPRING_RENEWAL_ENABLED;
-    public static final ForgeConfigSpec.BooleanValue QUAKES_BREAK_STRUCTURES;
-    public static final ForgeConfigSpec.ConfigValue<java.util.List<? extends String>> BUILDING_MODS;
-    public static final ForgeConfigSpec.BooleanValue SHAKING_LOOSENS_BUILDS;
-    public static final ForgeConfigSpec.DoubleValue SHAKING_DAMAGE;
-    public static final ForgeConfigSpec.BooleanValue SHAKING_FELLS_TREES;
-    public static final ForgeConfigSpec.DoubleValue SPRING_STAGE_ONE_DAYS;
-    public static final ForgeConfigSpec.DoubleValue SPRING_STAGE_TWO_DAYS;
-    public static final ForgeConfigSpec.DoubleValue SPRING_STAGE_THREE_DAYS;
-    public static final ForgeConfigSpec.BooleanValue QUAKES_OPEN_NEW_SPRINGS;
-    public static final ForgeConfigSpec.DoubleValue QUAKE_SPRING_CHANCE;   // per magnitude over 3
-    public static final ForgeConfigSpec.DoubleValue OCEAN_SHARE;           // share of plates that are oceanic (own terrain)
-    public static final ForgeConfigSpec.DoubleValue TERRAIN_BELT_FACTOR;   // mountain belt width, in fault widths
-    public static final ForgeConfigSpec.DoubleValue TERRAIN_UPLIFT;        // blocks a collision lifts the ground
-    public static final ForgeConfigSpec.DoubleValue DEM_HEIGHT_SCALE;      // how much the real mountain crops are exaggerated
-    public static final ForgeConfigSpec.BooleanValue LITHOLOGY;           // rock sequences under the ground (own terrain)
-    public static final ForgeConfigSpec.IntValue STEEP_RISE;              // rise in two blocks that bares a slope
-    public static final ForgeConfigSpec.IntValue HUMID_STEEP_RISE;        // the same, wet and under the tree line
-    public static final ForgeConfigSpec.DoubleValue TALUS_GREENING;       // share of low scree grown over
-    public static final ForgeConfigSpec.DoubleValue LEDGE_GREENING;       // share of a wet cliff's ledges green
-    public static final ForgeConfigSpec.DoubleValue ALLUVIAL_CROP_GROWTH; // how much faster crops ripen on a floodplain
+    public static final ModConfigSpec.BooleanValue RIVERS;                 // default ON, experimental
+    public static final ModConfigSpec.BooleanValue RIVERS_REFILL;          // lost river water comes back
+    public static final ModConfigSpec.BooleanValue SOIL_WATER;             // the ground's water, kept per chunk
+    public static final ModConfigSpec.BooleanValue SOIL_WATER_TINT;        // grass coloured by the water in the ground
+    public static final ModConfigSpec.BooleanValue SOIL_WATER_GROUND;      // grass dying back, mud, rain-fed farmland
+    public static final ModConfigSpec.BooleanValue SEA_WATER_SALTY;        // sea water waters no field
+    public static final ModConfigSpec.BooleanValue DAMS;                   // dammed rivers fill; weak dams break
+    public static final ModConfigSpec.BooleanValue WATER_LOAD_COLLAPSE;    // cave roofs under new water, drained karst
+    public static final ModConfigSpec.DoubleValue SINKHOLE_WARNING_DAYS;    // days a drawn-down karst roof takes to fall
+    public static final ModConfigSpec.DoubleValue SUBSIDENCE;               // clay settling over ground the wells drew down
+    public static final ModConfigSpec.BooleanValue REGIONAL_RAIN;           // storms instead of one weather for the world
+    public static final ModConfigSpec.DoubleValue RAIN_AMOUNT;              // how much of the land the weather keeps under rain
+    public static final ModConfigSpec.DoubleValue RAIN_STRENGTH;            // how hard the storms rain
+    public static final ModConfigSpec.DoubleValue STORM_LENGTH;             // how long the storms last
+    public static final ModConfigSpec.DoubleValue STORM_SIZE;               // how wide the storms are
+    public static final ModConfigSpec.BooleanValue PUDDLES;                 // the mod's own puddles, without Puddles & Floods
+    public static final ModConfigSpec.BooleanValue RIVER_SPILLS;            // a river runs out through a bank taken away
+    public static final ModConfigSpec.BooleanValue STREAMS_DRY_UP;          // a well's cone dries the small streams over it
+    public static final ModConfigSpec.BooleanValue RIVER_FLOODS;            // rivers over their banks in heavy rain on soaked ground
+    public static final ModConfigSpec.BooleanValue SEASONAL_RIVERS;         // the rivers' high water of their season (Serene Seasons)
+    public static final ModConfigSpec.BooleanValue HOLLOW_PONDS;            // rain running off into closed hollows stands there as ponds
+    public static final ModConfigSpec.BooleanValue LAKE_LEVELS;             // lakes down a block in a long drought
+    public static final ModConfigSpec.BooleanValue KARST;                  // rivers sink, caves, sinkholes
+    public static final ModConfigSpec.BooleanValue WATER_TABLE_ENABLED;
+    public static final ModConfigSpec.DoubleValue WATER_TABLE_SUBDUAL;      // relief it copies, 0..1
+    public static final ModConfigSpec.IntValue WATER_TABLE_DEPTH_TEMPERATE; // blocks below the land
+    public static final ModConfigSpec.IntValue WATER_TABLE_DEPTH_ARID;
+    public static final ModConfigSpec.IntValue WATER_TABLE_DEPTH_HUMID;
+    public static final ModConfigSpec.BooleanValue SPRING_RENEWAL_ENABLED;
+    public static final ModConfigSpec.BooleanValue QUAKES_BREAK_STRUCTURES;
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> BUILDING_MODS;
+    public static final ModConfigSpec.BooleanValue SHAKING_LOOSENS_BUILDS;
+    public static final ModConfigSpec.DoubleValue SHAKING_DAMAGE;
+    public static final ModConfigSpec.BooleanValue SHAKING_FELLS_TREES;
+    public static final ModConfigSpec.DoubleValue SPRING_STAGE_ONE_DAYS;
+    public static final ModConfigSpec.DoubleValue SPRING_STAGE_TWO_DAYS;
+    public static final ModConfigSpec.DoubleValue SPRING_STAGE_THREE_DAYS;
+    public static final ModConfigSpec.BooleanValue QUAKES_OPEN_NEW_SPRINGS;
+    public static final ModConfigSpec.DoubleValue QUAKE_SPRING_CHANCE;   // per magnitude over 3
+    public static final ModConfigSpec.DoubleValue OCEAN_SHARE;           // share of plates that are oceanic (own terrain)
+    public static final ModConfigSpec.DoubleValue TERRAIN_BELT_FACTOR;   // mountain belt width, in fault widths
+    public static final ModConfigSpec.DoubleValue TERRAIN_UPLIFT;        // blocks a collision lifts the ground
+    public static final ModConfigSpec.DoubleValue DEM_HEIGHT_SCALE;      // how much the real mountain crops are exaggerated
+    public static final ModConfigSpec.BooleanValue LITHOLOGY;           // rock sequences under the ground (own terrain)
+    public static final ModConfigSpec.IntValue STEEP_RISE;              // rise in two blocks that bares a slope
+    public static final ModConfigSpec.IntValue HUMID_STEEP_RISE;        // the same, wet and under the tree line
+    public static final ModConfigSpec.DoubleValue TALUS_GREENING;       // share of low scree grown over
+    public static final ModConfigSpec.DoubleValue LEDGE_GREENING;       // share of a wet cliff's ledges green
+    public static final ModConfigSpec.DoubleValue ALLUVIAL_CROP_GROWTH; // how much faster crops ripen on a floodplain
 
     // --- Instruments ---------------------------------------------------------
-    public static final ForgeConfigSpec.IntValue SEISMOGRAPH_RANGE;   // blocks a station can hear
-    public static final ForgeConfigSpec.DoubleValue SEISMOGRAPH_SIREN; // magnitude from which a station wails, not chimes
-    public static final ForgeConfigSpec.IntValue TURBINE_MAX_FE;      // FE/t of a turbine over the hottest ground
-    public static final ForgeConfigSpec.IntValue TURBINE_MIN_FE;      // FE/t over the faintest heat it runs on
-    public static final ForgeConfigSpec.IntValue TURBINE_WELL_DEPTH;  // lengths of casing a well may run to
-    public static final ForgeConfigSpec.IntValue WELL_PUMP_RATE;      // mB/t a well pump lifts at most
-    public static final ForgeConfigSpec.IntValue WELL_PUMP_ENERGY;    // FE a bucket a block of lift
-    public static final ForgeConfigSpec.IntValue CORE_DRILL_DEPTH;    // blocks the hand core drill bores down
+    public static final ModConfigSpec.IntValue SEISMOGRAPH_RANGE;   // blocks a station can hear
+    public static final ModConfigSpec.DoubleValue SEISMOGRAPH_SIREN; // magnitude from which a station wails, not chimes
+    public static final ModConfigSpec.IntValue TURBINE_MAX_FE;      // FE/t of a turbine over the hottest ground
+    public static final ModConfigSpec.IntValue TURBINE_MIN_FE;      // FE/t over the faintest heat it runs on
+    public static final ModConfigSpec.IntValue TURBINE_WELL_DEPTH;  // lengths of casing a well may run to
+    public static final ModConfigSpec.IntValue WELL_PUMP_RATE;      // mB/t a well pump lifts at most
+    public static final ModConfigSpec.IntValue WELL_PUMP_ENERGY;    // FE a bucket a block of lift
+    public static final ModConfigSpec.IntValue CORE_DRILL_DEPTH;    // blocks the hand core drill bores down
     static {
-        ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
+        ModConfigSpec.Builder b = new ModConfigSpec.Builder();
 
         b.push("thermodynamics");
         HEAT_PER_LAVA_NEIGHBOR = b

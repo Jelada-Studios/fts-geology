@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.blockentity;
 
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import com.jeladastudios.ftsgeology.block.ThermoelectricBlock;
 import com.jeladastudios.ftsgeology.gas.block.entity.GasValveBlockEntity;
 import com.jeladastudios.ftsgeology.gas.block.entity.MachineEnergy;
@@ -18,11 +20,11 @@ import net.minecraft.world.level.block.CampfireBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
-import net.minecraftforge.common.capabilities.Capability;
-import net.minecraftforge.common.capabilities.ForgeCapabilities;
-import net.minecraftforge.common.util.LazyOptional;
-import net.minecraftforge.energy.IEnergyStorage;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.common.capabilities.Capability;
+import net.neoforged.neoforge.common.capabilities.ForgeCapabilities;
+import net.neoforged.neoforge.common.util.LazyOptional;
+import net.neoforged.neoforge.energy.IEnergyStorage;
+import net.neoforged.neoforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -101,7 +103,7 @@ public class ThermoelectricBlockEntity extends BlockEntity {
         // A standing gas flame with the plate in it.
         double vent = com.jeladastudios.ftsgeology.gas.world.GasManager.get(level).flames().heatAt(at);
         if (vent > 0) return Math.min(1300, 600 + vent);
-        ResourceLocation id = ForgeRegistries.BLOCKS.getKey(s.getBlock());
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(s.getBlock());
         if (id != null && "fts_geology".equals(id.getNamespace())) {
             switch (id.getPath()) {
                 case "steam_vent" -> { return 140; }

@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": {
+    "item": "fts_geology:chert"
+  },
+  "result": {
+    "id": "fts_geology:chert_stairs",
+    "count": 1
+  }
+}

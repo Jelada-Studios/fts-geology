@@ -1,50 +1,50 @@
 package com.jeladastudios.ftsgeology.gas;
 
-import net.minecraftforge.common.ForgeConfigSpec;
+import net.neoforged.neoforge.common.ModConfigSpec;
 
 public final class GasConfig {
-    public static final ForgeConfigSpec SPEC;
+    public static final ModConfigSpec SPEC;
 
     // Simulation
-    public static final ForgeConfigSpec.BooleanValue ENABLED;
-    public static final ForgeConfigSpec.IntValue CELL_BUDGET;
-    public static final ForgeConfigSpec.IntValue SWEEP_INTERVAL;
-    public static final ForgeConfigSpec.IntValue SIM_RADIUS_CHUNKS;
-    public static final ForgeConfigSpec.IntValue MAX_CELLS;
-    public static final ForgeConfigSpec.DoubleValue DIFFUSION;
-    public static final ForgeConfigSpec.DoubleValue PRESSURE_FLOW;
-    public static final ForgeConfigSpec.DoubleValue BUOYANCY;
-    public static final ForgeConfigSpec.DoubleValue SKY_VENT;
-    public static final ForgeConfigSpec.DoubleValue CONDENSATION;
-    public static final ForgeConfigSpec.DoubleValue ROCK_EXCHANGE_DAYS;
+    public static final ModConfigSpec.BooleanValue ENABLED;
+    public static final ModConfigSpec.IntValue CELL_BUDGET;
+    public static final ModConfigSpec.IntValue SWEEP_INTERVAL;
+    public static final ModConfigSpec.IntValue SIM_RADIUS_CHUNKS;
+    public static final ModConfigSpec.IntValue MAX_CELLS;
+    public static final ModConfigSpec.DoubleValue DIFFUSION;
+    public static final ModConfigSpec.DoubleValue PRESSURE_FLOW;
+    public static final ModConfigSpec.DoubleValue BUOYANCY;
+    public static final ModConfigSpec.DoubleValue SKY_VENT;
+    public static final ModConfigSpec.DoubleValue CONDENSATION;
+    public static final ModConfigSpec.DoubleValue ROCK_EXCHANGE_DAYS;
 
     // Explosions
-    public static final ForgeConfigSpec.DoubleValue EXPLOSION_SCALE;
-    public static final ForgeConfigSpec.DoubleValue MAX_EXPLOSION_POWER;
-    public static final ForgeConfigSpec.IntValue MAX_EXPLOSIONS_PER_TICK;
-    public static final ForgeConfigSpec.BooleanValue EXPLOSIONS_BREAK_BLOCKS;
-    public static final ForgeConfigSpec.BooleanValue EXPLOSIONS_SPAWN_FIRE;
+    public static final ModConfigSpec.DoubleValue EXPLOSION_SCALE;
+    public static final ModConfigSpec.DoubleValue MAX_EXPLOSION_POWER;
+    public static final ModConfigSpec.IntValue MAX_EXPLOSIONS_PER_TICK;
+    public static final ModConfigSpec.BooleanValue EXPLOSIONS_BREAK_BLOCKS;
+    public static final ModConfigSpec.BooleanValue EXPLOSIONS_SPAWN_FIRE;
 
     // Ignition
-    public static final ForgeConfigSpec.BooleanValue TORCHES_IGNITE;
-    public static final ForgeConfigSpec.DoubleValue MINING_SPARK_CHANCE;
-    public static final ForgeConfigSpec.DoubleValue FLASHBACK_CHANCE;
+    public static final ModConfigSpec.BooleanValue TORCHES_IGNITE;
+    public static final ModConfigSpec.DoubleValue MINING_SPARK_CHANCE;
+    public static final ModConfigSpec.DoubleValue FLASHBACK_CHANCE;
 
     // Health
-    public static final ForgeConfigSpec.BooleanValue HEALTH_EFFECTS;
-    public static final ForgeConfigSpec.BooleanValue SMELL_MESSAGES;
+    public static final ModConfigSpec.BooleanValue HEALTH_EFFECTS;
+    public static final ModConfigSpec.BooleanValue SMELL_MESSAGES;
 
     // World
-    public static final ForgeConfigSpec.DoubleValue FIREDAMP_CHANCE;
-    public static final ForgeConfigSpec.DoubleValue KARST_CO2_CHANCE;
-    public static final ForgeConfigSpec.BooleanValue VOLCANO_GAS;
-    public static final ForgeConfigSpec.BooleanValue COAL_RELEASES_METHANE;
-    public static final ForgeConfigSpec.DoubleValue OUTBURST_CHANCE;
-    public static final ForgeConfigSpec.BooleanValue SWAMP_GAS;
-    public static final ForgeConfigSpec.DoubleValue SEEP_CHANCE;
+    public static final ModConfigSpec.DoubleValue FIREDAMP_CHANCE;
+    public static final ModConfigSpec.DoubleValue KARST_CO2_CHANCE;
+    public static final ModConfigSpec.BooleanValue VOLCANO_GAS;
+    public static final ModConfigSpec.BooleanValue COAL_RELEASES_METHANE;
+    public static final ModConfigSpec.DoubleValue OUTBURST_CHANCE;
+    public static final ModConfigSpec.BooleanValue SWAMP_GAS;
+    public static final ModConfigSpec.DoubleValue SEEP_CHANCE;
 
     static {
-        ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
+        ModConfigSpec.Builder b = new ModConfigSpec.Builder();
 
         b.comment("Gas simulation").push("simulation");
         ENABLED = b.comment("The gases at all: off, nothing is simulated, breathed or lit, and the machines hold their gas.")

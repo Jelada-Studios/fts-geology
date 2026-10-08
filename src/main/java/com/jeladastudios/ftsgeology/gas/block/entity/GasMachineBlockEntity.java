@@ -16,10 +16,10 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.BlockHitResult;
-import net.minecraftforge.common.capabilities.Capability;
-import net.minecraftforge.common.capabilities.ForgeCapabilities;
-import net.minecraftforge.common.util.LazyOptional;
-import net.minecraftforge.energy.IEnergyStorage;
+import net.neoforged.neoforge.common.capabilities.Capability;
+import net.neoforged.neoforge.common.capabilities.ForgeCapabilities;
+import net.neoforged.neoforge.common.util.LazyOptional;
+import net.neoforged.neoforge.energy.IEnergyStorage;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -107,7 +107,7 @@ public abstract class GasMachineBlockEntity extends BlockEntity {
     public InteractionResult onUse(Player player, InteractionHand hand, BlockHitResult hit) {
         if (player instanceof net.minecraft.server.level.ServerPlayer sp) {
             com.jeladastudios.ftsgeology.network.ModNetwork.CHANNEL.send(
-                    net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> sp),
+                    net.neoforged.neoforge.network.PacketDistributor.PLAYER.with(() -> sp),
                     new com.jeladastudios.ftsgeology.network.TerminalPacket(worldPosition, panelData(), true));
         }
         return InteractionResult.CONSUME;

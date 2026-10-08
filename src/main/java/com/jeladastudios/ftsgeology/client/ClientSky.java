@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.client;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.network.SkyPacket;
 import com.jeladastudios.ftsgeology.weather.LocalWeather;
@@ -10,12 +12,10 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -25,7 +25,7 @@ import java.util.List;
  * round them, moved on between the server's word; how much of the sky is cloud at a place, how dark and stormy, how
  * high it towers; and the lightning flickering inside the thunderclouds, with its thunder coming after.
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
 public final class ClientSky {
 
     private ClientSky() {}
@@ -176,7 +176,7 @@ public final class ClientSky {
             double len = Math.max(1e-3, Math.sqrt(dx * dx + dy * dy + dz * dz));
             level.playLocalSound(player.getX() + dx / len * 12, player.getY() + dy / len * 12, player.getZ() + dz / len * 12,
                     SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.WEATHER, t.volume(), t.pitch(), false);
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(new com.jeladastudios.ftsgeology.api.ThunderHeardEvent(t.x(), t.y(), t.z(), t.heard(), t.volume()));
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(new com.jeladastudios.ftsgeology.api.ThunderHeardEvent(t.x(), t.y(), t.z(), t.heard(), t.volume()));
             it.remove();
         }
         SkyPacket p = last;

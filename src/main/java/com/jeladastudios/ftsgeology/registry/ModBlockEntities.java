@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.registry;
 
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.blockentity.GeyserChamberBlockEntity;
 import com.jeladastudios.ftsgeology.blockentity.GeyserCoreBlockEntity;
@@ -10,14 +12,14 @@ import com.jeladastudios.ftsgeology.blockentity.SeismographBlockEntity;
 import com.jeladastudios.ftsgeology.blockentity.VolcanoCoreBlockEntity;
 import com.jeladastudios.ftsgeology.blockentity.VolcanoIgniterBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.registries.RegistryObject;
 
 public final class ModBlockEntities {
 
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
-            DeferredRegister.create(ForgeRegistries.BLOCK_ENTITY_TYPES, GeysersMod.MODID);
+            DeferredRegister.create(BuiltInRegistries.BLOCK_ENTITY_TYPE, GeysersMod.MODID);
 
     public static final RegistryObject<BlockEntityType<GeyserCoreBlockEntity>> GEYSER_CORE =
             BLOCK_ENTITIES.register("geyser_core", () -> BlockEntityType.Builder

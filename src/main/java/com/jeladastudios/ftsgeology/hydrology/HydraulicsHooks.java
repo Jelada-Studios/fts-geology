@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.hydrology;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.api.DroughtEvent;
 import com.jeladastudios.ftsgeology.api.FloodEvent;
@@ -17,12 +19,10 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -39,7 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * fissure's graben filling under water all stand down there; a dam still breaks where it cannot hold its water (the
  * hydraulics' water), and no rain pond is laid in a chunk it owns.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class HydraulicsHooks {
 
     private HydraulicsHooks() {}
@@ -114,7 +114,7 @@ public final class HydraulicsHooks {
             com.jeladastudios.ftsgeology.api.ClientFlow f = clientFlow;
             if (f == null) return null;
             if (level instanceof Level l && !l.isClientSide()) return null;
-            var server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+            var server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
             if (!(level instanceof Level) && server != null && server.isSameThread()) return null;
             return f.flow(level, pos, state);
         } catch (RuntimeException e) {
@@ -177,7 +177,7 @@ public final class HydraulicsHooks {
         FLOODED.put(k, level.getGameTime() + FLOOD_HOLD);
         if (fresh) {
             RISE.put(k, Math.max(1, rise));
-            MinecraftForge.EVENT_BUS.post(new FloodEvent(level, new ChunkPos(cx, cz), true, Math.max(1, rise)));
+            NeoForge.EVENT_BUS.post(new FloodEvent(level, new ChunkPos(cx, cz), true, Math.max(1, rise)));
         }
     }
 
@@ -194,7 +194,7 @@ public final class HydraulicsHooks {
             List<ChunkPos> chunks = new ArrayList<>(set.size());
             for (long k : set) chunks.add(new ChunkPos(k));
             set.clear();
-            MinecraftForge.EVENT_BUS.post(new RiverBlocksChangedEvent(level, chunks, c));
+            NeoForge.EVENT_BUS.post(new RiverBlocksChangedEvent(level, chunks, c));
         }
         if (!FLOODED.isEmpty() && now % 20 == 0) {
             LongArrayList over = new LongArrayList();
@@ -202,7 +202,7 @@ public final class HydraulicsHooks {
             for (long k : over) {
                 FLOODED.remove(k);
                 RISE.remove(k);
-                MinecraftForge.EVENT_BUS.post(new FloodEvent(level, new ChunkPos(k), false, 0));
+                NeoForge.EVENT_BUS.post(new FloodEvent(level, new ChunkPos(k), false, 0));
             }
         }
         if (now % 200 == 0 && !level.players().isEmpty()) droughts(level);
@@ -218,10 +218,10 @@ public final class HydraulicsHooks {
             boolean dry = DRY.contains(k);
             if (!dry && wet < DROUGHT_IN) {
                 DRY.add(k);
-                MinecraftForge.EVENT_BUS.post(new DroughtEvent(level, rx * REGION, rz * REGION, rx * REGION + REGION - 1, rz * REGION + REGION - 1, true));
+                NeoForge.EVENT_BUS.post(new DroughtEvent(level, rx * REGION, rz * REGION, rx * REGION + REGION - 1, rz * REGION + REGION - 1, true));
             } else if (dry && wet > DROUGHT_OUT) {
                 DRY.remove(k);
-                MinecraftForge.EVENT_BUS.post(new DroughtEvent(level, rx * REGION, rz * REGION, rx * REGION + REGION - 1, rz * REGION + REGION - 1, false));
+                NeoForge.EVENT_BUS.post(new DroughtEvent(level, rx * REGION, rz * REGION, rx * REGION + REGION - 1, rz * REGION + REGION - 1, false));
             }
         }
     }

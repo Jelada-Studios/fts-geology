@@ -1,5 +1,9 @@
 package com.jeladastudios.ftsgeology.hydrology;
 
+
+
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -13,11 +17,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.saveddata.SavedData;
-import net.minecraftforge.common.Tags;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.common.Tags;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,7 +35,7 @@ import java.util.List;
  * its cracks, basalt through its joints, granite and slate hardly at all, clay not at all. Times are the ground's
  * ({@link SoilWater#HOURS_PER_TICK}): a game day is a week of pumping.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class Aquifer {
 
     private Aquifer() {}

@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.compat;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.registry.ModBiomeModifiers;
@@ -19,12 +21,10 @@ import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.feature.configurations.OreConfiguration;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
-import net.minecraftforge.common.world.BiomeModifier;
-import net.minecraftforge.common.world.ModifiableBiomeInfo;
-import net.minecraftforge.event.level.ChunkEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.common.world.BiomeModifier;
+import net.neoforged.neoforge.common.world.ModifiableBiomeInfo;
+import net.neoforged.neoforge.event.level.ChunkEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -51,7 +51,7 @@ import java.util.Set;
  * ({@code OreGenesis.MOD_METALS}) are taken out, and {@code OreGenesis} lays the kept ores in deposits of their own:
  * tin in greisen, lead and zinc in limestone, chromium in ophiolite, uranium in sandstone.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class OreUnification {
 
     private OreUnification() {}
@@ -96,7 +96,7 @@ public final class OreUnification {
      */
     public static boolean geological() {
         if (!GeyserConfig.GEOLOGICAL_MOD_ORES.get() || com.jeladastudios.ftsgeology.compat.tfc.TfcCompat.active()) return false;
-        net.minecraft.server.MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+        net.minecraft.server.MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
         if (server == null) return false;
         var stem = server.registryAccess().registryOrThrow(Registries.LEVEL_STEM).get(net.minecraft.world.level.dimension.LevelStem.OVERWORLD);
         return stem != null && com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(stem.generator());
@@ -183,9 +183,9 @@ public final class OreUnification {
         return out;
     }
 
-    private static final TagKey<Block> IN_STONE = TagKey.create(Registries.BLOCK, new ResourceLocation("forge", "ores_in_ground/stone"));
-    private static final TagKey<Block> IN_DEEPSLATE = TagKey.create(Registries.BLOCK, new ResourceLocation("forge", "ores_in_ground/deepslate"));
-    private static final TagKey<Block> IN_NETHERRACK = TagKey.create(Registries.BLOCK, new ResourceLocation("forge", "ores_in_ground/netherrack"));
+    private static final TagKey<Block> IN_STONE = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("forge", "ores_in_ground/stone"));
+    private static final TagKey<Block> IN_DEEPSLATE = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("forge", "ores_in_ground/deepslate"));
+    private static final TagKey<Block> IN_NETHERRACK = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("forge", "ores_in_ground/netherrack"));
 
     /** Rocks an ore may sit in, by name: ores in different rock are different blocks on purpose, never made one. */
     private static final String[] ROCKS = {"deepslate", "blackstone", "basalt", "netherrack", "nether", "end_stone", "endstone",

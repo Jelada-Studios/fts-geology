@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.client;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.network.LocalWeatherPacket;
 import com.jeladastudios.ftsgeology.weather.LocalWeather;
@@ -14,13 +16,11 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FogType;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
-import net.minecraftforge.client.event.ViewportEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.ViewportEvent;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 /**
  * The player's own weather on the client: what the server says of the storm over them, eased in and out a tick at a
  * time (see {@link LocalWeather}), which the sky, the rain and the shaders then read; and how the rain looks where they
@@ -31,7 +31,7 @@ import net.minecraftforge.fml.common.Mod;
  * from where the rain lands (see {@link SkyEffects#tickRain}); the sound of rain and wind on what they fall on and blow
  * through is the Feel the Nature addon's, which reads this weather.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
 public final class ClientWeather {
 
     private ClientWeather() {}

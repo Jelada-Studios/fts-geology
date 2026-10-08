@@ -557,7 +557,7 @@ public final class RiverWater {
             BlockState was = level.getBlockState(at.set(x, y, z));
             // An ore the cut came down on is covered too: no ore shows on the surface, a river's floor included. The floor
             // dug to its drawn depth (DRAWN_BEDS) reached one in a column in seventy in the tall world's mountains.
-            boolean ore = was.is(net.minecraftforge.common.Tags.Blocks.ORES) && WorldgenRevision.has(WorldgenRevision.DRAWN_BEDS);
+            boolean ore = was.is(net.neoforged.neoforge.common.Tags.Blocks.ORES) && WorldgenRevision.has(WorldgenRevision.DRAWN_BEDS);
             if (!was.is(BlockTags.DIRT) && !was.is(BlockTags.BASE_STONE_OVERWORLD) && !was.is(BlockTags.TERRACOTTA)
                     && !was.is(Blocks.SANDSTONE) && !was.is(Blocks.RED_SANDSTONE) && !ore) break;
             if (EruptionHandler.isPlayerPlaced(was)) break;

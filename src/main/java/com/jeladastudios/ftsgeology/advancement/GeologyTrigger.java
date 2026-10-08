@@ -17,7 +17,7 @@ import net.minecraft.util.GsonHelper;
  */
 public final class GeologyTrigger extends SimpleCriterionTrigger<GeologyTrigger.Instance> {
 
-    static final ResourceLocation ID = new ResourceLocation(GeysersMod.MODID, "geology");
+    static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "geology");
 
     public static final GeologyTrigger INSTANCE = CriteriaTriggers.register(new GeologyTrigger());
 

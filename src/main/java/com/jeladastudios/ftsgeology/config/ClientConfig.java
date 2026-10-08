@@ -1,6 +1,6 @@
 package com.jeladastudios.ftsgeology.config;
 
-import net.minecraftforge.common.ForgeConfigSpec;
+import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
  * The player's own settings, kept on their machine (config/fts_geology-client.toml): how the sky and the rain are drawn,
@@ -11,17 +11,17 @@ public final class ClientConfig {
 
     private ClientConfig() {}
 
-    public static final ForgeConfigSpec SPEC;
-    public static final ForgeConfigSpec.BooleanValue STORM_CLOUDS;
-    public static final ForgeConfigSpec.BooleanValue SHADER_OVERCAST;
-    public static final ForgeConfigSpec.DoubleValue RAIN_SLANT;
-    public static final ForgeConfigSpec.BooleanValue RIVER_FOAM;
-    public static final ForgeConfigSpec.BooleanValue RIVER_FOAM_SHEET;
-    public static final ForgeConfigSpec.BooleanValue RIVER_DEBRIS;
-    public static final ForgeConfigSpec.IntValue SOUND_STREAMS;
+    public static final ModConfigSpec SPEC;
+    public static final ModConfigSpec.BooleanValue STORM_CLOUDS;
+    public static final ModConfigSpec.BooleanValue SHADER_OVERCAST;
+    public static final ModConfigSpec.DoubleValue RAIN_SLANT;
+    public static final ModConfigSpec.BooleanValue RIVER_FOAM;
+    public static final ModConfigSpec.BooleanValue RIVER_FOAM_SHEET;
+    public static final ModConfigSpec.BooleanValue RIVER_DEBRIS;
+    public static final ModConfigSpec.IntValue SOUND_STREAMS;
 
     static {
-        ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
+        ModConfigSpec.Builder b = new ModConfigSpec.Builder();
         b.push("sky");
         STORM_CLOUDS = b
                 .comment("Draw the weather's own clouds, which drift with the wind and gather into storms, in place of",

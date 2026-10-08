@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.volcano;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
@@ -25,11 +27,9 @@ import net.minecraft.world.level.block.CampfireBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,13 +47,13 @@ import java.util.Map;
  * second; its pockets are found then and kept for five minutes, and the gas lingers a couple of minutes after it
  * stops. Nothing is saved.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class VolcanicGas {
 
     private VolcanicGas() {}
 
     public static final ResourceKey<DamageType> DAMAGE = ResourceKey.create(Registries.DAMAGE_TYPE,
-            new ResourceLocation(GeysersMod.MODID, "volcanic_gas"));
+            ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "volcanic_gas"));
 
     /** How long the gas lingers after the volcano last reported it, and how long its pockets are kept, in ticks. */
     private static final long LINGER = 2400L, KEEP = 6000L;

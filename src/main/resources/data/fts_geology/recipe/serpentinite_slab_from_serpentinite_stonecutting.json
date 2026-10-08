@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": {
+    "item": "fts_geology:serpentinite"
+  },
+  "result": {
+    "id": "fts_geology:serpentinite_slab",
+    "count": 2
+  }
+}

@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.weather;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.tectonics.DepthScale;
 import com.jeladastudios.ftsgeology.util.SeedHash;
@@ -11,10 +13,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.saveddata.SavedData;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -33,7 +33,7 @@ import java.util.Locale;
  * <p>All of it is worked out, not simulated: the systems are a few records, and anything at a place -- now, or a day
  * ahead for a forecast -- is a sum over them. Off where {@link Storms#on} is off.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class Atmosphere {
 
     private Atmosphere() {}

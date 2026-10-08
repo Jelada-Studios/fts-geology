@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.compat;
 
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import com.jeladastudios.ftsgeology.registry.ModBiomeModifiers;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -9,9 +11,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.MobSpawnSettings;
-import net.minecraftforge.common.world.BiomeModifier;
-import net.minecraftforge.common.world.ModifiableBiomeInfo;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.common.world.BiomeModifier;
+import net.neoforged.neoforge.common.world.ModifiableBiomeInfo;
+import net.neoforged.neoforge.registries.ForgeRegistries;
 
 import java.util.List;
 
@@ -42,8 +44,8 @@ public record OptionalSpawns(HolderSet<Biome> biomes, List<Entry> spawns) implem
     public void modify(Holder<Biome> biome, Phase phase, ModifiableBiomeInfo.BiomeInfo.Builder builder) {
         if (phase != Phase.ADD || !biomes.contains(biome)) return;
         for (Entry e : spawns) {
-            if (!ForgeRegistries.ENTITY_TYPES.containsKey(e.entity())) continue;
-            EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(e.entity());
+            if (!BuiltInRegistries.ENTITY_TYPE.containsKey(e.entity())) continue;
+            EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(e.entity());
             if (type == null) continue;
             builder.getMobSpawnSettings().addSpawn(type.getCategory(),
                     new MobSpawnSettings.SpawnerData(type, e.weight(), e.min(), e.max()));

@@ -5,8 +5,8 @@ import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyBiomeSource;
 import com.mojang.serialization.Codec;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.biome.BiomeSource;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.RegistryObject;
 
 /**
  * Biome source types. The mod's world preset names {@code fts_geology:geology} and gives it the source it wraps,

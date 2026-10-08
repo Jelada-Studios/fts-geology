@@ -1,13 +1,13 @@
 package com.jeladastudios.ftsgeology.worldgen.terrain;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.hydrology.RiverNetwork;
 import com.jeladastudios.ftsgeology.tectonics.GeologyParams;
-import net.minecraftforge.event.server.ServerAboutToStartEvent;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 /**
  * What the terrain needs to know about the world being generated: its seed and the geology numbers. A density
  * function is built from JSON with neither, and the noise wiring keeps its own random source to itself.
@@ -16,7 +16,7 @@ import net.minecraftforge.fml.common.Mod;
  * (checked in {@code ServerLifecycleHooks.handleServerAboutToStart}), and the levels and their random state are
  * made just after. One server runs at a time.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class TerrainContext {
 
     private TerrainContext() {}

@@ -17,7 +17,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraftforge.client.model.data.ModelData;
+import net.neoforged.neoforge.client.model.data.ModelData;
 
 /**
  * Turns a machine's moving part while it runs: a ventilation fan's blades, a gas engine's flywheel. The rest of the
@@ -26,8 +26,8 @@ import net.minecraftforge.client.model.data.ModelData;
  */
 public class SpinningPartRenderer<T extends BlockEntity> implements BlockEntityRenderer<T> {
 
-    public static final ResourceLocation FAN_BLADES = new ResourceLocation(GeysersMod.MODID, "block/ventilation_fan_blades");
-    public static final ResourceLocation FLYWHEEL = new ResourceLocation(GeysersMod.MODID, "block/gas_engine_flywheel");
+    public static final ResourceLocation FAN_BLADES = ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "block/ventilation_fan_blades");
+    public static final ResourceLocation FLYWHEEL = ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "block/gas_engine_flywheel");
 
     private final ResourceLocation model;
     private final Axis axis;

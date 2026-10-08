@@ -1,20 +1,20 @@
 package com.jeladastudios.ftsgeology.weather;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
-import net.minecraftforge.event.entity.player.SleepingTimeCheckEvent;
-import net.minecraftforge.eventbus.api.Event;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.entity.player.SleepingTimeCheckEvent;
+import net.neoforged.bus.api.Event;
+import net.neoforged.bus.api.SubscribeEvent;
 /**
  * A bed by day in a thunderstorm, as vanilla allows it: its sky is dark enough to sleep under. The world's sky is
  * reckoned by the time of day alone where the rain is regional ({@link RainContext#pushClear}), so the darkness of the
  * storm over the player is reckoned here instead, by vanilla's own sum, from the rain and thunder where they lie.
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class StormSleep {
 
     private StormSleep() {}

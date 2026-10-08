@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.gas.event;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.gas.GasConfig;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.gas.command.GasCommand;
@@ -29,24 +31,22 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.event.AttachCapabilitiesEvent;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.EntityJoinLevelEvent;
-import net.minecraftforge.event.entity.ProjectileImpactEvent;
-import net.minecraftforge.event.entity.living.LivingEvent;
-import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraftforge.event.level.BlockEvent;
-import net.minecraftforge.event.level.ChunkEvent;
-import net.minecraftforge.event.level.ExplosionEvent;
-import net.minecraftforge.event.level.LevelEvent;
-import net.minecraftforge.event.server.ServerStoppedEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+import net.neoforged.neoforge.event.AttachCapabilitiesEvent;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
+import net.neoforged.neoforge.event.entity.living.LivingEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.level.ChunkEvent;
+import net.neoforged.neoforge.event.level.ExplosionEvent;
+import net.neoforged.neoforge.event.level.LevelEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class CommonEvents {
-    private static final ResourceLocation GAS_CAP_ID = new ResourceLocation(GeysersMod.MODID, "gas");
+    private static final ResourceLocation GAS_CAP_ID = ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "gas");
 
     private CommonEvents() {
     }
@@ -84,7 +84,7 @@ public final class CommonEvents {
 
     /** Off the server thread too: chunks are read from disk on the workers. */
     @SubscribeEvent
-    public static void onChunkDataLoad(net.minecraftforge.event.level.ChunkDataEvent.Load event) {
+    public static void onChunkDataLoad(net.neoforged.neoforge.event.level.ChunkDataEvent.Load event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         net.minecraft.nbt.CompoundTag tag = event.getData();
         if (!"minecraft:full".equals(tag.getString("Status")) && !"full".equals(tag.getString("Status"))) return;

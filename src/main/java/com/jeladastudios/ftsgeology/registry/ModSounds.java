@@ -1,11 +1,13 @@
 package com.jeladastudios.ftsgeology.registry;
 
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.registries.RegistryObject;
 
 /**
  * The mod's own sounds.
@@ -20,7 +22,7 @@ import net.minecraftforge.registries.RegistryObject;
 public final class ModSounds {
 
     public static final DeferredRegister<SoundEvent> SOUNDS =
-            DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, GeysersMod.MODID);
+            DeferredRegister.create(BuiltInRegistries.SOUND_EVENT, GeysersMod.MODID);
 
     /** The seismograph's alert, sounded through the warning window before the ground moves. */
     public static final RegistryObject<SoundEvent> QUAKE_SIREN = register("quake_siren");
@@ -30,7 +32,7 @@ public final class ModSounds {
 
     private static RegistryObject<SoundEvent> register(String name) {
         return SOUNDS.register(name,
-                () -> SoundEvent.createVariableRangeEvent(new ResourceLocation(GeysersMod.MODID, name)));
+                () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, name)));
     }
 
     private ModSounds() {}

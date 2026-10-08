@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": {
+    "item": "fts_geology:rhyolite"
+  },
+  "result": {
+    "id": "fts_geology:rhyolite_stairs",
+    "count": 1
+  }
+}

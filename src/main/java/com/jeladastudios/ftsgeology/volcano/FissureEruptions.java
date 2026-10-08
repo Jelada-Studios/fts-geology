@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.volcano;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.block.BasaltLayerBlock;
 import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
@@ -49,10 +51,8 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FlowingFluid;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.saveddata.SavedData;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -72,7 +72,7 @@ import java.util.PriorityQueue;
  * the GPS's swelling, the seismograph's volcanic swarm). Lava goes on to open ground only, never over what a player
  * built; it sets fire to what it touches as any lava does.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class FissureEruptions {
 
     private FissureEruptions() {}

@@ -1,7 +1,7 @@
 package com.jeladastudios.ftsgeology.api;
 
 import net.minecraft.server.level.ServerLevel;
-import net.minecraftforge.eventbus.api.Event;
+import net.neoforged.bus.api.Event;
 
 /**
  * A region's long dry spell begins or ends. Only information: its effect on the rivers is in the sources'

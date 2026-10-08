@@ -4,9 +4,9 @@ import com.jeladastudios.ftsgeology.GeysersMod;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.network.NetworkRegistry;
-import net.minecraftforge.network.PacketDistributor;
-import net.minecraftforge.network.simple.SimpleChannel;
+import net.neoforged.neoforge.network.NetworkRegistry;
+import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.network.simple.SimpleChannel;
 
 /**
  * The mod's one channel to the client.
@@ -34,7 +34,7 @@ public final class ModNetwork {
     private static final String VERSION = "10";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-            new ResourceLocation(GeysersMod.MODID, "main"),
+            ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "main"),
             () -> VERSION,
             VERSION::equals,
             VERSION::equals);
@@ -76,27 +76,27 @@ public final class ModNetwork {
                 .decoder(SkyPacket::decode)
                 .consumerMainThread(SkyPacket::handle)
                 .add();
-        CHANNEL.messageBuilder(TerminalPacket.class, id++, net.minecraftforge.network.NetworkDirection.PLAY_TO_CLIENT)
+        CHANNEL.messageBuilder(TerminalPacket.class, id++, net.neoforged.neoforge.network.NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(TerminalPacket::encode)
                 .decoder(TerminalPacket::decode)
                 .consumerMainThread(TerminalPacket::handle)
                 .add();
-        CHANNEL.messageBuilder(TerminalRequestPacket.class, id++, net.minecraftforge.network.NetworkDirection.PLAY_TO_SERVER)
+        CHANNEL.messageBuilder(TerminalRequestPacket.class, id++, net.neoforged.neoforge.network.NetworkDirection.PLAY_TO_SERVER)
                 .encoder(TerminalRequestPacket::encode)
                 .decoder(TerminalRequestPacket::decode)
                 .consumerMainThread(TerminalRequestPacket::handle)
                 .add();
-        CHANNEL.messageBuilder(StationRenamePacket.class, id++, net.minecraftforge.network.NetworkDirection.PLAY_TO_SERVER)
+        CHANNEL.messageBuilder(StationRenamePacket.class, id++, net.neoforged.neoforge.network.NetworkDirection.PLAY_TO_SERVER)
                 .encoder(StationRenamePacket::encode)
                 .decoder(StationRenamePacket::decode)
                 .consumerMainThread(StationRenamePacket::handle)
                 .add();
-        CHANNEL.messageBuilder(GasFiredPacket.class, id++, net.minecraftforge.network.NetworkDirection.PLAY_TO_CLIENT)
+        CHANNEL.messageBuilder(GasFiredPacket.class, id++, net.neoforged.neoforge.network.NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(GasFiredPacket::encode)
                 .decoder(GasFiredPacket::decode)
                 .consumerMainThread(GasFiredPacket::handle)
                 .add();
-        CHANNEL.messageBuilder(GasControlPacket.class, id++, net.minecraftforge.network.NetworkDirection.PLAY_TO_SERVER)
+        CHANNEL.messageBuilder(GasControlPacket.class, id++, net.neoforged.neoforge.network.NetworkDirection.PLAY_TO_SERVER)
                 .encoder(GasControlPacket::encode)
                 .decoder(GasControlPacket::decode)
                 .consumerMainThread(GasControlPacket::handle)

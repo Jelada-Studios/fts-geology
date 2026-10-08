@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.command;
 
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import com.mojang.brigadier.context.CommandContext;
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import net.minecraft.ChatFormatting;

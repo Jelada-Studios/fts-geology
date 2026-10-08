@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.command;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.jeladastudios.ftsgeology.GeysersMod;
@@ -14,10 +16,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 
 import java.util.Locale;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 /**
  * Admin command to drop a geyser system exactly where you want one.
  *
@@ -31,7 +31,7 @@ import net.minecraftforge.fml.common.Mod;
  * erupts on the normal cycle, so the water works its way to the surface shortly after. Requires
  * permission level 2 (op / cheats on).
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID)
+@EventBusSubscriber(modid = GeysersMod.MODID)
 public final class GeyserCommands {
 
     private GeyserCommands() {}

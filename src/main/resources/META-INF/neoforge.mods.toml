@@ -1,0 +1,82 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "MIT"
+issueTrackerURL = "https://github.com/Jelada-Studios/fts-geology/issues"
+
+[[mixins]]
+config = "fts_geology.mixins.json"
+
+[[mods]]
+modId = "fts_geology"
+version = "0.11.0"
+displayName = "FT's Geology"
+authors = "Jelada Studios"
+credits = "See CREDITS.md — community reports and questions that shaped the mod."
+displayURL = "https://jeladastudios.com/fts-geology/"
+updateJSONURL = "https://raw.githubusercontent.com/Jelada-Studios/fts-geology/main/update.json"
+description = '''
+A geology layer for Minecraft: real plate tectonics driving real landforms.
+
+Most world-generation mods decide what a place looks like. This one decides why. A volcano's shape
+is not picked from a list - it comes from the plate boundary it sits on, and so does the rock under
+it, the earthquakes that shake it, and the springs around it. The aim is a world you can read.
+
+Four fault types, each producing the landforms it should. Four volcano types, chosen by their
+setting. Earthquakes with ten seconds of early warning on a seismograph. Geysers, hot springs and
+travertine terraces. Boundary geology underground - dig beneath a volcanic arc and you find granite,
+because that is what is there. Instruments to read all of it.
+
+Strongly recommended alongside Terralith and Flowing Fluids.
+
+Reads the world's biome source rather than replacing worldgen, so it stacks on top of Terralith and
+Tectonic instead of fighting them. Retrogen-safe: it bolts onto worlds that already exist.
+
+Nothing is destroyed, but ground that loses its support falls - builds included. That, and whether
+earthquakes may deform player blocks at all, are config toggles.
+'''
+
+# --- Dependencies ---
+[[dependencies.fts_geology]]
+    modId = "neoforge"
+    type = "required"
+    versionRange = "[21.1,)"
+    ordering = "NONE"
+    side = "BOTH"
+
+[[dependencies.fts_geology]]
+    modId = "minecraft"
+    type = "required"
+    versionRange = "[1.21.1,1.22)"
+    ordering = "NONE"
+    side = "BOTH"
+
+# Optional integrations — soft deps so we load after them when present.
+# TerraFirmaCraft: optional; loaded after it so its blocks can be looked up by id.
+[[dependencies.fts_geology]]
+    modId = "tfc"
+    type = "optional"
+    versionRange = "*"
+    ordering = "AFTER"
+    side = "BOTH"
+
+[[dependencies.fts_geology]]
+    modId = "flowing_fluids"
+    type = "optional"
+    versionRange = "*"
+    ordering = "AFTER"
+    side = "BOTH"
+
+[[dependencies.fts_geology]]
+    modId = "water_erosion"
+    type = "optional"
+    versionRange = "*"
+    ordering = "AFTER"
+    side = "BOTH"
+
+# Immersive Weathering: loaded after it so the mod's data can still its lightning turning rock into magma.
+[[dependencies.fts_geology]]
+    modId = "immersive_weathering"
+    type = "optional"
+    versionRange = "*"
+    ordering = "AFTER"
+    side = "BOTH"

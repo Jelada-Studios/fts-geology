@@ -1,13 +1,15 @@
 package com.jeladastudios.ftsgeology.compat;
 
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.gas.block.entity.GasValveBlockEntity;
 import com.jeladastudios.ftsgeology.gas.registry.GasBlocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.fml.ModList;
+import net.neoforged.neoforge.registries.ForgeRegistries;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -25,7 +27,7 @@ public final class CreateBoiler {
 
     private CreateBoiler() {}
 
-    private static final ResourceLocation TANK = new ResourceLocation("create", "fluid_tank");
+    private static final ResourceLocation TANK = ResourceLocation.fromNamespaceAndPath("create", "fluid_tank");
 
     /** Puts the gas valve in Create's registry of boiler heaters. */
     public static void register() {
@@ -54,7 +56,7 @@ public final class CreateBoiler {
     /** Whether a block is one of Create's fluid tanks, which a boiler is built from. */
     public static boolean isTank(Level level, BlockPos pos) {
         if (!ModList.get().isLoaded("create")) return false;
-        return TANK.equals(ForgeRegistries.BLOCKS.getKey(level.getBlockState(pos).getBlock()));
+        return TANK.equals(BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()));
     }
 
     /** The heat Create reads off a block, as it reads it under a boiler: -1 none. For checking it from a command. */

@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:stonecutting",
+  "ingredient": {
+    "item": "fts_geology:rhyolite"
+  },
+  "result": {
+    "id": "fts_geology:polished_rhyolite",
+    "count": 1
+  }
+}

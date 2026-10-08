@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.client;
 
+
+import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import com.jeladastudios.ftsgeology.config.ClientConfig;
 import com.jeladastudios.ftsgeology.fluid.RiverWaterFluid;
@@ -27,11 +29,10 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.FlowingFluid;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RenderLevelStageEvent;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import org.joml.Matrix4f;
 
 import java.util.ArrayList;
@@ -52,7 +53,7 @@ import java.util.List;
  * frame lit as the water there is and fogged as particles are. The shades are set colours on vanilla's own blank
  * texture: no texture of the mod's. Nothing here is the server's.</p>
  */
-@Mod.EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
 public final class RiverFoamMesh {
 
     private RiverFoamMesh() {}
@@ -67,7 +68,7 @@ public final class RiverFoamMesh {
     private static final float SHARE = 0.8f;
     /** Foam in cold country, against the rest. */
     private static final float COLD = 0.7f;
-    private static final ResourceLocation WHITE = new ResourceLocation("textures/misc/white.png");
+    private static final ResourceLocation WHITE = ResourceLocation.parse("textures/misc/white.png");
 
     /** One block of water with foam on it: where its surface is, how much foam, which way it runs, how it is lit. */
     private record Spot(int x, int z, float top, float amount, float dx, float dz, int light, boolean fall, int water,
@@ -341,7 +342,7 @@ public final class RiverFoamMesh {
      * screen's lines every frame, open or not, and draws what it is given: only while it is open.
      */
     @SubscribeEvent
-    public static void onDebugText(net.minecraftforge.client.event.CustomizeGuiOverlayEvent.DebugText event) {
+    public static void onDebugText(net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent.DebugText event) {
         if (Minecraft.getInstance().level == null || !Minecraft.getInstance().options.renderDebug || !on()) return;
         int cold = 0;
         for (Spot s : spots) if (s.cold()) cold++;

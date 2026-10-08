@@ -15,7 +15,7 @@ public final class GasDamageTypes {
     public static final ResourceKey<DamageType> BURNER_FLAME = key("burner_flame");
 
     private static ResourceKey<DamageType> key(String name) {
-        return ResourceKey.create(Registries.DAMAGE_TYPE, new ResourceLocation(GeysersMod.MODID, name));
+        return ResourceKey.create(Registries.DAMAGE_TYPE, ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, name));
     }
 
     public static DamageSource source(Level level, ResourceKey<DamageType> key) {

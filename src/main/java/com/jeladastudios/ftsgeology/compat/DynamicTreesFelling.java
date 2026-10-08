@@ -1,5 +1,7 @@
 package com.jeladastudios.ftsgeology.compat;
 
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import com.jeladastudios.ftsgeology.GeysersMod;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -7,7 +9,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -112,7 +114,7 @@ public final class DynamicTreesFelling {
 
     /** Dynamic Trees' own tag for its rooted soils; empty, and never matched, without Dynamic Trees. */
     private static final net.minecraft.tags.TagKey<net.minecraft.world.level.block.Block> ROOTY =
-            net.minecraft.tags.BlockTags.create(new net.minecraft.resources.ResourceLocation("dynamictrees", "rooty_soil"));
+            net.minecraft.tags.BlockTags.create(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("dynamictrees", "rooty_soil"));
 
     /**
      * Whether a block is any part of a Dynamic Trees tree: branch, leaves, rooted soil, the shell round a thick trunk,

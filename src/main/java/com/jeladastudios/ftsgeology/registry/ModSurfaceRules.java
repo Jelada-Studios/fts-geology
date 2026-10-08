@@ -5,8 +5,8 @@ import com.jeladastudios.ftsgeology.worldgen.lithology.LithologyRule;
 import com.mojang.serialization.Codec;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.levelgen.SurfaceRules;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.RegistryObject;
 
 /** Surface rule types, referenced from the mod's noise settings by id. */
 public final class ModSurfaceRules {

@@ -40,8 +40,8 @@ import net.minecraft.world.level.material.FluidState;
  */
 public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
 
-    private static final ResourceLocation RAIN = new ResourceLocation("textures/environment/rain.png");
-    private static final ResourceLocation SNOW = new ResourceLocation("textures/environment/snow.png");
+    private static final ResourceLocation RAIN = ResourceLocation.parse("textures/environment/rain.png");
+    private static final ResourceLocation SNOW = ResourceLocation.parse("textures/environment/snow.png");
     /** How fast the drops fall, blocks a second, against which the wind slants them. */
     private static final float FALL = 7f;
 

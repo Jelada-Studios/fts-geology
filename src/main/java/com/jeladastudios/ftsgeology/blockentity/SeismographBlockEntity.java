@@ -498,14 +498,14 @@ public class SeismographBlockEntity extends BlockEntity {
     }
 
     private static boolean rock(BlockState s) {
-        return s.is(net.minecraft.tags.BlockTags.BASE_STONE_OVERWORLD) || s.is(net.minecraftforge.common.Tags.Blocks.STONE)
+        return s.is(net.minecraft.tags.BlockTags.BASE_STONE_OVERWORLD) || s.is(net.neoforged.neoforge.common.Tags.Blocks.STONE)
                 || s.is(net.minecraft.tags.BlockTags.STONE_ORE_REPLACEABLES) || s.is(net.minecraft.world.level.block.Blocks.BEDROCK)
                 || com.jeladastudios.ftsgeology.instrument.RockTypes.isRock(s);
     }
 
     private static boolean loose(BlockState s) {
         return s.is(net.minecraft.tags.BlockTags.DIRT) || s.is(net.minecraft.tags.BlockTags.SAND)
-                || s.is(net.minecraftforge.common.Tags.Blocks.GRAVEL) || s.is(net.minecraft.world.level.block.Blocks.CLAY)
+                || s.is(net.neoforged.neoforge.common.Tags.Blocks.GRAVEL) || s.is(net.minecraft.world.level.block.Blocks.CLAY)
                 || s.is(net.minecraft.world.level.block.Blocks.MUD);
     }
 

@@ -1371,7 +1371,7 @@ public final class QuakePlanner {
     private static boolean carvable(BlockState s, boolean mayBreakBuilds, boolean generated) {
         if (s == null || s.is(Blocks.BEDROCK)) return false;
         if (machinery(s)) return false;
-        if (GeyserConfig.QUAKE_PRESERVES_ORES.get() && s.is(net.minecraftforge.common.Tags.Blocks.ORES)) return false;
+        if (GeyserConfig.QUAKE_PRESERVES_ORES.get() && s.is(net.neoforged.neoforge.common.Tags.Blocks.ORES)) return false;
         // A world-made structure moves like any other ground; see Snapshot.generatedAt.
         return mayBreakBuilds || generated || !EruptionHandler.isPlayerPlaced(s);
     }
@@ -1382,7 +1382,7 @@ public final class QuakePlanner {
         if (!s.getFluidState().isEmpty()) return false;
         if (TerrainProbe.isVegetation(s)) return false;   // nothing to carry; it is just ground cover
         if (machinery(s)) return false;
-        if (GeyserConfig.QUAKE_PRESERVES_ORES.get() && s.is(net.minecraftforge.common.Tags.Blocks.ORES)) return false;
+        if (GeyserConfig.QUAKE_PRESERVES_ORES.get() && s.is(net.neoforged.neoforge.common.Tags.Blocks.ORES)) return false;
         // A world-made structure moves like any other ground; see Snapshot.generatedAt.
         return mayBreakBuilds || generated || !EruptionHandler.isPlayerPlaced(s);
     }

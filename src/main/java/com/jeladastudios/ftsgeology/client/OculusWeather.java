@@ -1,7 +1,7 @@
 package com.jeladastudios.ftsgeology.client;
 
 import com.jeladastudios.ftsgeology.GeysersMod;
-import net.minecraftforge.fml.ModList;
+import net.neoforged.fml.ModList;
 
 import java.lang.reflect.Method;
 
