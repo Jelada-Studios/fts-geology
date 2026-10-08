@@ -1019,7 +1019,7 @@ public final class SoilWater {
         Cells c = CELLS.get(key(level, pos.getX() >> 4, pos.getZ() >> 4));
         if (c == null || c.last < 0) return;
         double deny = Mth.clamp((CROP_THIRST - c.usable[cell(pos.getX(), pos.getZ())]) / CROP_THIRST, 0.0, 1.0);
-        if (deny > 0 && level.random.nextDouble() < deny) event.setResult(net.neoforged.bus.api.Event.Result.DENY);
+        if (deny > 0 && level.random.nextDouble() < deny) event.setResult(net.neoforged.neoforge.event.level.block.CropGrowEvent.Pre.Result.DO_NOT_GROW);
     }
 
     /** A cell never looked at: the ground as the place's weather keeps it, a few weeks of it on average. */

@@ -73,8 +73,9 @@ public class WellheadBlock extends BaseEntityBlock {
     }
 
     @Override
-    public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand,
-                                 BlockHitResult hit) {
+    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
+                                            BlockHitResult hit) {
+        InteractionHand hand = InteractionHand.MAIN_HAND;
         if (level.isClientSide) return InteractionResult.SUCCESS;
         if (!(level.getBlockEntity(pos) instanceof WellheadBlockEntity be)) return InteractionResult.PASS;
         ItemStack held = player.getItemInHand(hand);

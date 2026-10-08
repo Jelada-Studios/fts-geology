@@ -88,7 +88,7 @@ public class GeysersMod {
         modContainer.registerConfig(ModConfig.Type.CLIENT, com.jeladastudios.ftsgeology.config.ClientConfig.SPEC, "fts_geology-client.toml");
 
         // The geology advancements' trigger, registered before advancements are read.
-        com.jeladastudios.ftsgeology.advancement.GeologyTrigger.init();
+        com.jeladastudios.ftsgeology.advancement.GeologyTrigger.register(modBus);
 
         // Above the snow line only the animals of the high snow are born (game bus event).
         NeoForge.EVENT_BUS.addListener(com.jeladastudios.ftsgeology.worldgen.SnowLineSpawns::check);

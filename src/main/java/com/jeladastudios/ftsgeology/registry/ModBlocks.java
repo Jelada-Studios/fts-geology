@@ -64,7 +64,7 @@ public final class ModBlocks {
      */
     public static final DeferredHolder<Block, Block> RIVER_WATER = BLOCKS.register("river_water",
             () -> new com.jeladastudios.ftsgeology.block.RiverWaterBlock(
-                    () -> (net.minecraft.world.level.material.FlowingFluid) ModFluids.RIVER_WATER.get(),
+                    (net.minecraft.world.level.material.FlowingFluid) ModFluids.RIVER_WATER.get(),
                     BlockBehaviour.Properties.ofLegacyCopy(Blocks.WATER).noLootTable()));
 
     /** Sea water poured out of a bucket: water, but it waters no field; see {@link ModFluids#SEA_WATER}. */

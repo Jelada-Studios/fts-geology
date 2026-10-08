@@ -21,6 +21,13 @@ import java.util.Map;
 
 /** Copper gas pipe. Connects to anything exposing a gas tank on the touching side. */
 public class GasPipeBlock extends MachineBlock {
+    public static final com.mojang.serialization.MapCodec<GasPipeBlock> CODEC = simpleCodec(GasPipeBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends net.minecraft.world.level.block.BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
     public static final Map<Direction, BooleanProperty> PROPS = PipeBlock.PROPERTY_BY_DIRECTION;
     private static final VoxelShape CORE = Block.box(5, 5, 5, 11, 11, 11);
     private static final VoxelShape[] ARMS = {

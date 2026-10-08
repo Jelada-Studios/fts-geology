@@ -206,7 +206,6 @@ public final class RetrogenHandler {
      */
     @SubscribeEvent
     public static void onServerTick(net.neoforged.neoforge.event.tick.ServerTickEvent.Post event) {
-        if (event.phase != net.neoforged.neoforge.event.TickEvent.Phase.END) return;
         if (event.getServer() == null) return;
         // Retrogen places features by the river network, so it waits for a square rather than read it as empty.
         com.jeladastudios.ftsgeology.hydrology.RiverNetwork.mayWait(() -> retrogenTick(event));

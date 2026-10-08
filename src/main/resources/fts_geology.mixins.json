@@ -20,7 +20,8 @@
     "PlayerRainContextMixin",
     "BlockEntityRainContextMixin",
     "DieselOilChunksMixin",
-    "AbstractFurnaceAccessor"
+    "AbstractFurnaceAccessor",
+    "ExplosionAccessor"
   ],
   "client": [
     "OculusBlockIdsMixin",

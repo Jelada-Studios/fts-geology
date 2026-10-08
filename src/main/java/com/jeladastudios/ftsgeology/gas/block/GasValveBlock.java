@@ -25,6 +25,13 @@ import org.jetbrains.annotations.Nullable;
  * burner that keeps a jet flame going as long as fuel flows.
  */
 public class GasValveBlock extends MachineBlock implements GasIgniter {
+    public static final com.mojang.serialization.MapCodec<GasValveBlock> CODEC = simpleCodec(GasValveBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends net.minecraft.world.level.block.BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
     public static final DirectionProperty FACING = BlockStateProperties.FACING;
     public static final BooleanProperty OPEN = BlockStateProperties.OPEN;
     public static final BooleanProperty LIT = BlockStateProperties.LIT;

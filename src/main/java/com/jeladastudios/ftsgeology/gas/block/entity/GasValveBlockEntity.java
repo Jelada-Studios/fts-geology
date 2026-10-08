@@ -131,7 +131,7 @@ public class GasValveBlockEntity extends GasMachineBlockEntity {
 
     private void tryLight(Player player, ItemStack held, InteractionHand hand) {
         level.playSound(null, worldPosition, SoundEvents.FLINTANDSTEEL_USE, SoundSource.BLOCKS, 1.0f, 1.0f);
-        if (held.getItem() instanceof FlintAndSteelItem) held.hurtAndBreak(1, player, p -> p.broadcastBreakEvent(hand));
+        if (held.getItem() instanceof FlintAndSteelItem) held.hurtAndBreak(1, player, net.minecraft.world.entity.LivingEntity.getSlotForHand(hand));
         else if (!player.getAbilities().instabuild) held.shrink(1);
         Direction f = facing();
         // The spark itself may set off gas already in front of the nozzle.

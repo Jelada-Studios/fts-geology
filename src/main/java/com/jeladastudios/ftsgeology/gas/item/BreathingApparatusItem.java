@@ -36,11 +36,11 @@ public class BreathingApparatusItem extends ArmorItem {
     }
 
     public static double getOxygen(ItemStack stack) {
-        return stack.hasTag() ? stack.getTag().getDouble("oxygen") : 0;
+        return com.jeladastudios.ftsgeology.util.ItemData.has(stack) ? com.jeladastudios.ftsgeology.util.ItemData.get(stack).getDouble("oxygen") : 0;
     }
 
     public static void setOxygen(ItemStack stack, double v) {
-        stack.getOrCreateTag().putDouble("oxygen", Mth.clamp(v, 0, CAPACITY));
+        com.jeladastudios.ftsgeology.util.ItemData.update(stack, t -> t.putDouble("oxygen", Mth.clamp(v, 0, CAPACITY)));
     }
 
     /** @return true if it could supply a breath this second */

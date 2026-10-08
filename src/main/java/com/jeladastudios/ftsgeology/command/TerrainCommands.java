@@ -962,7 +962,7 @@ public final class TerrainCommands {
                 / com.jeladastudios.ftsgeology.tectonics.GeologyParams.current().horizontal();
         int sea = level.getSeaLevel();
         final int cx = at.getX(), cz = at.getZ();
-        java.io.File out = level.getServer().getServerDirectory().toPath().resolve("fts_relief_" + cx + "_" + cz + ".png").toFile();
+        java.io.File out = level.getServer().getServerDirectory().resolve("fts_relief_" + cx + "_" + cz + ".png").toFile();
         CompletableFuture.supplyAsync(() -> {
             int[] h = new int[n * n];
             java.util.stream.IntStream.range(0, n).parallel().forEach(i -> {
@@ -1085,7 +1085,7 @@ public final class TerrainCommands {
             return 0;
         }
         final int cx = at.getX(), cz = at.getZ();
-        java.io.File out = level.getServer().getServerDirectory().toPath()
+        java.io.File out = level.getServer().getServerDirectory()
                 .resolve("fts_rivers_" + cx + "_" + cz + ".png").toFile();
         CompletableFuture.supplyAsync(() -> riversPicture(cx, cz, half, step, out), Util.backgroundExecutor())
                 .thenAcceptAsync(msg -> {

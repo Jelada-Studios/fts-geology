@@ -39,7 +39,9 @@ import java.util.Locale;
  * the sky, a soil probe in the ground.
  */
 public class WeatherInstrumentBlock extends BaseEntityBlock {
-    public static final com.mojang.serialization.MapCodec<WeatherInstrumentBlock> CODEC = simpleCodec(WeatherInstrumentBlock::new);
+    public static final com.mojang.serialization.MapCodec<WeatherInstrumentBlock> CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.mapCodec(i -> i.group(
+            com.mojang.serialization.Codec.STRING.xmap(Instrument::valueOf, Instrument::name).fieldOf("instrument").forGetter(b -> b.instrument),
+            propertiesCodec()).apply(i, WeatherInstrumentBlock::new));
 
     @Override
     protected com.mojang.serialization.MapCodec<? extends BaseEntityBlock> codec() {

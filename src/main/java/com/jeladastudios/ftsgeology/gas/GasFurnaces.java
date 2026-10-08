@@ -38,14 +38,15 @@ public final class GasFurnaces {
     public static boolean wantsHeat(Level level, AbstractFurnaceBlockEntity furnace) {
         ItemStack in = furnace.getItem(0);
         if (in.isEmpty()) return false;
-        var recipe = ((AbstractFurnaceAccessor) furnace).fts_geology$quickCheck().getRecipeFor(furnace, level);
+        net.minecraft.world.item.crafting.SingleRecipeInput input = new net.minecraft.world.item.crafting.SingleRecipeInput(in);
+        var recipe = ((AbstractFurnaceAccessor) furnace).fts_geology$quickCheck().getRecipeFor(input, level);
         if (recipe.isEmpty()) return false;
-        AbstractCookingRecipe r = recipe.get();
-        ItemStack result = r.assemble(furnace, level.registryAccess());
+        AbstractCookingRecipe r = recipe.get().value();
+        ItemStack result = r.assemble(input, level.registryAccess());
         if (result.isEmpty()) return false;
         ItemStack out = furnace.getItem(2);
         if (out.isEmpty()) return true;
-        if (!ItemStack.isSameItemSameTags(out, result)) return false;
+        if (!ItemStack.isSameItemSameComponents(out, result)) return false;
         return out.getCount() + result.getCount() <= Math.min(out.getMaxStackSize(), furnace.getMaxStackSize());
     }
 

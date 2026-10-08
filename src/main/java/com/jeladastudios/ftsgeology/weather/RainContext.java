@@ -3,7 +3,6 @@ package com.jeladastudios.ftsgeology.weather;
 
 import net.neoforged.fml.common.EventBusSubscriber;
 import com.jeladastudios.ftsgeology.GeysersMod;
-import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import java.util.Arrays;
 
@@ -78,8 +77,7 @@ public final class RainContext {
 
     /** A tick that threw out of the middle of a push leaves it standing: each server tick starts with none. */
     @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.START) return;
+    public static void onServerTick(net.neoforged.neoforge.event.tick.ServerTickEvent.Pre event) {
         server = Thread.currentThread();
         reset();
     }

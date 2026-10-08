@@ -40,12 +40,7 @@ public class GasMaskItem extends ArmorItem {
     }
 
     @Override
-    public boolean canBeDepleted() {
-        return true;
-    }
-
-    @Override
-    public <T extends LivingEntity> int damageItem(ItemStack stack, int amount, T entity, java.util.function.Consumer<T> onBroken) {
+    public <T extends LivingEntity> int damageItem(ItemStack stack, int amount, @Nullable T entity, java.util.function.Consumer<net.minecraft.world.item.Item> onBroken) {
         // Armour hits do not wear the filter out.
         return 0;
     }

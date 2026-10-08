@@ -38,7 +38,7 @@ public final class StallReport {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        if (event.phase == TickEvent.Phase.END) lastTick = System.nanoTime();
+        lastTick = System.nanoTime();
     }
 
     @SubscribeEvent

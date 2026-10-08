@@ -26,16 +26,18 @@ import net.neoforged.neoforge.client.model.data.ModelData;
  */
 public class SpinningPartRenderer<T extends BlockEntity> implements BlockEntityRenderer<T> {
 
-    public static final ResourceLocation FAN_BLADES = ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "block/ventilation_fan_blades");
-    public static final ResourceLocation FLYWHEEL = ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "block/gas_engine_flywheel");
+    public static final net.minecraft.client.resources.model.ModelResourceLocation FAN_BLADES =
+            net.minecraft.client.resources.model.ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "block/ventilation_fan_blades"));
+    public static final net.minecraft.client.resources.model.ModelResourceLocation FLYWHEEL =
+            net.minecraft.client.resources.model.ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "block/gas_engine_flywheel"));
 
-    private final ResourceLocation model;
+    private final net.minecraft.client.resources.model.ModelResourceLocation model;
     private final Axis axis;
     private final float px, py, pz, degreesPerTick;
     /** Each machine's part: its angle, its speed and when it was last drawn. */
     private final Long2ObjectOpenHashMap<float[]> turning = new Long2ObjectOpenHashMap<>();
 
-    private SpinningPartRenderer(ResourceLocation model, Axis axis, float px, float py, float pz, float degreesPerTick) {
+    private SpinningPartRenderer(net.minecraft.client.resources.model.ModelResourceLocation model, Axis axis, float px, float py, float pz, float degreesPerTick) {
         this.model = model;
         this.axis = axis;
         this.px = px;

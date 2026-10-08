@@ -62,9 +62,15 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
     /** The weather's clouds where the server tells the sky and the player has them on; vanilla's otherwise. */
     @Override
     public boolean renderClouds(ClientLevel level, int ticks, float partial, com.mojang.blaze3d.vertex.PoseStack pose,
-                                double camX, double camY, double camZ, org.joml.Matrix4f projection) {
+                                double camX, double camY, double camZ, org.joml.Matrix4f modelView,
+                                org.joml.Matrix4f projection) {
         if (!com.jeladastudios.ftsgeology.config.ClientConfig.STORM_CLOUDS.get() || !ClientSky.ready()) return false;
-        return clouds.render(level, partial, pose, camX, camY, camZ, projection);
+        // Handed the bare stack, as vanilla is: the camera's turn goes on it first.
+        pose.pushPose();
+        pose.mulPose(modelView);
+        boolean drawn = clouds.render(level, partial, pose, camX, camY, camZ, projection);
+        pose.popPose();
+        return drawn;
     }
 
     public SkyEffects() {
@@ -98,12 +104,18 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
         return true;
     }
 
+    /** Draws what was laid since the last batch began, if anything was. */
+    private static void flush(BufferBuilder buffer) {
+        com.mojang.blaze3d.vertex.MeshData mesh = buffer.build();
+        if (mesh != null) com.mojang.blaze3d.vertex.BufferUploader.drawWithShader(mesh);
+    }
+
     private void draw(ClientLevel level, int ticks, float partial, LightTexture light, double camX, double camY, double camZ,
                       float f, boolean depth) {
         light.turnOnLightLayer();
         int x0 = Mth.floor(camX), y0 = Mth.floor(camY), z0 = Mth.floor(camZ);
         Tesselator tesselator = Tesselator.getInstance();
-        BufferBuilder buffer = tesselator.getBuilder();
+        BufferBuilder buffer = null;
         RenderSystem.disableCull();
         RenderSystem.enableBlend();
         RenderSystem.enableDepthTest();
@@ -149,10 +161,10 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
                 if (fall == Biome.Precipitation.RAIN) {
                     if (rnd.nextFloat() > keep) continue;
                     if (drawing != 0) {
-                        if (drawing >= 0) tesselator.end();
+                        if (buffer != null) flush(buffer);
                         drawing = 0;
                         RenderSystem.setShaderTexture(0, RAIN);
-                        buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
+                        buffer = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
                     }
                     int phase = ticks + x * x * 3121 + x * 45238971 + z * z * 418711 + z * 13761 & 31;
                     float v = -(phase + partial) / 32f * (3f + rnd.nextFloat()) * speed;
@@ -161,20 +173,20 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
                     float a = ((1f - d * d) * 0.5f + 0.5f) * alpha;
                     // Aslant in the wind: higher up, a drop is further upwind of where it lands.
                     double tx = -sx * (top - camY), tz = -sz * (top - camY), bx = -sx * (bottom - camY), bz = -sz * (bottom - camY);
-                    buffer.addVertex(x - camX - hx + 0.5 + tx, top - camY, z - camZ - hz + 0.5 + tz).setUv(0f, bottom * vScale + v)
+                    buffer.addVertex((float) (x - camX - hx + 0.5 + tx), (float) (top - camY), (float) (z - camZ - hz + 0.5 + tz)).setUv(0f, bottom * vScale + v)
                             .setColor(1f, 1f, 1f, a).setLight(lightColor);
-                    buffer.addVertex(x - camX + hx + 0.5 + tx, top - camY, z - camZ + hz + 0.5 + tz).setUv(1f, bottom * vScale + v)
+                    buffer.addVertex((float) (x - camX + hx + 0.5 + tx), (float) (top - camY), (float) (z - camZ + hz + 0.5 + tz)).setUv(1f, bottom * vScale + v)
                             .setColor(1f, 1f, 1f, a).setLight(lightColor);
-                    buffer.addVertex(x - camX + hx + 0.5 + bx, bottom - camY, z - camZ + hz + 0.5 + bz).setUv(1f, top * vScale + v)
+                    buffer.addVertex((float) (x - camX + hx + 0.5 + bx), (float) (bottom - camY), (float) (z - camZ + hz + 0.5 + bz)).setUv(1f, top * vScale + v)
                             .setColor(1f, 1f, 1f, a).setLight(lightColor);
-                    buffer.addVertex(x - camX - hx + 0.5 + bx, bottom - camY, z - camZ - hz + 0.5 + bz).setUv(0f, top * vScale + v)
+                    buffer.addVertex((float) (x - camX - hx + 0.5 + bx), (float) (bottom - camY), (float) (z - camZ - hz + 0.5 + bz)).setUv(0f, top * vScale + v)
                             .setColor(1f, 1f, 1f, a).setLight(lightColor);
                 } else if (fall == Biome.Precipitation.SNOW) {
                     if (drawing != 1) {
-                        if (drawing >= 0) tesselator.end();
+                        if (buffer != null) flush(buffer);
                         drawing = 1;
                         RenderSystem.setShaderTexture(0, SNOW);
-                        buffer.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
+                        buffer = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
                     }
                     float v = -((ticks & 511) + partial) / 512f;
                     float du = (float) (rnd.nextDouble() + time * 0.01 * (float) rnd.nextGaussian());
@@ -184,18 +196,18 @@ public class SkyEffects extends DimensionSpecialEffects.OverworldEffects {
                     float a = ((1f - d * d) * 0.3f + 0.5f) * f;
                     int sky = lightColor >> 16 & 65535, block = lightColor & 65535;
                     int sl = (sky * 3 + 240) / 4, bl = (block * 3 + 240) / 4;
-                    buffer.addVertex(x - camX - hx + 0.5, top - camY, z - camZ - hz + 0.5).setUv(0f + du, bottom * 0.25f + v + dv)
-                            .setColor(1f, 1f, 1f, a).setLight(bl, sl);
-                    buffer.addVertex(x - camX + hx + 0.5, top - camY, z - camZ + hz + 0.5).setUv(1f + du, bottom * 0.25f + v + dv)
-                            .setColor(1f, 1f, 1f, a).setLight(bl, sl);
-                    buffer.addVertex(x - camX + hx + 0.5, bottom - camY, z - camZ + hz + 0.5).setUv(1f + du, top * 0.25f + v + dv)
-                            .setColor(1f, 1f, 1f, a).setLight(bl, sl);
-                    buffer.addVertex(x - camX - hx + 0.5, bottom - camY, z - camZ - hz + 0.5).setUv(0f + du, top * 0.25f + v + dv)
-                            .setColor(1f, 1f, 1f, a).setLight(bl, sl);
+                    buffer.addVertex((float) (x - camX - hx + 0.5), (float) (top - camY), (float) (z - camZ - hz + 0.5)).setUv(0f + du, bottom * 0.25f + v + dv)
+                            .setColor(1f, 1f, 1f, a).setUv2(bl, sl);
+                    buffer.addVertex((float) (x - camX + hx + 0.5), (float) (top - camY), (float) (z - camZ + hz + 0.5)).setUv(1f + du, bottom * 0.25f + v + dv)
+                            .setColor(1f, 1f, 1f, a).setUv2(bl, sl);
+                    buffer.addVertex((float) (x - camX + hx + 0.5), (float) (bottom - camY), (float) (z - camZ + hz + 0.5)).setUv(1f + du, top * 0.25f + v + dv)
+                            .setColor(1f, 1f, 1f, a).setUv2(bl, sl);
+                    buffer.addVertex((float) (x - camX - hx + 0.5), (float) (bottom - camY), (float) (z - camZ - hz + 0.5)).setUv(0f + du, top * 0.25f + v + dv)
+                            .setColor(1f, 1f, 1f, a).setUv2(bl, sl);
                 }
             }
         }
-        if (drawing >= 0) tesselator.end();
+        if (buffer != null) flush(buffer);
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
         light.turnOffLightLayer();

@@ -21,7 +21,8 @@ import net.neoforged.neoforge.client.model.data.ModelData;
  */
 public class TurbineRenderer implements BlockEntityRenderer<GeothermalTurbineBlockEntity> {
 
-    public static final ResourceLocation ROTOR = ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "block/geothermal_turbine_rotor");
+    public static final net.minecraft.client.resources.model.ModelResourceLocation ROTOR =
+            net.minecraft.client.resources.model.ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "block/geothermal_turbine_rotor"));
 
     public TurbineRenderer(BlockEntityRendererProvider.Context ctx) {}
 

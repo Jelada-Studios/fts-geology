@@ -19,7 +19,6 @@ import net.minecraft.world.damagesource.DamageType;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.MobType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -273,7 +272,7 @@ public final class VolcanicGas {
         long now = level.getGameTime();
         for (LivingEntity e : level.getEntitiesOfClass(LivingEntity.class, box, LivingEntity::isAlive)) {
             if (e instanceof Player pl && (pl.isCreative() || pl.isSpectator())) continue;
-            if (e.getMobType() == MobType.UNDEAD) continue;                  // the dead do not breathe
+            if (e.getType().is(net.minecraft.tags.EntityTypeTags.UNDEAD)) continue;                  // the dead do not breathe
             if (!p.holds(e.getX(), e.getEyeY(), e.getZ())) continue;
             long[] x = EXPOSED.computeIfAbsent(e.getUUID(), u -> new long[2]);
             if (x[1] == now) continue;                                       // in two pockets at once: one breath

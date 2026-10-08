@@ -18,7 +18,6 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.MobType;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -56,7 +55,7 @@ public final class GasHealth {
         }
 
         if (!GasConfig.HEALTH_EFFECTS.get()) return;
-        if (e instanceof ArmorStand || e.getMobType() == MobType.UNDEAD || e.getType().is(GasTags.GAS_IMMUNE)) return;
+        if (e instanceof ArmorStand || e.getType().is(net.minecraft.tags.EntityTypeTags.UNDEAD) || e.getType().is(GasTags.GAS_IMMUNE)) return;
         if (e instanceof Player p && (p.isCreative() || p.isSpectator())) return;
 
         GasMix g = mgr.sample(eye);

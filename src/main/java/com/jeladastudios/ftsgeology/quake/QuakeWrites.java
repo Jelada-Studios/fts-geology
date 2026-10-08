@@ -59,7 +59,7 @@ public final class QuakeWrites {
         if (chunk == null) return null;
         net.minecraft.world.level.block.entity.BlockEntity be = chunk.getBlockEntity(pos);
         if (be == null) return null;
-        net.minecraft.nbt.CompoundTag tag = be.saveWithoutMetadata();
+        net.minecraft.nbt.CompoundTag tag = be.saveWithoutMetadata(level.registryAccess());
         chunk.removeBlockEntity(pos);
         return tag;
     }
@@ -69,7 +69,7 @@ public final class QuakeWrites {
         if (tag == null) return;
         net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(pos);
         if (be == null) return;
-        be.load(tag);
+        be.loadWithComponents(tag, level.registryAccess());
         be.setChanged();
     }
 

@@ -87,8 +87,7 @@ public class GeologistsHammerItem extends Item {
         }
 
         level.playSound(null, pos, SoundEvents.STONE_HIT, SoundSource.PLAYERS, 0.9f, 1.4f);
-        ctx.getItemInHand().hurtAndBreak(1, ctx.getPlayer(),
-                p -> p.broadcastBreakEvent(ctx.getHand()));
+        ctx.getItemInHand().hurtAndBreak(1, ctx.getPlayer(), net.minecraft.world.entity.LivingEntity.getSlotForHand(ctx.getHand()));
         return InteractionResult.CONSUME;
     }
 

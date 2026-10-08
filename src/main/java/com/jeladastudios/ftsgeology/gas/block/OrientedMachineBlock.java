@@ -20,6 +20,16 @@ import java.util.function.Supplier;
  * {@code allDirections} machines can also face up/down.
  */
 public class OrientedMachineBlock extends MachineBlock {
+    // Built by GasBlocks with its block entity type, which no codec can carry; the codec is never asked for in play.
+    public static final com.mojang.serialization.MapCodec<OrientedMachineBlock> CODEC = simpleCodec(p -> {
+        throw new UnsupportedOperationException("an oriented machine block is made by GasBlocks, not decoded");
+    });
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends net.minecraft.world.level.block.BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
     public static final BooleanProperty LIT = BlockStateProperties.LIT;
     private final boolean allDirections;
 

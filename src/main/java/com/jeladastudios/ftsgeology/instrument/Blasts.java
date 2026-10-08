@@ -30,7 +30,7 @@ public final class Blasts {
     @SubscribeEvent
     public static void onDetonate(ExplosionEvent.Detonate event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
-        BlockPos at = BlockPos.containing(event.getExplosion().getPosition());
+        BlockPos at = BlockPos.containing(event.getExplosion().center());
         long area = BlockPos.asLong(Math.floorDiv(at.getX(), AREA), 0, Math.floorDiv(at.getZ(), AREA));
         long now = level.getGameTime();
         synchronized (LAST) {

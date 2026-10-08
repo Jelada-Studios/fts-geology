@@ -203,7 +203,7 @@ public final class Reservoirs {
     @SubscribeEvent
     public static void onPlace(BlockEvent.EntityPlaceEvent event) {
         if (!(event.getLevel() instanceof ServerLevel level) || !on(level) || !(event.getEntity() instanceof Player)) return;
-        BlockState was = event.getBlockSnapshot().getReplacedBlock();
+        BlockState was = event.getBlockSnapshot().getState();
         BlockPos pos = event.getPos();
         boolean inRiver = riverWater(was.getFluidState());
         if (!inRiver) {

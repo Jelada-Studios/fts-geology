@@ -89,7 +89,7 @@ public final class ModFluids {
     }
 
     private static BaseFlowingFluid.Properties seaProperties() {
-        return new BaseFlowingFluid.Properties(NeoForgeMod.WATER_TYPE, SEA_WATER, FLOWING_SEA_WATER)
+        return new BaseFlowingFluid.Properties(NeoForgeMod.WATER_TYPE::value, SEA_WATER, FLOWING_SEA_WATER)
                 .block(() -> (net.minecraft.world.level.block.LiquidBlock) ModBlocks.SEA_WATER.get())
                 .bucket(() -> ModItems.SEA_WATER_BUCKET.get())
                 .slopeFindDistance(4).levelDecreasePerBlock(1).tickRate(5).explosionResistance(100.0F);
@@ -118,7 +118,7 @@ public final class ModFluids {
      * too. There is no river-water bucket: the fluid is a thing the generator lays, not a thing to carry about.</p>
      */
     private static BaseFlowingFluid.Properties properties() {
-        return new BaseFlowingFluid.Properties(NeoForgeMod.WATER_TYPE, RIVER_WATER, FLOWING_RIVER_WATER)
+        return new BaseFlowingFluid.Properties(NeoForgeMod.WATER_TYPE::value, RIVER_WATER, FLOWING_RIVER_WATER)
                 .block(() -> (net.minecraft.world.level.block.LiquidBlock) ModBlocks.RIVER_WATER.get())
                 .bucket(() -> Items.WATER_BUCKET);
     }

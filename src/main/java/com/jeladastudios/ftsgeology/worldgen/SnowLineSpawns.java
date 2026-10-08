@@ -44,7 +44,7 @@ public final class SnowLineSpawns {
         if (!GeologyWorld.isOwn(level.getLevel())) return;
         BlockPos pos = e.getPos();
         if (pos.getY() < SnowCover.line() || !level.getBiome(pos).value().coldEnoughToSnow(pos)) return;
-        e.setResult(Event.Result.DENY);
+        e.setResult(net.neoforged.neoforge.event.entity.living.MobSpawnEvent.SpawnPlacementCheck.Result.FAIL);
         KEPT_DOWN.increment();
     }
 

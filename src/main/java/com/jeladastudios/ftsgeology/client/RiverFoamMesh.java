@@ -311,8 +311,7 @@ public final class RiverFoamMesh {
         mc.gameRenderer.lightTexture().turnOnLightLayer();
         RenderSystem.setShader(GameRenderer::getParticleShader);
         RenderSystem.setShaderTexture(0, WHITE);
-        BufferBuilder b = Tesselator.getInstance().getBuilder();
-        b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
+        BufferBuilder b = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
         float[] v = draw.elements();
         int n = draw.size() / STRIDE;
         for (int k = 0; k < n; k++) {
@@ -326,9 +325,8 @@ public final class RiverFoamMesh {
             vertex(b, matrix, x1, y, z0, r, g, bl, a, light);
         }
         drawn = n;
-        BufferBuilder.RenderedBuffer done = b.end();
-        if (n > 0) com.mojang.blaze3d.vertex.BufferUploader.drawWithShader(done);
-        else done.release();
+        com.mojang.blaze3d.vertex.MeshData done = b.build();
+        if (done != null) com.mojang.blaze3d.vertex.BufferUploader.drawWithShader(done);
         mc.gameRenderer.lightTexture().turnOffLightLayer();
         RenderSystem.depthMask(true);
         RenderSystem.disableBlend();
@@ -342,7 +340,7 @@ public final class RiverFoamMesh {
      */
     @SubscribeEvent
     public static void onDebugText(net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent.DebugText event) {
-        if (Minecraft.getInstance().level == null || !Minecraft.getInstance().options.renderDebug || !on()) return;
+        if (Minecraft.getInstance().level == null || !Minecraft.getInstance().getDebugOverlay().showDebugScreen() || !on()) return;
         int cold = 0;
         for (Spot s : spots) if (s.cold()) cold++;
         event.getLeft().add("River foam: " + spots.size() + " blocks (" + cold + " cold), " + drawn

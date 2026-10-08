@@ -16,6 +16,13 @@ import net.minecraft.world.level.block.state.properties.IntegerProperty;
 
 /** Fixed gas detector head: measures the space in front of it and emits a redstone signal. */
 public class GasSensorBlock extends MachineBlock {
+    public static final com.mojang.serialization.MapCodec<GasSensorBlock> CODEC = simpleCodec(GasSensorBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends net.minecraft.world.level.block.BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
     public static final DirectionProperty FACING = BlockStateProperties.FACING;
     public static final IntegerProperty POWER = BlockStateProperties.POWER;
 

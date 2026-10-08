@@ -22,7 +22,8 @@ import net.neoforged.neoforge.client.model.data.ModelData;
  */
 public class AnemometerRenderer implements BlockEntityRenderer<InstrumentBlockEntity> {
 
-    public static final ResourceLocation CUPS = ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "block/anemometer_cups");
+    public static final net.minecraft.client.resources.model.ModelResourceLocation CUPS =
+            net.minecraft.client.resources.model.ModelResourceLocation.standalone(ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "block/anemometer_cups"));
 
     public AnemometerRenderer(BlockEntityRendererProvider.Context ctx) {}
 

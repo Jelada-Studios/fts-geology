@@ -18,7 +18,7 @@ import java.util.function.Supplier;
  */
 public class RiverWaterBlock extends LiquidBlock {
 
-    public RiverWaterBlock(Supplier<? extends FlowingFluid> fluid, Properties properties) {
+    public RiverWaterBlock(FlowingFluid fluid, Properties properties) {
         super(fluid, properties);
     }
 

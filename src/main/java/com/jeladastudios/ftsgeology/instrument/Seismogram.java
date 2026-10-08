@@ -147,13 +147,10 @@ public final class Seismogram {
     public static ItemStack print(Record r, BlockPos pos, long now) {
         List<Component> pages = pages(r, pos, now);
         ItemStack book = new ItemStack(Items.WRITTEN_BOOK);
-        CompoundTag tag = book.getOrCreateTag();
-        tag.putString("title", "Seismogram " + pos.getX() + " " + pos.getZ());
-        tag.putString("author", "Seismograph");
-        tag.putBoolean("resolved", true);
-        ListTag list = new ListTag();
-        for (Component p : pages) list.add(StringTag.valueOf(Component.Serializer.toJson(p, net.minecraft.core.RegistryAccess.EMPTY)));
-        tag.put("pages", list);
+        List<net.minecraft.server.network.Filterable<Component>> paper = new java.util.ArrayList<>(pages.size());
+        for (Component p : pages) paper.add(net.minecraft.server.network.Filterable.passThrough(p));
+        book.set(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT, new net.minecraft.world.item.component.WrittenBookContent(
+                net.minecraft.server.network.Filterable.passThrough("Seismogram " + pos.getX() + " " + pos.getZ()), "Seismograph", 0, paper, true));
         return book;
     }
 

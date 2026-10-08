@@ -530,7 +530,7 @@ public final class EruptionHandler {
                 || b instanceof net.minecraft.world.level.block.LadderBlock) {
             return true;
         }
-        if (s.is(BlockTags.PLANKS) || s.is(BlockTags.WOOL) || s.is(Tags.Blocks.GLASS) || s.is(Tags.Blocks.GLASS_PANES)
+        if (s.is(BlockTags.PLANKS) || s.is(BlockTags.WOOL) || s.is(Tags.Blocks.GLASS_BLOCKS) || s.is(Tags.Blocks.GLASS_PANES)
                 || s.is(Tags.Blocks.STORAGE_BLOCKS) || s.is(Blocks.HAY_BLOCK) || s.is(Blocks.BOOKSHELF)
                 || s.is(Blocks.MUD_BRICKS) || s.is(Blocks.PACKED_MUD) || s.is(Tags.Blocks.CHESTS)) {
             return true;
@@ -676,7 +676,7 @@ public final class EruptionHandler {
                 || s.is(Tags.Blocks.GRAVELS)
                 || s.is(Tags.Blocks.SANDS)
                 || s.is(Tags.Blocks.SANDSTONE_BLOCKS)
-                || s.is(Tags.Blocks.NETHERRACK)
+                || s.is(Tags.Blocks.NETHERRACKS)
                 || s.is(Tags.Blocks.ORES)
                 || s.is(BlockTags.NYLIUM)
                 || s.is(BlockTags.MOSS_REPLACEABLE)   // moss, and the soils and stones mods add to it

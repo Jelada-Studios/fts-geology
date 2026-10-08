@@ -26,17 +26,17 @@ public class FieldGuideClient {
 
     public static void openBook() {
         List<FormattedText> pages = pages(Minecraft.getInstance().font);
-        Minecraft.getInstance().setScreen(new BookViewScreen(new BookViewScreen.BookAccess() {
-            @Override
-            public int getPageCount() {
-                return pages.size();
-            }
-
-            @Override
-            public FormattedText getPageRaw(int index) {
-                return pages.get(index);
-            }
-        }));
+        // The book takes its pages as components: each split page, its styles kept.
+        List<Component> asComponents = new ArrayList<>(pages.size());
+        for (FormattedText page : pages) {
+            net.minecraft.network.chat.MutableComponent c = Component.empty();
+            page.visit((style, text) -> {
+                c.append(Component.literal(text).withStyle(style));
+                return java.util.Optional.empty();
+            }, Style.EMPTY);
+            asComponents.add(c);
+        }
+        Minecraft.getInstance().setScreen(new BookViewScreen(new BookViewScreen.BookAccess(asComponents)));
     }
 
     private static List<FormattedText> pages(Font font) {

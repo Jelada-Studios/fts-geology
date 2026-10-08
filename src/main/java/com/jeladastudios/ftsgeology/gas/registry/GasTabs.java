@@ -37,7 +37,7 @@ public final class GasTabs {
         mix.add(gas, atm * GasTankBlockEntity.VOLUME * Gas.MOL_PER_BLOCK);
         CompoundTag be = new CompoundTag();
         be.put("gas", mix.save());
-        stack.getOrCreateTag().put("BlockEntityTag", be);
+        com.jeladastudios.ftsgeology.util.ItemData.update(stack, t -> t.put("BlockEntityTag", be));
         return stack;
     }
 

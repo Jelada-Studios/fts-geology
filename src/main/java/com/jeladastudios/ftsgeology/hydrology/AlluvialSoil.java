@@ -41,7 +41,7 @@ public final class AlluvialSoil {
         if (!level.getBiome(pos).is(ALLUVIAL_PLAIN)) return;
         // The tick grows the crop by the game's own roll, one in (25 / speed) + 1; letting it grow besides with the
         // chance q makes the two together m times that roll, whatever the field round it.
-        double p = 1.0 / ((int) (25.0F / Speed.of(block, level, pos)) + 1);
+        double p = 1.0 / ((int) (25.0F / Speed.of(e.getState(), level, pos)) + 1);
         double q = Math.min(1.0, (m - 1.0) * p / (1.0 - p));
         if (level.getRandom().nextDouble() < q) e.setResult(net.neoforged.neoforge.event.level.block.CropGrowEvent.Pre.Result.GROW);
     }
@@ -52,8 +52,8 @@ public final class AlluvialSoil {
             super(properties);
         }
 
-        static float of(Block block, BlockGetter level, BlockPos pos) {
-            return getGrowthSpeed(block, level, pos);
+        static float of(net.minecraft.world.level.block.state.BlockState state, BlockGetter level, BlockPos pos) {
+            return getGrowthSpeed(state, level, pos);
         }
     }
 }

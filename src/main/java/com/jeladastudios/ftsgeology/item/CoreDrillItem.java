@@ -50,7 +50,7 @@ public class CoreDrillItem extends Item {
     }
 
     @Override
-    public int getUseDuration(ItemStack stack) {
+    public int getUseDuration(ItemStack stack, net.minecraft.world.entity.LivingEntity entity) {
         return DRILLING;
     }
 
@@ -94,7 +94,7 @@ public class CoreDrillItem extends Item {
         level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK, level.getBlockState(top)),
                 top.getX() + 0.5, top.getY() + 1.0, top.getZ() + 0.5, 20, 0.2, 0.3, 0.2, 0.1);
         player.getCooldowns().addCooldown(this, COOLDOWN);
-        stack.hurtAndBreak(1, player, p -> p.broadcastBreakEvent(p.getUsedItemHand()));
+        stack.hurtAndBreak(1, player, net.minecraft.world.entity.LivingEntity.getSlotForHand(player.getUsedItemHand()));
         GeologyTrigger.award(player, "core");
         if (CoreSampleItem.hasDeposit(core)) GeologyTrigger.award(player, "core_deposit");
         return stack;
@@ -136,7 +136,7 @@ public class CoreDrillItem extends Item {
         if (run != null && beds.size() < BEDS) beds.add(bed(run, count));
 
         ItemStack core = new ItemStack(ModItems.CORE_SAMPLE.get());
-        CompoundTag tag = core.getOrCreateTagElement("Core");
+        CompoundTag tag = new CompoundTag();
         tag.putInt("X", top.getX());
         tag.putInt("Z", top.getZ());
         tag.putInt("Y", top.getY());
@@ -151,6 +151,7 @@ public class CoreDrillItem extends Item {
             tag.putIntArray("Soil", new int[]{(int) Math.round(100 * soil.topSat()), (int) Math.round(100 * soil.rootSat()),
                     (int) Math.round(100 * soil.deepSat())});
         }
+        com.jeladastudios.ftsgeology.util.ItemData.update(core, t -> t.put("Core", tag));
         return core;
     }
 

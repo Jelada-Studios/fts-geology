@@ -9,6 +9,13 @@ import net.minecraft.world.level.block.state.BlockState;
 
 /** Pressure vessel. Pipes connect on every side. Ruptures (and releases its gas) when blown up. */
 public class GasTankBlock extends MachineBlock {
+    public static final com.mojang.serialization.MapCodec<GasTankBlock> CODEC = simpleCodec(GasTankBlock::new);
+
+    @Override
+    protected com.mojang.serialization.MapCodec<? extends net.minecraft.world.level.block.BaseEntityBlock> codec() {
+        return CODEC;
+    }
+
     public GasTankBlock(Properties props) {
         super(props, GasBlockEntities.GAS_TANK);
     }

@@ -114,7 +114,7 @@ public final class CommonEvents {
     @SubscribeEvent
     public static void onLivingTick(net.neoforged.neoforge.event.tick.EntityTickEvent.Post event) {
         if (event.getEntity().level().isClientSide || !on()) return;
-        GasHealth.tick(event.getEntity());
+        if (event.getEntity() instanceof net.minecraft.world.entity.LivingEntity living) GasHealth.tick(living);
     }
 
     // ---------------------------------------------------------------- ignition sources
@@ -229,12 +229,12 @@ public final class CommonEvents {
     @SubscribeEvent
     public static void onExplosion(ExplosionEvent.Detonate event) {
         if (!(event.getLevel() instanceof ServerLevel level) || !on()) return;
-        GasManager.get(level).igniteAround(BlockPos.containing(event.getExplosion().getPosition()), 3, null);
+        GasManager.get(level).igniteAround(BlockPos.containing(event.getExplosion().center()), 3, null);
         // A blast that is not the gas's own blows out the standing flames it reaches, as a well fire is put out.
-        if (!event.getExplosion().getDamageSource().is(com.jeladastudios.ftsgeology.gas.registry.GasDamageTypes.GAS_EXPLOSION)) {
+        if (!((com.jeladastudios.ftsgeology.mixin.ExplosionAccessor) event.getExplosion()).fts_geology$damageSource().is(com.jeladastudios.ftsgeology.gas.registry.GasDamageTypes.GAS_EXPLOSION)) {
             double reach = 2.0;
-            for (BlockPos p : event.getAffectedBlocks()) reach = Math.max(reach, p.getCenter().distanceTo(event.getExplosion().getPosition()));
-            GasManager.get(level).flames().blowOut(event.getExplosion().getPosition(), Math.min(reach, 12.0));
+            for (BlockPos p : event.getAffectedBlocks()) reach = Math.max(reach, p.getCenter().distanceTo(event.getExplosion().center()));
+            GasManager.get(level).flames().blowOut(event.getExplosion().center(), Math.min(reach, 12.0));
         }
         int n = 0;
         for (BlockPos p : event.getAffectedBlocks()) {

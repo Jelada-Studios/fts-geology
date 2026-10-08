@@ -23,7 +23,7 @@ public class GasTankItem extends BlockItem {
     }
 
     public static GasMix contents(ItemStack stack) {
-        CompoundTag be = stack.getTagElement("BlockEntityTag");
+        CompoundTag be = com.jeladastudios.ftsgeology.util.ItemData.element(stack, "BlockEntityTag");
         return be == null ? new GasMix() : GasMix.load(be.getCompound("gas"));
     }
 

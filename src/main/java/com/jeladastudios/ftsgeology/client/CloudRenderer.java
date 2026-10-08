@@ -65,7 +65,7 @@ final class CloudRenderer {
         RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
                 GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
         RenderSystem.depthMask(true);
-        RenderSystem.setShader(GameRenderer::getPositionTexColorNormalShader);
+        RenderSystem.setShader(GameRenderer::getRendertypeCloudsShader);
         RenderSystem.setShaderTexture(0, WHITE);
         FogRenderer.levelFogColor();
         pose.pushPose();
@@ -193,8 +193,7 @@ final class CloudRenderer {
         meshType = type;
         remesh = false;
         int count = 0;
-        BufferBuilder b = Tesselator.getInstance().getBuilder();
-        b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
+        BufferBuilder b = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
         float r = (float) color.x, g = (float) color.y, bl = (float) color.z;
         boolean fancy = type == CloudStatus.FANCY;
         float lift = height - cy;
@@ -222,12 +221,12 @@ final class CloudRenderer {
         if (clouds != null) clouds.close();
         clouds = null;
         if (count == 0) {
-            b.end().release();
+            { com.mojang.blaze3d.vertex.MeshData m = b.build(); if (m != null) m.close(); }
             return;
         }
         clouds = new VertexBuffer(VertexBuffer.Usage.STATIC);
         clouds.bind();
-        clouds.upload(b.end());
+        clouds.upload(b.buildOrThrow());
         VertexBuffer.unbind();
     }
 
@@ -275,8 +274,7 @@ final class CloudRenderer {
     private void flashes(PoseStack pose, Matrix4f projection, double dx, double dz, float height) {
         var list = ClientSky.flashes();
         if (list.isEmpty() || gridI == Integer.MIN_VALUE) return;
-        BufferBuilder b = Tesselator.getInstance().getBuilder();
-        b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
+        BufferBuilder b = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
         int quads = 0;
         float lift = height - meshY;
         for (ClientSky.Flash f : list) {
@@ -300,7 +298,7 @@ final class CloudRenderer {
             }
         }
         if (quads == 0) {
-            b.end().release();
+            { com.mojang.blaze3d.vertex.MeshData m = b.build(); if (m != null) m.close(); }
             return;
         }
         RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE);
@@ -308,7 +306,7 @@ final class CloudRenderer {
         RenderSystem.colorMask(true, true, true, true);
         if (glow == null) glow = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
         glow.bind();
-        glow.upload(b.end());
+        glow.upload(b.buildOrThrow());
         glow.drawWithShader(pose.last().pose(), projection, RenderSystem.getShader());
         VertexBuffer.unbind();
         RenderSystem.depthMask(true);

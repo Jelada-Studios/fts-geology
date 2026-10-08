@@ -19,5 +19,5 @@ public interface AbstractFurnaceAccessor {
     void fts_geology$setLitDuration(int ticks);
 
     @Accessor("quickCheck")
-    net.minecraft.world.item.crafting.RecipeManager.CachedCheck<net.minecraft.world.Container, ? extends AbstractCookingRecipe> fts_geology$quickCheck();
+    net.minecraft.world.item.crafting.RecipeManager.CachedCheck<net.minecraft.world.item.crafting.SingleRecipeInput, ? extends AbstractCookingRecipe> fts_geology$quickCheck();
 }

@@ -1,15 +1,19 @@
 package com.jeladastudios.ftsgeology.advancement;
 
-import com.google.gson.JsonObject;
 import com.jeladastudios.ftsgeology.GeysersMod;
-import net.minecraft.advancements.CriteriaTriggers;
-import net.minecraft.advancements.critereon.AbstractCriterionTriggerInstance;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.advancements.CriterionTrigger;
 import net.minecraft.advancements.critereon.ContextAwarePredicate;
-import net.minecraft.advancements.critereon.DeserializationContext;
+import net.minecraft.advancements.critereon.EntityPredicate;
 import net.minecraft.advancements.critereon.SimpleCriterionTrigger;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.GsonHelper;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredRegister;
+
+import java.util.Optional;
 
 /**
  * One advancement trigger for everything a player finds out about the ground: {@code fts_geology:geology} with an
@@ -17,16 +21,20 @@ import net.minecraft.util.GsonHelper;
  */
 public final class GeologyTrigger extends SimpleCriterionTrigger<GeologyTrigger.Instance> {
 
-    static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath(GeysersMod.MODID, "geology");
+    private static final DeferredRegister<CriterionTrigger<?>> TRIGGERS =
+            DeferredRegister.create(Registries.TRIGGER_TYPE, GeysersMod.MODID);
 
-    public static final GeologyTrigger INSTANCE = CriteriaTriggers.register(new GeologyTrigger());
+    public static final DeferredHolder<CriterionTrigger<?>, GeologyTrigger> INSTANCE =
+            TRIGGERS.register("geology", GeologyTrigger::new);
 
-    /** Makes sure the trigger is registered before advancements load. */
-    public static void init() {}
+    /** Registers the trigger on the mod bus, before advancements load. */
+    public static void register(IEventBus modBus) {
+        TRIGGERS.register(modBus);
+    }
 
     /** Tells the advancements that {@code player} has done {@code event}. */
     public static void award(ServerPlayer player, String event) {
-        INSTANCE.trigger(player, i -> i.event.equals(event));
+        INSTANCE.get().trigger(player, i -> i.event.equals(event));
     }
 
     /** Tells the advancements that everyone within {@code radius} of a point has seen {@code event}. */
@@ -38,28 +46,14 @@ public final class GeologyTrigger extends SimpleCriterionTrigger<GeologyTrigger.
     }
 
     @Override
-    public ResourceLocation getId() {
-        return ID;
+    public Codec<Instance> codec() {
+        return Instance.CODEC;
     }
 
-    @Override
-    protected Instance createInstance(JsonObject json, ContextAwarePredicate player, DeserializationContext context) {
-        return new Instance(player, GsonHelper.getAsString(json, "event"));
-    }
-
-    public static final class Instance extends AbstractCriterionTriggerInstance {
-        final String event;
-
-        Instance(ContextAwarePredicate player, String event) {
-            super(ID, player);
-            this.event = event;
-        }
-
-        @Override
-        public JsonObject serializeToJson(net.minecraft.advancements.critereon.SerializationContext context) {
-            JsonObject json = super.serializeToJson(context);
-            json.addProperty("event", event);
-            return json;
-        }
+    public record Instance(Optional<ContextAwarePredicate> player, String event) implements SimpleCriterionTrigger.SimpleInstance {
+        static final Codec<Instance> CODEC = RecordCodecBuilder.create(i -> i.group(
+                EntityPredicate.ADVANCEMENT_CODEC.optionalFieldOf("player").forGetter(Instance::player),
+                Codec.STRING.fieldOf("event").forGetter(Instance::event)
+        ).apply(i, Instance::new));
     }
 }

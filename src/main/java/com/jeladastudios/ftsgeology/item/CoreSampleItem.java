@@ -34,13 +34,13 @@ public class CoreSampleItem extends Item {
     public net.minecraft.world.InteractionResultHolder<ItemStack> use(Level level, net.minecraft.world.entity.player.Player player,
                                                                    net.minecraft.world.InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        if (!level.isClientSide && stack.getTagElement("Core") != null) describe(stack, level, player::sendSystemMessage);
+        if (!level.isClientSide && com.jeladastudios.ftsgeology.util.ItemData.element(stack, "Core") != null) describe(stack, level, player::sendSystemMessage);
         return net.minecraft.world.InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
     }
 
     @Override
     public Component getName(ItemStack stack) {
-        CompoundTag core = stack.getTagElement("Core");
+        CompoundTag core = com.jeladastudios.ftsgeology.util.ItemData.element(stack, "Core");
         if (core == null) return super.getName(stack);
         return Component.translatable("item.fts_geology.core_sample.from", core.getInt("X"), core.getInt("Z"));
     }
@@ -48,12 +48,12 @@ public class CoreSampleItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, net.minecraft.world.item.Item.TooltipContext context, List<Component> tooltip,
                                 TooltipFlag flag) {
-        if (stack.getTagElement("Core") == null) {
+        if (com.jeladastudios.ftsgeology.util.ItemData.element(stack, "Core") == null) {
             tooltip.add(Component.translatable("item.fts_geology.core_sample.blank").withStyle(ChatFormatting.GRAY));
             return;
         }
         try {
-            describe(stack, level, tooltip::add, TOOLTIP_BEDS);
+            describe(stack, context.level(), tooltip::add, TOOLTIP_BEDS);
         } catch (IllegalStateException e) {
             // The server's settings are not here yet, as in a menu before a world is joined.
             tooltip.add(Component.translatable("item.fts_geology.core_sample.blank").withStyle(ChatFormatting.GRAY));
@@ -61,7 +61,7 @@ public class CoreSampleItem extends Item {
     }
 
     static boolean hasDeposit(ItemStack stack) {
-        CompoundTag core = stack.getTagElement("Core");
+        CompoundTag core = com.jeladastudios.ftsgeology.util.ItemData.element(stack, "Core");
         if (core == null) return false;
         for (Tag t : core.getList("Deposits", Tag.TAG_COMPOUND)) {
             if (((CompoundTag) t).contains("Genesis")) return true;
@@ -78,7 +78,7 @@ public class CoreSampleItem extends Item {
     }
 
     static void describe(ItemStack stack, @javax.annotation.Nullable Level level, Consumer<Component> out, int most) {
-        CompoundTag core = stack.getTagElement("Core");
+        CompoundTag core = com.jeladastudios.ftsgeology.util.ItemData.element(stack, "Core");
         if (core == null) return;
         int top = core.getInt("Y");
         out.accept(Component.translatable("item.fts_geology.core_sample.header", core.getInt("X"), core.getInt("Z"),

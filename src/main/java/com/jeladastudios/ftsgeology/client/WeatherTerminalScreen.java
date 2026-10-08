@@ -148,13 +148,13 @@ public class WeatherTerminalScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mx, double my, double delta) {
+    public boolean mouseScrolled(double mx, double my, double scrollX, double delta) {
         if (tab == STATIONS) {
             int rows = data.getList("Stations", Tag.TAG_COMPOUND).size();
             scroll = Mth.clamp(scroll - (int) Math.signum(delta), 0, Math.max(0, rows - listRows()));
             return true;
         }
-        return super.mouseScrolled(mx, my, delta);
+        return super.mouseScrolled(mx, my, scrollX, delta);
     }
 
     private static void click() {

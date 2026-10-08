@@ -84,7 +84,7 @@ public class GasSeepBlock extends BaseEntityBlock {
         if (held.is(Items.FIRE_CHARGE)) {
             if (!player.getAbilities().instabuild) held.shrink(1);
         } else {
-            held.hurtAndBreak(1, player, p -> p.broadcastBreakEvent(hand));
+            held.hurtAndBreak(1, player, net.minecraft.world.entity.LivingEntity.getSlotForHand(hand));
         }
         return InteractionResult.CONSUME;
     }

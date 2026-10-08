@@ -62,7 +62,7 @@ public class GeologyMapItem extends Item {
         ItemStack map = MapItem.create(level, player.getBlockX(), player.getBlockZ(), SCALE, true, false);
         MapItem.lockMap(level, map);
         if (level instanceof ServerLevel server) mark(server, map);
-        map.getOrCreateTag().putBoolean(TAG, true);
+        com.jeladastudios.ftsgeology.util.ItemData.update(map, t -> t.putBoolean(TAG, true));
         map.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, Component.translatable("item.fts_geology.geology_map.filled").withStyle(style -> style.withItalic(false)));
         if (player instanceof ServerPlayer sp) GeologyTrigger.award(sp, "map_survey");
         level.playSound(null, player.blockPosition(), SoundEvents.UI_CARTOGRAPHY_TABLE_TAKE_RESULT,
@@ -98,7 +98,7 @@ public class GeologyMapItem extends Item {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (player.tickCount % 10 != 0) return;
         for (ItemStack stack : new ItemStack[]{player.getMainHandItem(), player.getOffhandItem()}) {
-            if (stack.is(Items.FILLED_MAP) && stack.getTag() != null && stack.getTag().getBoolean(TAG)) {
+            if (stack.is(Items.FILLED_MAP) && com.jeladastudios.ftsgeology.util.ItemData.get(stack) != null && com.jeladastudios.ftsgeology.util.ItemData.get(stack).getBoolean(TAG)) {
                 survey(player.serverLevel(), player, stack);
             }
         }
@@ -117,7 +117,7 @@ public class GeologyMapItem extends Item {
         for (var site : com.jeladastudios.ftsgeology.volcano.VolcanoField.sitesInBox(level, x0, z0, x1, z1)) {
             if (!site.chosen() || n++ >= 6) continue;
             MapItemSavedData.addTargetDecoration(map, new BlockPos(site.x(), 0, site.z()), "volcano" + n,
-                    net.minecraft.world.level.saveddata.maps.MapDecoration.Type.RED_MARKER);
+                    net.minecraft.world.level.saveddata.maps.MapDecorationTypes.RED_MARKER);
         }
         if (com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld.isOwn(level)
                 && com.jeladastudios.ftsgeology.worldgen.terrain.DemLibrary.landmarksReady()) {
@@ -126,7 +126,7 @@ public class GeologyMapItem extends Item {
                     com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params())) {
                 if (s.x() < x0 || s.x() > x1 || s.z() < z0 || s.z() > z1) continue;
                 MapItemSavedData.addTargetDecoration(map, new BlockPos(s.x(), 0, s.z()), "summit" + s.which(),
-                        net.minecraft.world.level.saveddata.maps.MapDecoration.Type.TARGET_POINT);
+                        net.minecraft.world.level.saveddata.maps.MapDecorationTypes.TARGET_POINT);
             }
         }
     }

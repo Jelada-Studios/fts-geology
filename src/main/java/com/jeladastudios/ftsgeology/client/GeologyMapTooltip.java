@@ -19,7 +19,7 @@ public final class GeologyMapTooltip {
     @SubscribeEvent
     public static void onTooltip(ItemTooltipEvent event) {
         var stack = event.getItemStack();
-        if (!stack.is(Items.FILLED_MAP) || stack.getTag() == null || !stack.getTag().getBoolean(GeologyMapItem.TAG)) return;
+        if (!stack.is(Items.FILLED_MAP) || com.jeladastudios.ftsgeology.util.ItemData.get(stack) == null || !com.jeladastudios.ftsgeology.util.ItemData.get(stack).getBoolean(GeologyMapItem.TAG)) return;
         event.getToolTip().add(Component.translatable("item.fts_geology.geology_map.key_rocks").withStyle(ChatFormatting.GRAY));
         event.getToolTip().add(Component.translatable("item.fts_geology.geology_map.key_more").withStyle(ChatFormatting.GRAY));
         event.getToolTip().add(Component.translatable("item.fts_geology.geology_map.key_faults").withStyle(ChatFormatting.GRAY));

@@ -42,8 +42,10 @@ public final class DefaultOverworldPack {
             }
         }
         Path root = ModList.get().getModFileById(GeysersMod.MODID).getFile().findResource("resourcepacks/default_overworld");
-        event.addRepositorySource(consumer -> consumer.accept(Pack.readMetaAndCreate(PACK_ID,
-                Component.literal("FT's Geology default overworld"), true,
-                id -> new PathPackResources(id, root, true), PackType.SERVER_DATA, Pack.Position.TOP, PackSource.BUILT_IN)));
+        event.addRepositorySource(consumer -> consumer.accept(Pack.readMetaAndCreate(
+                new net.minecraft.server.packs.PackLocationInfo(PACK_ID, Component.literal("FT's Geology default overworld"),
+                        PackSource.BUILT_IN, java.util.Optional.empty()),
+                new PathPackResources.PathResourcesSupplier(root), PackType.SERVER_DATA,
+                new net.minecraft.server.packs.PackSelectionConfig(true, Pack.Position.TOP, false))));
     }
 }
