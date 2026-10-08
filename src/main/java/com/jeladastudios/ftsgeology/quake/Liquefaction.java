@@ -48,7 +48,8 @@ import java.util.concurrent.atomic.LongAdder;
  * of it -- and wet -- by a river, a lake or the sea, on a floodplain, or where the water table stands within a few
  * blocks of the surface -- sand boils open in the open ground; the columns of what players and villages built on it
  * settle a block into it, and not all together, so a house on half-sound ground cracks and leans; and whoever stands
- * on it is held fast for a few seconds.</p>
+ * on it is held fast for a few seconds. Boils are few, one here and there; most of them heal within the
+ * hour, the sand worked back into the ground ({@link BoilScars}), and a few are left as cones.</p>
  */
 @Mod.EventBusSubscriber(modid = GeysersMod.MODID)
 public final class Liquefaction {
@@ -67,6 +68,11 @@ public final class Liquefaction {
     private static final int SINK = 4;
     /** How long a sand boil runs, in ticks. */
     private static final int BOIL = 240;
+    /** The share of the open ground's chances that opens a boil: a boil here and there, not a field of them. */
+    private static final double BOIL_SHARE = 0.1;
+    /** The share of boils whose sand is worked back into the ground, and after how long: thirty to forty minutes. */
+    private static final double HEALS = 0.8;
+    private static final int HEAL_AFTER = 36000, HEAL_MORE = 12000;
 
     private static final LongAdder CHUNKS = new LongAdder(), BOILS = new LongAdder(), SETTLED = new LongAdder(),
             HELD = new LongAdder();
@@ -227,7 +233,7 @@ public final class Liquefaction {
             int top = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, lx, lz);
             if (!susceptible(level, chunk, m, x, top, z)) continue;
             if (!chunk.getBlockState(m.set(x, top + 1, z)).isAir()) continue;
-            if (level.random.nextDouble() >= Math.min(0.8, 0.25 * (strength + 1.0))) continue;
+            if (level.random.nextDouble() >= BOIL_SHARE * Math.min(0.8, 0.25 * (strength + 1.0))) continue;
             DUE.add(new Due(level.dimension(), Kind.BOIL, new BlockPos(x, top, z), 0, when.getAsLong()));
         }
         // Whoever stands on it sinks in for a moment.
@@ -308,19 +314,32 @@ public final class Liquefaction {
     private static void boil(ServerLevel level, BlockPos top) {
         BlockState ground = level.getBlockState(top);
         if (!loose(ground) || !level.getBlockState(top.above()).isAir()) return;
+        // What the boil covers, as it was, for the ground to heal later.
+        List<BlockPos> changed = new java.util.ArrayList<>();
+        List<BlockState> was = new java.util.ArrayList<>();
+        changed.add(top.immutable());
+        was.add(ground);
         level.setBlock(top, Blocks.SAND.defaultBlockState(), Block.UPDATE_ALL);
         for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
             BlockPos n = top.relative(d);
             BlockState s = level.getBlockState(n);
             if (loose(s) && !s.is(BlockTags.SAND) && level.getBlockState(n.above()).isAir()) {
+                changed.add(n.immutable());
+                was.add(s);
                 level.setBlock(n, Blocks.SAND.defaultBlockState(), Block.UPDATE_ALL);
             } else if (s.isAir() && level.random.nextBoolean()) {
                 // ejected sand heaped on the rim
                 BlockState under = level.getBlockState(n.below());
                 if (under.isFaceSturdy(level, n.below(), net.minecraft.core.Direction.UP)) {
+                    changed.add(n.immutable());
+                    was.add(s);
                     level.setBlock(n, Blocks.SAND.defaultBlockState(), Block.UPDATE_ALL);
                 }
             }
+        }
+        // Most boils are gone in a while, the sand worked back into the ground; a few are left as cones.
+        if (level.random.nextDouble() < HEALS) {
+            BoilScars.keep(level, changed, was, level.getGameTime() + HEAL_AFTER + level.random.nextInt(HEAL_MORE));
         }
         // The vent itself sinks a little and water fills it.
         level.setBlock(top, Blocks.WATER.defaultBlockState(), Block.UPDATE_ALL);
