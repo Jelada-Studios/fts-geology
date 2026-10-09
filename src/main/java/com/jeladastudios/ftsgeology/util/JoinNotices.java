@@ -27,8 +27,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Two things said to whoever runs a world when they join it, each once.
  *
  * <p>That a newer version of the mod is out, as Forge's own update check found it: most players never open the mod
- * list, where Forge shows it. And that the world was made with an older version: what a new version changes in the
- * terrain shows only in ground generated from then on, and a player who updates and walks round the land they know
+ * list, where Forge shows it. And that the world was made with an older version: a world keeps the terrain it was
+ * made with, in new ground too (see {@code WorldgenRevision}), so a player who updates and walks out into new land
  * sees nothing new and takes it the update did nothing. The version a world was last opened with is kept in the
  * world's own data.</p>
  *
