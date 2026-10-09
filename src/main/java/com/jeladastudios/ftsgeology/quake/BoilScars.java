@@ -39,9 +39,19 @@ public final class BoilScars {
 
     static final class Store extends SavedData {
         final List<Scar> scars = new ArrayList<>();
+        /** Boil vents still holding water, with when they dry. */
+        final it.unimi.dsi.fastutil.longs.Long2LongLinkedOpenHashMap vents = new it.unimi.dsi.fastutil.longs.Long2LongLinkedOpenHashMap();
 
         @Override
         public CompoundTag save(CompoundTag tag) {
+            ListTag vented = new ListTag();
+            for (var e : vents.long2LongEntrySet()) {
+                CompoundTag v = new CompoundTag();
+                v.putLong("Pos", e.getLongKey());
+                v.putLong("Due", e.getLongValue());
+                vented.add(v);
+            }
+            tag.put("Vents", vented);
             ListTag list = new ListTag();
             for (Scar s : scars) {
                 CompoundTag t = new CompoundTag();
@@ -62,6 +72,10 @@ public final class BoilScars {
 
         static Store load(ServerLevel level, CompoundTag tag) {
             Store store = new Store();
+            for (Tag e : tag.getList("Vents", Tag.TAG_COMPOUND)) {
+                CompoundTag v = (CompoundTag) e;
+                store.vents.put(v.getLong("Pos"), v.getLong("Due"));
+            }
             var blocks = level.holderLookup(Registries.BLOCK);
             for (Tag e : tag.getList("Scars", Tag.TAG_COMPOUND)) {
                 CompoundTag t = (CompoundTag) e;
@@ -94,13 +108,69 @@ public final class BoilScars {
         store.setDirty();
     }
 
+    /** Keeps a boil's vent, to dry at {@code due}. */
+    static void vent(ServerLevel level, BlockPos at, long due) {
+        Store store = store(level);
+        store.vents.put(at.asLong(), due);
+        store.setDirty();
+    }
+
+    /** A vent dries: its water goes back into the ground and leaves sand, and any of it that ran out goes too. */
+    static void dryVent(ServerLevel level, BlockPos at) {
+        if (level.getBlockState(at).is(Blocks.WATER)) takeUp(level, at, Blocks.SAND.defaultBlockState());
+        clearSheet(level, at, 2);
+    }
+
+    /**
+     * Puts a block where water stands, the water taken up first. Put straight into it, a finite water mod pushes the
+     * block's water out onto the ground beside it: every boil that dried left its water lying round it.
+     */
+    private static void takeUp(ServerLevel level, BlockPos at, BlockState with) {
+        level.setBlock(at, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        level.setBlock(at, with, Block.UPDATE_ALL);
+    }
+
+    /**
+     * Takes up the thin water a boil let run over the ground round it: water that is not a source and not falling,
+     * lying open to the sky from a block under the vent's level to a block over it. A finite water mod spread a vent
+     * into such a sheet, and nothing took it back up.
+     */
+    private static void clearSheet(ServerLevel level, BlockPos at, int reach) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int dx = -reach; dx <= reach; dx++) {
+            for (int dz = -reach; dz <= reach; dz++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    m.set(at.getX() + dx, at.getY() + dy, at.getZ() + dz);
+                    if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, m)) continue;
+                    if (!level.getBlockState(m).is(Blocks.WATER)) continue;
+                    var fluid = level.getFluidState(m);
+                    if (fluid.isSource() || fluid.getValue(net.minecraft.world.level.material.FlowingFluid.FALLING)) continue;
+                    if (!level.getBlockState(m.above()).isAir()) continue;
+                    level.setBlock(m, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+                }
+            }
+        }
+    }
+
     @SubscribeEvent
     public static void onLevelTick(TickEvent.LevelTickEvent event) {
         if (event.phase != TickEvent.Phase.END || !(event.level instanceof ServerLevel level)) return;
         if (level.getGameTime() % 20 != 7) return;
         Store store = level.getDataStorage().get(t -> Store.load(level, t), "fts_geology_boil_scars");
-        if (store == null || store.scars.isEmpty()) return;
+        if (store == null || (store.scars.isEmpty() && store.vents.isEmpty())) return;
         long now = level.getGameTime();
+        int dried = 0;
+        for (var it = store.vents.long2LongEntrySet().iterator(); it.hasNext() && dried < 64; ) {
+            var e = it.next();
+            if (e.getLongValue() > now) continue;
+            BlockPos p = BlockPos.of(e.getLongKey());
+            // Out of the loaded world it waits for the ground to be loaded again.
+            if (!com.jeladastudios.ftsgeology.util.Loaded.at(level, p)) continue;
+            dryVent(level, p);
+            it.remove();
+            dried++;
+        }
+        if (dried > 0) store.setDirty();
         int healed = 0;
         for (var it = store.scars.iterator(); it.hasNext() && healed < 8; ) {
             Scar s = it.next();
@@ -117,11 +187,13 @@ public final class BoilScars {
             for (int i = 0; i < s.at.size(); i++) {
                 BlockPos p = s.at.get(i);
                 BlockState now2 = level.getBlockState(p);
-                // Only the boil's own sand and its water go back; anything put there since stays.
-                if (now2.is(Blocks.SAND) || (now2.is(Blocks.WATER) && level.getFluidState(p).isSource())) {
-                    level.setBlock(p, s.was.get(i), Block.UPDATE_ALL);
-                }
+                // Only the boil's own sand and its water go back; anything put there since stays. The water at any level:
+                // a finite water mod keeps a full block as running water, not a source.
+                if (now2.is(Blocks.WATER)) takeUp(level, p, s.was.get(i));
+                else if (now2.is(Blocks.SAND)) level.setBlock(p, s.was.get(i), Block.UPDATE_ALL);
             }
+            // A boil from before its vent kept its water in may have left a sheet round it: that goes as well.
+            clearSheet(level, s.at.get(0), 3);
             it.remove();
             healed++;
         }

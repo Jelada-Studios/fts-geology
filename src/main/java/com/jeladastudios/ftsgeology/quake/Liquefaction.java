@@ -327,8 +327,8 @@ public final class Liquefaction {
                 changed.add(n.immutable());
                 was.add(s);
                 level.setBlock(n, Blocks.SAND.defaultBlockState(), Block.UPDATE_ALL);
-            } else if (s.isAir() && level.random.nextBoolean()) {
-                // ejected sand heaped on the rim
+            } else if (s.isAir()) {
+                // ejected sand heaped on the rim, which also keeps the vent's water in
                 BlockState under = level.getBlockState(n.below());
                 if (under.isFaceSturdy(level, n.below(), net.minecraft.core.Direction.UP)) {
                     changed.add(n.immutable());
@@ -341,22 +341,28 @@ public final class Liquefaction {
         if (level.random.nextDouble() < HEALS) {
             BoilScars.keep(level, changed, was, level.getGameTime() + HEAL_AFTER + level.random.nextInt(HEAL_MORE));
         }
+        BOILS.increment();
+        com.jeladastudios.ftsgeology.advancement.GeologyTrigger.awardNear(level, top.getX(), top.getZ(), 48, "liquefaction");
+        // The vent wells up only where its rim holds the water in. Water with a way out ran over the field: a finite
+        // water mod spread it into a sheet that was never taken back up.
+        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            BlockPos n = top.relative(d);
+            if (!level.getBlockState(n).isFaceSturdy(level, n, d.getOpposite())) return;
+        }
         // The vent itself sinks a little and water fills it.
         level.setBlock(top, Blocks.WATER.defaultBlockState(), Block.UPDATE_ALL);
         RUNNING.put(top.immutable(), level.dimension());
         level.playSound(null, top, net.minecraft.sounds.SoundEvents.BUBBLE_COLUMN_UPWARDS_AMBIENT,
                 net.minecraft.sounds.SoundSource.BLOCKS, 1.0f, 0.6f);
         DUE.add(new Due(level.dimension(), Kind.DRAIN, top.immutable(), 0, level.getGameTime() + BOIL));
-        BOILS.increment();
-        com.jeladastudios.ftsgeology.advancement.GeologyTrigger.awardNear(level, top.getX(), top.getZ(), 48, "liquefaction");
+        // Kept with the world too, so the vent dries even if its ground is unloaded then, or the server stops first.
+        BoilScars.vent(level, top.immutable(), level.getGameTime() + BOIL);
     }
 
     /** A boil dries up: its water sinks back into the sand, and a sand cone is left. */
     private static void dry(ServerLevel level, BlockPos top) {
         RUNNING.remove(top);
-        if (level.getFluidState(top).isSource() && level.getBlockState(top).is(Blocks.WATER)) {
-            level.setBlock(top, Blocks.SAND.defaultBlockState(), Block.UPDATE_ALL);
-        }
+        BoilScars.dryVent(level, top);
     }
 
     /**
