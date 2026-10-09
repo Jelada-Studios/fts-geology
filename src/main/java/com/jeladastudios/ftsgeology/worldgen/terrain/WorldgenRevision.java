@@ -76,8 +76,10 @@ public final class WorldgenRevision {
     public static final int INLAND_CLIMATE = 16;
     /** The ocean side of a rift against a continent rugged away from the line as the rift is, not quiet throughout (round 144). */
     public static final int RUGGED_MARGINS = 16;
+    /** A named mountain kept off a rift between continents: no graben under its crop or round it (round 146). */
+    public static final int CLEAR_LANDMARKS = 17;
     /** What a world made now gets. */
-    public static final int CURRENT = 16;
+    public static final int CURRENT = 17;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;
