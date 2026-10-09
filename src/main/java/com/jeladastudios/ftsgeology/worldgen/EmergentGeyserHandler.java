@@ -25,7 +25,7 @@ import java.util.Set;
 /**
  * Turns <em>player-built</em> water-over-rock-over-lava setups into live geysers.
  *
- * <p>On by default (config {@code emergentEnabled}; its comment warns of it). While enabled, each loaded player's
+ * <p>Off by default (config {@code emergentEnabled}). While enabled, each loaded player's
  * surroundings are periodically scanned for the pattern: a body of water sitting on a solid rock
  * layer, with lava a few blocks under that rock. When found, the rock cell is replaced with a
  * (hidden) {@code GeyserCore} flagged {@code emergent} — the normal thermodynamic engine then

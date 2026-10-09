@@ -159,6 +159,12 @@ public class GeyserCoreBlockEntity extends BlockEntity {
         if (!(level instanceof ServerLevel server)) return;
         be.tickCount++; // diagnostic heartbeat
 
+        // Player-built geysers switched off: one caught mid-eruption winds down, then the rig lies still.
+        if (be.emergent && !GeyserConfig.EMERGENT_ENABLED.get()) {
+            if (be.phase == Phase.ERUPTING) be.endEruption(server, pos, be.cachedMouth(server, pos));
+            return;
+        }
+
         // Per-tick work: only the eruption jet needs sub-second resolution. It uses the mouth
         // cached by the once-per-second resolve so we don't re-trace/breach every tick.
         if (be.phase == Phase.ERUPTING) {
