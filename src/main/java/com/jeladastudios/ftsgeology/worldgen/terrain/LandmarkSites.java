@@ -41,6 +41,13 @@ public final class LandmarkSites {
     /** How far apart two of them have to stand, in crops: they are two thousand blocks wide each. */
     private static final double APART = 2.5;
 
+    /**
+     * How far round its crop a named mountain keeps clear of a rift's floor, in metres -- the crop's own valleys fade
+     * out at its edge, and a fault step there would stand against them -- and how finely the ground under it is looked
+     * over for one, in blocks.
+     */
+    private static final double RIFT_CLEAR = 1_000.0, RIFT_LOOK = 96.0;
+
     private static long forSeed = Long.MIN_VALUE;
     private static Site[] sites = new Site[0];
 
@@ -100,6 +107,7 @@ public final class LandmarkSites {
                 int cx = (int) Math.round(Math.cos(a) * r), cz = (int) Math.round(Math.sin(a) * r);
                 if (!suits(seed, p, cx, cz)) continue;
                 if (tooNear(out, made, cx, cz, reach * APART)) continue;
+                if (WorldgenRevision.has(WorldgenRevision.CLEAR_LANDMARKS) && riftUnder(seed, p, which, cx, cz, bearing)) continue;
                 return new Site(which, cx, cz, bearing);
             }
         }
@@ -110,6 +118,26 @@ public final class LandmarkSites {
     private static boolean suits(long seed, GeologyParams p, int x, int z) {
         return TerrainFields.field(TerrainFields.Field.CONTINENTS, seed, p, x, z) > WANT_LAND
                 && TerrainFields.field(TerrainFields.Field.BELT, seed, p, x, z) > WANT_BELT;
+    }
+
+    /**
+     * Whether a rift between continents has its floor under the crop or near it. The crop is laid over the ground the
+     * plates make, so a mountain put across a rift stood in its graben: the rift's lakes and fault steps ran up its
+     * flank and its rivers met them from below. A rift ends against a range or cuts it through; it does not run on
+     * under a summit.
+     */
+    private static boolean riftUnder(long seed, GeologyParams p, int which, int x, int z, double bearing) {
+        double mpb = TerrainFields.METRES_PER_BLOCK / p.horizontal();
+        double along = (DemLibrary.landmarkHalfAlong(which) + RIFT_CLEAR) / mpb;
+        double across = (DemLibrary.landmarkHalfAcross(which) + RIFT_CLEAR) / mpb;
+        double c = Math.cos(bearing), sn = Math.sin(bearing);
+        for (double u = -along; u <= along; u += RIFT_LOOK) {
+            for (double v = -across; v <= across; v += RIFT_LOOK) {
+                int px = (int) Math.round(x + u * c - v * sn), pz = (int) Math.round(z + u * sn + v * c);
+                if (TerrainFields.field(TerrainFields.Field.GRABEN, seed, p, px, pz) > 0.0) return true;
+            }
+        }
+        return false;
     }
 
     private static boolean tooNear(Site[] out, int made, int x, int z, double apart) {
