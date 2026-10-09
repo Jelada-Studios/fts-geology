@@ -617,9 +617,10 @@ public final class GeyserConfig {
         b.push("emergent");
         EMERGENT_ENABLED = b
                 .comment("Let PLAYER-BUILT water-over-rock-over-lava setups become live geysers.",
-                        "ON by default. WARNING: with emergentDestructive=true this can blow up bases",
-                        "you didn't intend as geysers -- set false (or emergentDestructive=false) to disable.")
-                .define("emergentEnabled", true);
+                        "OFF by default. Natural geysers, the geyser igniter and /geology place are not affected.",
+                        "WARNING: with emergentDestructive=true such a geyser can blow up the base around it.",
+                        "While this is off, a player-built geyser lit before lies still.")
+                .define("emergentEnabled", false);
         EMERGENT_DESTRUCTIVE = b
                 .comment("If true, emergent eruptions use a block-breaking explosion (the 'it blows up",
                         "your house' behaviour). If false they vent harmlessly like natural geysers.")
