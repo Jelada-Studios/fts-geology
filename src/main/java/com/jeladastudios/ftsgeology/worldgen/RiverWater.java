@@ -63,6 +63,8 @@ public final class RiverWater {
     private static final int CURTAIN_MAX = 16;
     /** The blocks at the top of the sea in a river's mouth that are the river's water. */
     private static final int MOUTH_TOP = 3;
+    /** How far under the water ground in a river's mouth may stand and still be dug to the drawn floor (MOUTH_BEDS). */
+    private static final int MOUTH_RIDGE = 3;
     /**
      * How far a lake's shore may be taken down to its water, in blocks at the normal world's layout. The lake's
      * extent is worked out on the raw ground; the chunk is built with the noise on top, which left the edge of a
@@ -164,13 +166,17 @@ public final class RiverWater {
                     }
                     g = bedY;
                     LEVELLED.increment();
-                } else if (!a.lake() && !mouth && WorldgenRevision.has(WorldgenRevision.DRAWN_BEDS)
+                } else if (!a.lake() && WorldgenRevision.has(WorldgenRevision.DRAWN_BEDS)
+                        && (!mouth || WorldgenRevision.has(WorldgenRevision.MOUTH_BEDS) && g >= w - MOUTH_RIDGE)
                         && g > Math.min(w - 1, (int) Math.round(a.floor()) - 1)) {
                     // Under the water too the floor is the drawn one. The noise left most channel floors a block or two
                     // over it, so the river held a block of water where its course had two or three: a mod that runs
                     // the water read the drawn level over that floor and found a riffle a few tenths of a block deep,
                     // too shallow to carry the river's own discharge even at critical flow. Where it cannot be dug,
-                    // the floor stays as it is.
+                    // the floor stays as it is. The mouth used to be left out: a wide river running out at sea level
+                    // kept lines of ground the noise had left a block under its water, ridges and pillars standing up
+                    // out of a channel eight or nine blocks deep. Only ground standing near the top of the water is taken:
+                    // the sea's own floor, further down, is left as it is.
                     int bedY = level(level, at, x, z, g, w, a);
                     if (bedY != Integer.MIN_VALUE) {
                         g = bedY;

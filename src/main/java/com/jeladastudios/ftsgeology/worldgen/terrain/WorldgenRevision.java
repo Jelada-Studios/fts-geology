@@ -78,8 +78,10 @@ public final class WorldgenRevision {
     public static final int RUGGED_MARGINS = 16;
     /** A named mountain kept off a rift between continents: no graben under its crop or round it (round 146). */
     public static final int CLEAR_LANDMARKS = 17;
+    /** A river's mouth dug to its drawn floor as the rest of it is: no ridges standing a block under the water (round 151). */
+    public static final int MOUTH_BEDS = 18;
     /** What a world made now gets. */
-    public static final int CURRENT = 17;
+    public static final int CURRENT = 18;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;
