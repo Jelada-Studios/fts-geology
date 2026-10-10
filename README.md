@@ -35,7 +35,7 @@ Two settings in the world's `serverconfig/fts_geology.toml` stay off until you t
 
 ## Works with
 
-Terralith (its biomes grow on the mod's terrain), TerraFirmaCraft, Distant Horizons, Create, Electrodynamics, Serene Seasons, Tough As Nails, Flowing Fluids and Oculus. With Tectonic, TerraBlender, Biomes O' Plenty or BYG installed, the default world stays theirs and the mod's world is under World Type. See [Compatibility](https://github.com/Jelada-Studios/fts-geology/wiki/Compatibility).
+Terralith (its biomes grow on the mod's terrain), TerraFirmaCraft, Distant Horizons, Create, Electrodynamics, Serene Seasons, Tough As Nails, Flowing Fluids and Oculus. Biomes O' Plenty and other TerraBlender mods grow their biomes in it too, in worlds made with 0.11.1 or later. With Tectonic, TerraBlender, Biomes O' Plenty or BYG installed, the default world stays theirs and the mod's world is under World Type. See [Compatibility](https://github.com/Jelada-Studios/fts-geology/wiki/Compatibility).
 
 **FT's Geology: Feel the Nature** is a separate addon. Among other things it plays recorded rain and wind.
 
