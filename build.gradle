@@ -22,16 +22,11 @@ neoForge {
         client {
             client()
             systemProperty 'neoforge.logging.console.level', 'debug'
-            // Test runs: a marker to find the process by, a folder of its own.
-            systemProperty 'ftstest', '74de3639'
             gameDirectory = project.file('run/client')
-            if (project.hasProperty('quickPlay')) programArguments.addAll('--quickPlayMultiplayer', project.property('quickPlay').toString())
         }
         server {
             server()
             systemProperty 'neoforge.logging.console.level', 'debug'
-            // Test runs: a marker to find the process by, a folder of its own, no window.
-            systemProperty 'ftstest', '74de3639'
             gameDirectory = project.file('run/server')
             programArgument '--nogui'
         }
@@ -81,9 +76,4 @@ tasks.named('jar', Jar).configure {
             'MixinConfigs'            : 'fts_geology.mixins.json'
         ])
     }
-}
-
-// Test runs carry their marker on the java command line itself, where a process list shows it.
-tasks.matching { it.name == 'runClient' || it.name == 'runServer' }.configureEach {
-    systemProperty 'ftstest', '74de3639'
 }
