@@ -45,22 +45,78 @@ public final class ClientSoilTint {
     private static final float LUSH = 0.15f;
 
     public static void set(SoilTintPacket p) {
+        heard++;
         long key = ChunkPos.asLong(p.chunkX(), p.chunkZ());
         boolean any = false;
         for (byte b : p.dry()) any |= b != 0;
         byte[] was = any ? DRY.put(key, p.dry()) : DRY.remove(key);
         if (was == null && !any) return;
+        if (was != null && java.util.Arrays.equals(was, p.dry())) return;
         // The meshes keep the colours they were built with: build them again, the chunk's and, as its cells blend into
-        // theirs at the edges, those of the chunks round it.
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || mc.levelRenderer == null) return;
-        int min = mc.level.getMinSection(), max = mc.level.getMaxSection();
+        // theirs at the edges, those of the chunks round it -- a few chunks a tick (see onClientTick).
         for (int cx = p.chunkX() - 1; cx <= p.chunkX() + 1; cx++) {
-            for (int cz = p.chunkZ() - 1; cz <= p.chunkZ() + 1; cz++) {
-                if (mc.level.getChunkSource().getChunk(cx, cz, false) == null) continue;
-                for (int sy = min; sy < max; sy++) mc.levelRenderer.setSectionDirty(cx, sy, cz);
+            for (int cz = p.chunkZ() - 1; cz <= p.chunkZ() + 1; cz++) REDRAW.add(ChunkPos.asLong(cx, cz));
+        }
+    }
+
+    /**
+     * Chunks whose grass is to be drawn again, each once however many of its neighbours changed. Every change used to
+     * build nine chunks again at once from the bottom of the world to the top -- sixty sections a chunk in the tall
+     * world -- and where the ground was wet and changing, by a river in the rain, that was hundreds of sections a
+     * second for the game to build over again.
+     */
+    private static final it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet REDRAW = new it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet();
+    /** Chunks drawn again a tick, at most. */
+    private static final int REDRAW_A_TICK = 8;
+    /** Sections drawn again for the grass's colour, counted for the debug screen, and the count of the last second. */
+    private static int marked, markedLastSecond, heard, heardLastSecond;
+    private static long secondStarted;
+
+    @SubscribeEvent
+    public static void onClientTick(net.neoforged.neoforge.client.event.ClientTickEvent.Post event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null || mc.levelRenderer == null) {
+            REDRAW.clear();
+            return;
+        }
+        for (int n = 0; n < REDRAW_A_TICK && !REDRAW.isEmpty(); n++) {
+            long key = REDRAW.removeFirstLong();
+            int cx = ChunkPos.getX(key), cz = ChunkPos.getZ(key);
+            net.minecraft.world.level.chunk.LevelChunk chunk = mc.level.getChunkSource().getChunk(cx, cz, false);
+            if (chunk == null) continue;
+            // Only the sections the grass can be in: from a little under the lowest ground of the chunk to its highest.
+            int low = Integer.MAX_VALUE, high = Integer.MIN_VALUE;
+            for (int x = 0; x < 16; x++) {
+                for (int z = 0; z < 16; z++) {
+                    int y = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x, z);
+                    low = Math.min(low, y);
+                    high = Math.max(high, y);
+                }
+            }
+            int from = Math.max(mc.level.getMinSection(), net.minecraft.core.SectionPos.blockToSectionCoord(low - 3));
+            int to = Math.min(mc.level.getMaxSection() - 1, net.minecraft.core.SectionPos.blockToSectionCoord(high + 1));
+            for (int sy = from; sy <= to; sy++) {
+                mc.levelRenderer.setSectionDirty(cx, sy, cz);
+                marked++;
             }
         }
+        long now = net.minecraft.Util.getMillis();
+        if (now - secondStarted >= 1000) {
+            markedLastSecond = marked;
+            heardLastSecond = heard;
+            heard = 0;
+            marked = 0;
+            secondStarted = now;
+        }
+    }
+
+    /** The grass's colour on the debug screen (F3): chunks waiting to be drawn again, and sections drawn in the last second. */
+    @SubscribeEvent
+    public static void onDebugText(net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent.DebugText event) {
+        if (Minecraft.getInstance().level == null || !Minecraft.getInstance().getDebugOverlay().showDebugScreen()) return;
+        if (DRY.isEmpty() && REDRAW.isEmpty() && markedLastSecond == 0 && heardLastSecond == 0) return;
+        event.getLeft().add("Grass colour: " + DRY.size() + " chunks tinted, " + REDRAW.size() + " waiting, "
+                + markedLastSecond + " sections drawn again a second, " + heardLastSecond + " changes heard a second");
     }
 
     /** One cell, by its index across the world (four columns to a cell): -1 lushest to 1 straw, 0 where nothing was said. */
@@ -127,5 +183,6 @@ public final class ClientSoilTint {
     @SubscribeEvent
     public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         DRY.clear();
+        REDRAW.clear();
     }
 }
