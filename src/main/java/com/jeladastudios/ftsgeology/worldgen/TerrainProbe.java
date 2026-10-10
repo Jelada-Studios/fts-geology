@@ -235,6 +235,16 @@ public final class TerrainProbe {
                         else if (high < rim) rim = high;
                     }
                 }
+                // At the chunk's edge only the inner half of the ground round a column is seen, and a hollow in a slope
+                // read as a hole on every side it showed: built from that rim, the column stood up to twenty blocks over
+                // its neighbours on a cone's flank. There the ground beside it in the chunk has to stand over it too.
+                if (pit && known < 8 && com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.has(
+                        com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.CUT_ROOFS)) {
+                    for (int d = 0; d < 4 && pit; d++) {
+                        int nx = lx + dxs[d], nz = lz + dzs[d];
+                        if (nx >= 0 && nx < 16 && nz >= 0 && nz < 16 && natural[nx * 16 + nz] - ground < PIT_DEPTH) pit = false;
+                    }
+                }
                 if (pit && known >= 5) out[i] = rim - 1;
             }
         }
