@@ -32,7 +32,6 @@ import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import org.joml.Matrix4f;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,8 +48,8 @@ import java.util.List;
  * it is not taken for snow. It lies flat on the water and ends at a step's lip.</p>
  *
  * <p>The water round the player is read every half second, the pixels laid out every tick from that, and drawn each
- * frame lit as the water there is and fogged as particles are. The shades are set colours on vanilla's own blank
- * texture: no texture of the mod's. Nothing here is the server's.</p>
+ * frame lit as the water there is and fogged as particles are, from what was sent to the graphics card that tick.
+ * The shades are set colours on vanilla's own blank texture: no texture of the mod's. Nothing here is the server's.</p>
  */
 @Mod.EventBusSubscriber(modid = GeysersMod.MODID, value = Dist.CLIENT)
 public final class RiverFoamMesh {
@@ -106,6 +105,46 @@ public final class RiverFoamMesh {
         long t0 = System.nanoTime();
         lay(now, mc.player.getX(), mc.player.getZ());
         layMs = 0.95 * layMs + 0.05 * (System.nanoTime() - t0) / 1e6;
+        laid = true;
+    }
+
+    /**
+     * The pixels as the graphics card holds them, sent once a tick when they are laid out and drawn from there every
+     * frame. Building the quads afresh every frame cost a busy river three to four milliseconds a frame in a large pack.
+     * Their corners are kept from {@link #originX}, {@link #originZ}, near the player, so a float holds them exactly.
+     */
+    private static com.mojang.blaze3d.vertex.VertexBuffer mesh;
+    private static boolean laid;
+    private static int meshQuads;
+    private static int originX, originZ;
+
+    /** Sends this tick's pixels to the graphics card. */
+    private static void upload(FloatArrayList draw) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null) {
+            originX = mc.player.getBlockX();
+            originZ = mc.player.getBlockZ();
+        }
+        int n = draw.size() / STRIDE;
+        meshQuads = n;
+        if (n == 0) return;
+        BufferBuilder b = Tesselator.getInstance().getBuilder();
+        b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
+        float[] v = draw.elements();
+        for (int k = 0; k < n; k++) {
+            int o = k * STRIDE;
+            float x0 = v[o] - originX, z0 = v[o + 1] - originZ, x1 = v[o + 2] - originX, z1 = v[o + 3] - originZ, y = v[o + 4];
+            float r = v[o + 5], g = v[o + 6], bl = v[o + 7], a = v[o + 8];
+            int light = Float.floatToRawIntBits(v[o + 9]);
+            vertex(b, x0, y, z0, r, g, bl, a, light);
+            vertex(b, x0, y, z1, r, g, bl, a, light);
+            vertex(b, x1, y, z1, r, g, bl, a, light);
+            vertex(b, x1, y, z0, r, g, bl, a, light);
+        }
+        if (mesh == null) mesh = new com.mojang.blaze3d.vertex.VertexBuffer(com.mojang.blaze3d.vertex.VertexBuffer.Usage.DYNAMIC);
+        mesh.bind();
+        mesh.upload(b.end());
+        com.mojang.blaze3d.vertex.VertexBuffer.unbind();
     }
 
     private static long key(int x, int z) {
@@ -290,20 +329,29 @@ public final class RiverFoamMesh {
     @SubscribeEvent
     public static void onRender(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return;
-        FloatArrayList draw = runs;
-        if (draw.isEmpty() || !on()) {
+        if (!on()) {
             drawn = 0;
+            drawMs *= 0.95;
             return;
         }
         long t0 = System.nanoTime();
+        if (laid) {
+            laid = false;
+            upload(runs);
+        }
+        if (meshQuads == 0 || mesh == null) {
+            // Nothing drawn costs nothing: the debug screen kept the last figure, a frame's cost with no foam at all.
+            drawn = 0;
+            drawMs *= 0.95;
+            return;
+        }
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) return;
         Camera camera = event.getCamera();
         Vec3 cam = camera.getPosition();
         PoseStack pose = event.getPoseStack();
         pose.pushPose();
-        pose.translate(-cam.x, -cam.y, -cam.z);
-        Matrix4f matrix = pose.last().pose();
+        pose.translate(originX - cam.x, -cam.y, originZ - cam.z);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.enableDepthTest();
@@ -311,24 +359,10 @@ public final class RiverFoamMesh {
         mc.gameRenderer.lightTexture().turnOnLightLayer();
         RenderSystem.setShader(GameRenderer::getParticleShader);
         RenderSystem.setShaderTexture(0, WHITE);
-        BufferBuilder b = Tesselator.getInstance().getBuilder();
-        b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.PARTICLE);
-        float[] v = draw.elements();
-        int n = draw.size() / STRIDE;
-        for (int k = 0; k < n; k++) {
-            int o = k * STRIDE;
-            float x0 = v[o], z0 = v[o + 1], x1 = v[o + 2], z1 = v[o + 3], y = v[o + 4];
-            float r = v[o + 5], g = v[o + 6], bl = v[o + 7], a = v[o + 8];
-            int light = Float.floatToRawIntBits(v[o + 9]);
-            vertex(b, matrix, x0, y, z0, r, g, bl, a, light);
-            vertex(b, matrix, x0, y, z1, r, g, bl, a, light);
-            vertex(b, matrix, x1, y, z1, r, g, bl, a, light);
-            vertex(b, matrix, x1, y, z0, r, g, bl, a, light);
-        }
-        drawn = n;
-        BufferBuilder.RenderedBuffer done = b.end();
-        if (n > 0) com.mojang.blaze3d.vertex.BufferUploader.drawWithShader(done);
-        else done.release();
+        mesh.bind();
+        mesh.drawWithShader(pose.last().pose(), event.getProjectionMatrix(), GameRenderer.getParticleShader());
+        com.mojang.blaze3d.vertex.VertexBuffer.unbind();
+        drawn = meshQuads;
         mc.gameRenderer.lightTexture().turnOffLightLayer();
         RenderSystem.depthMask(true);
         RenderSystem.disableBlend();
@@ -354,8 +388,8 @@ public final class RiverFoamMesh {
     /** What laying the pixels out takes a tick and drawing them a frame, smoothed, for the debug screen. */
     private static double layMs, drawMs;
 
-    private static void vertex(BufferBuilder b, Matrix4f m, float x, float y, float z, float r, float g, float bl, float alpha, int light) {
-        b.vertex(m, x, y, z).uv(0.5f, 0.5f).color(r, g, bl, alpha).uv2(light).endVertex();
+    private static void vertex(BufferBuilder b, float x, float y, float z, float r, float g, float bl, float alpha, int light) {
+        b.vertex(x, y, z).uv(0.5f, 0.5f).color(r, g, bl, alpha).uv2(light).endVertex();
     }
 
     /**
