@@ -45,6 +45,7 @@ public final class TerrainContext {
         boolean tall = isTall(event.getServer());
         TerrainContext.tall = tall;
         WorldgenRevision.open(event.getServer());
+        com.jeladastudios.ftsgeology.compat.TerraBlenderRegions.open(event.getServer(), seed);
         GeologyParams.take(tall ? TALL_HORIZONTAL : 1.0);
         com.jeladastudios.ftsgeology.compat.ThinAirHeights.open(tall, TALL_HORIZONTAL, seaLevel(event.getServer()));
         TerrainCache.clear();
@@ -84,6 +85,7 @@ public final class TerrainContext {
         TerrainCache.clear();
         GeologyWorld.clear();
         OverworldSurfaceRule.clear();
+        com.jeladastudios.ftsgeology.compat.TerraBlenderRegions.close();
         LandmarkSites.clear();
         RawGround.clear();
         RiverNetwork.clear();
