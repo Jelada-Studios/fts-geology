@@ -82,6 +82,9 @@ public final class WorldgenRevision {
     public static final int MOUTH_BEDS = 18;
     /** The biomes of mods that add theirs through TerraBlender, Biomes O' Plenty's among them (round 151). */
     public static final int REGION_BIOMES = 18;
+    /** A hole on a big cone's flank cut down with the ground round it and roofed under the profile, not at its rim, and a
+     * hollow half seen at a chunk's edge not taken for a hole (round 151). */
+    public static final int CUT_ROOFS = 18;
     /** What a world made now gets. */
     public static final int CURRENT = 18;
 

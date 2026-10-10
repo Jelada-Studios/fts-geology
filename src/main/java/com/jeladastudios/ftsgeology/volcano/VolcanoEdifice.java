@@ -4,6 +4,7 @@ import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
 
 import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.worldgen.TerrainProbe;
+import com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
@@ -193,9 +194,14 @@ public final class VolcanoEdifice {
 
         int target = coneTargetY(c, gx, gz, ground, dist, ang);
         if (target == Integer.MIN_VALUE) return;
+        // Where the mountain cuts the country down to its profile, a hole's rim is cut down with the ground round it and
+        // the hole roofed just under the profile. Roofed at the rim, the column stood as a pillar where its neighbours
+        // were cut: one block across, up to seventy blocks over a dead cone's flank.
+        boolean cutRoof = roofed && worldgen && WorldgenRevision.has(WorldgenRevision.CUT_ROOFS)
+                && cutsDown(c, dist, ang, ground, target);
         // A roofed shaft gets its roof whatever the profile adds here: three courses at the rim's level. Near the foot
         // the profile adds nothing, and raising the ground alone left the hole open under a stretch of nothing.
-        if (roofed) {
+        if (roofed && !cutRoof) {
             ground -= 3;
             if (target < ground + 3) target = ground + 3;
         }
@@ -225,18 +231,23 @@ public final class VolcanoEdifice {
             // it was built over stood out of its lake with its trees on. Elsewhere ground above the profile is left
             // alone. A live summit's own ground is left to the job that finishes it; a dead one has none, so its
             // rim is cut like its flank.
-            boolean dead = c.activity == VolcanoActivity.EXTINCT;
-            boolean deadCrater = dead && dist <= craterEdge(c, ang);
-            double flankFrom = dead ? craterEdge(c, ang) : c.craterR * 1.6;
-            boolean largeFlank = c.size == VolcanoSize.LARGE && dist > flankFrom && dist <= c.coneBaseR * 1.1;
-            if (worldgen && !underWater && (deadCrater ? ground > target : largeFlank && ground > target + 2)) {
-                for (int y = ground; y > target; y--) {
+            if (worldgen && !underWater && cutsDown(c, dist, ang, ground, target)) {
+                // A hole's rim is cut from the column's own top: what stands over the rim goes too.
+                int from = cutRoof ? Math.max(ground, level.getHeight(Heightmap.Types.WORLD_SURFACE, gx, gz)) : ground;
+                for (int y = from; y > target; y--) {
                     level.setBlock(new BlockPos(gx, y, gz), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
                 }
                 BlockState rock = coneRock(rng, c, gx, target, gz);
                 if (c.type == VolcanoType.STRATOVOLCANO) rock = stratoSurface(rng, c, gx, target, gz, rock);
                 else if (c.type == VolcanoType.SHIELD) rock = shieldSurface(rng, c, gx, target, gz, rock);
                 setRock(level, new BlockPos(gx, target, gz), rock);
+                // The hole under it roofed: three courses under the new surface.
+                if (cutRoof) {
+                    for (int y = target - 1; y >= target - 3; y--) {
+                        BlockPos at = new BlockPos(gx, y, gz);
+                        if (level.getBlockState(at).isAir()) setRock(level, at, coneRock(rng, c, gx, y, gz));
+                    }
+                }
                 soilUnder(level, gx, target, gz, rock, target - 3);
                 clearCover(level, gx, target, gz);
                 craterLake(level, c, gx, gz, target, dist, ang);
@@ -264,6 +275,18 @@ public final class VolcanoEdifice {
             clearCover(level, gx, target, gz);
             craterLake(level, c, gx, gz, target, dist, ang);
         }
+    }
+
+    /**
+     * Whether ground standing at {@code ground} here is cut down to the profile {@code target} at generation: a large
+     * cone's flank more than a couple of blocks over it, and a dead crater anywhere over its bowl.
+     */
+    private static boolean cutsDown(Ctx c, double dist, double ang, int ground, int target) {
+        boolean dead = c.activity == VolcanoActivity.EXTINCT;
+        boolean deadCrater = dead && dist <= craterEdge(c, ang);
+        double flankFrom = dead ? craterEdge(c, ang) : c.craterR * 1.6;
+        boolean largeFlank = c.size == VolcanoSize.LARGE && dist > flankFrom && dist <= c.coneBaseR * 1.1;
+        return deadCrater ? ground > target : largeFlank && ground > target + 2;
     }
 
     /**
