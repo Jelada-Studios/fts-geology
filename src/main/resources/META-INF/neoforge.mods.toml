@@ -15,24 +15,23 @@ credits = "See CREDITS.md — community reports and questions that shaped the mo
 displayURL = "https://jeladastudios.com/fts-geology/"
 updateJSONURL = "https://raw.githubusercontent.com/Jelada-Studios/fts-geology/main/update.json"
 description = '''
-A geology layer for Minecraft: real plate tectonics driving real landforms.
+The Minecraft world built from plate tectonics. Plates drift, and their edges become mountain belts,
+volcanic arcs, rifts and ocean ridges.
 
-Most world-generation mods decide what a place looks like. This one decides why. A volcano's shape
-is not picked from a list - it comes from the plate boundary it sits on, and so does the rock under
-it, the earthquakes that shake it, and the springs around it. The aim is a world you can read.
+- A 960-block tall world type, with mountains from real elevation data and one Everest, K2 and Matterhorn
+- Earthquakes from the faults: P and S waves, aftershocks, liquefaction and landslides. Damage depends
+  on what a build is made of and what it stands on.
+- Volcanoes that warn before they erupt, with pyroclastic flows, gas and ashfall, and fissure eruptions
+  on rifts
+- Rivers traced from the land, groundwater and floods, and rain that comes with drifting storms
+- Nine gases, a geothermal turbine, and instruments to read it all: hammer, fault compass, core drill,
+  seismograph network, weather station
 
-Four fault types, each producing the landforms it should. Four volcano types, chosen by their
-setting. Earthquakes with ten seconds of early warning on a seismograph. Geysers, hot springs and
-travertine terraces. Boundary geology underground - dig beneath a volcanic arc and you find granite,
-because that is what is there. Instruments to read all of it.
+The new terrain needs a new world; earthquakes, volcanoes, weather and instruments also work in older
+worlds. Terralith's biomes grow on the mod's terrain. With Tectonic or Biomes O' Plenty installed, pick
+FT's Geology under World Type.
 
-Strongly recommended alongside Terralith and Flowing Fluids.
-
-Reads the world's biome source rather than replacing worldgen, so it stacks on top of Terralith and
-Tectonic instead of fighting them. Retrogen-safe: it bolts onto worlds that already exist.
-
-Nothing is destroyed, but ground that loses its support falls - builds included. That, and whether
-earthquakes may deform player blocks at all, are config toggles.
+Wiki: https://github.com/Jelada-Studios/fts-geology/wiki
 '''
 
 # --- Dependencies ---

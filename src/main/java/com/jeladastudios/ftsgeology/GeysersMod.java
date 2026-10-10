@@ -79,8 +79,8 @@ public class GeysersMod {
                 e.enqueueWork(com.jeladastudios.ftsgeology.compat.CreateBoiler::register));
 
         // SERVER, not COMMON: every setting decides what the world does, and SERVER configs are synced
-        // to clients on join. The file lives in <world>/serverconfig/fts_geology.toml; a file in the
-        // instance's defaultconfigs/ folder is copied into each new world.
+        // to clients on join. NeoForge keeps the file in the instance's config/fts_geology.toml; a copy in
+        // <world>/serverconfig/ overrides it for that world.
         modContainer.registerConfig(ModConfig.Type.SERVER, GeyserConfig.SPEC, "fts_geology.toml");
         // The gases' settings, beside it in the same folder.
         modContainer.registerConfig(ModConfig.Type.SERVER, com.jeladastudios.ftsgeology.gas.GasConfig.SPEC, "fts_geology-gases.toml");
