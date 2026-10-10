@@ -13,7 +13,8 @@ import net.minecraft.world.level.levelgen.SurfaceRules;
  * they are meant to have in the {@code minecraft:overworld} noise settings' surface rule, and the mod's world types
  * read their own rule instead, so those biomes came out as plain grass and stone. This rule stands after the mod's
  * own (its biomes, bare rock) and hands every column to the overworld's rule when that rule is not vanilla's; with
- * vanilla's it does nothing, and the mod's copy of it carries on as before.
+ * vanilla's it does nothing, and the mod's copy of it carries on as before. The biomes a mod adds through TerraBlender
+ * take that mod's own rule here first (see {@code compat.TerraBlenderRegions}).
  */
 public record OverworldSurfaceRule() implements SurfaceRules.RuleSource {
 
@@ -46,8 +47,15 @@ public record OverworldSurfaceRule() implements SurfaceRules.RuleSource {
 
     @Override
     public SurfaceRules.SurfaceRule apply(SurfaceRules.Context context) {
+        // The ground of the biomes mods add through TerraBlender, from each of those mods' own rule, first.
+        SurfaceRules.SurfaceRule regions = com.jeladastudios.ftsgeology.compat.TerraBlenderRegions.surface(context);
         SurfaceRules.RuleSource rule = foreign;
-        if (rule == null) return (x, y, z) -> null;
-        return rule.apply(context);
+        SurfaceRules.SurfaceRule over = rule == null ? null : rule.apply(context);
+        if (regions == null) return over == null ? (x, y, z) -> null : over;
+        if (over == null) return regions;
+        return (x, y, z) -> {
+            net.minecraft.world.level.block.state.BlockState s = regions.tryApply(x, y, z);
+            return s != null ? s : over.tryApply(x, y, z);
+        };
     }
 }

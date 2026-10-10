@@ -80,6 +80,8 @@ public final class WorldgenRevision {
     public static final int CLEAR_LANDMARKS = 17;
     /** A river's mouth dug to its drawn floor as the rest of it is: no ridges standing a block under the water (round 151). */
     public static final int MOUTH_BEDS = 18;
+    /** The biomes of mods that add theirs through TerraBlender, Biomes O' Plenty's among them (round 151). */
+    public static final int REGION_BIOMES = 18;
     /** What a world made now gets. */
     public static final int CURRENT = 18;
 
