@@ -149,6 +149,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue OCEANIC_RIDGE_ENABLED;
     public static final ForgeConfigSpec.BooleanValue GEOLOGY_AT_GENERATION; // deep geology written as chunks generate
     public static final ForgeConfigSpec.BooleanValue ORE_GENESIS_ENABLED;   // ore laid down by tectonic setting
+    public static final ForgeConfigSpec.BooleanValue ORE_OUTCROPS;          // prototype: large bodies that crop out
     public static final ForgeConfigSpec.BooleanValue PETROLEUM;             // oil and gas fields in the basins
     public static final ForgeConfigSpec.DoubleValue PETROLEUM_CHANCE;       // share of basin grid cells with a field
     public static final ForgeConfigSpec.BooleanValue FOSSIL_BEDS;            // Jurassic Reborn fossils laid by the geology
@@ -805,6 +806,12 @@ public final class GeyserConfig {
                         "seams in the quiet basins between. Applies to chunks that have not had their",
                         "deep geology yet; it never touches player blocks.")
                 .define("oreGenesisEnabled", true);
+        ORE_OUTCROPS = b
+                .comment("PROTOTYPE. Large ore bodies that reach the ground: porphyry copper on the arcs, its face stained",
+                        "green and blue where the mountain has worn into it, and gold-bearing quartz reefs along the collision",
+                        "belts, with pieces of them in the beds of the streams nearby. Seen only where the ground is bare",
+                        "rock. The mod's own world type, new chunks only.")
+                .define("oreOutcrops", false);
         PETROLEUM = b
                 .comment("Oil and gas fields in the sedimentary basins: a dome of reservoir sandstone under shale, gas at",
                         "its top, oil-soaked sandstone under it, water below. Broken into, its gas comes out under the",
