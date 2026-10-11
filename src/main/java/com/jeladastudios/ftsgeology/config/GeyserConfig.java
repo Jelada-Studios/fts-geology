@@ -88,6 +88,7 @@ public final class GeyserConfig {
     public static final ModConfigSpec.BooleanValue VOLCANIC_ASHFALL;      // default ON
     public static final ModConfigSpec.BooleanValue VOLCANO_GROUND_BIOME;
     public static final ModConfigSpec.BooleanValue ASHFALL_BURIES_CROPS;  // default ON
+    public static final ModConfigSpec.BooleanValue VOLCANO_ERUPTIONS;     // off: volcanoes sleep for good
     public static final ModConfigSpec.BooleanValue VOLCANO_UNREST;        // swarm, warming springs before an eruption
     public static final ModConfigSpec.IntValue VOLCANO_UNREST_TICKS;
     public static final ModConfigSpec.BooleanValue FISSURE_ERUPTIONS;     // Reykjanes-style events on rifts
@@ -401,6 +402,12 @@ public final class GeyserConfig {
         b.pop();
 
         b.push("volcano");
+        VOLCANO_ERUPTIONS = b
+                .comment("Volcanoes erupt. Off, every volcano sleeps for good, the ones already in the world too: no warning",
+                        "signs, no eruption, no quake setting one off; they keep their lazy smoke and, with volcanicGas, the gas",
+                        "in their craters. Rift fissure eruptions stop as well. To have no volcanoes in new land at all, turn",
+                        "off largeVolcanoes and set volcanoSpawnChance to 0.")
+                .define("volcanoEruptions", true);
         VOLCANO_DORMANT_MIN_TICKS = b
                 .comment("Minimum quiet time between eruptions (12000 = 10 min).")
                 .defineInRange("volcanoDormantMinTicks", 12000, 200, 720000);

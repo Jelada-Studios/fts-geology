@@ -480,7 +480,7 @@ public final class FissureEruptions {
         long now = level.getGameTime();
         Store st = level.getDataStorage().get(new net.minecraft.world.level.saveddata.SavedData.Factory<>(Store::new, Store::load, null), NAME);
         // One at a time, but one left a day with nobody near does not keep the others off.
-        if (now % ROLL == 0 && GeyserConfig.FISSURE_ERUPTIONS.get() && (st == null || st.all.stream().allMatch(e -> e.held > 24000))) roll(level);
+        if (now % ROLL == 0 && GeyserConfig.FISSURE_ERUPTIONS.get() && GeyserConfig.VOLCANO_ERUPTIONS.get() && (st == null || st.all.stream().allMatch(e -> e.held > 24000))) roll(level);
         if (st == null || st.all.isEmpty()) return;
         long t0 = System.nanoTime();
         TickBudget.open(event.getServer().getTickCount());

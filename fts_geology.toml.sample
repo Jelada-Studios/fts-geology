@@ -142,6 +142,11 @@
 	hotSpringRegen = true
 
 [volcano]
+	#Volcanoes erupt. Off, every volcano sleeps for good, the ones already in the world too: no warning
+	#signs, no eruption, no quake setting one off; they keep their lazy smoke and, with volcanicGas, the gas
+	#in their craters. Rift fissure eruptions stop as well. To have no volcanoes in new land at all, turn
+	#off largeVolcanoes and set volcanoSpawnChance to 0.
+	volcanoEruptions = true
 	#Minimum quiet time between eruptions (12000 = 10 min).
 	#Range: 200 ~ 720000
 	volcanoDormantMinTicks = 12000
