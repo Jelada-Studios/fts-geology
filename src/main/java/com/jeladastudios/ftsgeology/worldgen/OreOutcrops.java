@@ -49,7 +49,7 @@ public final class OreOutcrops {
     private OreOutcrops() {}
 
     /** A grid cell holds at most one body; how far a body can reach from its anchor. */
-    private static final int CELL = 320, REACH = 130;
+    private static final int CELL = 320, REACH = 420;
     /** Prototype switch: a porphyry's weathered top as a rusty gossan (on), or only its copper stain (off). */
     private static final boolean GOSSAN = Boolean.parseBoolean(System.getProperty("fts.gossan", "true"));
 
@@ -165,7 +165,7 @@ public final class OreOutcrops {
                 }
             }
         }
-        floatPieces(c, ax, az, radius * 3.2, h, false);
+        floatPieces(c, ax, g, az, FLOAT_REACH, false);
     }
 
     // === Gold-bearing quartz reef ==============================================
@@ -219,26 +219,43 @@ public final class OreOutcrops {
                 }
             }
         }
-        floatPieces(c, ax, az, half + 40, h, true);
+        floatPieces(c, ax, g, az, FLOAT_REACH, true);
     }
 
     // === Float ================================================================
 
-    /** Pieces of the body in the beds of streams and pools within a reach of it. */
-    private static void floatPieces(Chunk c, int ax, int az, double reach, long h, boolean gold) {
+    /** How far down the streams pieces of a body are carried. */
+    private static final double FLOAT_REACH = 400.0;
+
+    /**
+     * Pieces of the body in the beds of the streams below it: water runs off the body's slopes into them, so a bed lower
+     * than the body and within a reach of it may hold a piece, the nearer the likelier. Following them uphill leads to it.
+     */
+    private static void floatPieces(Chunk c, int ax, int g, int az, double reach, boolean gold) {
         for (int x = c.x0; x <= c.x0 + 15; x++) {
             for (int z = c.z0; z <= c.z0 + 15; z++) {
                 double d2 = (double) (x - ax) * (x - ax) + (double) (z - az) * (z - az);
                 if (d2 > reach * reach) continue;
                 int top = c.ground(x, z);
+                if (top > g - 8) continue;                      // only below the body: downhill of it
                 BlockPos bed = new BlockPos(x, top, z);
-                if (!c.level.getFluidState(bed.above()).is(FluidTags.WATER)) continue;
                 BlockState s = c.level.getBlockState(bed);
-                if (!(s.is(Blocks.GRAVEL) || s.is(BlockTags.SAND) || s.is(Blocks.CLAY) || s.is(Blocks.COARSE_DIRT)
-                        || OreGenesis.isHostRock(s))) continue;
+                boolean wet = c.level.getFluidState(bed.above()).is(FluidTags.WATER);
+                double chance;
+                if (wet) {
+                    if (!(s.is(Blocks.GRAVEL) || s.is(BlockTags.SAND) || s.is(Blocks.CLAY) || s.is(BlockTags.DIRT)
+                            || s.is(Blocks.MUD) || OreGenesis.isHostRock(s))) continue;
+                    chance = 0.12;
+                } else {
+                    // The bare bank of the stream, a gravel or sand bar or rock at the water's edge: pieces lie in the
+                    // open there, and these are the ones a walker sees.
+                    if (!(s.is(Blocks.GRAVEL) || s.is(BlockTags.SAND) || OreGenesis.isHostRock(s))) continue;
+                    if (!c.besideWater(x, top, z)) continue;
+                    chance = 0.10;
+                }
                 double near = 1.0 - Math.sqrt(d2) / reach;
                 double roll = grain(c.seed, x, top, z, 0xF1);
-                if (roll > 0.10 * near) continue;
+                if (roll > chance * near * near) continue;
                 double kind = grain(c.seed, x, top, z, 0xF2);
                 Block b = gold ? (kind < 0.25 ? Blocks.GOLD_ORE : ModBlocks.QUARTZ_VEIN.get())
                         : (kind < 0.5 ? ModBlocks.MALACHITE.get() : kind < 0.8 ? Blocks.COPPER_ORE : ModBlocks.CHALCOPYRITE.get());
@@ -280,6 +297,19 @@ public final class OreOutcrops {
             int i = ((x - x0) << 4) | (z - z0);
             if (ground[i] == Integer.MIN_VALUE) ground[i] = level.getHeight(Heightmap.Types.OCEAN_FLOOR, x, z) - 1;
             return ground[i];
+        }
+
+        /** Water in a neighbouring column of this chunk, its surface no more than a block above this ground. */
+        boolean besideWater(int x, int top, int z) {
+            int[][] around = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+            for (int[] o : around) {
+                int nx = x + o[0], nz = z + o[1];
+                if (!isAnchorChunk(nx, nz)) continue;
+                int n = ground(nx, nz);
+                if (n > top || n < top - 3) continue;
+                if (level.getFluidState(new BlockPos(nx, n + 1, nz)).is(FluidTags.WATER) && top - n <= 1 + 1) return true;
+            }
+            return false;
         }
 
         void set(int x, int y, int z, Block b) {
