@@ -107,6 +107,31 @@ public final class PlayerBuilt {
         }
     }
 
+    /** Counts a block as a player's build: for builds pasted in or set by command, which no placing recorded. */
+    public static void markBuilt(ServerLevel level, BlockPos p) {
+        mark(level, p);
+    }
+
+    /** No longer counts a block as a player's build. */
+    public static void unmark(ServerLevel level, BlockPos p) {
+        LongSet set = PLACED.get(key(level, p.getX() >> 4, p.getZ() >> 4));
+        if (set == null) return;
+        synchronized (set) {
+            set.remove(p.asLong());
+        }
+        net.minecraft.world.level.chunk.LevelChunk chunk = level.getChunkSource().getChunkNow(p.getX() >> 4, p.getZ() >> 4);
+        if (chunk != null) chunk.setUnsaved(true);
+    }
+
+    /** Whether a player placed the block at a position: one lookup, no copy. */
+    public static boolean contains(ServerLevel level, net.minecraft.core.BlockPos p) {
+        LongSet set = PLACED.get(key(level, p.getX() >> 4, p.getZ() >> 4));
+        if (set == null) return false;
+        synchronized (set) {
+            return set.contains(p.asLong());
+        }
+    }
+
     /** A copy of what players placed in a chunk, empty where nothing is known. */
     public static LongSet inChunk(ServerLevel level, int cx, int cz) {
         LongSet set = PLACED.get(key(level, cx, cz));
