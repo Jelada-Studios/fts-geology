@@ -535,9 +535,10 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                 }
                 // Flows petrify as they advance rather than waiting for the eruption to end, so
                 // what you watch is a lava tongue turning to rock behind its own front.
-                if (be.eruptionTicks % 60 == 0) {
+                int cool = GeyserConfig.VOLCANO_LAVA_COOL_SECONDS.get();
+                if (be.eruptionTicks % (20 * cool) == 0) {
                     VolcanoEruption.coolScatteredLava(server, summit, be.craterR,
-                            20 + be.magnitude, be.surfaceVents, be.moltenCells);
+                            be.lavaReach(), be.surfaceVents, be.moltenCells);
                 }
                 // The outlets trickle gently while it erupts — one random outlet each second.
                 if (be.surfaceVents.length > 0) {
@@ -547,14 +548,14 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                 if ((be.timer -= 20) <= 0) {
                     if (be.sealed) {
                         // A sleeping volcano's crater does not stay a lake: all of it cools but the vent, which is plugged.
-                        VolcanoEruption.coolScatteredLava(server, summit, 0, 20 + be.magnitude,
+                        VolcanoEruption.coolScatteredLava(server, summit, 0, be.lavaReach(),
                                 be.surfaceVents, be.moltenCells);
                         be.reseal(server, pos);
                     } else {
                         VolcanoEruption.formCrater(server, summit, be.craterR, be.moltenCells);
                         // Everything spilled OUTSIDE the crater cools to basalt/tuff; the crater lake
                         // stays molten, and the outlet trickles cool too.
-                        VolcanoEruption.coolScatteredLava(server, summit, be.craterR, 20 + be.magnitude,
+                        VolcanoEruption.coolScatteredLava(server, summit, be.craterR, be.lavaReach(),
                                 be.surfaceVents, be.moltenCells);
                     }
                     for (long v : be.surfaceVents) {
@@ -581,6 +582,15 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
      * @param deposit whether vents also lay sulfur; only while quiet, since sulfur is a fumarole
      *                product and an erupting vent pours lava
      */
+    /**
+     * How far round the summit an eruption's lava is gone through when it is turned to rock: further when the flows are
+     * let run longer (volcanoLavaCoolSeconds), so a long flow's tongue is cooled too and not left molten past the sweep.
+     */
+    private int lavaReach() {
+        int cool = GeyserConfig.VOLCANO_LAVA_COOL_SECONDS.get();
+        return 20 + magnitude + 6 * Math.max(0, cool - 3);
+    }
+
     private void idleSmoke(ServerLevel level, BlockPos summit, float intensity, boolean deposit) {
         // A few random samples of the crater lava pool.
         int puffs = 1 + Math.round(intensity * 3);
