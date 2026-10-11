@@ -255,6 +255,7 @@ public final class GeyserConfig {
     public static final ModConfigSpec.DoubleValue TERRAIN_UPLIFT;        // blocks a collision lifts the ground
     public static final ModConfigSpec.DoubleValue DEM_HEIGHT_SCALE;      // how much the real mountain crops are exaggerated
     public static final ModConfigSpec.BooleanValue LITHOLOGY;           // rock sequences under the ground (own terrain)
+    public static final ModConfigSpec.DoubleValue LAYER_THICKNESS, LAYER_TILT, PLUTONS, DIKES, CONTACT_WANDER;
     public static final ModConfigSpec.IntValue STEEP_RISE;              // rise in two blocks that bares a slope
     public static final ModConfigSpec.IntValue HUMID_STEEP_RISE;        // the same, wet and under the tree line
     public static final ModConfigSpec.DoubleValue TALUS_GREENING;       // share of low scree grown over
@@ -1496,6 +1497,28 @@ public final class GeyserConfig {
                         "belt's gneiss and marble, an arc's ash over its plutons. Off leaves plain stone, and chunks",
                         "generate a little faster.")
                 .define("lithology", true);
+        LAYER_THICKNESS = b
+                .comment("How thick the rock layers are: the beds of a platform, a foreland and a rift's fill, the",
+                        "bands of a fold belt and a shear zone, an arc's lava and ash, a hotspot's flows. 2 doubles them,",
+                        "0.5 halves them. Like every setting of the rock under here, it applies only to chunks generated",
+                        "after the change: in a world already explored, new ground meets old ground at a seam.")
+                .defineInRange("layerThickness", 1.0D, 0.4D, 4.0D);
+        LAYER_TILT = b
+                .comment("How steeply the layers dip: the bands of a fold belt, standing steep by default, and the beds",
+                        "of a foreland, tilted up towards the mountains. 0 lays them flat, 2 doubles the dip.")
+                .defineInRange("layerTilt", 1.0D, 0.0D, 4.0D);
+        PLUTONS = b
+                .comment("How much granite and diorite intrudes from below: the bodies under a fold belt's bands and",
+                        "an arc's volcanoes. 0 leaves none, 2 puts one under most of a belt.")
+                .defineInRange("plutons", 1.0D, 0.0D, 2.0D);
+        DIKES = b
+                .comment("How close together the gabbro dikes of a rift's shoulders stand. 0 leaves none, 2 halves the",
+                        "spacing.")
+                .defineInRange("dikes", 1.0D, 0.0D, 4.0D);
+        CONTACT_WANDER = b
+                .comment("How far the contacts between rocks wander: the block or two by which a bed's top steps up and",
+                        "down, and how much a fold belt's bands meander. 0 makes every contact a straight line.")
+                .defineInRange("contactWander", 1.0D, 0.0D, 4.0D);
         STEEP_RISE = b
                 .comment("How many blocks the ground has to climb across two for a slope to shed its soil and show",
                         "its rock (worlds made with this version on; older ones keep 3). About 56 degrees: no soil",
