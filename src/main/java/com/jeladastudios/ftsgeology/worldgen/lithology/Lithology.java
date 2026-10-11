@@ -43,11 +43,12 @@ public final class Lithology {
      * @param bedShift     how far flat beds are lifted or lowered here
      * @param basement     the old rock under the sediment
      * @param pluton       the rock of this column's pluton
-     * @param dyke         whether a dyke swarm runs through here
+     * @param dike         whether a dike swarm runs through here
+     * @param layers       the config's scales on layer thickness, dip, dikes and wandering contacts
      */
     public record Column(Setting setting, double weight, Setting fallback, double across, double folded, int cover,
-                         int plutonTop, int bedShift, Rock basement, Rock pluton, boolean dyke, double highFrom,
-                         double highOver) {
+                         int plutonTop, int bedShift, Rock basement, Rock pluton, boolean dike, double highFrom,
+                         double highOver, GeologyParams.Layers layers) {
 
         /**
          * How far up a mountain a column stands, 0 at the foot and 1 at the top.
@@ -119,18 +120,27 @@ public final class Lithology {
             weight = 1.0;
         }
 
+        GeologyParams.Layers layers = p.layers();
         double granite = noise(seed, x, z, 90.0 * p.horizontal(), 0x7A11L);
-        int plutonTop = granite > 0.1 ? 14 + (int) Math.round(46.0 * (1.0 - granite)) : NO_PLUTON;
+        // A pluton where the noise clears a cut: 0.1 at the default, nothing at all with plutons 0, most of a belt at 2.
+        double plutonCut = layers.plutons() == 1.0 ? 0.1 : 1.0 - 0.9 * layers.plutons();
+        int plutonTop = layers.plutons() > 0.0 && granite > plutonCut
+                ? 14 + (int) Math.round(46.0 * (1.0 - granite)) : NO_PLUTON;
         double highFrom = 63.0 + 60.0 * p.horizontal(), highOver = 110.0 * p.horizontal();
         return new Column(setting, weight, fallback, a,
-                s.faultDistance() + 14.0 * noise(seed, x, z, 120.0 * p.horizontal(), 0x2C3DL),
+                s.faultDistance() + 14.0 * layers.wander() * noise(seed, x, z, 120.0 * p.horizontal(), 0x2C3DL),
                 18 + (int) Math.round(26.0 * (0.5 + 0.5 * noise(seed, x, z, 700.0 * p.horizontal(), 0x5E71L))),
                 plutonTop,
                 (int) Math.round(5.0 * noise(seed, x, z, 220.0 * p.horizontal(), 0x3B1FL)),
                 noise(seed, x, z, 160.0 * p.horizontal(), 0x6D0BL) > 0.0 ? Rock.GRANITE : Rock.GNEISS,
                 noise(seed, x, z, 200.0 * p.horizontal(), 0x1E5AL) > 0.0 ? Rock.GRANITE : Rock.DIORITE,
                 noise(seed, x, z, 60.0 * p.horizontal(), 0x44D1L) > 0.2,
-                highFrom, highOver);
+                highFrom, highOver, layers);
+    }
+
+    /** A thickness in blocks, scaled by the config and never under one. */
+    private static int thick(Column c, int blocks) {
+        return c.layers().thickness() == 1.0 ? blocks : Math.max(1, (int) Math.round(blocks * c.layers().thickness()));
     }
 
     /**
@@ -155,7 +165,9 @@ public final class Lithology {
         // Vanilla's deepslate fades in over the bottom eight blocks, so the sequences stop there raggedly too.
         if (y < (int) (h & 7)) return Rock.KEEP;
         // Every contact wanders a block or two.
-        int depth = surface - y + (int) ((h >>> 3) & 3) - 1;
+        int step = (int) ((h >>> 3) & 3) - 1;
+        double wander = c.layers().wander();
+        int depth = surface - y + (wander == 1.0 ? step : (int) Math.round(step * wander));
         Setting setting = c.setting();
         if (c.weight() < 1.0) {
             // Where one setting gives way to the next, their rocks interfinger in blobs rather than meet at a line.
@@ -164,25 +176,28 @@ public final class Lithology {
         }
         long salt = SeedHash.mix(setting == Setting.FORELAND && c.setting() == Setting.FOLD_BELT
                 ? seed ^ 0x117E6L : seed ^ 0x117E5L);
+        double tilt = c.layers().tilt();
         return weathered(c, surface, h, switch (setting) {
-            case PLATFORM -> depth < c.cover() ? bed(salt, y + c.bedShift(), PLATFORM_BEDS, PLATFORM_BANDS)
+            case PLATFORM -> depth < c.cover() ? bed(c, salt, y + c.bedShift(), PLATFORM_BEDS, PLATFORM_BANDS)
                     : basement(seed, c, x, y, z, depth - c.cover());
             case FOLD_BELT -> depth > c.plutonTop() ? Rock.GRANITE
-                    : pick(FOLD_BANDS, salt ^ 0x40L, Math.floorDiv((int) Math.floor(c.folded() + 0.5 * y), 12));
+                    : pick(FOLD_BANDS, salt ^ 0x40L, Math.floorDiv((int) Math.floor(c.folded() + 0.5 * tilt * y),
+                            thick(c, 12)));
             case FORELAND -> depth < c.cover() + 12
-                    ? bed(salt ^ 0x50L, y + c.bedShift() + (int) Math.round(0.35 * c.folded() / 8.0), FORELAND_BEDS,
-                            FORELAND_BANDS)
+                    ? bed(c, salt ^ 0x50L, y + c.bedShift() + (int) Math.round(0.35 * tilt * c.folded() / 8.0),
+                            FORELAND_BEDS, FORELAND_BANDS)
                     : basement(seed, c, x, y, z, depth - c.cover() - 12);
-            // An arc's lavas and ash lie over everything to a good depth; under them, older flows and dykes, and
+            // An arc's lavas and ash lie over everything to a good depth; under them, older flows and dikes, and
             // the plutons that fed them.
             case ARC -> depth > c.plutonTop() ? c.pluton()
-                    : depth < 22 + c.bedShift() * 2 ? pick(ARC_BEDS, salt ^ 0x60L, Math.floorDiv(depth + c.bedShift(), 4))
+                    : depth < 22 + c.bedShift() * 2
+                    ? pick(ARC_BEDS, salt ^ 0x60L, Math.floorDiv(depth + c.bedShift(), thick(c, 4)))
                     : pick(ARC_ROOT, salt ^ 0x68L, lump(seed, 0x68L, x, y, z, 3));
             case PRISM -> body(seed, x, y, z, pick(PRISM_ROCKS, salt ^ 0x70L, lump(seed, 0x70L, x, y, z, 2)));
             case RIFT -> rift(seed, salt, c, x, y, z, depth);
             case SHEAR_ZONE -> depth > 40 ? basement(seed, c, x, y, z, depth - 40)
-                    : pick(SHEAR_BANDS, salt ^ 0x90L, Math.floorDiv((int) Math.floor(c.folded()), 3));
-            case HOTSPOT -> depth < 50 ? pick(HOTSPOT_BEDS, salt ^ 0xA0L, Math.floorDiv(depth + c.bedShift(), 5))
+                    : pick(SHEAR_BANDS, salt ^ 0x90L, Math.floorDiv((int) Math.floor(c.folded()), thick(c, 3)));
+            case HOTSPOT -> depth < 50 ? pick(HOTSPOT_BEDS, salt ^ 0xA0L, Math.floorDiv(depth + c.bedShift(), thick(c, 5)))
                     : body(seed, x, y, z, Rock.GABBRO);
             case OCEAN_FLOOR -> depth < 8 ? ((h >>> 5) & 3) == 0 ? Rock.SMOOTH_BASALT : Rock.BASALT
                     : depth < 30 ? body(seed, x, y, z, Rock.GABBRO)
@@ -214,11 +229,13 @@ public final class Lithology {
                 ? HARD[(int) Math.floorMod(h >>> 9, (long) HARD.length)] : r;
     }
 
-    /** A rift's floor holds basalt flows and sediment, deepest on the axis; its shoulders are basement, cut by dykes. */
+    /** A rift's floor holds basalt flows and sediment, deepest on the axis; its shoulders are basement, cut by dikes. */
     private static Rock rift(long seed, long salt, Column c, int x, int y, int z, int depth) {
         int fill = riftFill(c);
-        if (depth < fill) return bed(salt ^ 0x80L, y + c.bedShift(), RIFT_FILL, RIFT_BANDS);
-        if (c.dyke() && Math.floorMod((int) Math.floor(c.folded()), 41) < 2) return Rock.GABBRO;
+        if (depth < fill) return bed(c, salt ^ 0x80L, y + c.bedShift(), RIFT_FILL, RIFT_BANDS);
+        double dikes = c.layers().dikes();
+        int spacing = dikes == 1.0 ? 41 : dikes <= 0.0 ? 0 : Math.max(4, (int) Math.round(41 / dikes));
+        if (c.dike() && spacing > 0 && Math.floorMod((int) Math.floor(c.folded()), spacing) < 2) return Rock.GABBRO;
         return basement(seed, c, x, y, z, depth - fill);
     }
 
@@ -290,7 +307,7 @@ public final class Lithology {
      * The body of deep rock a block is in: cells of eight blocks across ({@code 1 << yShift} down), each its own rock.
      * Laid on the grid as it stands the cells were cubes, and a cave wall showed squares of granite and diorite side by
      * side. Looked up at a point the noise pushes a few blocks about, the walls wander and the bodies come out as
-     * rounded lumps of different sizes, as dykes and pods are. Worlds made before round 142 keep the cubes.
+     * rounded lumps of different sizes, as dikes and pods are. Worlds made before round 142 keep the cubes.
      */
     private static long lump(long seed, long salt, int x, int y, int z, int yShift) {
         if (com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.has(
@@ -319,10 +336,10 @@ public final class Lithology {
      * bands, which is where a cliff face shows them anyway. Laid down eight thick they stood out as white and yellow
      * stripes and, because no vanilla ore may replace them, they took better than half the coal out of the ground.
      */
-    private static Rock bed(long salt, int level, Rock[] beds, Rock[] bands) {
-        long thin = SeedHash.mix(salt ^ (Math.floorDiv(level, 3) * 0x9E3779B97F4A7C15L));
+    private static Rock bed(Column c, long salt, int level, Rock[] beds, Rock[] bands) {
+        long thin = SeedHash.mix(salt ^ (Math.floorDiv(level, thick(c, 3)) * 0x9E3779B97F4A7C15L));
         if ((thin & 7) == 1) return bands[(int) Math.floorMod(thin >>> 4, (long) bands.length)];
-        return pick(beds, salt, Math.floorDiv(level, 5));
+        return pick(beds, salt, Math.floorDiv(level, thick(c, 5)));
     }
 
     private static Rock pick(Rock[] table, long salt, long index) {
