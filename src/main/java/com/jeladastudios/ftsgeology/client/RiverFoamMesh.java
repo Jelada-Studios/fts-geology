@@ -270,7 +270,7 @@ public final class RiverFoamMesh {
             int shift = (int) (now * (still ? 0.06 : 0.9));
             int wr = s.water() >> 16 & 255, wg = s.water() >> 8 & 255, wb = s.water() & 255;
             float tint = s.cold() ? 0.45f : 0.2f;
-            float y = s.top() + 0.01f;
+            float y = s.top() + lift;
             for (int j = 0; j < PX; j++) {
                 int run = -1, runShade = -1;
                 for (int i = 0; i <= PX; i++) {
@@ -326,6 +326,51 @@ public final class RiverFoamMesh {
         out.add(Float.intBitsToFloat(s.light()));
     }
 
+    /**
+     * Iris's own way to the shader pack's translucent particle program, looked up once, or null without Iris. Asked for
+     * the vanilla particle shader, Iris hands out the program for solid particles, which a pack draws before its
+     * deferred pass: foam drawn with it after the water is lost. Iris gives its translucent particles this one.
+     */
+    private static java.lang.invoke.MethodHandle irisTranslucent;
+    private static boolean irisLooked;
+
+    /**
+     * How far over the water's surface the foam lies. A shader pack draws the water a little higher than the game does
+     * (Bliss: foam a hundredth of a block over it was hidden, at six hundredths it shows), so the foam is lifted while
+     * one is in use.
+     */
+    private static volatile float lift = 0.01f;
+
+    private static net.minecraft.client.renderer.ShaderInstance foamShader() {
+        if (!irisLooked) {
+            irisLooked = true;
+            if (net.neoforged.fml.ModList.get().isLoaded("iris")) {
+                try {
+                    Class<?> access = Class.forName("net.irisshaders.iris.pipeline.programs.ShaderAccess");
+                    irisTranslucent = java.lang.invoke.MethodHandles.publicLookup().findStatic(access,
+                            "getParticleTranslucentShader",
+                            java.lang.invoke.MethodType.methodType(net.minecraft.client.renderer.ShaderInstance.class));
+                } catch (ReflectiveOperationException | LinkageError e) {
+                    com.jeladastudios.ftsgeology.GeysersMod.LOGGER.warn("River foam: Iris's translucent particle shader not found ({}); foam may not show under a shader pack", e.toString());
+                }
+            }
+        }
+        if (irisTranslucent != null) {
+            try {
+                net.minecraft.client.renderer.ShaderInstance s = (net.minecraft.client.renderer.ShaderInstance) irisTranslucent.invokeExact();
+                if (s != null) {
+                    // Without a pack Iris hands back the game's own particle shader.
+                    lift = s == GameRenderer.getParticleShader() ? 0.01f : 0.06f;
+                    return s;
+                }
+            } catch (Throwable e) {
+                irisTranslucent = null;
+            }
+        }
+        lift = 0.01f;
+        return GameRenderer.getParticleShader();
+    }
+
     @SubscribeEvent
     public static void onRender(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return;
@@ -357,13 +402,14 @@ public final class RiverFoamMesh {
         RenderSystem.enableDepthTest();
         RenderSystem.depthMask(false);
         mc.gameRenderer.lightTexture().turnOnLightLayer();
-        RenderSystem.setShader(GameRenderer::getParticleShader);
+        net.minecraft.client.renderer.ShaderInstance shader = foamShader();
+        RenderSystem.setShader(() -> shader);
         RenderSystem.setShaderTexture(0, WHITE);
         // The view's own turn is in the model-view matrix the level is drawn with; the buffer's draw replaces that
         // matrix, so the two are put together here.
         Matrix4f view = new Matrix4f(RenderSystem.getModelViewMatrix()).mul(pose.last().pose());
         mesh.bind();
-        mesh.drawWithShader(view, event.getProjectionMatrix(), GameRenderer.getParticleShader());
+        mesh.drawWithShader(view, event.getProjectionMatrix(), shader);
         com.mojang.blaze3d.vertex.VertexBuffer.unbind();
         drawn = meshQuads;
         mc.gameRenderer.lightTexture().turnOffLightLayer();
