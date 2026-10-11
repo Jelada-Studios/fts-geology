@@ -8,7 +8,7 @@ config = "fts_geology.mixins.json"
 
 [[mods]]
 modId = "fts_geology"
-version = "0.11.1"
+version = "0.11.2"
 displayName = "FT's Geology"
 authors = "Jelada Studios"
 credits = "See CREDITS.md — community reports and questions that shaped the mod."
