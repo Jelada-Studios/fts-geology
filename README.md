@@ -51,4 +51,4 @@ Java 17. Run `./gradlew build` and take the jar from `build/libs/`. Use `build`,
 
 Copyright (C) 2026 Jelada Studios. FT's Geology is free software under the GNU General Public License v3.0: see `LICENSE`. Versions up to 0.10 were released under the MIT License. Third-party data and sounds are credited in `CREDITS.md`.
 
-The code, this README and the wiki were written with the help of an AI model.
+The code, the block textures, this README and the wiki were made with the help of an AI model.
