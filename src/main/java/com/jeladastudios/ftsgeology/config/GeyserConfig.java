@@ -172,6 +172,7 @@ public final class GeyserConfig {
     public static final ModConfigSpec.BooleanValue QUAKE_LANDSLIDES;
     public static final ModConfigSpec.BooleanValue RAIN_LANDSLIDES;
     public static final ModConfigSpec.DoubleValue RAIN_LANDSLIDE_RATE;
+    public static final ModConfigSpec.BooleanValue SLOPE_SUPPORT;          // retaining walls, anchors, drains, trees
     public static final ModConfigSpec.DoubleValue AFTERSHOCK_RATE;
     public static final ModConfigSpec.IntValue AFTERSHOCK_MAX;
     public static final ModConfigSpec.DoubleValue AFTERSHOCK_DAYS;
@@ -991,6 +992,13 @@ public final class GeyserConfig {
         RAIN_LANDSLIDE_RATE = b
                 .comment("How often a soaked slope gives way in rain, against the usual (1).")
                 .defineInRange("rainLandslideRate", 1.0, 0.0, 20.0);
+        SLOPE_SUPPORT = b
+                .comment("What holds a slope up against landslides, quake or rain: a retaining wall of stone, brick or",
+                        "concrete at its foot, as high as the ground it holds and set into the ground (a terrace is a stair",
+                        "of them); iron bars or chains driven through the loose cover into the rock; a drain of gravel or",
+                        "pipe sunk into the slope, against slides in rain; and trees, whose roots bind the soil. A thin,",
+                        "low or unfounded wall holds less and can lose its top when the slope comes down against it.")
+                .define("slopeSupport", true);
         QUAKE_AFTERSHOCKS = b
                 .comment("After a quake of magnitude 5.5 or more the fault goes on slipping for days: the few aftershocks",
                         "worth feeling, three to five for most quakes, sooner rather than later (Omori's law), the largest",

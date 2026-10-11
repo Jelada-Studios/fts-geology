@@ -62,7 +62,7 @@ public final class Landslides {
     private static final int RUNOUT = 24;
 
     private static final LongAdder SLIDES = new LongAdder(), MOVED = new LongAdder(), TREES = new LongAdder(),
-            WET = new LongAdder(), WARNED = new LongAdder();
+            WET = new LongAdder(), WARNED = new LongAdder(), HELD = new LongAdder(), WALL_LOSS = new LongAdder();
 
     /** How often the slopes round each player are looked at in rain, ticks; how many columns, and how far. */
     private static final int RAIN_EVERY = 200, RAIN_LOOKS = 8, RAIN_REACH = 96;
@@ -109,6 +109,7 @@ public final class Landslides {
                 if (chunk == null || built(PlayerBuilt.inChunk(level, x >> 4, z >> 4),
                         ShakingDamage.structureBoxes(level, chunk, level.getMinBuildHeight()), x, top, z)) continue;
                 double chance = RAIN_CHANCE * rate * rain * Math.min(3.0, drop / (double) STEEP);
+                chance *= SlopeSupport.at(level, x, top, z, down, true).left();
                 if (level.random.nextDouble() >= chance) continue;
                 BlockPos seed = new BlockPos(x, top, z);
                 warn(level, seed, down);
@@ -246,7 +247,8 @@ public final class Landslides {
                 double chance = 0.04 * (strength + 0.5) * Math.min(3.0, drop / (double) STEEP);
                 int table = com.jeladastudios.ftsgeology.hydrology.WaterTable.tableYBefore(level, x, z, scanDeadline);
                 if (table != Integer.MIN_VALUE && top - table <= 4) chance *= 1.5;
-                if (level.random.nextDouble() >= Math.min(0.5, chance)) continue;
+                chance = Math.min(0.5, chance) * SlopeSupport.at(level, x, top, z, down, false).left();
+                if (level.random.nextDouble() >= chance) continue;
                 if (job.counts()[0]++ >= MOST) return;
                 here++;
                 DUE.add(new Slide(level.dimension(), new BlockPos(x, top, z), down, radius,
@@ -266,7 +268,7 @@ public final class Landslides {
         return n;
     }
 
-    private static boolean loose(BlockState s) {
+    static boolean loose(BlockState s) {
         return s.is(BlockTags.DIRT) && !DynamicTreesFelling.isRooty(s) || s.is(BlockTags.SAND) || s.is(Tags.Blocks.GRAVELS)
                 || s.is(Blocks.SNOW_BLOCK) || s.is(Blocks.POWDER_SNOW) || s.is(Blocks.CLAY) || s.is(Blocks.MUD)
                 || s.is(Blocks.COARSE_DIRT) || s.is(Blocks.DIRT_PATH) || s.is(Blocks.PACKED_MUD)
@@ -303,6 +305,7 @@ public final class Landslides {
         LongSet placed = PlayerBuilt.inChunk(level, seed.getX() >> 4, seed.getZ() >> 4);
         List<QuakePlanner.Edit> emptied = new ArrayList<>();
         int moved = 0;
+        it.unimi.dsi.fastutil.longs.LongSet walls = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
         for (int dx = -s.radius(); dx <= s.radius(); dx++) {
             for (int dz = -s.radius(); dz <= s.radius(); dz++) {
                 if (dx * dx + dz * dz > s.radius() * s.radius() + 1) continue;
@@ -319,6 +322,16 @@ public final class Landslides {
                 if (placed.contains(BlockPos.asLong(x, top, z)) || placed.contains(BlockPos.asLong(x, top + 1, z))) continue;
                 int k = cover(level, x, top, z);
                 if (k == 0) continue;
+                // Ground behind a sound retaining wall is held when the slope round it goes; behind a poor one the
+                // slope comes down against the wall and may take its top course with it.
+                SlopeSupport.Wall wall = GeyserConfig.SLOPE_SUPPORT.get() ? SlopeSupport.wall(level, x, top, z, down) : null;
+                if (wall != null) {
+                    if (level.random.nextDouble() < wall.held()) {
+                        HELD.increment();
+                        continue;
+                    }
+                    if (walls.add(wall.face().asLong())) WALL_LOSS.add(SlopeSupport.overtop(level, wall, down, 1));
+                }
                 // A Dynamic Trees tree on it comes down whole, felled down the slope.
                 BlockState over = level.getBlockState(new BlockPos(x, top + 1, z));
                 if (DynamicTreesFelling.isBranch(over) && DynamicTreesFelling.fell(level, new BlockPos(x, top + 1, z),
@@ -394,8 +407,8 @@ public final class Landslides {
     }
 
     public static String summary() {
-        return String.format(java.util.Locale.ROOT, "landslides: %d (%d of them in rain, %d slopes warned), %d blocks moved, %d trees felled",
-                SLIDES.sum(), WET.sum(), WARNED.sum(), MOVED.sum(), TREES.sum());
+        return String.format(java.util.Locale.ROOT, "landslides: %d (%d of them in rain, %d slopes warned), %d blocks moved, %d trees felled, %d columns held by walls, %d wall blocks lost",
+                SLIDES.sum(), WET.sum(), WARNED.sum(), MOVED.sum(), TREES.sum(), HELD.sum(), WALL_LOSS.sum());
     }
 
     public static void clear() {
