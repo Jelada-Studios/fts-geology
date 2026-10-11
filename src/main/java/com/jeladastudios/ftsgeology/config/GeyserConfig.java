@@ -80,6 +80,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue VOLCANO_BOMBS_MELT_IN_LAVA;
     public static final ForgeConfigSpec.IntValue VOLCANO_CRATER_RADIUS;     // summit crater/lava-pool radius
     public static final ForgeConfigSpec.IntValue VOLCANO_LAVA_BUDGET;       // lava cells per eruption
+    public static final ForgeConfigSpec.IntValue VOLCANO_LAVA_COOL_SECONDS; // seconds a flow runs before its front freezes
     public static final ForgeConfigSpec.BooleanValue QUAKE_TRIGGERS_ERUPTIONS; // big quakes set nearby volcanoes off
     public static final ForgeConfigSpec.DoubleValue QUAKE_ERUPTION_CHANCE;
     public static final ForgeConfigSpec.IntValue QUAKE_ERUPTION_DELAY_MIN_TICKS;
@@ -439,13 +440,20 @@ public final class GeyserConfig {
                 .comment("Radius of the summit crater / lava pool.")
                 .defineInRange("volcanoCraterRadius", 3, 1, 12);
         VOLCANO_LAVA_BUDGET = b
-                .comment("How many cells of lava one eruption may pour out of the summit.",
-                        "A real flow chills against the ground and stops; left unbounded the crater",
-                        "simply kept welling until the whole flank was molten and the forest was on",
-                        "fire. With a budget you get a tongue of lava that advances down the slope",
-                        "and turns to basalt behind its own front, which is both what happens and",
-                        "what actually looks like an eruption.")
+                .comment("How many cells of lava one eruption may pour out of the summit, one a second while it",
+                        "erupts (so volcanoEruptTicks / 20 caps it too). A real flow chills against the ground and",
+                        "stops; left unbounded the crater kept welling until the whole flank was molten and the forest",
+                        "was on fire. This sets how much ground the flows cover, not how far they run: for longer flows",
+                        "lengthen the eruption (volcanoEruptTicks) and raise volcanoLavaCoolSeconds together.")
                 .defineInRange("volcanoLavaBudget", 24, 0, 400);
+        VOLCANO_LAVA_COOL_SECONDS = b
+                .comment("How long a lava flow runs on before its front chills and stops, in seconds. While a volcano",
+                        "erupts, the lava out of its crater is turned to rock this often, a tongue freezing behind its",
+                        "own front. Lava is slow in Minecraft, so this matters only with a longer eruption: with the",
+                        "default minute (volcanoEruptTicks 1200) the flows reach about 100 to 140 blocks from the summit",
+                        "whatever this is; with three minutes (3600) and 30 here their tongues reach about 200. Over flat",
+                        "ground lava runs only a few blocks, so the flows end near the volcano's foot.")
+                .defineInRange("volcanoLavaCoolSeconds", 3, 1, 60);
         QUAKE_TRIGGERS_ERUPTIONS = b
                 .comment("A large earthquake can set off volcanoes around it once the ground has settled, as the",
                         "1960 Chile earthquake did at Cordon Caulle. Only a volcano with magma to draw on erupts.")
