@@ -82,6 +82,12 @@ public class GeologistsHammerItem extends Item {
                     trail(server, pos, target[0]);
                 }
                 player.getCooldowns().addCooldown(this, 20);
+            } else if (com.jeladastudios.ftsgeology.instrument.SoilSampling.sampleable(struck)) {
+                // Soil and loose ground: an assay of the metals weathered up into it from ore below.
+                for (Component line : com.jeladastudios.ftsgeology.instrument.SoilSampling.read(server, pos)) {
+                    player.sendSystemMessage(line);
+                }
+                player.getCooldowns().addCooldown(this, 30);
             }
             com.jeladastudios.ftsgeology.advancement.GeologyTrigger.award(player, "hammer_rock");
         }
