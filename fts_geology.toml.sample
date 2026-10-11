@@ -11,17 +11,6 @@
 #  Every value is hot-reloadable. Ticks: 20 = 1 second.
 # =====================================================================
 
-[diagnostics]
-	#Write the mod's running counts and events to the log: rivers, villages and hot springs as
-	#the world is made, retrogen, volcanoes finishing and waking, quakes, springs growing. For
-	#testing and for bug reports; off, the log keeps only warnings and one-off notes.
-	verboseLog = false
-	#If the server thread goes this many seconds without finishing a tick, write every
-	#thread's stack to logs/fts_geology_stall.txt, once per stall. The stacks show what the
-	#game was waiting on when it froze. Nothing else is read or written. 0 turns it off.
-	#Range: 0 ~ 3600
-	stallReportSeconds = 30
-
 [thermodynamics]
 	#Degrees Celsius added per tick for each adjacent lava/magma block.
 	#Lowered so setups don't boil almost instantly -- gives time to react in a base.
@@ -175,14 +164,21 @@
 	#Radius of the summit crater / lava pool.
 	#Range: 1 ~ 12
 	volcanoCraterRadius = 3
-	#How many cells of lava one eruption may pour out of the summit.
-	#A real flow chills against the ground and stops; left unbounded the crater
-	#simply kept welling until the whole flank was molten and the forest was on
-	#fire. With a budget you get a tongue of lava that advances down the slope
-	#and turns to basalt behind its own front, which is both what happens and
-	#what actually looks like an eruption.
+	#How many cells of lava one eruption may pour out of the summit, one a second while it
+	#erupts (so volcanoEruptTicks / 20 caps it too). A real flow chills against the ground and
+	#stops; left unbounded the crater kept welling until the whole flank was molten and the forest
+	#was on fire. This sets how much ground the flows cover, not how far they run: for longer flows
+	#lengthen the eruption (volcanoEruptTicks) and raise volcanoLavaCoolSeconds together.
 	#Range: 0 ~ 400
 	volcanoLavaBudget = 24
+	#How long a lava flow runs on before its front chills and stops, in seconds. While a volcano
+	#erupts, the lava out of its crater is turned to rock this often, a tongue freezing behind its
+	#own front. Lava is slow in Minecraft, so this matters only with a longer eruption: with the
+	#default minute (volcanoEruptTicks 1200) the flows reach about 100 to 140 blocks from the summit
+	#whatever this is; with three minutes (3600) and 30 here their tongues reach about 200. Over flat
+	#ground lava runs only a few blocks, so the flows end near the volcano's foot.
+	#Range: 1 ~ 60
+	volcanoLavaCoolSeconds = 3
 	#A large earthquake can set off volcanoes around it once the ground has settled, as the
 	#1960 Chile earthquake did at Cordon Caulle. Only a volcano with magma to draw on erupts.
 	quakeTriggersEruptions = true
@@ -668,6 +664,12 @@
 	#How often a soaked slope gives way in rain, against the usual (1).
 	#Range: 0.0 ~ 20.0
 	rainLandslideRate = 1.0
+	#What holds a slope up against landslides, quake or rain: a retaining wall of stone, brick or
+	#concrete at its foot, as high as the ground it holds and set into the ground (a terrace is a stair
+	#of them); iron bars or chains driven through the loose cover into the rock; a drain of gravel or
+	#pipe sunk into the slope, against slides in rain; and trees, whose roots bind the soil. A thin,
+	#low or unfounded wall holds less and can lose its top when the slope comes down against it.
+	slopeSupport = true
 	#After a quake of magnitude 5.5 or more the fault goes on slipping for days: the few aftershocks
 	#worth feeling, three to five for most quakes, sooner rather than later (Omori's law), the largest
 	#about 1.2 below the main shock. Those of 5.5 and up near a player break the ground too; the rest
@@ -851,6 +853,17 @@
 	geologicalModOres = false
 	#Also make the ores one in chunks made before, as each is next loaded. Off: those keep what they had.
 	unifyOresInExistingChunks = false
+
+[diagnostics]
+	#If the server thread goes this many seconds without finishing a tick, write every
+	#thread's stack to logs/fts_geology_stall.txt, once per stall. The stacks show what the
+	#game was waiting on when it froze. Nothing else is read or written. 0 turns it off.
+	#Range: 0 ~ 3600
+	stallReportSeconds = 30
+	#Write the mod's running counts and events to the log: rivers, villages and hot springs as
+	#the world is made, retrogen, volcanoes finishing and waking, quakes, springs growing. For
+	#testing and for bug reports; off, the log keeps only warnings and one-off notes.
+	verboseLog = false
 
 [instruments]
 	#How far away, in blocks, a seismograph will look at an earthquake at all.
@@ -1125,6 +1138,28 @@
 	#belt's gneiss and marble, an arc's ash over its plutons. Off leaves plain stone, and chunks
 	#generate a little faster.
 	lithology = true
+	#How thick the rock layers are: the beds of a platform, a foreland and a rift's fill, the
+	#bands of a fold belt and a shear zone, an arc's lava and ash, a hotspot's flows. 2 doubles them,
+	#0.5 halves them. Like every setting of the rock under here, it applies only to chunks generated
+	#after the change: in a world already explored, new ground meets old ground at a seam.
+	#Range: 0.4 ~ 4.0
+	layerThickness = 1.0
+	#How steeply the layers dip: the bands of a fold belt, standing steep by default, and the beds
+	#of a foreland, tilted up towards the mountains. 0 lays them flat, 2 doubles the dip.
+	#Range: 0.0 ~ 4.0
+	layerTilt = 1.0
+	#How much granite and diorite intrudes from below: the bodies under a fold belt's bands and
+	#an arc's volcanoes. 0 leaves none, 2 puts one under most of a belt.
+	#Range: 0.0 ~ 2.0
+	plutons = 1.0
+	#How close together the gabbro dikes of a rift's shoulders stand. 0 leaves none, 2 halves the
+	#spacing.
+	#Range: 0.0 ~ 4.0
+	dikes = 1.0
+	#How far the contacts between rocks wander: the block or two by which a bed's top steps up and
+	#down, and how much a fold belt's bands meander. 0 makes every contact a straight line.
+	#Range: 0.0 ~ 4.0
+	contactWander = 1.0
 	#How many blocks the ground has to climb across two for a slope to shed its soil and show
 	#its rock (worlds made with this version on; older ones keep 3). About 56 degrees: no soil
 	#holds on steeper ground in a dry climate or over the tree line. Where it is wet enough for
