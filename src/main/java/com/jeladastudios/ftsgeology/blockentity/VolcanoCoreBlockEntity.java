@@ -457,6 +457,21 @@ public class VolcanoCoreBlockEntity extends BlockEntity {
                 if (quake != 0L && quake > be.rebuiltFor) be.rebuildAfterQuake(server, pos, quake);
                 be.refillAfterQuake(server, pos);
                 if (!hasLava(server, pos)) return; // dead until it has lava again
+                // Eruptions switched off: it sleeps on with its lazy smoke, its clock stopped, no swarm and no quake
+                // to wake it. Its crater still breathes gas, which volcanicGas governs.
+                if (!GeyserConfig.VOLCANO_ERUPTIONS.get()) {
+                    if (be.restless) {
+                        be.restless = false;
+                        com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.settle(summit);
+                        be.broadcastEruption(server, summit);
+                    }
+                    if (!be.sealed) {
+                        com.jeladastudios.ftsgeology.volcano.VolcanicGas.breatheQuietly(server, summit, be.craterR, be.magnitude,
+                                be.surfaceVents);
+                    }
+                    be.idleSmoke(server, summit, 0.4f, true);
+                    return;
+                }
                 be.answerQuake(server, pos);
                 // The last minutes before it erupts: magma rising, a swarm under the mountain, the springs warming.
                 int window = com.jeladastudios.ftsgeology.volcano.VolcanoUnrest.window(be.sealed);
