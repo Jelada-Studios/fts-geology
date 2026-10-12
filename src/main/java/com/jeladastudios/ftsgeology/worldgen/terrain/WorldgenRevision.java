@@ -87,8 +87,13 @@ public final class WorldgenRevision {
     public static final int CUT_ROOFS = 18;
     /** Large ore bodies that crop out on bare rock, their float and placer down the streams (round 159). */
     public static final int ORE_BODIES = 19;
+    /** A boundary lent by a plate across a junction read from the side of its line the column stands on, so a range
+     * running past a rift does not end in a wall where the nearer plate changes; and a roof kept over the caverns
+     * (round 160). */
+    public static final int LENT_SIDES = 20;
+    public static final int CAVE_ROOFS = 20;
     /** What a world made now gets. */
-    public static final int CURRENT = 19;
+    public static final int CURRENT = 20;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;

@@ -31,6 +31,10 @@ public final class ModDensityFunctions {
     public static final DeferredHolder<MapCodec<? extends DensityFunction>, MapCodec<? extends DensityFunction>> SUMMIT_SHIELD =
             DENSITY_FUNCTIONS.register("summit_shield", () -> com.jeladastudios.ftsgeology.worldgen.terrain.SummitShield.CODEC.codec());
 
+    /** A roof kept over the caverns. See {@link com.jeladastudios.ftsgeology.worldgen.terrain.CaveRoof}. */
+    public static final DeferredHolder<MapCodec<? extends DensityFunction>, MapCodec<? extends DensityFunction>> CAVE_ROOF =
+            DENSITY_FUNCTIONS.register("cave_roof", () -> com.jeladastudios.ftsgeology.worldgen.terrain.CaveRoof.CODEC.codec());
+
     /** The highest summits rounded off under the top of the world. See {@link com.jeladastudios.ftsgeology.worldgen.terrain.SummitCeiling}. */
     public static final DeferredHolder<MapCodec<? extends DensityFunction>, MapCodec<? extends DensityFunction>> SUMMIT_CEILING =
             DENSITY_FUNCTIONS.register("summit_ceiling", () -> com.jeladastudios.ftsgeology.worldgen.terrain.SummitCeiling.CODEC.codec());

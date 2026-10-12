@@ -261,7 +261,10 @@ public final class TerrainFields {
         for (int i = 0; i < e.rest().length; i++) {
             double w = weight(e, i, handover);
             if (w <= 0) continue;
-            v += w * value(field, e.rest()[i], p, seed, x, z);
+            // A boundary lent across a junction, near the run of its line past it: the two plates' views blended.
+            double share = e.shares()[i], one = value(field, e.rest()[i], p, seed, x, z);
+            if (share < 1.0) one = share * one + (1.0 - share) * value(field, e.across()[i], p, seed, x, z);
+            v += w * one;
             weights += w;
         }
         v /= weights;
@@ -280,12 +283,15 @@ public final class TerrainFields {
     public static String debugAt(long seed, GeologyParams p, int x, int z) {
         TectonicMap.Edges e = edgesAt(seed, p, x, z);
         double handover = HANDOVER * p.horizontal();
-        StringBuilder sb = new StringBuilder(String.format(java.util.Locale.ROOT, "first %s d %.0f plate %d e %.3f",
-                e.first().boundaryType(), e.first().faultDistance(), e.first().plateId(), erosion(e.first(), p, seed, x, z)));
+        StringBuilder sb = new StringBuilder(String.format(java.util.Locale.ROOT, "first %s d %.0f plate %d/%d e %.3f dem %.3f grip %.3f",
+                e.first().boundaryType(), e.first().faultDistance(), e.first().plateId(), e.first().neighbourId(),
+                erosion(e.first(), p, seed, x, z), dem(e.first(), p, seed, x, z), demGrip(e.first(), p)));
         for (int i = 0; i < e.rest().length; i++) {
             PlateSample s = e.rest()[i];
-            sb.append(String.format(java.util.Locale.ROOT, " | %s gap %.0f w %.3f plate %d e %.3f", s.boundaryType(),
-                    e.gaps()[i], weight(e, i, handover), s.plateId(), erosion(s, p, seed, x, z)));
+            sb.append(String.format(java.util.Locale.ROOT,
+                    " | %s gap %.0f w %.3f share %.2f plate %d/%d e %.3f dem %.3f grip %.3f", s.boundaryType(),
+                    e.gaps()[i], weight(e, i, handover), e.shares()[i], s.plateId(), s.neighbourId(), erosion(s, p, seed, x, z),
+                    dem(s, p, seed, x, z), demGrip(s, p)));
         }
         return sb.toString();
     }

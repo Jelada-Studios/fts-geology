@@ -1,6 +1,7 @@
 package com.jeladastudios.ftsgeology.tectonics;
 
 import com.jeladastudios.ftsgeology.compat.tfc.TfcCompat;
+import com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision;
 import static com.jeladastudios.ftsgeology.util.SeedHash.hash;
 import static com.jeladastudios.ftsgeology.util.SeedHash.mix;
 import static com.jeladastudios.ftsgeology.util.SeedHash.rand01;
@@ -75,7 +76,8 @@ public final class TectonicMap {
      * collision belt's crop stood up out of a rift's floor as a straight wall a hundred blocks high. Kept whole, a
      * boundary comes into the blend only at the reach, where its weight is nothing.</p>
      */
-    public record Edges(PlateSample first, PlateSample[] rest, double[] gaps, double[] lends) {
+    public record Edges(PlateSample first, PlateSample[] rest, double[] gaps, double[] lends, PlateSample[] across,
+                        double[] shares) {
         /** The second nearest, or the first where there is none. */
         public PlateSample second() {
             return rest.length > 0 ? rest[0] : first;
@@ -149,7 +151,7 @@ public final class TectonicMap {
         double faultDistance = Math.max(0.0, own[0]);
         PlateKind kind = biomes == null ? seededKind(seed, plateId, params) : plateKind(biomes, seed, bgx, bgz, scale, jitter);
         PlateSample first = boundary(seed, plateId, kind, (int) own[3], (int) own[4], faultDistance, own[1], own[2], own[7], biomes, params);
-        if (!withSecond) return new Edges(first, NO_SAMPLES, NO_GAPS, NO_GAPS);
+        if (!withSecond) return new Edges(first, NO_SAMPLES, NO_GAPS, NO_GAPS, NO_SAMPLES, NO_GAPS);
 
         // 3. Every plate near this column lends its boundaries: where three plates meet, all three boundaries shape the
         //    ground. Each lends by how near its own ground is, measured to its whole outline, so the answer does not
@@ -189,15 +191,37 @@ public final class TectonicMap {
         // full.
         int keep = 0;
         while (keep < sorted.size() && (keep < 2 || sorted.get(keep)[0] - faultDistance < reach)) keep++;
-        PlateSample[] rest = new PlateSample[keep];
-        double[] gaps = new double[keep], lends = new double[keep];
+        PlateSample[] rest = new PlateSample[keep], across = new PlateSample[keep];
+        double[] gaps = new double[keep], lends = new double[keep], shares = new double[keep];
+        boolean sides = WorldgenRevision.has(WorldgenRevision.LENT_SIDES);
+        double band = SIDE_BAND * params.horizontal();
         for (int i = 0; i < keep; i++) {
-            rest[i] = sampleFor(seed, sorted.get(i), biomes, params, scale, jitter);
-            gaps[i] = sorted.get(i)[0] - faultDistance;
-            lends[i] = sorted.get(i)[8];
+            double[] e = sorted.get(i);
+            gaps[i] = e[0] - faultDistance;
+            lends[i] = e[8];
+            boolean lent = (int) e[5] != bgx || (int) e[6] != bgz;
+            if (!sides || !lent) {
+                rest[i] = sampleFor(seed, e, false, biomes, params, scale, jitter);
+                shares[i] = 1.0;
+                continue;
+            }
+            // A boundary between two other plates, lent across a junction: the column may stand past its line, in
+            // neither of them. Each plate sees it as standing on its own side; the two views are blended across the
+            // line run on past the junction, so neither the nearer plate changing nor the column crossing the line is
+            // a step. The lending plate's view alone stood the real mountain ground of a collision belt mirrored
+            // across the line wherever the other plate was nearer: a range running past a rift ended in a wall.
+            double t = Mth.clamp(0.5 + e[9] / (2.0 * band), 0.0, 1.0);
+            t = t * t * (3.0 - 2.0 * t);
+            boolean mine = t >= 0.5;
+            rest[i] = sampleFor(seed, e, !mine, biomes, params, scale, jitter);
+            shares[i] = mine ? t : 1.0 - t;
+            if (shares[i] < 1.0) across[i] = sampleFor(seed, e, mine, biomes, params, scale, jitter);
         }
-        return new Edges(first, rest, gaps, lends);
+        return new Edges(first, rest, gaps, lends, across, shares);
     }
+
+    /** Over how far either side of a lent boundary's line its two plates' views are blended, in blocks of the normal world. */
+    private static final double SIDE_BAND = 64.0;
 
     /**
      * Keeps one copy of a boundary: the same line is found from both the plates it parts, and the copy from the plate
@@ -207,7 +231,7 @@ public final class TectonicMap {
         long key = pairKey(e);
         double[] was = unique.get(key);
         if (was != null && was[8] <= lend) return;
-        double[] c = java.util.Arrays.copyOf(e, 9);
+        double[] c = java.util.Arrays.copyOf(e, 10);
         c[8] = lend;
         unique.put(key, c);
     }
@@ -277,12 +301,15 @@ public final class TectonicMap {
                     }
                 }
                 if (lo > hi) continue;
+                // How far the column stands from the line itself, run on past the junctions: on this cell's side (always,
+                // in the cell it stands in) or, below nothing, the one across.
+                double side = d;
                 d = Math.abs(d);
                 if (along < lo || along > hi) {
                     double t = along < lo ? lo : hi;
                     d = Math.sqrt(sq(px - (midX - uz * t)) + sq(pz - (midZ + ux * t)));
                 }
-                out.add(new double[]{d, ux, uz, gx, gz, cgx, cgz, alongOne});
+                out.add(new double[]{d, ux, uz, gx, gz, cgx, cgz, alongOne, 0.0, side});
             }
         }
     }
@@ -291,13 +318,18 @@ public final class TectonicMap {
         return d * d;
     }
 
-    /** The sample a candidate edge makes, as the plate that owns the edge sees it. */
-    private static PlateSample sampleFor(long seed, double[] e, ServerLevel biomes, GeologyParams params, double scale,
-                                         double jitter) {
-        int ogx = (int) e[5], ogz = (int) e[6];
+    /**
+     * The sample a candidate edge makes: as the plate that owns the edge sees it, or, {@code across}, as the plate on
+     * the other side of its line does.
+     */
+    private static PlateSample sampleFor(long seed, double[] e, boolean across, ServerLevel biomes, GeologyParams params,
+                                         double scale, double jitter) {
+        int ogx = (int) (across ? e[3] : e[5]), ogz = (int) (across ? e[4] : e[6]);
+        int ngx = (int) (across ? e[5] : e[3]), ngz = (int) (across ? e[6] : e[4]);
         long ownerId = plateId(seed, ogx, ogz);
         PlateKind ownerKind = biomes == null ? seededKind(seed, ownerId, params) : plateKind(biomes, seed, ogx, ogz, scale, jitter);
-        return boundary(seed, ownerId, ownerKind, (int) e[3], (int) e[4], Math.max(0.0, e[0]), e[1], e[2], e[7], biomes, params);
+        return boundary(seed, ownerId, ownerKind, ngx, ngz, Math.max(0.0, e[0]), across ? -e[1] : e[1],
+                across ? -e[2] : e[2], e[7], biomes, params);
     }
 
     /** A column's plate against one of its boundaries, the plate across it lying in grid cell (ngx, ngz). */
