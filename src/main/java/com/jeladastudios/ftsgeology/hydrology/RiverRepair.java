@@ -98,7 +98,7 @@ public final class RiverRepair {
     private static final LongLinkedOpenHashSet MOVED = new LongLinkedOpenHashSet(), KEEP = new LongLinkedOpenHashSet();
 
     private static final LongAdder LAID = new LongAdder(), RECUT_COLUMNS = new LongAdder(), BANKS = new LongAdder(),
-            CHUNKS = new LongAdder(), DRIED_COLUMNS = new LongAdder(), RECEDED = new LongAdder();
+            CHUNKS = new LongAdder(), DRIED_COLUMNS = new LongAdder(), RECEDED = new LongAdder(), CLEARED = new LongAdder();
 
     /** Columns of small streams a well's cone has dried, until the water comes back under a block; and the drawdowns. */
     private static final it.unimi.dsi.fastutil.longs.LongOpenHashSet DRIED = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
@@ -247,6 +247,7 @@ public final class RiverRepair {
                 if (w == Integer.MIN_VALUE) continue;
                 int x = cp.getMinBlockX() + lx, z = cp.getMinBlockZ() + lz;
                 if (Reservoirs.heldBack(x, z)) continue;       // a reservoir filling upstream takes this water
+                clearOver(level, chunk, x, z, w, m);
                 int g = ground(chunk, x, z, m);
                 if (g == Integer.MIN_VALUE) continue;
                 boolean lake = plan.lake()[Plan.index(lx, lz)];
@@ -290,7 +291,8 @@ public final class RiverRepair {
                 int here = 0;
                 for (int y = g + 1; y <= top; y++) {
                     BlockState s = chunk.getBlockState(m.set(x, y, z));
-                    if (s.is(ModBlocks.RIVER_WATER.get())) continue;
+                    // A block of the river's water left running (another mod moved it) is laid again as the still water it is.
+                    if (s.is(ModBlocks.RIVER_WATER.get()) && s.getFluidState().isSource()) continue;
                     if (placed.contains(m.asLong())) break;
                     boolean open = s.isAir() || TerrainProbe.isVegetation(s) && !s.is(Blocks.SNOW)
                             || s.getFluidState().is(FluidTags.WATER) && !s.getFluidState().isSource();
@@ -313,6 +315,34 @@ public final class RiverRepair {
     }
 
     private static final int[][] SIDES = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+
+    /** How far over a river's level water that does not belong there is looked for. */
+    private static final int STRAY_REACH = 3;
+
+    /**
+     * Water over a river's level that does not belong there, taken away without waking anything round it: a block of
+     * the river's own water standing alone above the river (pushed up out of the channel on top of a block put into
+     * it, as Flowing Fluids did), and ordinary water lying on the river's surface, which does not mix with it.
+     * The river's own water raised whole -- a flood, the spring's high water, a reservoir -- has more of it beside it
+     * and stays.
+     */
+    private static void clearOver(ServerLevel level, LevelChunk chunk, int x, int z, int w, BlockPos.MutableBlockPos m) {
+        for (int y = w + 1; y <= w + STRAY_REACH; y++) {
+            BlockState s = chunk.getBlockState(m.set(x, y, z));
+            if (s.getFluidState().isEmpty() || !(s.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock)) return;
+            boolean stray;
+            if (s.is(ModBlocks.RIVER_WATER.get())) {
+                stray = !RiverSpill.inRiver(level, m);
+            } else {
+                stray = s.getFluidState().is(FluidTags.WATER)
+                        && !chunk.getBlockState(m.set(x, y - 1, z)).getFluidState().isEmpty();
+                m.set(x, y, z);
+            }
+            if (!stray) continue;
+            level.setBlock(m, Blocks.AIR.defaultBlockState(), FLAGS);
+            CLEARED.increment();
+        }
+    }
 
     /** How dry a region's spell is for its lakes to go down a block (see Storms#spell). */
     private static final double DROUGHT = 0.2;
@@ -430,8 +460,8 @@ public final class RiverRepair {
 
     public static String summary() {
         return String.format(java.util.Locale.ROOT,
-                "river repair: %d chunks laid again, %d blocks of water, %d channels cut through, %d banks built up, %d stream columns run dry, %d lake columns down a block in a drought",
-                CHUNKS.sum(), LAID.sum(), RECUT_COLUMNS.sum(), BANKS.sum(), DRIED_COLUMNS.sum(), RECEDED.sum());
+                "river repair: %d chunks laid again, %d blocks of water, %d channels cut through, %d banks built up, %d stream columns run dry, %d lake columns down a block in a drought, %d blocks of stray water cleared off the rivers",
+                CHUNKS.sum(), LAID.sum(), RECUT_COLUMNS.sum(), BANKS.sum(), DRIED_COLUMNS.sum(), RECEDED.sum(), CLEARED.sum());
     }
 
     @SubscribeEvent

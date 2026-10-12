@@ -48,6 +48,7 @@ public final class TerrainContext {
         com.jeladastudios.ftsgeology.compat.TerraBlenderRegions.open(event.getServer(), seed);
         GeologyParams.take(tall ? TALL_HORIZONTAL : 1.0);
         com.jeladastudios.ftsgeology.compat.ThinAirHeights.open(tall, TALL_HORIZONTAL, seaLevel(event.getServer()));
+        com.jeladastudios.ftsgeology.compat.FlowingFluidsRivers.keepOut();
         TerrainCache.clear();
         GeologyWorld.clear();
         OverworldSurfaceRule.open(event.getServer());

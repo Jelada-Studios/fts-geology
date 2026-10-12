@@ -169,6 +169,9 @@ public class GeysersMod {
      */
     @SubscribeEvent
     public void onPlayerJoin(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedInEvent event) {
+        // Flowing Fluids' settings may have been replaced since the server started (its own commands): the rivers'
+        // water goes back on its list before they are sent to the player.
+        com.jeladastudios.ftsgeology.compat.FlowingFluidsRivers.keepOut();
         if (!GeyserConfig.SUGGEST_OPTIONAL_MODS.get()) return;
         if (com.jeladastudios.ftsgeology.eruption.EruptionHandler.hasFiniteWater()) return;
         event.getEntity().sendSystemMessage(
