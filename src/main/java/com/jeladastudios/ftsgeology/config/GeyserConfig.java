@@ -150,6 +150,7 @@ public final class GeyserConfig {
     public static final ModConfigSpec.BooleanValue OCEANIC_RIDGE_ENABLED;
     public static final ModConfigSpec.BooleanValue GEOLOGY_AT_GENERATION; // deep geology written as chunks generate
     public static final ModConfigSpec.BooleanValue ORE_GENESIS_ENABLED;   // ore laid down by tectonic setting
+    public static final ModConfigSpec.BooleanValue ORE_OUTCROPS;          // large ore bodies that crop out, their float
     public static final ModConfigSpec.BooleanValue PETROLEUM;             // oil and gas fields in the basins
     public static final ModConfigSpec.DoubleValue PETROLEUM_CHANCE;       // share of basin grid cells with a field
     public static final ModConfigSpec.BooleanValue FOSSIL_BEDS;            // Jurassic Reborn fossils laid by the geology
@@ -815,6 +816,13 @@ public final class GeyserConfig {
                         "seams in the quiet basins between. Applies to chunks that have not had their",
                         "deep geology yet; it never touches player blocks.")
                 .define("oreGenesisEnabled", true);
+        ORE_OUTCROPS = b
+                .comment("Large ore bodies that reach the ground: porphyry copper on the arcs over a pluton, its top rotted to",
+                        "a rusty gossan stained green and blue with malachite and azurite, and gold-bearing quartz reefs along",
+                        "the collision belts. The streams below them carry pieces of them down their banks for a few hundred",
+                        "blocks, and gold into the gravel of their beds below a reef. Seen only where the ground is bare rock.",
+                        "The mod's own world type, worlds made with 0.11.3 or later; off, new chunks get none.")
+                .define("oreOutcrops", true);
         PETROLEUM = b
                 .comment("Oil and gas fields in the sedimentary basins: a dome of reservoir sandstone under shale, gas at",
                         "its top, oil-soaked sandstone under it, water below. Broken into, its gas comes out under the",

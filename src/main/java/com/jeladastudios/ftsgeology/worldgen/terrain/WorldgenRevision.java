@@ -85,8 +85,10 @@ public final class WorldgenRevision {
     /** A hole on a big cone's flank cut down with the ground round it and roofed under the profile, not at its rim, and a
      * hollow half seen at a chunk's edge not taken for a hole (round 151). */
     public static final int CUT_ROOFS = 18;
+    /** Large ore bodies that crop out on bare rock, their float and placer down the streams (round 159). */
+    public static final int ORE_BODIES = 19;
     /** What a world made now gets. */
-    public static final int CURRENT = 18;
+    public static final int CURRENT = 19;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;

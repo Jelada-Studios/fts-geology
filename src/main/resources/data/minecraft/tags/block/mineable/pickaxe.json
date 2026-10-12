@@ -103,6 +103,18 @@
     "fts_geology:oil_sandstone",
     "fts_geology:gas_seep",
     "fts_geology:wellhead",
+    "fts_geology:gold_quartz",
+    "fts_geology:gold_gneiss",
+    "fts_geology:gold_schist",
+    "fts_geology:copper_porphyry",
+    "fts_geology:pyrite_rock",
+    "fts_geology:malachite_rock",
+    "fts_geology:azurite_rock",
+    "fts_geology:gossan_brown",
+    "fts_geology:gossan_orange",
+    "fts_geology:gossan_yellow",
+    "fts_geology:copper_float",
+    "fts_geology:gold_float",
     {"id": "fts_geology:crankshaft", "required": false}
   ]
 }

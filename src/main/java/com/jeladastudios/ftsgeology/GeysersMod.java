@@ -156,6 +156,7 @@ public class GeysersMod {
         com.jeladastudios.ftsgeology.blockentity.GeyserCoreBlockEntity.clearAll();
         com.jeladastudios.ftsgeology.worldgen.LavaTubes.clear();
         com.jeladastudios.ftsgeology.worldgen.OreGenesis.clear();
+        com.jeladastudios.ftsgeology.worldgen.OreOutcrops.clear();
         com.jeladastudios.ftsgeology.worldgen.GeothermalBasin.clear();
         com.jeladastudios.ftsgeology.worldgen.RetrogenHandler.clear();
         TfcCompat.clear();
@@ -241,6 +242,19 @@ public class GeysersMod {
             event.accept(ModItems.QUARTZ_VEIN.get());
             event.accept(ModItems.CINNABAR.get());
             event.accept(ModItems.GALENA.get());
+            event.accept(ModItems.GOLD_QUARTZ.get());
+            event.accept(ModItems.GOLD_GNEISS.get());
+            event.accept(ModItems.GOLD_SCHIST.get());
+            event.accept(ModItems.COPPER_PORPHYRY.get());
+            event.accept(ModItems.PYRITE_ROCK.get());
+            event.accept(ModItems.MALACHITE_ROCK.get());
+            event.accept(ModItems.AZURITE_ROCK.get());
+            event.accept(ModItems.GOSSAN_BROWN.get());
+            event.accept(ModItems.GOSSAN_ORANGE.get());
+            event.accept(ModItems.GOSSAN_YELLOW.get());
+            event.accept(ModItems.GOLD_GRAVEL.get());
+            event.accept(ModItems.COPPER_FLOAT.get());
+            event.accept(ModItems.GOLD_FLOAT.get());
             acceptWorkedRocks(event);
             event.accept(ModItems.MICROBIAL_MAT_ORANGE.get());
             event.accept(ModItems.MICROBIAL_MAT_YELLOW.get());

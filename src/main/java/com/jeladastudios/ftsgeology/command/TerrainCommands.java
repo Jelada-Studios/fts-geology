@@ -928,6 +928,69 @@ public final class TerrainCommands {
         return sorted.get(Math.min(sorted.size() - 1, (int) Math.floor(q * sorted.size())));
     }
 
+    /**
+     * The large ore bodies over a square round here, from the model, without building a chunk: how many of each kind,
+     * how many have streams below them, and the nearest few. Worked out off the server thread; answered in chat and log.
+     */
+    public static int terrainOreBodies(CommandContext<CommandSourceStack> ctx, int half) {
+        ServerLevel level = ctx.getSource().getLevel();
+        BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+        CommandSourceStack src = ctx.getSource();
+        java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            if (!com.jeladastudios.ftsgeology.worldgen.OreOutcrops.active(level)) return "no ore bodies in this world";
+            int porphyry = 0, reef = 0, withStreams = 0;
+            StringBuilder list = new StringBuilder();
+            List<com.jeladastudios.ftsgeology.worldgen.OreOutcrops.Body> bodies =
+                    com.jeladastudios.ftsgeology.worldgen.OreOutcrops.near(level, at.getX(), at.getZ(), (int) Math.round(half * 1.4143));
+            int shown = 0;
+            for (var b : bodies) {
+                if (Math.abs(b.x() - at.getX()) > half || Math.abs(b.z() - at.getZ()) > half) continue;
+                if (b.kind() == com.jeladastudios.ftsgeology.worldgen.OreOutcrops.Kind.PORPHYRY) porphyry++;
+                else reef++;
+                if (shown++ < 12) {
+                    int segs = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.ready()
+                            ? com.jeladastudios.ftsgeology.worldgen.OreOutcrops.path(b).size() : 0;
+                    if (segs > 0) withStreams++;
+                    list.append(String.format(Locale.ROOT, "%n  %s at %d %d %d, reaches %d, %d stream lengths below",
+                            b.kind(), b.x(), b.ground(), b.z(), b.reach(), segs));
+                }
+            }
+            double km2 = (2.0 * half) * (2.0 * half) / 65536.0;
+            return String.format(Locale.ROOT, "ore bodies within %d of %d,%d: %d porphyry, %d reef (%.2f per 256x256), of the nearest 12, %d with streams below%s",
+                    half, at.getX(), at.getZ(), porphyry, reef, (porphyry + reef) / km2, withStreams, list);
+        }, net.minecraft.Util.backgroundExecutor()).thenAccept(out -> {
+            com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(out);
+            src.sendSuccess(() -> Component.literal(out), false);
+        });
+        return 1;
+    }
+
+    /** What the hammer says of a large ore body on striking this block, logged too. */
+    public static int terrainStrike(CommandContext<CommandSourceStack> ctx, BlockPos pos) {
+        ServerLevel level = ctx.getSource().getLevel();
+        CommandSourceStack src = ctx.getSource();
+        net.minecraft.world.level.block.state.BlockState struck = level.getBlockState(pos);
+        String name = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(struck.getBlock()).toString();
+        com.jeladastudios.ftsgeology.instrument.OreBodyReading.read(level, pos, struck).thenAcceptAsync(line -> {
+            String out = String.format(Locale.ROOT, "strike %s at %d %d %d: %s", name, pos.getX(), pos.getY(), pos.getZ(),
+                    line == null ? "nothing on a large body" : line.getString());
+            com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(out);
+            src.sendSuccess(() -> Component.literal(out), false);
+        }, level.getServer());
+        return 1;
+    }
+
+    /** A core drilled down from this block and read out, as the drill would give it, logged too. */
+    public static int terrainCore(CommandContext<CommandSourceStack> ctx, BlockPos pos) {
+        ServerLevel level = ctx.getSource().getLevel();
+        net.minecraft.world.item.ItemStack core = com.jeladastudios.ftsgeology.item.CoreDrillItem.drill(level, pos);
+        StringBuilder sb = new StringBuilder("core at " + pos.getX() + " " + pos.getY() + " " + pos.getZ() + ":");
+        com.jeladastudios.ftsgeology.item.CoreSampleItem.describe(core, level, c -> sb.append("\n  ").append(c.getString()));
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(sb.toString());
+        ctx.getSource().sendSuccess(() -> Component.literal(sb.toString()), false);
+        return 1;
+    }
+
     /** The traced river nearest this column: its channel, the pool over it and the rock bar below it. */
     public static int terrainTrace(CommandContext<CommandSourceStack> ctx) {
         ServerLevel level = ctx.getSource().getLevel();

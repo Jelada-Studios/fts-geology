@@ -128,6 +128,8 @@ public final class OreUnification {
             if (!(id.getNamespace().equals("c") || id.getNamespace().equals("forge")) || !id.getPath().startsWith("ores/")) return;
             String metal = id.getPath().substring(5);
             for (Holder<Block> h : BuiltInRegistries.BLOCK.getTagOrEmpty(tag)) {
+                // The geology's own ore bodies are laid where it means them: never made into another mod's ore.
+                if (BuiltInRegistries.BLOCK.getKey(h.value()).getNamespace().equals(GeysersMod.MODID)) continue;
                 if (!grouped.add(h.value())) continue;          // in another group already: left to that one
                 metals.computeIfAbsent(metal, k -> new HashMap<>()).computeIfAbsent(form(h), k -> new ArrayList<>()).add(h.value());
             }

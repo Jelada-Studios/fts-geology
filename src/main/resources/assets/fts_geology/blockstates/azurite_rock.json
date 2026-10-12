@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "": [
+      { "model": "fts_geology:block/azurite_rock" },
+      { "model": "fts_geology:block/azurite_rock_mirrored" },
+      { "model": "fts_geology:block/azurite_rock", "y": 180 },
+      { "model": "fts_geology:block/azurite_rock_mirrored", "y": 180 }
+    ]
+  }
+}

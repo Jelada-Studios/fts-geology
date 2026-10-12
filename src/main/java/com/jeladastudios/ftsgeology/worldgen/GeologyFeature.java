@@ -65,6 +65,8 @@ public class GeologyFeature extends Feature<NoneFeatureConfiguration> {
             placed += Dolines.generate(level, cp);
             RiverWater.generate(level, cp);
             placed += KarstCaves.generate(level, cp);
+            // After the river water, so pieces of a body can lie in the streams' beds.
+            ore += OreOutcrops.generate(level, cp);
             long t5 = System.nanoTime();
             GenCost.add(GenCost.DEEP, t1 - t0);
             GenCost.add(GenCost.RIDGE, t2 - t1);

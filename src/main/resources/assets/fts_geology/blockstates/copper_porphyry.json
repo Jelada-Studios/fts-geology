@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "": [
+      { "model": "fts_geology:block/copper_porphyry" },
+      { "model": "fts_geology:block/copper_porphyry_mirrored" },
+      { "model": "fts_geology:block/copper_porphyry", "y": 180 },
+      { "model": "fts_geology:block/copper_porphyry_mirrored", "y": 180 }
+    ]
+  }
+}

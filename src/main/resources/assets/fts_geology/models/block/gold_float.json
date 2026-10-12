@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "particle": "fts_geology:block/gold_quartz",
+    "a": "fts_geology:block/gold_quartz",
+    "b": "fts_geology:block/gold_quartz"
+  },
+  "elements": [
+    { "from": [3, 0, 4], "to": [8, 3, 9],
+      "faces": {
+        "north": {"uv": [3, 5, 8, 8], "texture": "#a"}, "south": {"uv": [8, 5, 13, 8], "texture": "#a"},
+        "west": {"uv": [4, 5, 9, 8], "texture": "#a"}, "east": {"uv": [7, 5, 12, 8], "texture": "#a"},
+        "up": {"uv": [3, 4, 8, 9], "texture": "#a"}, "down": {"uv": [3, 4, 8, 9], "texture": "#a", "cullface": "down"}
+      }
+    },
+    { "from": [9, 0, 8], "to": [12, 2, 11],
+      "faces": {
+        "north": {"uv": [9, 6, 12, 8], "texture": "#b"}, "south": {"uv": [4, 6, 7, 8], "texture": "#b"},
+        "west": {"uv": [8, 6, 11, 8], "texture": "#b"}, "east": {"uv": [5, 6, 8, 8], "texture": "#b"},
+        "up": {"uv": [9, 8, 12, 11], "texture": "#b"}, "down": {"uv": [9, 8, 12, 11], "texture": "#b", "cullface": "down"}
+      }
+    },
+    { "from": [6, 0, 11], "to": [8, 1, 13],
+      "faces": {
+        "north": {"uv": [6, 7, 8, 8], "texture": "#a"}, "south": {"uv": [2, 7, 4, 8], "texture": "#a"},
+        "west": {"uv": [11, 7, 13, 8], "texture": "#a"}, "east": {"uv": [1, 7, 3, 8], "texture": "#a"},
+        "up": {"uv": [6, 11, 8, 13], "texture": "#a"}, "down": {"uv": [6, 11, 8, 13], "texture": "#a", "cullface": "down"}
+      }
+    }
+  ]
+}

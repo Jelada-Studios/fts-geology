@@ -296,6 +296,10 @@ public final class InspectCommands {
         if (st.is(ModBlocks.PYRITE.get())) return "command.fts_geology.column.ore.pyrite";
         if (st.is(ModBlocks.CINNABAR.get())) return "command.fts_geology.column.ore.cinnabar";
         if (st.is(ModBlocks.GALENA.get())) return "command.fts_geology.column.ore.galena";
+        if (com.jeladastudios.ftsgeology.worldgen.OreBodyBlocks.kind(st) == com.jeladastudios.ftsgeology.worldgen.OreBodyBlocks.Kind.PORPHYRY)
+            return "command.fts_geology.column.ore.porphyry_body";
+        if (com.jeladastudios.ftsgeology.worldgen.OreBodyBlocks.kind(st) == com.jeladastudios.ftsgeology.worldgen.OreBodyBlocks.Kind.REEF)
+            return "command.fts_geology.column.ore.reef_body";
         // Vanilla ores get no story: a column cannot tell a vein this laid from one vanilla scattered.
         return null;
     }
@@ -317,6 +321,25 @@ public final class InspectCommands {
      * Prints the vertical section under the player, bedrock to surface, so generation can be checked
      * without digging.
      */
+    /** A soil sample of the ground under the source, as the hammer takes it: for checking without a player. */
+    static int soil(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+        ServerLevel level = source.getLevel();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        int top = com.jeladastudios.ftsgeology.worldgen.TerrainProbe.groundY(level, at.getX(), at.getZ());
+        if (top == Integer.MIN_VALUE) top = level.getHeight(
+                net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, at.getX(), at.getZ()) - 1;
+        BlockPos ground = new BlockPos(at.getX(), top, at.getZ());
+        net.minecraft.world.level.block.state.BlockState st = level.getBlockState(ground);
+        String head = "soil sample at " + ground.getX() + " " + ground.getY() + " " + ground.getZ() + " ("
+                + net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(st.getBlock()) + ")";
+        source.sendSuccess(() -> Component.literal(head), false);
+        for (Component line : com.jeladastudios.ftsgeology.instrument.SoilSampling.read(level, ground)) {
+            source.sendSuccess(() -> line, false);
+        }
+        return 1;
+    }
+
     static int column(CommandContext<CommandSourceStack> ctx) {
         CommandSourceStack source = ctx.getSource();
         ServerLevel level = source.getLevel();

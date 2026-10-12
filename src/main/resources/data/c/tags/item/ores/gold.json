@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:gold_quartz",
+    "fts_geology:gold_gneiss",
+    "fts_geology:gold_schist"
+  ]
+}

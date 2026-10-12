@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1.0,
+      "bonus_rolls": 0.0,
+      "entries": [{"type": "minecraft:item", "functions": [{"function": "minecraft:explosion_decay"}], "name": "fts_geology:gossan_brown"}],
+      "conditions": [{"condition": "minecraft:survives_explosion"}]
+    },
+    {
+      "rolls": 1.0,
+      "bonus_rolls": 0.0,
+      "conditions": [{"condition": "minecraft:inverted", "term": {"condition": "minecraft:match_tool", "predicate": {"predicates": {"minecraft:enchantments": [{"enchantments": "minecraft:silk_touch", "levels": {"min": 1}}]}}}}, {"condition": "minecraft:random_chance", "chance": 0.3}],
+      "entries": [{"type": "minecraft:item", "functions": [{"function": "minecraft:set_count", "count": {"type": "minecraft:uniform", "min": 1, "max": 2}, "add": false}, {"function": "minecraft:apply_bonus", "enchantment": "minecraft:fortune", "formula": "minecraft:uniform_bonus_count", "parameters": {"bonusMultiplier": 1}}, {"function": "minecraft:explosion_decay"}], "name": "minecraft:iron_nugget"}]
+    }
+  ]
+}

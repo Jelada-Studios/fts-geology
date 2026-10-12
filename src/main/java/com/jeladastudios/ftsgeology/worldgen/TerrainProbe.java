@@ -46,6 +46,7 @@ public final class TerrainProbe {
                 || s.is(Blocks.SWEET_BERRY_BUSH) || s.is(Blocks.LILY_PAD)
                 || s.is(Blocks.SEAGRASS) || s.is(Blocks.TALL_SEAGRASS) || s.is(Blocks.KELP)
                 || s.is(Blocks.KELP_PLANT)
+                || s.getBlock() instanceof com.jeladastudios.ftsgeology.block.OreFloatBlock
                 || modPlant(s);
     }
 

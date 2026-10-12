@@ -356,6 +356,102 @@ public final class ModBlocks {
                     .strength(3.0F, 3.0F)
                     .requiresCorrectToolForDrops()));
 
+    // --- Ore bodies (0.11.3) -------------------------------------------------
+    //
+    // The large bodies that crop out on bare rock (OreOutcrops): the ore lies in the body's own rock as grains, the way
+    // a prospector meets it, not as a block of pure ore.
+
+    /** Gold-bearing quartz: the rich shoots of a reef, milky quartz with grains of native gold. */
+    public static final DeferredHolder<Block, Block> GOLD_QUARTZ = BLOCKS.register("gold_quartz",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
+                    .mapColor(MapColor.QUARTZ)
+                    .strength(3.0F, 3.0F)
+                    .requiresCorrectToolForDrops()));
+
+    /** Gneiss beside a reef, specked with the gold the reef's fluids left in it. */
+    public static final DeferredHolder<Block, Block> GOLD_GNEISS = BLOCKS.register("gold_gneiss",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
+                    .mapColor(MapColor.TERRACOTTA_LIGHT_GRAY)
+                    .strength(3.0F, 3.0F)
+                    .requiresCorrectToolForDrops()));
+
+    /** Schist beside a reef, specked with gold. */
+    public static final DeferredHolder<Block, Block> GOLD_SCHIST = BLOCKS.register("gold_schist",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
+                    .mapColor(MapColor.TERRACOTTA_GREEN)
+                    .strength(3.0F, 3.0F)
+                    .requiresCorrectToolForDrops()));
+
+    /** The core of a porphyry copper body: pink porphyry with brassy grains of chalcopyrite. */
+    public static final DeferredHolder<Block, Block> COPPER_PORPHYRY = BLOCKS.register("copper_porphyry",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
+                    .mapColor(MapColor.TERRACOTTA_PINK)
+                    .strength(3.0F, 3.0F)
+                    .requiresCorrectToolForDrops()));
+
+    /** The pyrite shell round a porphyry: rock the fluids bleached, peppered with pyrite. */
+    public static final DeferredHolder<Block, Block> PYRITE_ROCK = BLOCKS.register("pyrite_rock",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
+                    .mapColor(MapColor.STONE)
+                    .strength(3.0F, 3.0F)
+                    .requiresCorrectToolForDrops()));
+
+    /** Rock crusted with green malachite where a copper body weathers at the surface. */
+    public static final DeferredHolder<Block, Block> MALACHITE_ROCK = BLOCKS.register("malachite_rock",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
+                    .mapColor(MapColor.COLOR_GREEN)
+                    .strength(2.5F, 3.0F)
+                    .requiresCorrectToolForDrops()));
+
+    /** Rock crusted with blue azurite, beside the malachite. */
+    public static final DeferredHolder<Block, Block> AZURITE_ROCK = BLOCKS.register("azurite_rock",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
+                    .mapColor(MapColor.COLOR_BLUE)
+                    .strength(2.5F, 3.0F)
+                    .requiresCorrectToolForDrops()));
+
+    /** Gossan: the rusted, rotten top of a sulfide body, iron oxides in browns, oranges and yellows. */
+    public static final DeferredHolder<Block, Block> GOSSAN_BROWN = BLOCKS.register("gossan_brown",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
+                    .mapColor(MapColor.TERRACOTTA_BROWN)
+                    .strength(1.5F, 3.0F)
+                    .requiresCorrectToolForDrops()));
+    public static final DeferredHolder<Block, Block> GOSSAN_ORANGE = BLOCKS.register("gossan_orange",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
+                    .mapColor(MapColor.TERRACOTTA_ORANGE)
+                    .strength(1.5F, 3.0F)
+                    .requiresCorrectToolForDrops()));
+    public static final DeferredHolder<Block, Block> GOSSAN_YELLOW = BLOCKS.register("gossan_yellow",
+            () -> new Block(BlockBehaviour.Properties.ofLegacyCopy(Blocks.STONE)
+                    .mapColor(MapColor.TERRACOTTA_YELLOW)
+                    .strength(1.5F, 3.0F)
+                    .requiresCorrectToolForDrops()));
+
+    /** Gold-bearing gravel: a stream's bed below a reef, with gold among the pebbles. A placer, to be panned or dug. */
+    public static final DeferredHolder<Block, Block> GOLD_GRAVEL = BLOCKS.register("gold_gravel",
+            () -> new net.minecraft.world.level.block.ColoredFallingBlock(new net.minecraft.util.ColorRGBA(-8356741), BlockBehaviour.Properties.ofLegacyCopy(Blocks.GRAVEL)
+                    .mapColor(MapColor.STONE)));
+
+    /** Float: pieces of a copper body lying on a stream's bank downstream of it. */
+    public static final DeferredHolder<Block, Block> COPPER_FLOAT = BLOCKS.register("copper_float",
+            () -> new com.jeladastudios.ftsgeology.block.OreFloatBlock(BlockBehaviour.Properties.of()
+                    .sound(SoundType.STONE)
+                    .mapColor(MapColor.COLOR_GREEN)
+                    .strength(0.3F)
+                    .noCollission()
+                    .noOcclusion()
+                    .pushReaction(net.minecraft.world.level.material.PushReaction.DESTROY)));
+
+    /** Float: pieces of a gold-bearing reef, quartz with gold in it, on a stream's bank downstream. */
+    public static final DeferredHolder<Block, Block> GOLD_FLOAT = BLOCKS.register("gold_float",
+            () -> new com.jeladastudios.ftsgeology.block.OreFloatBlock(BlockBehaviour.Properties.of()
+                    .sound(SoundType.STONE)
+                    .mapColor(MapColor.QUARTZ)
+                    .strength(0.3F)
+                    .noCollission()
+                    .noOcclusion()
+                    .pushReaction(net.minecraft.world.level.material.PushReaction.DESTROY)));
+
     // --- Worked rock forms (polished, slab, stairs, wall) -------------------
 
     public static final DeferredHolder<Block, Block> POLISHED_TRAVERTINE = BLOCKS.register("polished_travertine",

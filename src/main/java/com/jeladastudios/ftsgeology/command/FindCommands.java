@@ -117,6 +117,16 @@ public final class FindCommands {
                     String.format(java.util.Locale.ROOT, "%.3f", f.sour()), String.format(java.util.Locale.ROOT, "%.2f", f.richness()));
             return f == null ? null : new Hit(f.x(), f.z(), (int) Math.round(Math.hypot(f.x() - at.getX(), f.z() - at.getZ())));
         }
+        // A large ore body: one of a seeded grid, where the rock allows it.
+        if (what.equals("porphyry") || what.equals("reef")) {
+            if (!com.jeladastudios.ftsgeology.worldgen.OreOutcrops.active(level)) return null;
+            var b = com.jeladastudios.ftsgeology.worldgen.OreOutcrops.nearest(level, at.getX(), at.getZ(),
+                    what.equals("porphyry") ? com.jeladastudios.ftsgeology.worldgen.OreOutcrops.Kind.PORPHYRY
+                            : com.jeladastudios.ftsgeology.worldgen.OreOutcrops.Kind.REEF, 12000);
+            if (b != null) GeysersMod.LOGGER.info("ore body at {} {} {}: {}, reaches {} blocks, down to Y {}", b.x(), b.ground(), b.z(),
+                    b.kind(), b.reach(), b.bottom());
+            return b == null ? null : new Hit(b.x(), b.z(), (int) Math.round(Math.hypot(b.x() - at.getX(), b.z() - at.getZ())));
+        }
         // Natural hydrogen: a lens on a seeded grid, in an ophiolite's mantle rock only.
         if (what.equals("hydrogen")) {
             BlockPos h = com.jeladastudios.ftsgeology.gas.world.HydrogenTraps.nearest(level, at.getX(), at.getZ(), 8000);

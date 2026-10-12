@@ -127,6 +127,34 @@ public final class ModItems {
     public static final DeferredHolder<Item, Item> GALENA = ITEMS.register("galena",
             () -> new BlockItem(ModBlocks.GALENA.get(), new Item.Properties()));
 
+    // Ore bodies (0.11.3)
+    public static final DeferredHolder<Item, Item> GOLD_QUARTZ = ITEMS.register("gold_quartz",
+            () -> new BlockItem(ModBlocks.GOLD_QUARTZ.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, Item> GOLD_GNEISS = ITEMS.register("gold_gneiss",
+            () -> new BlockItem(ModBlocks.GOLD_GNEISS.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, Item> GOLD_SCHIST = ITEMS.register("gold_schist",
+            () -> new BlockItem(ModBlocks.GOLD_SCHIST.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, Item> COPPER_PORPHYRY = ITEMS.register("copper_porphyry",
+            () -> new BlockItem(ModBlocks.COPPER_PORPHYRY.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, Item> PYRITE_ROCK = ITEMS.register("pyrite_rock",
+            () -> new BlockItem(ModBlocks.PYRITE_ROCK.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, Item> MALACHITE_ROCK = ITEMS.register("malachite_rock",
+            () -> new BlockItem(ModBlocks.MALACHITE_ROCK.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, Item> AZURITE_ROCK = ITEMS.register("azurite_rock",
+            () -> new BlockItem(ModBlocks.AZURITE_ROCK.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, Item> GOSSAN_BROWN = ITEMS.register("gossan_brown",
+            () -> new BlockItem(ModBlocks.GOSSAN_BROWN.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, Item> GOSSAN_ORANGE = ITEMS.register("gossan_orange",
+            () -> new BlockItem(ModBlocks.GOSSAN_ORANGE.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, Item> GOSSAN_YELLOW = ITEMS.register("gossan_yellow",
+            () -> new BlockItem(ModBlocks.GOSSAN_YELLOW.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, Item> GOLD_GRAVEL = ITEMS.register("gold_gravel",
+            () -> new BlockItem(ModBlocks.GOLD_GRAVEL.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, Item> COPPER_FLOAT = ITEMS.register("copper_float",
+            () -> new BlockItem(ModBlocks.COPPER_FLOAT.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, Item> GOLD_FLOAT = ITEMS.register("gold_float",
+            () -> new BlockItem(ModBlocks.GOLD_FLOAT.get(), new Item.Properties()));
+
     // --- Worked rock forms (polished, slab, stairs, wall) -------------------
 
     public static final DeferredHolder<Item, Item> POLISHED_TRAVERTINE = ITEMS.register("polished_travertine",

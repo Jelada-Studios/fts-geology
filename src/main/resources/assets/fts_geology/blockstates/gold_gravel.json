@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "": [
+      { "model": "fts_geology:block/gold_gravel" },
+      { "model": "fts_geology:block/gold_gravel_mirrored" },
+      { "model": "fts_geology:block/gold_gravel", "y": 180 },
+      { "model": "fts_geology:block/gold_gravel_mirrored", "y": 180 }
+    ]
+  }
+}

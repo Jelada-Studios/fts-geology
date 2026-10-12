@@ -61,6 +61,7 @@ public final class TectonicCommands {
                         .then(Commands.literal("plate").executes(InspectCommands::plate))
                         .then(Commands.literal("suitability").executes(InspectCommands::suitability))
                         .then(Commands.literal("column").executes(InspectCommands::column))
+                        .then(Commands.literal("soil").executes(InspectCommands::soil))
                         .then(BuiltCommands.node())
                         .then(Commands.literal("slope").executes(ctx -> {
                             BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
@@ -191,6 +192,20 @@ public final class TectonicCommands {
                                                         .executes(ctx -> TerrainCommands.terrainGrid(ctx,
                                                                 IntegerArgumentType.getInteger(ctx, "half"),
                                                                 IntegerArgumentType.getInteger(ctx, "step"))))))
+                                // The large ore bodies over a square, from the model: how many of each kind, and where.
+                                .then(Commands.literal("orebodies")
+                                        .then(Commands.argument("half", IntegerArgumentType.integer(64, 20000))
+                                                .executes(ctx -> TerrainCommands.terrainOreBodies(ctx,
+                                                        IntegerArgumentType.getInteger(ctx, "half")))))
+                                // What the hammer and the core drill say at a block, without a player: for tests.
+                                .then(Commands.literal("strike")
+                                        .then(Commands.argument("pos", net.minecraft.commands.arguments.coordinates.BlockPosArgument.blockPos())
+                                                .executes(ctx -> TerrainCommands.terrainStrike(ctx,
+                                                        net.minecraft.commands.arguments.coordinates.BlockPosArgument.getLoadedBlockPos(ctx, "pos")))))
+                                .then(Commands.literal("core")
+                                        .then(Commands.argument("pos", net.minecraft.commands.arguments.coordinates.BlockPosArgument.blockPos())
+                                                .executes(ctx -> TerrainCommands.terrainCore(ctx,
+                                                        net.minecraft.commands.arguments.coordinates.BlockPosArgument.getLoadedBlockPos(ctx, "pos")))))
                                 // The alluvial plains as bodies of ground, by the old rule and today's.
                                 .then(Commands.literal("plains")
                                         .then(Commands.argument("half", IntegerArgumentType.integer(64, 16000))
@@ -515,7 +530,7 @@ public final class TectonicCommands {
     }
 
     static final String[] SETTINGS = {"subduction", "rift", "collision", "transform", "hotspot", "tube", "valley",
-            "everest", "k2", "matterhorn", "sinkhole", "swallowhole", "oil", "fossils", "hydrogen"};
+            "everest", "k2", "matterhorn", "sinkhole", "swallowhole", "oil", "fossils", "hydrogen", "porphyry", "reef"};
     static final String[] FAULTS = {"subduction", "rift", "collision", "transform"};
     static final String[] VOLCANO_TYPES = {"strato", "shield", "fissure", "caldera", "island", "flooded", "eroded", "atoll",
             "guyot", "active", "dormant", "extinct"};
