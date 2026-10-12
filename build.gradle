@@ -3,7 +3,7 @@ plugins {
     id 'net.neoforged.moddev' version '2.0.78'
 }
 
-version = '0.11.2'
+version = '0.11.3'
 group = 'com.jeladastudios.ftsgeology'
 
 base {

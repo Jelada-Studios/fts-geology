@@ -584,6 +584,12 @@
 	#seams in the quiet basins between. Applies to chunks that have not had their
 	#deep geology yet; it never touches player blocks.
 	oreGenesisEnabled = true
+	#Large ore bodies that reach the ground: porphyry copper on the arcs over a pluton, its top rotted to
+	#a rusty gossan stained green and blue with malachite and azurite, and gold-bearing quartz reefs along
+	#the collision belts. The streams below them carry pieces of them down their banks for a few hundred
+	#blocks, and gold into the gravel of their beds below a reef. Seen only where the ground is bare rock.
+	#The mod's own world type, worlds made with 0.11.3 or later; off, new chunks get none.
+	oreOutcrops = true
 	#Oil and gas fields in the sedimentary basins: a dome of reservoir sandstone under shale, gas at
 	#its top, oil-soaked sandstone under it, water below. Broken into, its gas comes out under the
 	#pressure of its depth. With Create Diesel Generators the pumpjack finds oil over the fields only.
