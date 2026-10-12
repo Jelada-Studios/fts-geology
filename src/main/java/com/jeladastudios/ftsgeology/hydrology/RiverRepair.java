@@ -294,8 +294,11 @@ public final class RiverRepair {
                     // A block of the river's water left running (another mod moved it) is laid again as the still water it is.
                     if (s.is(ModBlocks.RIVER_WATER.get()) && s.getFluidState().isSource()) continue;
                     if (placed.contains(m.asLong())) break;
+                    // Ordinary water standing in the channel above the sea (a bucket emptied into it, or a hole a broken
+                    // block left, which before 0.11.3's fix filled with it and ran without end) is taken into the river.
                     boolean open = s.isAir() || TerrainProbe.isVegetation(s) && !s.is(Blocks.SNOW)
-                            || s.getFluidState().is(FluidTags.WATER) && !s.getFluidState().isSource();
+                            || s.getFluidState().is(FluidTags.WATER) && !s.getFluidState().isSource()
+                            || s.is(Blocks.WATER) && y > level.getSeaLevel();
                     if (!open) {
                         if (s.getFluidState().isSource()) continue;         // the sea's water, or a lake's own
                         break;                                               // something standing in the channel
