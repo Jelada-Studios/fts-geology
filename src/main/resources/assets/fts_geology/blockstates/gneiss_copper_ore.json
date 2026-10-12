@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "": [
+      { "model": "fts_geology:block/gneiss_copper_ore" },
+      { "model": "fts_geology:block/gneiss_copper_ore_mirrored" },
+      { "model": "fts_geology:block/gneiss_copper_ore", "y": 180 },
+      { "model": "fts_geology:block/gneiss_copper_ore_mirrored", "y": 180 }
+    ]
+  }
+}

@@ -3,6 +3,16 @@
   "values": [
     "fts_geology:gold_quartz",
     "fts_geology:gold_gneiss",
-    "fts_geology:gold_schist"
+    "fts_geology:gold_schist",
+    "fts_geology:peridotite_diamond_ore",
+    "fts_geology:schist_emerald_ore",
+    "fts_geology:marble_emerald_ore",
+    "fts_geology:schist_gold_ore",
+    "fts_geology:gneiss_gold_ore",
+    "fts_geology:slate_gold_ore",
+    "fts_geology:quartzite_gold_ore",
+    "fts_geology:rhyolite_gold_ore",
+    "fts_geology:serpentinite_redstone_ore",
+    "fts_geology:rhyolite_redstone_ore"
   ]
 }

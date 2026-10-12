@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:schist_emerald_ore",
+    "fts_geology:marble_emerald_ore"
+  ]
+}

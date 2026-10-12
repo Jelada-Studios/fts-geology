@@ -483,8 +483,15 @@ public final class DeepStructure {
         // Already this rock: skip, since a no-op write through the live chunk still pays every hook.
         if (s.is(block)) return false;
         if (s.is(Blocks.BEDROCK) || EruptionHandler.isPlayerPlaced(s)) return false;
-        // Ore the generator placed before this step stays: the rock grows round it instead of replacing it.
-        if (s.is(net.neoforged.neoforge.common.Tags.Blocks.ORES)) return false;
+        // Ore the generator placed before this step stays: the rock grows round it instead of replacing it, and the ore
+        // takes the rock's look where the rock has an ore of that metal.
+        if (s.is(net.neoforged.neoforge.common.Tags.Blocks.ORES)) {
+            if (!com.jeladastudios.ftsgeology.config.GeyserConfig.ROCK_ORES.get()) return false;
+            BlockState own = com.jeladastudios.ftsgeology.registry.RockOreBlocks.inRock(block.defaultBlockState(), s);
+            if (own == s) return false;
+            level.setBlock(p, own, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+            return true;
+        }
         // Never eat what the mod relies on: a geyser's magma slab and its block entities.
         if (s.is(Blocks.MAGMA_BLOCK) || s.hasBlockEntity()) return false;
         // Only ever replace rock: caves, aquifers and the shape of the terrain are left alone.

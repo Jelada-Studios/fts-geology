@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:schist_copper_ore",
+    "fts_geology:gneiss_copper_ore",
+    "fts_geology:shale_copper_ore",
+    "fts_geology:gabbro_copper_ore",
+    "fts_geology:peridotite_copper_ore",
+    "fts_geology:rhyolite_copper_ore"
+  ]
+}

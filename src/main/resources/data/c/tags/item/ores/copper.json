@@ -3,6 +3,12 @@
   "values": [
     "fts_geology:copper_porphyry",
     "fts_geology:malachite_rock",
-    "fts_geology:azurite_rock"
+    "fts_geology:azurite_rock",
+    "fts_geology:schist_copper_ore",
+    "fts_geology:gneiss_copper_ore",
+    "fts_geology:shale_copper_ore",
+    "fts_geology:gabbro_copper_ore",
+    "fts_geology:peridotite_copper_ore",
+    "fts_geology:rhyolite_copper_ore"
   ]
 }

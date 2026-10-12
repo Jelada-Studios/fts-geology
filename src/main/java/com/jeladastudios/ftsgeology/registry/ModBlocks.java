@@ -615,5 +615,10 @@ public final class ModBlocks {
                 BlockBehaviour.Properties.ofLegacyCopy(like).mapColor(color).strength(1.5F, 3.0F).noOcclusion()));
     }
 
+    // Vanilla's ores in the mod's rocks, after the rocks they copy.
+    static {
+        RockOreBlocks.registerBlocks();
+    }
+
     private ModBlocks() {}
 }

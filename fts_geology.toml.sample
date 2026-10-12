@@ -590,6 +590,11 @@
 	#blocks, and gold into the gravel of their beds below a reef. Seen only where the ground is bare rock.
 	#The mod's own world type, worlds made with 0.11.3 or later; off, new chunks get none.
 	oreOutcrops = true
+	#Vanilla's ores in the mod's rocks take the rock's look, the way Spelunkery does it for granite and
+	#andesite: iron in gneiss, lapis in marble, coal in slate, gold in quartzite. Only the pairs that occur in
+	#nature; any other ore in these rocks stays the stone one. The rocks also take ore where a mod has narrowed
+	#vanilla's ores down to stone and its own rocks. New chunks only; off, they get vanilla's ores as before.
+	rockOres = true
 	#Oil and gas fields in the sedimentary basins: a dome of reservoir sandstone under shale, gas at
 	#its top, oil-soaked sandstone under it, water below. Broken into, its gas comes out under the
 	#pressure of its depth. With Create Diesel Generators the pumpjack finds oil over the fields only.

@@ -381,5 +381,9 @@ public final class ModItems {
     public static final DeferredHolder<Item, Item> GEOLOGY_MAP = ITEMS.register("geology_map",
             () -> new com.jeladastudios.ftsgeology.item.GeologyMapItem(new Item.Properties()));
 
+    static {
+        RockOreBlocks.registerItems();
+    }
+
     private ModItems() {}
 }

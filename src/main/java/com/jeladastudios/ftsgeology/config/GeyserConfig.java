@@ -150,6 +150,7 @@ public final class GeyserConfig {
     public static final ModConfigSpec.BooleanValue OCEANIC_RIDGE_ENABLED;
     public static final ModConfigSpec.BooleanValue GEOLOGY_AT_GENERATION; // deep geology written as chunks generate
     public static final ModConfigSpec.BooleanValue ORE_GENESIS_ENABLED;   // ore laid down by tectonic setting
+    public static final ModConfigSpec.BooleanValue ROCK_ORES;             // vanilla ores in the mod's rocks, in the rock's own look
     public static final ModConfigSpec.BooleanValue ORE_OUTCROPS;          // large ore bodies that crop out, their float
     public static final ModConfigSpec.BooleanValue PETROLEUM;             // oil and gas fields in the basins
     public static final ModConfigSpec.DoubleValue PETROLEUM_CHANCE;       // share of basin grid cells with a field
@@ -823,6 +824,12 @@ public final class GeyserConfig {
                         "blocks, and gold into the gravel of their beds below a reef. Seen only where the ground is bare rock.",
                         "The mod's own world type, worlds made with 0.11.3 or later; off, new chunks get none.")
                 .define("oreOutcrops", true);
+        ROCK_ORES = b
+                .comment("Vanilla's ores in the mod's rocks take the rock's look, the way Spelunkery does it for granite and",
+                        "andesite: iron in gneiss, lapis in marble, coal in slate, gold in quartzite. Only the pairs that occur in",
+                        "nature; any other ore in these rocks stays the stone one. The rocks also take ore where a mod has narrowed",
+                        "vanilla's ores down to stone and its own rocks. New chunks only; off, they get vanilla's ores as before.")
+                .define("rockOres", true);
         PETROLEUM = b
                 .comment("Oil and gas fields in the sedimentary basins: a dome of reservoir sandstone under shale, gas at",
                         "its top, oil-soaked sandstone under it, water below. Broken into, its gas comes out under the",

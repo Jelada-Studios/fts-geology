@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "lit=false": [
+      { "model": "fts_geology:block/serpentinite_redstone_ore" },
+      { "model": "fts_geology:block/serpentinite_redstone_ore_mirrored" },
+      { "model": "fts_geology:block/serpentinite_redstone_ore", "y": 180 },
+      { "model": "fts_geology:block/serpentinite_redstone_ore_mirrored", "y": 180 }
+    ],
+    "lit=true": [
+      { "model": "fts_geology:block/serpentinite_redstone_ore" },
+      { "model": "fts_geology:block/serpentinite_redstone_ore_mirrored" },
+      { "model": "fts_geology:block/serpentinite_redstone_ore", "y": 180 },
+      { "model": "fts_geology:block/serpentinite_redstone_ore_mirrored", "y": 180 }
+    ]
+  }
+}

@@ -258,6 +258,7 @@ public class GeysersMod {
             event.accept(ModItems.GOLD_GRAVEL.get());
             event.accept(ModItems.COPPER_FLOAT.get());
             event.accept(ModItems.GOLD_FLOAT.get());
+            for (net.neoforged.neoforge.registries.DeferredHolder<net.minecraft.world.item.Item, net.minecraft.world.item.Item> ore : com.jeladastudios.ftsgeology.registry.RockOreBlocks.ITEMS.values()) event.accept(ore.get());
             acceptWorkedRocks(event);
             event.accept(ModItems.MICROBIAL_MAT_ORANGE.get());
             event.accept(ModItems.MICROBIAL_MAT_YELLOW.get());
