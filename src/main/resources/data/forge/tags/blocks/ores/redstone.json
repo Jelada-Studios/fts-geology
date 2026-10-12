@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:serpentinite_redstone_ore",
+    "fts_geology:rhyolite_redstone_ore"
+  ]
+}

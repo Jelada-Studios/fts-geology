@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:slate_coal_ore",
+    "fts_geology:shale_coal_ore"
+  ]
+}

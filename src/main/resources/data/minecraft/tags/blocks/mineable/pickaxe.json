@@ -1,4 +1,5 @@
 {
+  "replace": false,
   "values": [
     "fts_geology:geothermal_turbine",
     "fts_geology:thermoelectric_generator",
@@ -115,6 +116,36 @@
     "fts_geology:gossan_yellow",
     "fts_geology:copper_float",
     "fts_geology:gold_float",
-    {"id": "fts_geology:crankshaft", "required": false}
+    "id",
+    "fts_geology:crankshaft",
+    "required",
+    "fts_geology:schist_gold_ore",
+    "fts_geology:schist_emerald_ore",
+    "fts_geology:schist_iron_ore",
+    "fts_geology:schist_copper_ore",
+    "fts_geology:gneiss_iron_ore",
+    "fts_geology:gneiss_gold_ore",
+    "fts_geology:gneiss_lapis_ore",
+    "fts_geology:gneiss_copper_ore",
+    "fts_geology:slate_coal_ore",
+    "fts_geology:slate_gold_ore",
+    "fts_geology:slate_iron_ore",
+    "fts_geology:shale_coal_ore",
+    "fts_geology:shale_iron_ore",
+    "fts_geology:shale_copper_ore",
+    "fts_geology:quartzite_gold_ore",
+    "fts_geology:quartzite_iron_ore",
+    "fts_geology:marble_lapis_ore",
+    "fts_geology:marble_emerald_ore",
+    "fts_geology:gabbro_iron_ore",
+    "fts_geology:gabbro_copper_ore",
+    "fts_geology:peridotite_diamond_ore",
+    "fts_geology:peridotite_copper_ore",
+    "fts_geology:serpentinite_iron_ore",
+    "fts_geology:serpentinite_redstone_ore",
+    "fts_geology:rhyolite_gold_ore",
+    "fts_geology:rhyolite_copper_ore",
+    "fts_geology:rhyolite_redstone_ore",
+    "fts_geology:chert_iron_ore"
   ]
 }

@@ -1093,7 +1093,10 @@ public final class OreGenesis {
         BlockPos p = new BlockPos(x, y, z);
         BlockState s = d.level.getBlockState(p);
         if (s.is(ore) || s.hasBlockEntity() || !host.test(s)) return;
-        d.level.setBlock(p, ore.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+        // In one of the mod's rocks, the rock's own ore of that metal where it has one.
+        BlockState put = com.jeladastudios.ftsgeology.config.GeyserConfig.ROCK_ORES.get()
+                ? com.jeladastudios.ftsgeology.registry.RockOreBlocks.inRock(s, ore.defaultBlockState()) : ore.defaultBlockState();
+        d.level.setBlock(p, put, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
         d.placed++;
     }
 

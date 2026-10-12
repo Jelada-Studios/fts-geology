@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:gneiss_lapis_ore",
+    "fts_geology:marble_lapis_ore"
+  ]
+}

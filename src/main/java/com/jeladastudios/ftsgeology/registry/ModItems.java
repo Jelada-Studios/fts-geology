@@ -379,5 +379,9 @@ public final class ModItems {
     public static final RegistryObject<Item> GEOLOGY_MAP = ITEMS.register("geology_map",
             () -> new com.jeladastudios.ftsgeology.item.GeologyMapItem(new Item.Properties()));
 
+    static {
+        RockOreBlocks.registerItems();
+    }
+
     private ModItems() {}
 }

@@ -1,0 +1,13 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:schist_iron_ore",
+    "fts_geology:gneiss_iron_ore",
+    "fts_geology:slate_iron_ore",
+    "fts_geology:shale_iron_ore",
+    "fts_geology:quartzite_iron_ore",
+    "fts_geology:gabbro_iron_ore",
+    "fts_geology:serpentinite_iron_ore",
+    "fts_geology:chert_iron_ore"
+  ]
+}

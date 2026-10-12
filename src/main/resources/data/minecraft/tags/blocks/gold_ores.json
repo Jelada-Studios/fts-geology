@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:schist_gold_ore",
+    "fts_geology:gneiss_gold_ore",
+    "fts_geology:slate_gold_ore",
+    "fts_geology:quartzite_gold_ore",
+    "fts_geology:rhyolite_gold_ore"
+  ]
+}
