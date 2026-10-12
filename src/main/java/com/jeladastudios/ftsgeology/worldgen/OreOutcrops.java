@@ -14,6 +14,7 @@ import com.jeladastudios.ftsgeology.tectonics.TectonicMap;
 import com.jeladastudios.ftsgeology.util.Diagnostics;
 import com.jeladastudios.ftsgeology.worldgen.lithology.Lithology;
 import com.jeladastudios.ftsgeology.worldgen.terrain.GeologyWorld;
+import com.jeladastudios.ftsgeology.worldgen.terrain.RawGround;
 import com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext;
 import com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision;
 import net.minecraft.core.BlockPos;
@@ -149,7 +150,7 @@ public final class OreOutcrops {
     /** The places of a cell weighed for its body's anchor. */
     private static final int TRIES = 4;
     /** How far apart the heights that tell how broken the ground is are read. */
-    private static final int RELIEF_STEP = 12;
+    private static final int RELIEF_STEP = 16;
 
     /** The kind of body the rock under a point could hold, or null. */
     private static Kind kindAt(int x, int z) {
@@ -160,13 +161,15 @@ public final class OreOutcrops {
         return null;
     }
 
-    /** How broken the ground round a point is: the spread of the generator's heights a few blocks either way. */
-    private static int relief(ServerLevel world, int x, int z, int ground) {
-        int lo = ground, hi = ground;
+    /**
+     * How broken the ground round a point is: the spread of the plate model's surface a few blocks either way. Read off
+     * the model alone, which is cheap; NaN where the model is not bound.
+     */
+    private static double relief(int x, int z) {
+        double lo = Double.MAX_VALUE, hi = -Double.MAX_VALUE;
         for (int i = -1; i <= 1; i++) {
             for (int j = -1; j <= 1; j++) {
-                if (i == 0 && j == 0) continue;
-                int y = OreGenesis.anchorGroundAt(world, x + i * RELIEF_STEP, z + j * RELIEF_STEP);
+                double y = RawGround.heightAt(x + i * RELIEF_STEP, z + j * RELIEF_STEP);
                 lo = Math.min(lo, y);
                 hi = Math.max(hi, y);
             }
@@ -186,18 +189,24 @@ public final class OreOutcrops {
         if (kind == null) return null;
         int g = OreGenesis.anchorGroundAt(world, ax, az);
         if (g < world.getSeaLevel() + 12) return null;       // in the hills and mountains, not under the sea
-        int best = relief(world, ax, az, g);
-        for (int k = 1; k < TRIES; k++) {
+        double best = relief(ax, az);
+        int bx = ax, bz = az;
+        for (int k = 1; k < TRIES && !Double.isNaN(best); k++) {
             int x = cellX * CELL + 32 + (int) (die(h, 20 + 2 * k) * (CELL - 64));
             int z = cellZ * CELL + 32 + (int) (die(h, 21 + 2 * k) * (CELL - 64));
-            if (kindAt(x, z) != kind) continue;
-            int ground = OreGenesis.anchorGroundAt(world, x, z);
-            if (ground < world.getSeaLevel() + 12) continue;
-            int r = relief(world, x, z, ground);
+            if (kindAt(x, z) != kind || RawGround.heightAt(x, z) < world.getSeaLevel() + 12) continue;
+            double r = relief(x, z);
             if (r > best) {
                 best = r;
-                ax = x;
-                az = z;
+                bx = x;
+                bz = z;
+            }
+        }
+        if (bx != ax || bz != az) {
+            int ground = OreGenesis.anchorGroundAt(world, bx, bz);
+            if (ground >= world.getSeaLevel() + 12) {
+                ax = bx;
+                az = bz;
                 g = ground;
             }
         }
