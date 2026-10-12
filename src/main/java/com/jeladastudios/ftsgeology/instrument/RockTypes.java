@@ -108,7 +108,8 @@ public final class RockTypes {
                 || s.is(ModBlocks.PYRITE.get()) || s.is(ModBlocks.CHALCOPYRITE.get())
                 || s.is(ModBlocks.AZURITE.get()) || s.is(ModBlocks.CINNABAR.get())
                 || s.is(ModBlocks.GALENA.get()) || s.is(ModBlocks.MALACHITE.get())
-                || s.is(ModBlocks.QUARTZ_VEIN.get())) {
+                || s.is(ModBlocks.QUARTZ_VEIN.get())
+                || com.jeladastudios.ftsgeology.worldgen.OreBodyBlocks.is(s)) {
             return Rock.ORE;
         }
 

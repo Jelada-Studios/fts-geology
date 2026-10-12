@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "fts_geology:copper_porphyry",
+    "fts_geology:malachite_rock",
+    "fts_geology:azurite_rock"
+  ]
+}

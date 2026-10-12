@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "": [
+      { "model": "fts_geology:block/gold_gneiss" },
+      { "model": "fts_geology:block/gold_gneiss_mirrored" },
+      { "model": "fts_geology:block/gold_gneiss", "y": 180 },
+      { "model": "fts_geology:block/gold_gneiss_mirrored", "y": 180 }
+    ]
+  }
+}
