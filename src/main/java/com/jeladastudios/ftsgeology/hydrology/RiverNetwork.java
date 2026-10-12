@@ -577,6 +577,43 @@ public final class RiverNetwork {
         return out;
     }
 
+    /**
+     * The lengths of river in the open -- a river's own course or one joining another, not a lake, not underground --
+     * that start in a box: where the streams draining a piece of ground set out from it.
+     */
+    public static List<Point> lengthsStartingIn(int x0, int z0, int x1, int z1) {
+        List<Point> out = new ArrayList<>();
+        if (lattice == null) return out;
+        for (int bx = Math.floorDiv(x0, BLOCK); bx <= Math.floorDiv(x1, BLOCK); bx++) {
+            for (int bz = Math.floorDiv(z0, BLOCK); bz <= Math.floorDiv(z1, BLOCK); bz++) {
+                for (Point p : block(bx, bz).points()) {
+                    if (p.lake() || p.sunk()) continue;
+                    if (p.x < x0 || p.x > x1 || p.z < z0 || p.z > z1) continue;
+                    out.add(p);
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * The length the water goes on into where this one ends: the river further down, or the one it joins. Null where it
+     * runs into a lake, goes underground, reaches the sea, or the next length is not known yet.
+     */
+    public static Point downstream(Point p) {
+        if (lattice == null) return null;
+        long end = joint(p.ex, p.ez);
+        Point next = null;
+        for (Point q : block(Math.floorDiv((int) Math.floor(p.ex), BLOCK), Math.floorDiv((int) Math.floor(p.ez), BLOCK)).points()) {
+            if (q == p || joint(q.x, q.z) != end) continue;
+            // A lake or a cave takes what the river carries: nothing is followed past it.
+            if (q.lake() || q.sunk()) return null;
+            // Of two lengths leaving one joint, the river's own course before a join brought in along it.
+            if (next == null || (q.channel() && !next.channel())) next = q;
+        }
+        return next;
+    }
+
     /** Where a length starts or ends, to a sixteenth of a block: two lengths joined end to start share it. */
     public static long joint(float x, float z) {
         return ((long) Math.round(x * 16.0f) << 32) ^ (Math.round(z * 16.0f) & 0xFFFFFFFFL);

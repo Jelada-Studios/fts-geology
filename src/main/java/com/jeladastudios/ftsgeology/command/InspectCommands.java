@@ -294,6 +294,10 @@ public final class InspectCommands {
         if (st.is(ModBlocks.PYRITE.get())) return "command.fts_geology.column.ore.pyrite";
         if (st.is(ModBlocks.CINNABAR.get())) return "command.fts_geology.column.ore.cinnabar";
         if (st.is(ModBlocks.GALENA.get())) return "command.fts_geology.column.ore.galena";
+        if (com.jeladastudios.ftsgeology.worldgen.OreBodyBlocks.kind(st) == com.jeladastudios.ftsgeology.worldgen.OreBodyBlocks.Kind.PORPHYRY)
+            return "command.fts_geology.column.ore.porphyry_body";
+        if (com.jeladastudios.ftsgeology.worldgen.OreBodyBlocks.kind(st) == com.jeladastudios.ftsgeology.worldgen.OreBodyBlocks.Kind.REEF)
+            return "command.fts_geology.column.ore.reef_body";
         // Vanilla ores get no story: a column cannot tell a vein this laid from one vanilla scattered.
         return null;
     }

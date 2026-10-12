@@ -4,7 +4,9 @@ import com.jeladastudios.ftsgeology.advancement.GeologyTrigger;
 import com.jeladastudios.ftsgeology.command.InspectCommands;
 import com.jeladastudios.ftsgeology.config.GeyserConfig;
 import com.jeladastudios.ftsgeology.instrument.RockTypes;
+import com.jeladastudios.ftsgeology.registry.ModBlocks;
 import com.jeladastudios.ftsgeology.registry.ModItems;
+import com.jeladastudios.ftsgeology.worldgen.OreBodyBlocks;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
@@ -100,19 +102,36 @@ public class CoreDrillItem extends Item {
         return stack;
     }
 
+    /** The blocks of a large body that carry its ore: what a grade is counted from. */
+    private static boolean bodyOre(BlockState s) {
+        return s.is(ModBlocks.COPPER_PORPHYRY.get())
+                || s.is(ModBlocks.MALACHITE_ROCK.get())
+                || s.is(ModBlocks.AZURITE_ROCK.get())
+                || s.is(ModBlocks.GOLD_QUARTZ.get())
+                || s.is(ModBlocks.GOLD_GNEISS.get())
+                || s.is(ModBlocks.GOLD_SCHIST.get());
+    }
+
     /** Bores down from {@code top} and returns the core. */
     public static ItemStack drill(ServerLevel level, BlockPos top) {
         int depth = GeyserConfig.CORE_DRILL_DEPTH.get();
         int floor = Math.max(level.getMinBuildHeight(), top.getY() - depth + 1);
-        ListTag beds = new ListTag(), deposits = new ListTag();
+        ListTag beds = new ListTag();
+        java.util.List<CompoundTag> found = new java.util.ArrayList<>();
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         String run = null;
         int count = 0, drilled = 0;
         String lastDeposit = null;
+        // Through a large ore body: where the core enters and leaves it, and how much of it is ore (porphyry, reef).
+        // The quartz, pyrite and chalcopyrite of its veins and its sheet count as the body where they touch it.
+        int[] bodyFrom = {-1, -1}, bodyTo = {-1, -1}, bodyOre = {0, 0};
+        java.util.List<Integer> chalcopyrite = new java.util.ArrayList<>();
+        int veinFrom = -1;
         for (int y = top.getY(); y >= floor; y--) {
             BlockState s = level.getBlockState(m.set(top.getX(), y, top.getZ()));
             if (s.is(Blocks.BEDROCK)) break;
             drilled++;
+            int at = top.getY() - y;
             String name = s.isAir() || !s.getFluidState().isEmpty() ? "void"
                     : BuiltInRegistries.BLOCK.getKey(s.getBlock()).toString();
             if (name.equals(run)) {
@@ -123,17 +142,38 @@ public class CoreDrillItem extends Item {
                 count = 1;
             }
             boolean deposit = RockTypes.classify(s) == RockTypes.Rock.ORE;
-            if (deposit && !name.equals(lastDeposit) && deposits.size() < DEPOSITS) {
+            if (deposit && !name.equals(lastDeposit)) {
                 CompoundTag d = new CompoundTag();
                 d.putString("Block", name);
                 String genesis = InspectCommands.oreGenesisKey(s);
                 if (genesis != null) d.putString("Genesis", genesis);
-                d.putInt("Depth", top.getY() - y);
-                deposits.add(d);
+                d.putInt("Depth", at);
+                found.add(d);
             }
             lastDeposit = deposit ? name : null;
+            boolean vein = s.is(ModBlocks.QUARTZ_VEIN.get()) || s.is(ModBlocks.PYRITE.get()) || s.is(ModBlocks.CHALCOPYRITE.get());
+            if (s.is(ModBlocks.CHALCOPYRITE.get())) chalcopyrite.add(at);
+            OreBodyBlocks.Kind bk = OreBodyBlocks.kind(s);
+            if (bk != OreBodyBlocks.Kind.NONE && !OreBodyBlocks.carried(s)) {
+                int i = bk.ordinal();
+                if (bodyFrom[i] < 0) bodyFrom[i] = veinFrom >= 0 ? veinFrom : at;
+                bodyTo[i] = at;
+                if (bodyOre(s)) bodyOre[i]++;
+            } else if (vein) {
+                for (int i = 0; i < 2; i++) if (bodyFrom[i] >= 0 && bodyTo[i] == at - 1) bodyTo[i] = at;
+            }
+            veinFrom = vein ? (veinFrom >= 0 ? veinFrom : at) : -1;
         }
         if (run != null && beds.size() < BEDS) beds.add(bed(run, count));
+        for (int at : chalcopyrite) if (bodyFrom[0] >= 0 && at >= bodyFrom[0] && at <= bodyTo[0]) bodyOre[0]++;
+        // What lies inside a body is told by the body's own line, not vein by vein.
+        ListTag deposits = new ListTag();
+        for (CompoundTag d : found) {
+            int at = d.getInt("Depth");
+            boolean inside = false;
+            for (int i = 0; i < 2; i++) inside |= bodyFrom[i] >= 0 && at >= bodyFrom[i] && at <= bodyTo[i];
+            if (!inside && deposits.size() < DEPOSITS) deposits.add(d);
+        }
 
         ItemStack core = new ItemStack(ModItems.CORE_SAMPLE.get());
         CompoundTag tag = core.getOrCreateTagElement("Core");
@@ -143,6 +183,17 @@ public class CoreDrillItem extends Item {
         tag.putInt("Drilled", drilled);
         tag.put("Beds", beds);
         tag.put("Deposits", deposits);
+        ListTag bodies = new ListTag();
+        for (int i = 0; i < 2; i++) {
+            if (bodyFrom[i] < 0) continue;
+            CompoundTag b = new CompoundTag();
+            b.putString("Kind", i == 0 ? "porphyry" : "reef");
+            b.putInt("From", bodyFrom[i]);
+            b.putInt("To", bodyTo[i]);
+            b.putInt("Ore", bodyOre[i]);
+            bodies.add(b);
+        }
+        if (!bodies.isEmpty()) tag.put("Bodies", bodies);
         tag.putInt("Water", com.jeladastudios.ftsgeology.hydrology.WaterTable.tableY(level, top.getX(), top.getZ()));
         // How wet the soil was when it was drilled, layer by layer, in hundredths.
         com.jeladastudios.ftsgeology.hydrology.SoilWater.Reading soil =

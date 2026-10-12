@@ -63,6 +63,7 @@ public class CoreSampleItem extends Item {
     static boolean hasDeposit(ItemStack stack) {
         CompoundTag core = stack.getTagElement("Core");
         if (core == null) return false;
+        if (!core.getList("Bodies", Tag.TAG_COMPOUND).isEmpty()) return true;
         for (Tag t : core.getList("Deposits", Tag.TAG_COMPOUND)) {
             if (((CompoundTag) t).contains("Genesis")) return true;
         }
@@ -122,6 +123,16 @@ public class CoreSampleItem extends Item {
                         : Component.translatable("item.fts_geology.core_sample.deposit_plain", at, b.getName()))
                         .withStyle(ChatFormatting.YELLOW));
             }
+        }
+        // A large ore body the core went through: from where to where, and how much of that is ore.
+        for (Tag t : core.getList("Bodies", Tag.TAG_COMPOUND)) {
+            CompoundTag b = (CompoundTag) t;
+            int from = b.getInt("From"), to = b.getInt("To"), blocks = to - from + 1;
+            int grade = (int) Math.round(100.0 * b.getInt("Ore") / Math.max(1, blocks));
+            out.accept(Component.translatable("item.fts_geology.core_sample.body",
+                    Component.translatable("prospect.fts_geology.body.kind." + b.getString("Kind")),
+                    DepthScale.format(from * DepthScale.metresPerBlock()), DepthScale.format((to + 1) * DepthScale.metresPerBlock()),
+                    blocks, grade).withStyle(ChatFormatting.YELLOW));
         }
         int[] soil = core.getIntArray("Soil");
         if (soil.length == 3) {

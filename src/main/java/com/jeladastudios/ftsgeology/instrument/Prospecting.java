@@ -36,6 +36,17 @@ public final class Prospecting {
 
     /** The system this mineral belongs to in this setting, as a translation key. */
     static String system(BlockState s, FaultType setting) {
+        // The large bodies: what part of one this is.
+        if (com.jeladastudios.ftsgeology.worldgen.OreBodyBlocks.is(s)) {
+            if (s.is(ModBlocks.COPPER_FLOAT.get()) || s.is(ModBlocks.GOLD_FLOAT.get())) return "prospect.fts_geology.system.float";
+            if (s.is(ModBlocks.GOLD_GRAVEL.get())) return "prospect.fts_geology.system.placer";
+            if (s.is(ModBlocks.GOSSAN_BROWN.get()) || s.is(ModBlocks.GOSSAN_ORANGE.get()) || s.is(ModBlocks.GOSSAN_YELLOW.get()))
+                return "prospect.fts_geology.system.gossan";
+            if (s.is(ModBlocks.MALACHITE_ROCK.get()) || s.is(ModBlocks.AZURITE_ROCK.get())) return "prospect.fts_geology.system.oxide_cap";
+            if (s.is(ModBlocks.PYRITE_ROCK.get())) return "prospect.fts_geology.system.porphyry_halo";
+            if (s.is(ModBlocks.COPPER_PORPHYRY.get())) return "prospect.fts_geology.system.porphyry_core";
+            return "prospect.fts_geology.system.orogenic_gold";
+        }
         if (s.is(ModBlocks.MALACHITE.get()) || s.is(ModBlocks.AZURITE.get())) return "prospect.fts_geology.system.oxide_cap";
         if (s.is(ModBlocks.CINNABAR.get())) return "prospect.fts_geology.system.epithermal";
         if (s.is(ModBlocks.GALENA.get())) {
