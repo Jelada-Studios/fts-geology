@@ -80,6 +80,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue VOLCANO_BOMBS_MELT_IN_LAVA;
     public static final ForgeConfigSpec.IntValue VOLCANO_CRATER_RADIUS;     // summit crater/lava-pool radius
     public static final ForgeConfigSpec.IntValue VOLCANO_LAVA_BUDGET;       // lava cells per eruption
+    public static final ForgeConfigSpec.IntValue VOLCANO_LAVA_COOL_SECONDS; // seconds a flow runs before its front freezes
     public static final ForgeConfigSpec.BooleanValue QUAKE_TRIGGERS_ERUPTIONS; // big quakes set nearby volcanoes off
     public static final ForgeConfigSpec.DoubleValue QUAKE_ERUPTION_CHANCE;
     public static final ForgeConfigSpec.IntValue QUAKE_ERUPTION_DELAY_MIN_TICKS;
@@ -172,6 +173,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.BooleanValue QUAKE_LANDSLIDES;
     public static final ForgeConfigSpec.BooleanValue RAIN_LANDSLIDES;
     public static final ForgeConfigSpec.DoubleValue RAIN_LANDSLIDE_RATE;
+    public static final ForgeConfigSpec.BooleanValue SLOPE_SUPPORT;          // retaining walls, anchors, drains, trees
     public static final ForgeConfigSpec.DoubleValue AFTERSHOCK_RATE;
     public static final ForgeConfigSpec.IntValue AFTERSHOCK_MAX;
     public static final ForgeConfigSpec.DoubleValue AFTERSHOCK_DAYS;
@@ -256,6 +258,7 @@ public final class GeyserConfig {
     public static final ForgeConfigSpec.DoubleValue TERRAIN_UPLIFT;        // blocks a collision lifts the ground
     public static final ForgeConfigSpec.DoubleValue DEM_HEIGHT_SCALE;      // how much the real mountain crops are exaggerated
     public static final ForgeConfigSpec.BooleanValue LITHOLOGY;           // rock sequences under the ground (own terrain)
+    public static final ForgeConfigSpec.DoubleValue LAYER_THICKNESS, LAYER_TILT, PLUTONS, DIKES, CONTACT_WANDER;
     public static final ForgeConfigSpec.IntValue STEEP_RISE;              // rise in two blocks that bares a slope
     public static final ForgeConfigSpec.IntValue HUMID_STEEP_RISE;        // the same, wet and under the tree line
     public static final ForgeConfigSpec.DoubleValue TALUS_GREENING;       // share of low scree grown over
@@ -439,13 +442,20 @@ public final class GeyserConfig {
                 .comment("Radius of the summit crater / lava pool.")
                 .defineInRange("volcanoCraterRadius", 3, 1, 12);
         VOLCANO_LAVA_BUDGET = b
-                .comment("How many cells of lava one eruption may pour out of the summit.",
-                        "A real flow chills against the ground and stops; left unbounded the crater",
-                        "simply kept welling until the whole flank was molten and the forest was on",
-                        "fire. With a budget you get a tongue of lava that advances down the slope",
-                        "and turns to basalt behind its own front, which is both what happens and",
-                        "what actually looks like an eruption.")
+                .comment("How many cells of lava one eruption may pour out of the summit, one a second while it",
+                        "erupts (so volcanoEruptTicks / 20 caps it too). A real flow chills against the ground and",
+                        "stops; left unbounded the crater kept welling until the whole flank was molten and the forest",
+                        "was on fire. This sets how much ground the flows cover, not how far they run: for longer flows",
+                        "lengthen the eruption (volcanoEruptTicks) and raise volcanoLavaCoolSeconds together.")
                 .defineInRange("volcanoLavaBudget", 24, 0, 400);
+        VOLCANO_LAVA_COOL_SECONDS = b
+                .comment("How long a lava flow runs on before its front chills and stops, in seconds. While a volcano",
+                        "erupts, the lava out of its crater is turned to rock this often, a tongue freezing behind its",
+                        "own front. Lava is slow in Minecraft, so this matters only with a longer eruption: with the",
+                        "default minute (volcanoEruptTicks 1200) the flows reach about 100 to 140 blocks from the summit",
+                        "whatever this is; with three minutes (3600) and 30 here their tongues reach about 200. Over flat",
+                        "ground lava runs only a few blocks, so the flows end near the volcano's foot.")
+                .defineInRange("volcanoLavaCoolSeconds", 3, 1, 60);
         QUAKE_TRIGGERS_ERUPTIONS = b
                 .comment("A large earthquake can set off volcanoes around it once the ground has settled, as the",
                         "1960 Chile earthquake did at Cordon Caulle. Only a volcano with magma to draw on erupts.")
@@ -989,6 +999,13 @@ public final class GeyserConfig {
         RAIN_LANDSLIDE_RATE = b
                 .comment("How often a soaked slope gives way in rain, against the usual (1).")
                 .defineInRange("rainLandslideRate", 1.0, 0.0, 20.0);
+        SLOPE_SUPPORT = b
+                .comment("What holds a slope up against landslides, quake or rain: a retaining wall of stone, brick or",
+                        "concrete at its foot, as high as the ground it holds and set into the ground (a terrace is a stair",
+                        "of them); iron bars or chains driven through the loose cover into the rock; a drain of gravel or",
+                        "pipe sunk into the slope, against slides in rain; and trees, whose roots bind the soil. A thin,",
+                        "low or unfounded wall holds less and can lose its top when the slope comes down against it.")
+                .define("slopeSupport", true);
         QUAKE_AFTERSHOCKS = b
                 .comment("After a quake of magnitude 5.5 or more the fault goes on slipping for days: the few aftershocks",
                         "worth feeling, three to five for most quakes, sooner rather than later (Omori's law), the largest",
@@ -1503,6 +1520,28 @@ public final class GeyserConfig {
                         "belt's gneiss and marble, an arc's ash over its plutons. Off leaves plain stone, and chunks",
                         "generate a little faster.")
                 .define("lithology", true);
+        LAYER_THICKNESS = b
+                .comment("How thick the rock layers are: the beds of a platform, a foreland and a rift's fill, the",
+                        "bands of a fold belt and a shear zone, an arc's lava and ash, a hotspot's flows. 2 doubles them,",
+                        "0.5 halves them. Like every setting of the rock under here, it applies only to chunks generated",
+                        "after the change: in a world already explored, new ground meets old ground at a seam.")
+                .defineInRange("layerThickness", 1.0D, 0.4D, 4.0D);
+        LAYER_TILT = b
+                .comment("How steeply the layers dip: the bands of a fold belt, standing steep by default, and the beds",
+                        "of a foreland, tilted up towards the mountains. 0 lays them flat, 2 doubles the dip.")
+                .defineInRange("layerTilt", 1.0D, 0.0D, 4.0D);
+        PLUTONS = b
+                .comment("How much granite and diorite intrudes from below: the bodies under a fold belt's bands and",
+                        "an arc's volcanoes. 0 leaves none, 2 puts one under most of a belt.")
+                .defineInRange("plutons", 1.0D, 0.0D, 2.0D);
+        DIKES = b
+                .comment("How close together the gabbro dikes of a rift's shoulders stand. 0 leaves none, 2 halves the",
+                        "spacing.")
+                .defineInRange("dikes", 1.0D, 0.0D, 4.0D);
+        CONTACT_WANDER = b
+                .comment("How far the contacts between rocks wander: the block or two by which a bed's top steps up and",
+                        "down, and how much a fold belt's bands meander. 0 makes every contact a straight line.")
+                .defineInRange("contactWander", 1.0D, 0.0D, 4.0D);
         STEEP_RISE = b
                 .comment("How many blocks the ground has to climb across two for a slope to shed its soil and show",
                         "its rock (worlds made with this version on; older ones keep 3). About 56 degrees: no soil",

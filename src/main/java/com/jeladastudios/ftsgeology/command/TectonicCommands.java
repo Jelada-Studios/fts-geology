@@ -61,6 +61,14 @@ public final class TectonicCommands {
                         .then(Commands.literal("suitability").executes(InspectCommands::suitability))
                         .then(Commands.literal("column").executes(InspectCommands::column))
                         .then(Commands.literal("soil").executes(InspectCommands::soil))
+                        .then(BuiltCommands.node())
+                        .then(Commands.literal("slope").executes(ctx -> {
+                            BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+                            String s = com.jeladastudios.ftsgeology.quake.SlopeSupport.describe(ctx.getSource().getLevel(),
+                                    at.getX(), at.getZ());
+                            ctx.getSource().sendSuccess(() -> Component.literal(s), false);
+                            return 1;
+                        }))
                         .then(Commands.literal("water").executes(InspectCommands::water)
                                 .then(Commands.literal("weather")
                                         .then(waterWeather("dry", false))

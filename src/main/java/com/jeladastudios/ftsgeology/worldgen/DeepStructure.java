@@ -210,7 +210,7 @@ public final class DeepStructure {
 
         // The slab: dips away from the trench, sweeping the deep half of the column. It is old sea floor, an
         // ophiolite, with its layers in the order they formed: mantle peridotite at the base, serpentinite where
-        // sea water got into it, gabbro, the basalt of its dykes and pillows, and deep-sea chert on top. It
+        // sea water got into it, gabbro, the basalt of its dikes and pillows, and deep-sea chert on top. It
         // swells and thins over tens of blocks rather than column by column.
         int deepTop = Math.min(top, floor + (int) Math.round((top - floor) * 0.45));
         int slabY = Mth.clamp((int) Math.round(deepTop - across * (deepTop - floor)), floor + 3, deepTop);

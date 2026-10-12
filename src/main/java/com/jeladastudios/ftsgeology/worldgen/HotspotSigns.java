@@ -97,7 +97,7 @@ public final class HotspotSigns {
 
     /**
      * Which way a fracture trace runs: along the fault where a boundary's heat feeds the field, give or take
-     * fifteen degrees; out from the plume over a hotspot, as its dykes run; round the ring fault on a caldera
+     * fifteen degrees; out from the plume over a hotspot, as its dikes run; round the ring fault on a caldera
      * floor; and anywhere at all where none of those holds.
      */
     private static double fieldBearing(ServerLevel model, int x, int z, RandomSource rng) {

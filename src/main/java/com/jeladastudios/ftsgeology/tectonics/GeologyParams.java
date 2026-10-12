@@ -37,18 +37,28 @@ public record GeologyParams(
          * the terrain's own noises. 1 in the normal world type; the tall one is scaled up sideways as much as its
          * mountains are scaled up, or a mountain three times as high stood on the same footing as a wall.
          */
-        double horizontal) {
+        double horizontal,
+        /** How the rock under the ground is laid: layer thickness and dip, plutons, dikes, how far contacts wander. */
+        Layers layers) {
+
+    /**
+     * Scales on the rock sequences of {@link com.jeladastudios.ftsgeology.worldgen.lithology.Lithology}; all 1 lays
+     * them as they always were.
+     */
+    public record Layers(double thickness, double tilt, double plutons, double dikes, double wander) {
+        public static final Layers DEFAULT = new Layers(1.0, 1.0, 1.0, 1.0, 1.0);
+    }
 
     private static final GeologyParams DEFAULTS = new GeologyParams(
             3000.0, 0.8, 220.0, 0.4,
             true, 8500.0, 0.18, 700.0, 320.0,
-            2.5, 140.0, 1.0, 1.0);
+            2.5, 140.0, 1.0, 1.0, Layers.DEFAULT);
 
     /** The same picture {@code h} times wider: every length in blocks scaled, every share and height kept. */
     public GeologyParams scaled(double h) {
         return new GeologyParams(plateScale * h, plateJitter, faultWidth * h, oceanShare,
                 hotspots, hotspotScale * h, hotspotDensity, hotspotRadius * h, hotspotBasinScale * h,
-                beltFactor, uplift, demScale, horizontal * h);
+                beltFactor, uplift, demScale, horizontal * h, layers);
     }
 
     /** The numbers with no config behind them: the config's own defaults, for tests and tools. */
@@ -70,7 +80,9 @@ public record GeologyParams(
                 GeyserConfig.TERRAIN_BELT_FACTOR.get(),
                 GeyserConfig.TERRAIN_UPLIFT.get(),
                 GeyserConfig.DEM_HEIGHT_SCALE.get(),
-                1.0);
+                1.0,
+                new Layers(GeyserConfig.LAYER_THICKNESS.get(), GeyserConfig.LAYER_TILT.get(), GeyserConfig.PLUTONS.get(),
+                        GeyserConfig.DIKES.get(), GeyserConfig.CONTACT_WANDER.get()));
     }
 
     // === The running server's numbers =======================================
