@@ -342,6 +342,8 @@ public final class OreOutcrops {
                 int top = c.ground(x, z);
                 // How deep the rot of the surface goes here: five blocks, give or take.
                 int capDepth = 4 + (int) Math.round(2.0 * (0.5 + 0.5 * noise(x - salt, z + salt, 11.0)));
+                // And how far out from the middle it reaches: a ragged edge, not a round one.
+                double capEdge = 0.86 + 0.10 * noise(x + salt, z - salt, 9.0) + 0.06 * noise(x - salt, z + salt, 3.5);
                 double yr = rr * STRETCH * 1.05;
                 int y0 = Math.max(c.level.getMinBuildHeight() + 2, (int) Math.floor(cy - yr));
                 int y1 = Math.min(top, (int) Math.ceil(cy + yr));
@@ -373,12 +375,13 @@ public final class OreOutcrops {
                     }
                     // Near the surface the sulfides have rotted: the iron to a rusty gossan, the copper to green malachite
                     // and blue azurite where it was, so the stain comes in patches through the rust.
-                    if (top - y < capDepth && r < 0.92 && blk != ModBlocks.QUARTZ_VEIN.get()) {
+                    if (top - y < capDepth && r < capEdge && blk != ModBlocks.QUARTZ_VEIN.get()) {
                         if (copper && r < 0.6) {
                             blk = noise3D(x + 97, y, z - 97, 3.0, 3.0) > 0.0 ? ModBlocks.MALACHITE_ROCK.get() : ModBlocks.AZURITE_ROCK.get();
                         } else {
-                            double n = noise3D(x - 41, y, z + 41, 5.0, 3.0);
-                            blk = n < -0.2 ? ModBlocks.GOSSAN_BROWN.get() : n < 0.25 ? ModBlocks.GOSSAN_ORANGE.get() : ModBlocks.GOSSAN_YELLOW.get();
+                            // The colours in patches a few blocks across, their edges broken.
+                            double n = noise3D(x - 41, y, z + 41, 9.0, 5.0) + 0.35 * noise3D(x + 13, y, z - 13, 3.0, 3.0);
+                            blk = n < -0.25 ? ModBlocks.GOSSAN_BROWN.get() : n < 0.25 ? ModBlocks.GOSSAN_ORANGE.get() : ModBlocks.GOSSAN_YELLOW.get();
                         }
                     }
                     c.set(x, y, z, blk);
