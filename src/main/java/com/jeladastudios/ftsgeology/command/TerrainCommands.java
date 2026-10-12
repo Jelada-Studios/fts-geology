@@ -309,6 +309,62 @@ public final class TerrainCommands {
      * The alluvial plains round here, counted as bodies of ground, by the rule the worlds made before round 129 use and
      * by today's: how many there are, how many of them are small pockets, and how much ground they cover.
      */
+    /**
+     * Where coal may go round here, nothing generated: of the land columns, the share in each rock setting and the
+     * share in a basin where coal formed (see CoalGround), by setting.
+     */
+    static int terrainCoal(CommandContext<CommandSourceStack> ctx, int half, int step) {
+        CommandSourceStack source = ctx.getSource();
+        BlockPos at = BlockPos.containing(source.getPosition());
+        int n = 2 * (half / step) + 1;
+        if ((long) n * n > 250_000) {
+            source.sendFailure(Component.literal("Too many samples: " + (long) n * n + ", keep it under 250000"));
+            return 0;
+        }
+        long seed = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.seed();
+        var params = com.jeladastudios.ftsgeology.worldgen.terrain.TerrainContext.params();
+        var settings = com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.Setting.values();
+        long[] land = new long[settings.length], basin = new long[settings.length];
+        long[] nearest = new long[settings.length];
+        java.util.Arrays.fill(nearest, Long.MAX_VALUE);
+        int[][] where = new int[settings.length][2];
+        long total = 0, sea = 0;
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                int x = at.getX() + (i - n / 2) * step, z = at.getZ() + (j - n / 2) * step;
+                total++;
+                var col = com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.column(seed, params, x, z);
+                if (col.setting() == com.jeladastudios.ftsgeology.worldgen.lithology.Lithology.Setting.OCEAN_FLOOR) {
+                    sea++;
+                    continue;
+                }
+                int k = col.setting().ordinal();
+                land[k]++;
+                if (com.jeladastudios.ftsgeology.worldgen.CoalGround.basin(source.getLevel(), x, z)) {
+                    basin[k]++;
+                    long d2 = (long) (x - at.getX()) * (x - at.getX()) + (long) (z - at.getZ()) * (z - at.getZ());
+                    if (d2 < nearest[k]) { nearest[k] = d2; where[k][0] = x; where[k][1] = z; }
+                }
+            }
+        }
+        long landAll = total - sea, basinAll = 0;
+        for (long b : basin) basinAll += b;
+        StringBuilder sb = new StringBuilder(String.format(Locale.ROOT,
+                "coal ground over %d samples: sea floor %.1f%%; of the land, in a basin %.1f%%", total,
+                100.0 * sea / total, landAll == 0 ? 0 : 100.0 * basinAll / landAll));
+        for (var s : settings) {
+            int k = s.ordinal();
+            if (land[k] == 0) continue;
+            sb.append(String.format(Locale.ROOT, "; %s %.1f%% of land (basin %.0f%%)", s.name().toLowerCase(Locale.ROOT),
+                    100.0 * land[k] / landAll, 100.0 * basin[k] / land[k]));
+            if (basin[k] > 0) sb.append(String.format(Locale.ROOT, " nearest basin %d %d", where[k][0], where[k][1]));
+        }
+        String line = sb.toString();
+        source.sendSuccess(() -> Component.literal(line), false);
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(line);
+        return 1;
+    }
+
     static int terrainPlains(CommandContext<CommandSourceStack> ctx, int half, int step) {
         CommandSourceStack source = ctx.getSource();
         BlockPos at = BlockPos.containing(source.getPosition());

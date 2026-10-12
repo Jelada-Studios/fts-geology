@@ -213,6 +213,13 @@ public final class TectonicCommands {
                                                         .executes(ctx -> TerrainCommands.terrainPlains(ctx,
                                                                 IntegerArgumentType.getInteger(ctx, "half"),
                                                                 IntegerArgumentType.getInteger(ctx, "step"))))))
+                                // Where coal may go: the land in each rock setting and how much of it is basin.
+                                .then(Commands.literal("coal")
+                                        .then(Commands.argument("half", IntegerArgumentType.integer(64, 32000))
+                                                .then(Commands.argument("step", IntegerArgumentType.integer(16, 2048))
+                                                        .executes(ctx -> TerrainCommands.terrainCoal(ctx,
+                                                                IntegerArgumentType.getInteger(ctx, "half"),
+                                                                IntegerArgumentType.getInteger(ctx, "step"))))))
                                 .then(Commands.literal("biomes")
                                         .then(Commands.argument("half", IntegerArgumentType.integer(64, 16000))
                                                 .then(Commands.argument("step", IntegerArgumentType.integer(16, 1024))

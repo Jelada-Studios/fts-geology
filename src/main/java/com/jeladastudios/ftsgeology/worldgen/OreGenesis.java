@@ -194,7 +194,12 @@ public final class OreGenesis {
             BlockPos p = new BlockPos(x, y, z);
             BlockState s = level.getBlockState(p);
             if (s.is(block) || s.hasBlockEntity() || !isHostRock(s)) return;
-            level.setBlock(p, TfcCompat.translate(level, p, block.defaultBlockState()), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+            BlockState put = block.defaultBlockState();
+            // An ore in one of the mod's rocks is that rock's own ore of the metal, where it has one.
+            if (com.jeladastudios.ftsgeology.config.GeyserConfig.ROCK_ORES.get()) {
+                put = com.jeladastudios.ftsgeology.registry.RockOreBlocks.inRock(s, put);
+            }
+            level.setBlock(p, TfcCompat.translate(level, p, put), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
             placed++;
         }
 
@@ -301,6 +306,9 @@ public final class OreGenesis {
      * <p>Presence and height are decided per column, so neighbouring columns differ by at most one
      * block, border or not.</p>
      */
+    /** How far apart the coal measures' seams lie in a basin's cover. */
+    private static final int MEASURE = 12;
+
     private static void sedimentaryBasin(Deposit d) {
         // The heart of an active belt is not a basin. Most chunks are plainly one or the other; only those near
         // the edge ask each column, which gives the edge a ragged line instead of a chunk border.
@@ -331,6 +339,20 @@ public final class OreGenesis {
                         d.set(x, y, z, Blocks.COAL_ORE, 4);
                         d.set(x, y - 1, z, roll(x, y, z, 3) == 0 ? Blocks.COAL_ORE : ModBlocks.SHALE.get(), 4);
                         if (fossils) coalRoof(d, x, y, z, false);
+                    }
+                }
+
+                // The coal measures: where vanilla's scattered coal keeps to the basins (CoalGround), the cover holds a
+                // seam every twelve blocks, most of the way, as the swamps came and went with the sea; on a valley side
+                // a seam crops out as a black band. The rest of the coal the mountains no longer have is here.
+                if (d.own && col != null && com.jeladastudios.ftsgeology.config.GeyserConfig.COAL_IN_BASINS.get()) {
+                    int base = ground - cover;
+                    for (int y0 = Math.floorDiv(base, MEASURE) * MEASURE + MEASURE; y0 < ground - 3; y0 += MEASURE) {
+                        if (noise(x + 31 * y0, z - 17 * y0, 56.0) < -0.2) continue;
+                        int y = y0 + (int) Math.round(2.0 * Math.sin(x * 0.011 + y0) + 2.0 * Math.cos(z * 0.013 - y0));
+                        if (y >= ground - 3 || ground - y >= cover || y <= d.level.getMinBuildHeight() + 10) continue;
+                        d.set(x, y, z, Blocks.COAL_ORE, 3);
+                        if (noise(x - 53 * y0, z + 29 * y0, 40.0) > 0.2) d.set(x, y - 1, z, Blocks.COAL_ORE, 3);
                     }
                 }
 

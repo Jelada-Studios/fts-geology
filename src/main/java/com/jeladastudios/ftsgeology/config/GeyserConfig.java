@@ -151,6 +151,7 @@ public final class GeyserConfig {
     public static final ModConfigSpec.BooleanValue GEOLOGY_AT_GENERATION; // deep geology written as chunks generate
     public static final ModConfigSpec.BooleanValue ORE_GENESIS_ENABLED;   // ore laid down by tectonic setting
     public static final ModConfigSpec.BooleanValue ROCK_ORES;             // vanilla ores in the mod's rocks, in the rock's own look
+    public static final ModConfigSpec.BooleanValue COAL_IN_BASINS;        // coal veins keep to the basins, slate outside them
     public static final ModConfigSpec.BooleanValue ORE_OUTCROPS;          // large ore bodies that crop out, their float
     public static final ModConfigSpec.BooleanValue PETROLEUM;             // oil and gas fields in the basins
     public static final ModConfigSpec.DoubleValue PETROLEUM_CHANCE;       // share of basin grid cells with a field
@@ -830,6 +831,12 @@ public final class GeyserConfig {
                         "nature; any other ore in these rocks stays the stone one. The rocks also take ore where a mod has narrowed",
                         "vanilla's ores down to stone and its own rocks. New chunks only; off, they get vanilla's ores as before.")
                 .define("rockOres", true);
+        COAL_IN_BASINS = b
+                .comment("Coal where coal forms: in the mod's world types a vein of vanilla's coal keeps to the sedimentary basins",
+                        "(foreland, rift and inland basins), in their shale, slate and stone; outside them only slate holds it, as",
+                        "anthracite. Mountain cores, granite, lavas and the sea floor have none. The basins also have their seams.",
+                        "New chunks only; off, coal is scattered through every stone as in vanilla.")
+                .define("coalWhereItForms", true);
         PETROLEUM = b
                 .comment("Oil and gas fields in the sedimentary basins: a dome of reservoir sandstone under shale, gas at",
                         "its top, oil-soaked sandstone under it, water below. Broken into, its gas comes out under the",
