@@ -7,6 +7,8 @@ import com.jeladastudios.ftsgeology.tectonics.PlateSample;
 import com.jeladastudios.ftsgeology.util.SeedHash;
 import com.jeladastudios.ftsgeology.util.ValueNoise;
 import com.jeladastudios.ftsgeology.worldgen.terrain.TerrainFields;
+import com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision;
+import net.minecraft.util.Mth;
 
 /**
  * What the ground is made of under a column, from the plates alone: the rock sequence a geologist would expect of the
@@ -45,10 +47,12 @@ public final class Lithology {
      * @param pluton       the rock of this column's pluton
      * @param dike         whether a dike swarm runs through here
      * @param layers       the config's scales on layer thickness, dip, dikes and wandering contacts
+     * @param foldOffset   how far up or down the folds carry a layer here, in blocks (worlds since FOLDED_BELTS)
+     * @param grade        a fold belt's metamorphic grade here, 0 at its outer edge to 1 in its core
      */
     public record Column(Setting setting, double weight, Setting fallback, double across, double folded, int cover,
                          int plutonTop, int bedShift, Rock basement, Rock pluton, boolean dike, double highFrom,
-                         double highOver, GeologyParams.Layers layers) {
+                         double highOver, GeologyParams.Layers layers, double foldOffset, double grade) {
 
         /**
          * How far up a mountain a column stands, 0 at the foot and 1 at the top.
@@ -64,6 +68,8 @@ public final class Lithology {
 
     /** A pluton this deep or deeper is none at all. */
     private static final int NO_PLUTON = 10_000;
+    /** How fast a granite body's roof falls away towards its edge (worlds since FOLDED_BELTS). */
+    private static final double PLUTON_DOME = 3.0;
 
     public static Column column(long seed, GeologyParams p, int x, int z) {
         PlateSample s = TerrainFields.sampleAt(seed, p, x, z);
@@ -126,16 +132,46 @@ public final class Lithology {
         double plutonCut = layers.plutons() == 1.0 ? 0.1 : 1.0 - 0.9 * layers.plutons();
         int plutonTop = layers.plutons() > 0.0 && granite > plutonCut
                 ? 14 + (int) Math.round(46.0 * (1.0 - granite)) : NO_PLUTON;
+        // A granite body's roof curves down at its edge, a dome rather than a box: stopped at a set depth, its side stood
+        // as a vertical wall through every section of the range.
+        if (plutonTop != NO_PLUTON && WorldgenRevision.has(WorldgenRevision.FOLDED_BELTS)) {
+            plutonTop += (int) Math.round(PLUTON_DOME / (granite - plutonCut + 0.03));
+        }
         double highFrom = 63.0 + 60.0 * p.horizontal(), highOver = 110.0 * p.horizontal();
+        double folded = s.faultDistance() + 14.0 * layers.wander() * noise(seed, x, z, 120.0 * p.horizontal(), 0x2C3DL);
+
+        // Folds. Squeezed between two plates the layers buckle into upright folds whose axes run along the boundary:
+        // tight and steep in the range's core, opener out to its edge, and dying away across the foreland in front of
+        // it. A layer is lifted or lowered by the fold's height here, so its outcrop on a slope runs in arcs and
+        // zigzags, and the axes plunge and swing as the noise moves them along the range.
+        double squeeze;
+        if (setting == Setting.FOLD_BELT) {
+            squeeze = 0.35 + 0.65 * weight;
+        } else if (setting == Setting.FORELAND) {
+            double edge = p.beltFactor();
+            squeeze = 0.35 * (1.0 - smooth((a - edge) / (0.8 * edge)));
+        } else {
+            squeeze = 0.0;
+        }
+        double foldOffset = 0.0;
+        if (squeeze > 0.0) {
+            double wave = FOLD_WAVE * p.horizontal();
+            double theta = 2.0 * Math.PI * folded / wave + Math.PI * noise(seed, x, z, 420.0 * p.horizontal(), 0x5F01L);
+            // A little of the second harmonic leans the folds one way: one limb steeper than the other.
+            foldOffset = 0.6 * squeeze * wave * layers.tilt() * (Math.sin(theta) + 0.25 * Math.sin(2.0 * theta));
+        }
+        // Metamorphic grade: highest in the core, falling outwards; the line between two grades wanders.
+        double grade = setting == Setting.FOLD_BELT
+                ? Mth.clamp(weight + 0.12 * noise(seed, x, z, 60.0 * p.horizontal(), 0x6A3BL), 0.0, 1.0) : 0.0;
         return new Column(setting, weight, fallback, a,
-                s.faultDistance() + 14.0 * layers.wander() * noise(seed, x, z, 120.0 * p.horizontal(), 0x2C3DL),
+                folded,
                 18 + (int) Math.round(26.0 * (0.5 + 0.5 * noise(seed, x, z, 700.0 * p.horizontal(), 0x5E71L))),
                 plutonTop,
                 (int) Math.round(5.0 * noise(seed, x, z, 220.0 * p.horizontal(), 0x3B1FL)),
                 noise(seed, x, z, 160.0 * p.horizontal(), 0x6D0BL) > 0.0 ? Rock.GRANITE : Rock.GNEISS,
                 noise(seed, x, z, 200.0 * p.horizontal(), 0x1E5AL) > 0.0 ? Rock.GRANITE : Rock.DIORITE,
                 noise(seed, x, z, 60.0 * p.horizontal(), 0x44D1L) > 0.2,
-                highFrom, highOver, layers);
+                highFrom, highOver, layers, foldOffset, grade);
     }
 
     /** A thickness in blocks, scaled by the config and never under one. */
@@ -169,8 +205,11 @@ public final class Lithology {
         double wander = c.layers().wander();
         int depth = surface - y + (wander == 1.0 ? step : (int) Math.round(step * wander));
         Setting setting = c.setting();
-        if (c.weight() < 1.0) {
-            // Where one setting gives way to the next, their rocks interfinger in blobs rather than meet at a line.
+        boolean folds = WorldgenRevision.has(WorldgenRevision.FOLDED_BELTS);
+        // Where one setting gives way to the next, their rocks interfinger in blobs rather than meet at a line. Not a
+        // fold belt's in worlds with folds: its grade falls off outwards instead, and pods of flat foreland beds stood
+        // as level stripes of shale and marble high on the mountains.
+        if (c.weight() < 1.0 && !(folds && setting == Setting.FOLD_BELT)) {
             double pick = 0.5 + 0.5 * ValueNoise.noise3D(x + shiftX(seed) + 4096, y, z + shiftZ(seed), POD_SCALE, POD_SCALE);
             if (pick >= c.weight()) setting = give(setting, c.fallback());
         }
@@ -181,10 +220,13 @@ public final class Lithology {
             case PLATFORM -> depth < c.cover() ? bed(c, salt, y + c.bedShift(), PLATFORM_BEDS, PLATFORM_BANDS)
                     : basement(seed, c, x, y, z, depth - c.cover());
             case FOLD_BELT -> depth > c.plutonTop() ? Rock.GRANITE
+                    : folds ? pick(c.grade() > 0.66 ? FOLD_HIGH : c.grade() > 0.33 ? FOLD_MID : FOLD_LOW, salt ^ 0x41L,
+                            Math.floorDiv((int) Math.floor(uneven(y + c.foldOffset())), thick(c, 16)))
                     : pick(FOLD_BANDS, salt ^ 0x40L, Math.floorDiv((int) Math.floor(c.folded() + 0.5 * tilt * y),
                             thick(c, 12)));
             case FORELAND -> depth < c.cover() + 12
-                    ? bed(c, salt ^ 0x50L, y + c.bedShift() + (int) Math.round(0.35 * tilt * c.folded() / 8.0),
+                    ? bed(c, salt ^ 0x50L, y + c.bedShift() + (int) Math.round(0.35 * tilt * c.folded() / 8.0
+                                    + (folds ? c.foldOffset() : 0.0)),
                             FORELAND_BEDS, FORELAND_BANDS)
                     : basement(seed, c, x, y, z, depth - c.cover() - 12);
             // An arc's lavas and ash lie over everything to a good depth; under them, older flows and dikes, and
@@ -359,6 +401,25 @@ public final class Lithology {
             Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.QUARTZITE, Rock.QUARTZITE,
             Rock.MARBLE, Rock.MARBLE, Rock.SCHIST, Rock.SLATE,
             Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP};
+    // A fold belt by metamorphic grade (worlds since FOLDED_BELTS): gneiss and schist in the hot core, schist with the
+    // quartzite and marble the sandstone and limestone became further out, slate at the edge where the mud was only
+    // just cooked. Shale, unmetamorphosed, belongs to the foreland in front of it, not between schist and gneiss.
+    private static final Rock[] FOLD_HIGH = {
+            Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.GNEISS, Rock.SCHIST, Rock.SCHIST, Rock.MARBLE,
+            Rock.QUARTZITE, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP};
+    private static final Rock[] FOLD_MID = {
+            Rock.SCHIST, Rock.SCHIST, Rock.SCHIST, Rock.SCHIST, Rock.GNEISS, Rock.QUARTZITE, Rock.QUARTZITE,
+            Rock.MARBLE, Rock.SCHIST, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP};
+    private static final Rock[] FOLD_LOW = {
+            Rock.SLATE, Rock.SLATE, Rock.SLATE, Rock.SLATE, Rock.SLATE, Rock.QUARTZITE, Rock.MARBLE, Rock.CHERT,
+            Rock.SCHIST, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP};
+    /** A fold's wavelength across its axes, blocks at the normal scale: a ridge of folds every hundred blocks. */
+    private static final double FOLD_WAVE = 96.0;
+
+    /** A layer's level stretched and squeezed in turn, so a fold belt's beds come from eleven to near thirty thick. */
+    private static double uneven(double level) {
+        return level + 5.0 * Math.sin(level * 0.09);
+    }
     private static final Rock[] FORELAND_BEDS = {
             Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.SHALE, Rock.CHERT, Rock.MARBLE,
             Rock.KEEP, Rock.KEEP, Rock.KEEP, Rock.KEEP};

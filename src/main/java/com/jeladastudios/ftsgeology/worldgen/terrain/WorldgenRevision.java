@@ -92,8 +92,11 @@ public final class WorldgenRevision {
      * (round 160). */
     public static final int LENT_SIDES = 20;
     public static final int CAVE_ROOFS = 20;
+    /** A fold belt's layers folded into upright folds along its boundary and laid by metamorphic grade, and a
+     * foreland's beds folding as they near the range (round 161). */
+    public static final int FOLDED_BELTS = 21;
     /** What a world made now gets. */
-    public static final int CURRENT = 20;
+    public static final int CURRENT = 21;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;
