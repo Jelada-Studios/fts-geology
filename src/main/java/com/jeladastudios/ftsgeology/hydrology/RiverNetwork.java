@@ -521,6 +521,9 @@ public final class RiverNetwork {
                 a.lake ? "lake" : "channel", a.distance, a.halfWidth, a.water, a.bed, a.cut,
                 floorAt(x, z) == Double.MAX_VALUE ? "none" : String.format(java.util.Locale.ROOT, "%.1f", floorAt(x, z)),
                 ground == null ? Double.NaN : ground.heightAt(x, z)));
+        if (ground != null) {
+            s.append(String.format(java.util.Locale.ROOT, ", built %.1f, %s", ground.floor(x, z), ground.wet(x, z) ? "wet" : "dry"));
+        }
         for (RiverPieces.LakeMask m : block(Math.floorDiv(x, BLOCK), Math.floorDiv(z, BLOCK)).lakes()) {
             double d = m.distanceToWater(x, z, 40);
             if (d == Double.MAX_VALUE) continue;
@@ -992,6 +995,7 @@ public final class RiverNetwork {
         int j0 = (int) Math.floor((cz - half) / l.cell), j1 = (int) Math.floor((cz + half) / l.cell);
         int channels = 0, heads = 0, mouths = 0, intoLakes = 0, sinks = 0, rising = 0, narrower = 0, overBank = 0;
         int lakes = 0, lakesNoWay = 0, land = 0, flooded = 0, mouthsDry = 0;
+        List<Double> ratios = new ArrayList<>(), changes = new ArrayList<>(), depths = new ArrayList<>();
         String firstDryMouth = "";
         StringBuilder sinkAt = new StringBuilder();
         int[] byArea = new int[12];
@@ -1068,6 +1072,7 @@ public final class RiverNetwork {
                     if (!way) lakesNoWay++;
                 }
                 if (ps.length == 0) continue;
+                widths(ps, ratios, changes, depths);
                 for (int q = 0; q < ps.length; q++) {
                     Point p = ps[q];
                     if (p.lake()) continue;
@@ -1212,7 +1217,48 @@ public final class RiverNetwork {
                 "; dry mouths %d of %d%s; sea nodes dry in the world by depth 0-1,1-2,2-4,4-8,8-16,deeper: %d/%d %d/%d %d/%d %d/%d %d/%d %d/%d",
                 mouthsDry, mouths, firstDryMouth + (sinkAt.length() > 0 ? "; sinks at" + sinkAt : ""), seaDry[0], seaNodes[0], seaDry[1], seaNodes[1], seaDry[2], seaNodes[2],
                 seaDry[3], seaNodes[3], seaDry[4], seaNodes[4], seaDry[5], seaNodes[5]))
+                + shapes(ratios, changes, depths)
                 + swallows(cx - half, cz - half, cx + half, cz + half);
+    }
+
+    /**
+     * For the audit, a node's own channel: how far its width strays (widest over narrowest), the largest change of
+     * width between two points per sixteen blocks of river, and the depth of its water over its bed at each point.
+     */
+    private static void widths(Point[] ps, List<Double> ratios, List<Double> changes, List<Double> depths) {
+        double lo = Double.MAX_VALUE, hi = 0, steepest = 0;
+        Point prev = null;
+        int n = 0;
+        for (Point p : ps) {
+            if (p.kind != RiverPieces.CHANNEL || p.sunk()) continue;
+            n++;
+            lo = Math.min(lo, p.halfWidth);
+            hi = Math.max(hi, p.halfWidth);
+            depths.add((double) (p.water - p.bed));
+            if (prev != null) {
+                double d = Math.hypot(p.x - prev.x, p.z - prev.z);
+                if (d > 1e-3) steepest = Math.max(steepest, 2.0 * Math.abs(p.halfWidth - prev.halfWidth) * 16.0 / d);
+            }
+            prev = p;
+        }
+        if (n < 2) return;
+        ratios.add(hi / lo);
+        changes.add(steepest);
+    }
+
+    private static String shapes(List<Double> ratios, List<Double> changes, List<Double> depths) {
+        if (ratios.isEmpty()) return "";
+        java.util.Collections.sort(ratios);
+        java.util.Collections.sort(changes);
+        java.util.Collections.sort(depths);
+        return String.format(Locale.ROOT,
+                "; channel widths over %d courses: widest/narrowest median %.2f, 90%% %.2f, max %.2f; change of width per 16 blocks 90%% %.2f, max %.2f; depth of water median %.1f, 90%% %.1f, max %.1f",
+                ratios.size(), at(ratios, 0.5), at(ratios, 0.9), at(ratios, 1.0), at(changes, 0.9), at(changes, 1.0),
+                at(depths, 0.5), at(depths, 0.9), at(depths, 1.0));
+    }
+
+    private static double at(List<Double> sorted, double q) {
+        return sorted.get(Math.min(sorted.size() - 1, (int) Math.floor(q * (sorted.size() - 1) + 0.5)));
     }
 
     /** How many rivers sink in a box, and where the first few do, for the audit. */

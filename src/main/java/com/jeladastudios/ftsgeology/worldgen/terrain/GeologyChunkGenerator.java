@@ -118,6 +118,20 @@ public final class GeologyChunkGenerator extends NoiseBasedChunkGenerator {
 
     private static final LongAdder GUARDED = new LongAdder();
 
+    /**
+     * Every feature of the chunk, then the channels taken back from another mod's water ({@code RiverWater.reclaim}):
+     * Streams Reflowing lays its own water in the rivers at the last step, after the river's water is in.
+     */
+    @Override
+    public void applyBiomeDecoration(net.minecraft.world.level.WorldGenLevel level, ChunkAccess chunk, StructureManager structures) {
+        super.applyBiomeDecoration(level, chunk, structures);
+        try {
+            com.jeladastudios.ftsgeology.worldgen.RiverWater.reclaim(level, chunk.getPos());
+        } catch (RuntimeException e) {
+            com.jeladastudios.ftsgeology.GeysersMod.LOGGER.warn("Taking the rivers back failed for chunk {}: {}", chunk.getPos(), e.toString());
+        }
+    }
+
     @Override
     public void createStructures(RegistryAccess registries, ChunkGeneratorStructureState state,
                                  StructureManager structures, ChunkAccess chunk, StructureTemplateManager templates) {

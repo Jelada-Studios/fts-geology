@@ -72,7 +72,7 @@ public final class RiverRepair {
      * What the network says of a chunk's columns and the ring round it, 18 by 18: the water level, or
      * {@link Integer#MIN_VALUE} where no river or lake is; which way it runs; whether it is a lake.
      */
-    private record Plan(int[] water, byte[] flow, boolean[] lake, boolean[] narrow) {
+    private record Plan(int[] water, byte[] flow, boolean[] lake, boolean[] narrow, int[] reclaim) {
         static int index(int lx, int lz) {
             return (lx + 1) * 18 + (lz + 1);
         }
@@ -83,7 +83,7 @@ public final class RiverRepair {
     }
 
     /** A chunk with no river or lake anywhere near it. */
-    private static final Plan DRY = new Plan(new int[0], new byte[0], new boolean[0], new boolean[0]);
+    private static final Plan DRY = new Plan(new int[0], new byte[0], new boolean[0], new boolean[0], new int[0]);
 
     private static final Map<Long, Plan> PLANS = java.util.Collections.synchronizedMap(
             new LinkedHashMap<>(256, 0.75f, true) {
@@ -210,15 +210,27 @@ public final class RiverRepair {
         byte[] flow = new byte[18 * 18];
         boolean[] lake = new boolean[18 * 18];
         boolean[] narrow = new boolean[18 * 18];
+        int[] reclaim = new int[18 * 18];
         boolean any = false;
         for (int lx = -1; lx <= 16; lx++) {
             for (int lz = -1; lz <= 16; lz++) {
                 int i = Plan.index(lx, lz);
                 water[i] = Integer.MIN_VALUE;
+                reclaim[i] = Integer.MIN_VALUE;
                 RiverNetwork.At a = RiverNetwork.at(cx * 16 + lx, cz * 16 + lz);
                 if (a.distance() == Double.MAX_VALUE || a.sunk()) continue;
                 int w = (int) Math.floor(a.water());
                 // As the generator fills them: the channel's floor under its water, and above the sea.
+                // A channel at the sea's level cut through land is not filled here, only taken back from another mod's
+                // water, and so are the strips of water at its sides.
+                if (w <= sea && !a.lake()
+                        && (a.floor() <= w - 0.5 || com.jeladastudios.ftsgeology.worldgen.RiverWater.edge(a, w, sea))
+                        && !com.jeladastudios.ftsgeology.worldgen.terrain.RawGround.wet(cx * 16 + lx, cz * 16 + lz)) {
+                    reclaim[i] = sea - 1;
+                    flow[i] = (byte) RiverWaterFluid.wayOf(a.fx(), a.fz());
+                    if (lx >= 0 && lx < 16 && lz >= 0 && lz < 16) any = true;
+                    continue;
+                }
                 if (a.floor() > w - 0.5 || w <= sea) continue;
                 water[i] = w;
                 flow[i] = (byte) RiverWaterFluid.wayOf(a.fx(), a.fz());
@@ -227,7 +239,7 @@ public final class RiverRepair {
                 if (lx >= 0 && lx < 16 && lz >= 0 && lz < 16) any = true;
             }
         }
-        return any ? new Plan(water, flow, lake, narrow) : DRY;
+        return any ? new Plan(water, flow, lake, narrow, reclaim) : DRY;
     }
 
     /**
@@ -244,12 +256,21 @@ public final class RiverRepair {
         for (int lx = 0; lx < 16; lx++) {
             for (int lz = 0; lz < 16; lz++) {
                 int w = plan.waterAt(lx, lz);
+                int r = plan.reclaim()[Plan.index(lx, lz)];
+                if (r != Integer.MIN_VALUE) {
+                    int rx = cp.getMinBlockX() + lx, rz = cp.getMinBlockZ() + lz;
+                    int rg = ground(chunk, rx, rz, m);
+                    if (rg != Integer.MIN_VALUE) reclaim(level, chunk, rx, rz, rg, r,
+                            water.setValue(RiverWaterFluid.FLOW, (int) plan.flow()[Plan.index(lx, lz)]), m);
+                    continue;
+                }
                 if (w == Integer.MIN_VALUE) continue;
                 int x = cp.getMinBlockX() + lx, z = cp.getMinBlockZ() + lz;
                 if (Reservoirs.heldBack(x, z)) continue;       // a reservoir filling upstream takes this water
                 clearOver(level, chunk, x, z, w, m);
                 int g = ground(chunk, x, z, m);
                 if (g == Integer.MIN_VALUE) continue;
+                reclaim(level, chunk, x, z, g, w, water.setValue(RiverWaterFluid.FLOW, (int) plan.flow()[Plan.index(lx, lz)]), m);
                 boolean lake = plan.lake()[Plan.index(lx, lz)];
                 // A lake in a long drought, and the rivers in their dry season, are down a block: the top water goes as the
                 // column is visited, and is not laid again till the rains or the season come back, when it fills from the
@@ -318,6 +339,24 @@ public final class RiverRepair {
     }
 
     private static final int[][] SIDES = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+
+    /**
+     * Another mod's water in a channel, under the river's level, taken back as the river's own: in a world generated
+     * before the channels were taken back at generation, Streams Reflowing's water lay in the lower half of the rivers
+     * (see {@code RiverWater.reclaim}).
+     */
+    private static void reclaim(ServerLevel level, LevelChunk chunk, int x, int z, int g, int w, BlockState run,
+                                BlockPos.MutableBlockPos m) {
+        for (int y = g + 1; y <= w; y++) {
+            BlockState s = chunk.getBlockState(m.set(x, y, z));
+            if (!(s.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock)
+                    || !RiverWaterFluid.foreignWater(s.getFluidState())) continue;
+            level.setBlock(m, run, FLAGS);
+            RECLAIMED.increment();
+        }
+    }
+
+    private static final LongAdder RECLAIMED = new LongAdder();
 
     /** How far over a river's level water that does not belong there is looked for. */
     private static final int STRAY_REACH = 3;
@@ -463,8 +502,8 @@ public final class RiverRepair {
 
     public static String summary() {
         return String.format(java.util.Locale.ROOT,
-                "river repair: %d chunks laid again, %d blocks of water, %d channels cut through, %d banks built up, %d stream columns run dry, %d lake columns down a block in a drought, %d blocks of stray water cleared off the rivers",
-                CHUNKS.sum(), LAID.sum(), RECUT_COLUMNS.sum(), BANKS.sum(), DRIED_COLUMNS.sum(), RECEDED.sum(), CLEARED.sum());
+                "river repair: %d chunks laid again, %d blocks of water, %d channels cut through, %d banks built up, %d stream columns run dry, %d lake columns down a block in a drought, %d blocks of stray water cleared off the rivers, %d of another mod's water taken back",
+                CHUNKS.sum(), LAID.sum(), RECUT_COLUMNS.sum(), BANKS.sum(), DRIED_COLUMNS.sum(), RECEDED.sum(), CLEARED.sum(), RECLAIMED.sum());
     }
 
     @SubscribeEvent

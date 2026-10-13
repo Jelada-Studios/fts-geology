@@ -43,6 +43,14 @@ public final class DrainageLattice {
             return true;
         }
 
+        /**
+         * The top of the ground here as the generator builds it, before any channel is cut, near the sea's level; NaN
+         * where it does not know. The raw ground reads a shallow sea's floor a few blocks lower than it is built.
+         */
+        default double floor(int x, int z) {
+            return Double.NaN;
+        }
+
         /** Whether the rock under the ground here dissolves, for a river to sink into it. See {@link Karst}. */
         default boolean soluble(int x, int z, double ground) {
             return false;

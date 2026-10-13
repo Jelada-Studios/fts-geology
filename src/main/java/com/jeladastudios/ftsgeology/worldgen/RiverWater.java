@@ -107,6 +107,75 @@ public final class RiverWater {
     private static final int[][] SIDES = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
     private static final AtomicLong CHUNKS = new AtomicLong();
 
+    /** How far down a channel's column is looked through for another mod's water. */
+    private static final int RECLAIM_DEPTH = 40;
+    /**
+     * How far past the channel of a river at the sea's level, cut through land, the water at its sides is the river's:
+     * the ground the channel's banks were cut from goes under the sea's level there, and the water standing on it, a
+     * strip a block or two wide along each bank, was the sea's. Streams Reflowing turned those strips into its own water
+     * as a player came near, running its own way along the river.
+     */
+    public static final int EDGE = 4;
+
+    /** A column at the side of a river at the sea's level, within {@link #EDGE} of its channel. */
+    public static boolean edge(RiverNetwork.At a, int w, int sea) {
+        return !a.lake() && w <= sea && a.distance() <= a.halfWidth() + EDGE;
+    }
+    private static final LongAdder RECLAIMED = new LongAdder(), RAISED = new LongAdder();
+
+    /**
+     * Takes another mod's water out of the channels and lakes, once every feature of a chunk is in, and lays the
+     * river's own in its place; under a river's mouth, the sea's. Streams Reflowing gives the rivers it finds a current
+     * of its own by laying its own water in them at the last step of generation, after this mod's water: the lower
+     * half of a channel turned to Streams' water in patches a chunk across, drawn as a second body of water inside the
+     * river and pushing its own way, up the river in places. Only a third fluid is taken back: plain water, the
+     * river's, ice and what grows in the water stay. Streams' streams keep their water up to the channel's edge.
+     */
+    public static int reclaim(WorldGenLevel level, ChunkPos cp) {
+        ServerLevel server = level.getLevel();
+        if (TfcCompat.active() || !GeologyWorld.isOwn(server) || !RiverNetwork.ready()) return 0;
+        if (!GeyserConfig.RIVERS.get() || !com.jeladastudios.ftsgeology.worldgen.terrain.RiverSystem.ourWater()) return 0;
+        // Most chunks hold none: a look at the palettes first.
+        net.minecraft.world.level.chunk.ChunkAccess chunk = level.getChunk(cp.x, cp.z);
+        boolean any = false;
+        for (net.minecraft.world.level.chunk.LevelChunkSection s : chunk.getSections()) {
+            if (!s.hasOnlyAir() && s.getStates().maybeHas(b -> RiverWaterFluid.foreignWater(b.getFluidState()))) {
+                any = true;
+                break;
+            }
+        }
+        if (!any) return 0;
+        int sea = level.getSeaLevel();
+        BlockState water = ModBlocks.RIVER_WATER.get().defaultBlockState();
+        BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();
+        int taken = 0;
+        for (int dx = 0; dx < 16; dx++) {
+            for (int dz = 0; dz < 16; dz++) {
+                int x = cp.getMinBlockX() + dx, z = cp.getMinBlockZ() + dz;
+                RiverNetwork.At a = RiverNetwork.at(x, z);
+                if (a.distance() == Double.MAX_VALUE || a.sunk()) continue;
+                int w = (int) Math.floor(a.water());
+                boolean side = a.floor() > w - 0.5;
+                if (side && !edge(a, w, sea)) continue;
+                boolean mouth = w <= sea;
+                int top = mouth ? sea - 1 : w;
+                boolean inland = mouth && !a.lake() && !com.jeladastudios.ftsgeology.worldgen.terrain.RawGround.wet(x, z);
+                if (side && !inland) continue;
+                BlockState run = water.setValue(RiverWaterFluid.FLOW, RiverWaterFluid.wayOf(a.fx(), a.fz()));
+                for (int y = top; y > top - RECLAIM_DEPTH && y > level.getMinBuildHeight(); y--) {
+                    BlockState s = level.getBlockState(at.set(x, y, z));
+                    if (s.isAir()) continue;
+                    if (s.getFluidState().isEmpty() && !TerrainProbe.isVegetation(s)) break;
+                    if (!(s.getBlock() instanceof LiquidBlock) || !RiverWaterFluid.foreignWater(s.getFluidState())) continue;
+                    level.setBlock(at, mouth && !inland && y <= top - MOUTH_TOP ? Blocks.WATER.defaultBlockState() : run, FLAGS);
+                    taken++;
+                }
+            }
+        }
+        RECLAIMED.add(taken);
+        return taken;
+    }
+
     public static int generate(WorldGenLevel level, ChunkPos cp) {
         ServerLevel server = level.getLevel();
         if (TfcCompat.active() || !GeologyWorld.isOwn(server) || !RiverNetwork.ready()) return 0;
@@ -145,10 +214,22 @@ public final class RiverWater {
                     // The sea's floor round a river's mouth is what the river brings down, not soil (RIVER_BEDS): the
                     // shallow floor off a raised coast came out as dirt, half of it in front of some mouths.
                     if (!a.lake() && w <= sea && WorldgenRevision.has(WorldgenRevision.RIVER_BEDS)) seaFloor(level, at, x, z, sea);
+                    // The water at the sides of a river at the sea's level, cut through land, is the river's (RIVER_SHAPES).
+                    if (edge(a, w, sea) && WorldgenRevision.has(WorldgenRevision.RIVER_SHAPES)
+                            && !com.jeladastudios.ftsgeology.worldgen.terrain.RawGround.wet(x, z)) {
+                        sides(level, at, x, z, sea - 1, water.setValue(RiverWaterFluid.FLOW, RiverWaterFluid.wayOf(a.fx(), a.fz())));
+                    }
                     continue;
                 }
                 boolean mouth = w <= sea;
                 if (mouth) w = sea - 1;
+                // A channel at the sea's level cut through land (RIVER_SHAPES) is the river's to its bed, not a strip of the river's
+                // water over the sea's: Streams Reflowing turns the plain water under it into its own as a player comes near,
+                // a second body of water in the river that runs its own way.
+                boolean inland = mouth && !a.lake() && WorldgenRevision.has(WorldgenRevision.RIVER_SHAPES)
+                        && !com.jeladastudios.ftsgeology.worldgen.terrain.RawGround.wet(x, z);
+                int drawn = mouth && !a.lake() && WorldgenRevision.has(WorldgenRevision.RIVER_SHAPES)
+                        ? mouthBed(a, w) : Integer.MIN_VALUE;
                 CANDIDATES.increment();
                 int g = TerrainProbe.groundY(level, x, z);
                 if (g == Integer.MIN_VALUE) {
@@ -164,7 +245,7 @@ public final class RiverWater {
                     if (a.lake() && g - w > LAKE_LEVEL
                             && (g - w > Math.round(LAKE_LEVEL * RiverNetwork.horizontal()) || !nearStream(x, z))) continue;
                     if (a.lake()) SHORED.increment();
-                    int bedY = level(level, at, x, z, g, w, a);
+                    int bedY = level(level, at, x, z, g, w, a, drawn);
                     if (bedY == Integer.MIN_VALUE) {
                         DROPPED.increment();
                         continue;
@@ -173,7 +254,7 @@ public final class RiverWater {
                     LEVELLED.increment();
                 } else if (!a.lake() && WorldgenRevision.has(WorldgenRevision.DRAWN_BEDS)
                         && (!mouth || WorldgenRevision.has(WorldgenRevision.MOUTH_BEDS) && g >= w - MOUTH_RIDGE)
-                        && g > Math.min(w - 1, (int) Math.round(a.floor()) - 1)) {
+                        && g > Math.min(w - 1, drawn != Integer.MIN_VALUE ? drawn : (int) Math.round(a.floor()) - 1)) {
                     // Under the water too the floor is the drawn one. The noise left most channel floors a block or two
                     // over it, so the river held a block of water where its course had two or three: a mod that runs
                     // the water read the drawn level over that floor and found a riffle a few tenths of a block deep,
@@ -182,10 +263,21 @@ public final class RiverWater {
                     // kept lines of ground the noise had left a block under its water, ridges and pillars standing up
                     // out of a channel eight or nine blocks deep. Only ground standing near the top of the water is taken:
                     // the sea's own floor, further down, is left as it is.
-                    int bedY = level(level, at, x, z, g, w, a);
+                    int bedY = level(level, at, x, z, g, w, a, drawn);
                     if (bedY != Integer.MIN_VALUE) {
                         g = bedY;
                         DEEPENED.increment();
+                    }
+                } else if (inland) {
+                    // A river through low land at the sea's level ran over ground the noise had left well under the
+                    // floor drawn for it, six and seven blocks of water in an estuary: its bed is brought up to the
+                    // drawn floor with what it lies on (RIVER_SHAPES).
+                    int want = drawn;
+                    BlockState bed = level.getBlockState(at.set(x, g, z));
+                    if (g < want && bed.isSolidRender(level, at) && !built(bed)) {
+                        for (int y = g + 1; y <= want; y++) level.setBlock(at.set(x, y, z), bed, FLAGS);
+                        RAISED.increment();
+                        g = want;
                     }
                 }
                 // Nothing is poured over a hole: the block under the water has to be solid, or a cave under the bed is
@@ -207,7 +299,7 @@ public final class RiverWater {
                     // and a river's mouth does not. Seagrass and kelp reaching up into it go too: each holds vanilla water
                     // of its own, drawn as a block of a different water standing in the river.
                     // A lake at sea level is still water: the sea's own freezes over it as a lake's would.
-                    if (mouth && !a.lake() && y >= w - MOUTH_TOP + 1 && (was.is(Blocks.WATER) || seaPlant(was))) {
+                    if (mouth && !a.lake() && (y >= w - MOUTH_TOP + 1 || inland) && (was.is(Blocks.WATER) || seaPlant(was))) {
                         level.setBlock(at, run, FLAGS);
                         here++;
                         continue;
@@ -253,9 +345,9 @@ public final class RiverWater {
         if (CHUNKS.incrementAndGet() % 100 == 0) {
             com.jeladastudios.ftsgeology.util.Diagnostics.info("River water over {} chunks: {} columns in a channel, {} kept, {} of them wet, "
                             + "{} levelled, {} let go, {} springs, {} blocks, {} banks built up, {} left as cliffs, "
-                            + "{} lake columns iced, {} glacier columns, {} hollows stopped up, {} steps hung with falling water, {} lake shore columns taken down, {} lake necks filled, {} plants cleared off the water, {} lake floor columns eased, {} floors under the water dug to the drawn floor, {} sea floor columns by a mouth laid with sand; {}; {}; {}",
+                            + "{} lake columns iced, {} glacier columns, {} hollows stopped up, {} steps hung with falling water, {} lake shore columns taken down, {} lake necks filled, {} plants cleared off the water, {} lake floor columns eased, {} floors under the water dug to the drawn floor, {} sea floor columns by a mouth laid with sand, {} blocks of another mod's water taken back, {} estuary beds raised, {} blocks at the sides of a river at sea level made its own; {}; {}; {}",
                     CHUNKS.get(), CANDIDATES.sum(), KEPT.sum(), WET.sum(), LEVELLED.sum(), DROPPED.sum(),
-                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(), PLUGGED.sum(), CURTAINS.sum(), SHORED.sum(), GAPS.sum(), REEDS.sum(), EASED.sum(), DEEPENED.sum(), SEA_FLOORS.sum(),
+                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(), PLUGGED.sum(), CURTAINS.sum(), SHORED.sum(), GAPS.sum(), REEDS.sum(), EASED.sum(), DEEPENED.sum(), SEA_FLOORS.sum(), RECLAIMED.sum(), RAISED.sum(), SIDES_TAKEN.sum(),
                     RiverNetwork.summary(), GeologyChunkGenerator.summary(), SnowCover.summary() + "; " + SnowLineSpawns.summary() + "; " + KarstCaves.summary() + "; " + Dolines.summary());
         }
         return placed;
@@ -512,8 +604,19 @@ public final class RiverWater {
      *
      * @return the new ground, or {@link Integer#MIN_VALUE} to leave the column alone
      */
+    /**
+     * The top of the floor of a river's mouth (RIVER_SHAPES): as far under the sea's water as the river was drawn under
+     * its own. The network carries a river's water down to the sea a few blocks under the sea's level (in the tall world
+     * two under the line the sea's nodes stand at), and the fill brings it up to the sea's: a river drawn four blocks
+     * deep held seven at its mouth, and ended in a step of three or four where its bed met a shallow sea floor.
+     */
+    private static int mouthBed(RiverNetwork.At a, int w) {
+        int depth = (int) Math.ceil(Math.max(1.0, a.water() - a.floor()));
+        return Math.max((int) Math.round(a.floor()) - 1, w - depth);
+    }
+
     private static int level(WorldGenLevel level, BlockPos.MutableBlockPos at, int x, int z, int g, int w,
-                             RiverNetwork.At a) {
+                             RiverNetwork.At a, int drawn) {
         // The bank ring counts too. The water is laid out to where the channel's own wall reaches the surface,
         // about a block past the flat bed, but the shave used to stop at the bed -- so every column in that ring
         // whose floor the noise left high was dropped, and the river got a ragged stair down both its sides.
@@ -525,7 +628,7 @@ public final class RiverWater {
         if (g - w > Math.round(LEVEL_SHAVE * RiverNetwork.horizontal())) return Integer.MIN_VALUE;
         // The top of the floor nearest the drawn one: the floor's top block under it. It used to be the block the drawn
         // floor runs through, whose top stands up to a block over it -- half a block on average, a third of a rill.
-        int bedY = Math.min(w - 1, WorldgenRevision.has(WorldgenRevision.DRAWN_BEDS)
+        int bedY = Math.min(w - 1, drawn != Integer.MIN_VALUE ? drawn : WorldgenRevision.has(WorldgenRevision.DRAWN_BEDS)
                 ? (int) Math.round(a.floor()) - 1 : (int) Math.floor(a.floor()));
         // A lake's shore taken down is a shelf under its water, not dug to the lake's bed: dug to the bed, it was a
         // trench along the shore with the ground left standing behind it a cliff above the water.
@@ -713,6 +816,22 @@ public final class RiverWater {
     }
 
     /** A plant of the sea, standing in vanilla water of its own. */
+    /** The sea's water at a river's side, from its top down to the ground, made the river's (see {@link #EDGE}). */
+    private static void sides(WorldGenLevel level, BlockPos.MutableBlockPos at, int x, int z, int top, BlockState run) {
+        for (int y = top; y > top - RECLAIM_DEPTH && y > level.getMinBuildHeight(); y--) {
+            BlockState s = level.getBlockState(at.set(x, y, z));
+            if (s.is(Blocks.WATER) || seaPlant(s)) {
+                level.setBlock(at, run, FLAGS);
+                SIDES_TAKEN.increment();
+                continue;
+            }
+            if (s.isAir() && y == top) continue;
+            break;
+        }
+    }
+
+    private static final LongAdder SIDES_TAKEN = new LongAdder();
+
     private static boolean seaPlant(BlockState s) {
         return s.is(Blocks.SEAGRASS) || s.is(Blocks.TALL_SEAGRASS) || s.is(Blocks.KELP) || s.is(Blocks.KELP_PLANT);
     }
