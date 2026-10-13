@@ -35,6 +35,9 @@ public final class RiverSpill {
     public static void consider(ServerLevel level, BlockPos pos, BlockPos from) {
         if (!GeyserConfig.RIVER_SPILLS.get() || HydraulicsHooks.active(level)) return;
         if (from.getY() > pos.getY() || Math.abs(from.getX() - pos.getX()) + Math.abs(from.getY() - pos.getY()) + Math.abs(from.getZ() - pos.getZ()) != 1) return;
+        // The blocks round both are read below: at the edge of the loaded ground one of them can lie in a chunk still
+        // on its way in, and reading it would make the server thread wait for that chunk to be built.
+        if (!com.jeladastudios.ftsgeology.util.Loaded.around(level, pos) || !com.jeladastudios.ftsgeology.util.Loaded.around(level, from)) return;
         FluidState here = level.getFluidState(pos);
         if (!(here.getType() instanceof RiverWaterFluid) || !here.isSource()) return;
         // Only a river lets water out: a block of its water standing alone, pushed up out of the channel on top of
