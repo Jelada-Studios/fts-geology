@@ -139,6 +139,15 @@ public abstract class RiverWaterFluid extends ForgeFlowingFluid {
                 || fluid instanceof RiverWaterFluid;
     }
 
+    /**
+     * Whether a river's water meets plain water here, for the renderers: the two are drawn as one body, with no face
+     * between them. Only the river's side is asked: plain water's side against the river is not drawn already, since
+     * the river takes water for its own ({@link #isSame}).
+     */
+    public static boolean seamless(Fluid self, Fluid next) {
+        return self instanceof RiverWaterFluid && (next == Fluids.WATER || next == Fluids.FLOWING_WATER);
+    }
+
     /** The full block. */
     public static class Source extends RiverWaterFluid {
         public Source(Properties properties) {

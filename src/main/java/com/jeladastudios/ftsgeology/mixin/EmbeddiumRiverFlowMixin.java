@@ -26,6 +26,16 @@ public abstract class EmbeddiumRiverFlowMixin {
         return fluid.getType() instanceof RiverWaterFluid ? fluid.getFlow(world, pos) : flow;
     }
 
+    /** No face between a river's water and the sea's, as in {@link RiverFlowRenderMixin}: Embeddium asks it here. */
+    @Inject(method = "isFluidOccluded", at = @At("HEAD"), cancellable = true, require = 0, remap = false)
+    private void fts_geology$riverMeetsWater(net.minecraft.world.level.BlockAndTintGetter world, int x, int y, int z,
+                                             net.minecraft.core.Direction dir, net.minecraft.world.level.material.Fluid fluid,
+                                             org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Boolean> cir) {
+        if (!(fluid instanceof RiverWaterFluid)) return;
+        FluidState next = world.getFluidState(new BlockPos(x + dir.getStepX(), y + dir.getStepY(), z + dir.getStepZ()));
+        if (RiverWaterFluid.seamless(fluid, next.getType())) cir.setReturnValue(true);
+    }
+
     /** A river block's water as high as a registered hook says it stands, in Embeddium's corner heights. */
     @Inject(method = "fluidHeight", at = @At("HEAD"), cancellable = true, require = 0, remap = false)
     private void fts_geology$riverSurface(net.minecraft.world.level.BlockAndTintGetter world, net.minecraft.world.level.material.Fluid fluid,
