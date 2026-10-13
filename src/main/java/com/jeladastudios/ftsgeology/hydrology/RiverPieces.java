@@ -88,6 +88,12 @@ final class RiverPieces {
      * shut and let out again.
      */
     static final double WIDTH_STEP = 1.2;
+    /**
+     * In worlds made since RIVER_SHAPES (round 165): a torrent keeps four fifths of its width, a plunge pool widens it by
+     * a quarter and is dug at most a block and a half deeper, and the width changes by no more than this many blocks
+     * every sixteen.
+     */
+    static final double STEEP_NARROW_SHAPED = 0.8, POOL_WIDE_SHAPED = 1.25, POOL_DIG_SHAPED = 1.5, WIDTH_PER_16 = 1.0;
     /** How much deeper under the sea, per unit of layout past the normal world's, a mouth is carried out to. */
     static final double MOUTH_DEEPER = 2.0;
     /** A river that the ground closes round ends in a pond this wide, as a share of the lattice cell. */
@@ -135,6 +141,8 @@ final class RiverPieces {
     private final DrainageLattice lat;
     private final DrainageLattice.Ground ground;
     private final double h;
+    /** Rivers shallower and of a steadier width (RIVER_SHAPES, round 165): only in worlds made since. */
+    private final boolean shapes;
     final int areaMin;
     /** Blocks between the points a way is traced over and a lake is flooded on. */
     final int grid;
@@ -156,6 +164,8 @@ final class RiverPieces {
         this.lat = lat;
         this.ground = ground;
         this.h = horizontal;
+        this.shapes = com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.has(
+                com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.RIVER_SHAPES);
         this.areaMin = areaMin;
         // Eight grid steps to a cell. Every grid point is a read of the ground, and a finer grid made the rivers cost
         // several times what the lattice did; the ground itself is no finer than this in either world.
@@ -649,10 +659,11 @@ final class RiverPieces {
                 int steps = Math.max(1, (int) Math.ceil(len));
                 for (int k = 0; k <= steps; k++) {
                     double t = (double) k / steps;
-                    double g = read(p.x() + (p.ex() - p.x()) * t, p.z() + (p.ez() - p.z()) * t);
-                    if (g < floorLine) {
+                    double sx = p.x() + (p.ex() - p.x()) * t, sz = p.z() + (p.ez() - p.z()) * t;
+                    double g = read(sx, sz);
+                    if (g < floorLine && (!shapes || ground.wet((int) Math.floor(sx), (int) Math.floor(sz)))) {
                         shore = run + len * t;
-                        shoreFloor = g - 1.0;
+                        shoreFloor = seaFloor(sx, sz, g) - 1.0;
                         break;
                     }
                 }
@@ -664,7 +675,7 @@ final class RiverPieces {
             if (onlyAtShore) return;
             RiverNetwork.Point last = out.get(out.size() - 1);
             shore = run;
-            shoreFloor = read(last.ex(), last.ez()) - 1.0;
+            shoreFloor = seaFloor(last.ex(), last.ez(), read(last.ex(), last.ez())) - 1.0;
         }
         // A shore near the top of these lengths ramps over what is left, so the bed meets the river above it level.
         double reach = Math.max(1.0, Math.min(MOUTH_RAMP * h, shore));
@@ -679,11 +690,25 @@ final class RiverPieces {
         }
     }
 
+    /**
+     * The sea's floor at a point off a mouth: the raw ground, or (RIVER_SHAPES) the ground as the generator builds it
+     * where that is known and higher. Off a shallow coast the raw ground lay two or three blocks under the floor the
+     * world got, the river's bed was brought down to it, and the channel ran on as a trench through the shallows, its
+     * floor rising three or four blocks at once where the trench stopped. The shore is likewise where the built
+     * ground holds the sea's water, not where the raw ground dips under it: a river through low land at the sea's level
+     * keeps its own depth to the coast.
+     */
+    private double seaFloor(double x, double z, double raw) {
+        if (!shapes) return raw;
+        double built = ground.floor((int) Math.floor(x), (int) Math.floor(z));
+        return Double.isNaN(built) ? raw : Math.max(raw, built);
+    }
+
     /** The bed at a point {@code before} blocks up from the shore (under 0: past it), for {@link #ramp}. */
     private double rampBed(double bed, double water, double half, double x, double z, double before, double reach,
                            double shoreFloor) {
         double most = water - DEPTH_LEAST;
-        if (before <= 0) return Math.max(bed, Math.min(most, read(x, z) - 1.0));
+        if (before <= 0) return Math.max(bed, Math.min(most, seaFloor(x, z, read(x, z)) - 1.0));
         if (before >= reach) return bed;
         double full = depthFor(half), atShore = Math.max(DEPTH_LEAST, water - shoreFloor);
         if (atShore >= full) return bed;
@@ -1127,9 +1152,38 @@ final class RiverPieces {
         return node == Long.MIN_VALUE || halfFor(lat.area(node)) >= RiverNetwork.RIVER_BIOME_HALF;
     }
 
-    /** How deep a channel this wide runs: a rill a block, a grown river the full depth. */
+    /**
+     * How deep a channel this wide runs: a rill a block, a grown river the full depth. The full depth grew with the
+     * layout, and in the tall world a river ran seven and eight blocks deep and a mountain torrent's pools eleven and
+     * twelve; a river two hundred metres across is a few metres deep. In worlds made since (RIVER_SHAPES) a grown river
+     * runs four blocks deep in the tall world and three in the normal one.
+     */
     private double depthFor(double half) {
-        return Math.max(DEPTH_LEAST, Math.min(DEPTH * h, DEPTH_BASE + DEPTH_PER_HALF * half));
+        double full = shapes ? DEPTH + (h > 1.0 ? 1.0 : 0.0) : DEPTH * h;
+        return Math.max(DEPTH_LEAST, Math.min(full, DEPTH_BASE + DEPTH_PER_HALF * half));
+    }
+
+    /**
+     * The width of a river kept steady (RIVER_SHAPES). A steep length narrowed it to seven tenths and a plunge pool
+     * widened it to nearly twice, one after the other on a mountain river, so it went from fifteen blocks to five and
+     * back within a few dozen. Its width now keeps within a fifth either way of its own, and changes by no more than a
+     * block across every sixteen blocks down it.
+     */
+    private double steepNarrow() {
+        return shapes ? STEEP_NARROW_SHAPED : STEEP_NARROW;
+    }
+
+    private double poolWide() {
+        return shapes ? POOL_WIDE_SHAPED : POOL_WIDE;
+    }
+
+    /** Half widths along a length, held to a change of half a block every sixteen blocks, up and down. */
+    private static void steady(double[] hws, double step) {
+        double most = WIDTH_PER_16 * 0.5 * step / 16.0;
+        for (int q = 1; q < hws.length; q++) hws[q] = Math.max(hws[q], hws[q - 1] - most);
+        for (int q = hws.length - 2; q >= 0; q--) hws[q] = Math.max(hws[q], hws[q + 1] - most);
+        for (int q = 1; q < hws.length; q++) hws[q] = Math.min(hws[q], hws[q - 1] + most);
+        for (int q = hws.length - 2; q >= 0; q--) hws[q] = Math.min(hws[q], hws[q + 1] + most);
     }
 
     /**
@@ -1167,7 +1221,7 @@ final class RiverPieces {
             // and the widest it can be drawn are read.
             double tx = b[0] - a[0], tz = b[1] - a[1], tl = Math.hypot(tx, tz);
             double dx = tl < 1e-9 ? 0 : -tz / tl, dz = tl < 1e-9 ? 0 : tx / tl;
-            double narrowest = Math.max(HALF_MIN, half * STEEP_NARROW), widest = half * POOL_WIDE;
+            double narrowest = Math.max(HALF_MIN, half * steepNarrow()), widest = half * poolWide();
             double in = narrowest + BANK_RISE * h + 1.0, out = widest + BANK_RISE * h + 1.0;
             double rim = Math.min(Math.min(read(x + dx * out, z + dz * out), read(x - dx * out, z - dz * out)),
                     Math.min(read(x + dx * in, z + dz * in), read(x - dx * in, z - dz * in)));
@@ -1207,10 +1261,10 @@ final class RiverPieces {
             double fall = qw[Math.max(0, q - 2)] - qw[q];
             if (fall < POOL_FALL * h) continue;
             if (q < n && qw[q] - qw[q + 1] > fall * 0.5) continue;
-            double dig = Math.min(POOL_DIG * fall, POOL_DIG_MAX * h);
+            double dig = Math.min(POOL_DIG * fall, shapes ? POOL_DIG_SHAPED : POOL_DIG_MAX * h);
             pools.increment();
             for (int k = q; k <= Math.min(n, q + POOL_RUN - 1); k++) {
-                wide[k] = POOL_WIDE;
+                wide[k] = poolWide();
                 deeper[k] = Math.max(deeper[k], dig);
             }
         }
@@ -1220,12 +1274,13 @@ final class RiverPieces {
             double fall = (qw[q] - qw[q + 1]) / Math.max(step, 1e-6);
             double t = Math.max(0.0, Math.min(1.0, 1.0 - (fall - STEEP_FROM) / STEEP_OVER));
             double gentle = t * t * (3.0 - 2.0 * t);
-            double narrow = STEEP_NARROW + (1.0 - STEEP_NARROW) * gentle;
+            double narrow = steepNarrow() + (1.0 - steepNarrow()) * gentle;
             hws[q] = Math.max(HALF_MIN, half * narrow) * Math.max(wide[q], wide[q + 1]);
         }
         // No point narrower than its neighbours allow: a width comes down and goes back up gradually.
         for (int q = 1; q < n; q++) hws[q] = Math.max(hws[q], hws[q - 1] / WIDTH_STEP);
         for (int q = n - 2; q >= 0; q--) hws[q] = Math.max(hws[q], hws[q + 1] / WIDTH_STEP);
+        if (shapes) steady(hws, step);
         for (int q = 0; q < n; q++) {
             double hw = hws[q];
             double depth = depthFor(hw);

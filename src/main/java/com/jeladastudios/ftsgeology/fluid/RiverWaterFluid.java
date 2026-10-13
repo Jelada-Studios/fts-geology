@@ -2,6 +2,7 @@ package com.jeladastudios.ftsgeology.fluid;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -140,12 +141,24 @@ public abstract class RiverWaterFluid extends ForgeFlowingFluid {
     }
 
     /**
-     * Whether a river's water meets plain water here, for the renderers: the two are drawn as one body, with no face
-     * between them. Only the river's side is asked: plain water's side against the river is not drawn already, since
-     * the river takes water for its own ({@link #isSame}).
+     * Whether a river's water meets other water here, for the renderers: the two are drawn as one body, with no face
+     * between them. Any water counts, either way round: plain water's side against the river is not drawn already,
+     * since the river takes water for its own ({@link #isSame}), but another mod's water (Streams Reflowing's) was
+     * drawn as a sheet of glass wherever it met a river.
      */
     public static boolean seamless(Fluid self, Fluid next) {
-        return self instanceof RiverWaterFluid && (next == Fluids.WATER || next == Fluids.FLOWING_WATER);
+        if (self instanceof RiverWaterFluid) return next == Fluids.WATER || next == Fluids.FLOWING_WATER || next.is(FluidTags.WATER);
+        return next instanceof RiverWaterFluid && self.is(FluidTags.WATER);
+    }
+
+    /**
+     * Whether a fluid is a third mod's water: in the water tag, but neither plain water nor the river's. Streams
+     * Reflowing's own water is one.
+     */
+    public static boolean foreignWater(FluidState f) {
+        if (f.isEmpty() || !f.is(FluidTags.WATER)) return false;
+        Fluid t = f.getType();
+        return t != Fluids.WATER && t != Fluids.FLOWING_WATER && !(t instanceof RiverWaterFluid);
     }
 
     /** The full block. */

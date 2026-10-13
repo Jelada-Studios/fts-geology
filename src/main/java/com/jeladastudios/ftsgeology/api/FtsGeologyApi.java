@@ -374,7 +374,7 @@ public final class FtsGeologyApi {
      * big rivers (as wide as the river biome is painted on) and its lakes there, in its own river water, and
      * {@link #channel} answers for those alone; the streams are Streams', plain water. {@link #sources} still lists the
      * inflows of the whole network traced, the streams Streams draws in its place among them. False outside the mod's
-     * world. Since 0.11.4.
+     * world. Since 0.11.3.
      */
     public static boolean streamsByOtherMod(ServerLevel level) {
         return isGeologyWorld(level) && com.jeladastudios.ftsgeology.worldgen.terrain.RiverSystem.trunksOnly();

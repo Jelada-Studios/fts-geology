@@ -31,7 +31,9 @@ public abstract class EmbeddiumRiverFlowMixin {
     private void fts_geology$riverMeetsWater(net.minecraft.world.level.BlockAndTintGetter world, int x, int y, int z,
                                              net.minecraft.core.Direction dir, net.minecraft.world.level.material.Fluid fluid,
                                              org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Boolean> cir) {
-        if (!(fluid instanceof RiverWaterFluid)) return;
+        // The river's own faces, and a third mod's water against the river (plain water's are not drawn already).
+        if (!(fluid instanceof RiverWaterFluid) && (fluid == net.minecraft.world.level.material.Fluids.WATER
+                || fluid == net.minecraft.world.level.material.Fluids.FLOWING_WATER || !fluid.is(net.minecraft.tags.FluidTags.WATER))) return;
         FluidState next = world.getFluidState(new BlockPos(x + dir.getStepX(), y + dir.getStepY(), z + dir.getStepZ()));
         if (RiverWaterFluid.seamless(fluid, next.getType())) cir.setReturnValue(true);
     }

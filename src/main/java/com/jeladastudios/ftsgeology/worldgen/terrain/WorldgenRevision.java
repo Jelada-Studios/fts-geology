@@ -101,8 +101,11 @@ public final class WorldgenRevision {
     /** Mountain rivers floored with gravel, sand and their own bedrock, not cobblestone, and the sea's floor by a mouth
      * with what a river brings down (round 162). */
     public static final int RIVER_BEDS = 22;
+    /** Rivers shallower (a grown river four blocks deep in the tall world, three in the normal one) and of a steadier
+     * width; a mouth's bed brought up to a shallow shore (round 165). */
+    public static final int RIVER_SHAPES = 23;
     /** What a world made now gets. */
-    public static final int CURRENT = 22;
+    public static final int CURRENT = 23;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;

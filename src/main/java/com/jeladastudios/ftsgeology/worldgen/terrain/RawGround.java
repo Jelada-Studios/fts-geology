@@ -66,6 +66,11 @@ public final class RawGround {
         }
 
         @Override
+        public double floor(int x, int z) {
+            return RawGround.floor(x, z);
+        }
+
+        @Override
         public boolean soluble(int x, int z, double ground) {
             return com.jeladastudios.ftsgeology.hydrology.Karst.soluble(x, z, ground);
         }
@@ -97,6 +102,7 @@ public final class RawGround {
         columns = generator;
         terrain = state.router().finalDensity().mapAll(BARE);
         WET.clear();
+        FLOOR.clear();
     }
 
     public static boolean ready() {
@@ -154,10 +160,46 @@ public final class RawGround {
         }
     }
 
+    private static final ColumnCache<Integer> FLOOR = new ColumnCache<>(14);
+
+    /**
+     * The top of the ground here as the generator builds it with no channel cut, if it lies in the stretch of the
+     * column round the sea's surface that is built to tell ({@code COLUMN_FROM} up); NaN otherwise, or with no
+     * generator bound. For the floor of a shallow sea off a river's mouth, which the raw ground reads a few blocks low.
+     */
+    public static double floor(int x, int z) {
+        NoiseBasedChunkGenerator g = columns;
+        if (g == null) return Double.NaN;
+        long key = ColumnCache.key(x, z);
+        Integer known = FLOOR.get(key);
+        if (known == null) {
+            known = floorColumn(g, x, z);
+            FLOOR.put(key, known);
+        }
+        return known == Integer.MIN_VALUE ? Double.NaN : known;
+    }
+
+    private static int floorColumn(NoiseBasedChunkGenerator g, int x, int z) {
+        RiverDensity.bare(true);
+        try {
+            LevelHeightAccessor h = columnHeight;
+            NoiseColumn column = g.getBaseColumn(x, z, h, columnState);
+            for (int y = h.getMaxBuildHeight() - 1; y >= h.getMinBuildHeight(); y--) {
+                BlockState b = column.getBlock(y);
+                if (b.isAir() || !b.getFluidState().isEmpty()) continue;
+                return y == h.getMaxBuildHeight() - 1 ? Integer.MIN_VALUE : y;
+            }
+            return Integer.MIN_VALUE;
+        } finally {
+            RiverDensity.bare(false);
+        }
+    }
+
     public static void clear() {
         offset = null;
         terrain = null;
         WET.clear();
+        FLOOR.clear();
         columns = null;
         columnState = null;
         columnHeight = null;
