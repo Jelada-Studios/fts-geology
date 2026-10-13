@@ -254,6 +254,25 @@ public final class TectonicCommands {
                                                 .then(Commands.argument("half", IntegerArgumentType.integer(16, 4000))
                                                         .executes(ctx -> TerrainCommands.terrainRiversFlow(ctx,
                                                                 IntegerArgumentType.getInteger(ctx, "half")))))
+                                        // Where the rivers round here reach the sea, biggest first.
+                                        .then(Commands.literal("mouths")
+                                                .then(Commands.argument("half", IntegerArgumentType.integer(64, 16000))
+                                                        .executes(ctx -> {
+                                                            net.minecraft.core.BlockPos at = net.minecraft.core.BlockPos.containing(ctx.getSource().getPosition());
+                                                            int half = IntegerArgumentType.getInteger(ctx, "half");
+                                                            java.util.List<String> m = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.mouths(at.getX(), at.getZ(), half, 12);
+                                                            String line = "river mouths within " + half + ": " + (m.isEmpty() ? "none" : String.join("; ", m));
+                                                            ctx.getSource().sendSuccess(() -> Component.literal(line), false);
+                                                            com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(line);
+                                                            return m.size();
+                                                        })))
+                                        // The same mouths as built: bed, water and banks along each, a test command.
+                                        .then(Commands.literal("mouthprofile")
+                                                .then(Commands.argument("half", IntegerArgumentType.integer(64, 16000))
+                                                        .then(Commands.argument("max", IntegerArgumentType.integer(1, 64))
+                                                                .executes(ctx -> TerrainCommands.terrainRiversMouthProfile(ctx,
+                                                                        IntegerArgumentType.getInteger(ctx, "half"),
+                                                                        IntegerArgumentType.getInteger(ctx, "max"))))))
                                         // Crossings, dead ends, water going uphill or standing over its bank.
                                         .then(Commands.literal("audit")
                                                 .then(Commands.argument("half", IntegerArgumentType.integer(64, 8000))

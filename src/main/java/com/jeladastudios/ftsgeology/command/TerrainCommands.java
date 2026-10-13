@@ -1353,6 +1353,167 @@ public final class TerrainCommands {
                 cx, cz, step, n, channel, lake, out.getAbsolutePath());
     }
 
+    /**
+     * The rivers round here where they reach the sea, as built: along each one's last lengths and on past its end, the
+     * bed, the water and the ground either side, block by block. Counted per mouth: where the shore is (the first
+     * column with water at sea level on both sides), the most the bed rises within six blocks seaward (a floor that
+     * comes up at once), how far the lowest bed near the shore lies under the sea floor further out (a pit), how deep
+     * the channel lies under the sea floor beside it once in the sea (a trench), how many columns before the shore have
+     * ground four or more over the water close by on both sides (walls), and how many have no water (dry). Builds the
+     * chunks it reads; a test command.
+     */
+    public static int terrainRiversMouthProfile(CommandContext<CommandSourceStack> ctx, int half, int max) {
+        BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
+        if (!com.jeladastudios.ftsgeology.hydrology.RiverNetwork.ready()) {
+            ctx.getSource().sendSuccess(() -> Component.literal("No river network: this world type traces none."), false);
+            return 0;
+        }
+        ServerLevel level = ctx.getSource().getLevel();
+        double h = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.horizontal();
+        int seaTop = level.getSeaLevel() - 1;
+        var paths = com.jeladastudios.ftsgeology.hydrology.RiverNetwork.mouthPaths(at.getX(), at.getZ(), half, max);
+        StringBuilder sb = new StringBuilder(String.format(Locale.ROOT, "river mouths within %d of %d,%d: %d%n",
+                half, at.getX(), at.getZ(), paths.size()));
+        int[] riseHist = new int[8];
+        int mouths = 0, walledMouths = 0, dryMouths = 0;
+        double pitSum = 0, trenchSum = 0;
+        int trenchN = 0;
+        for (var path : paths) {
+            // Every block along the lengths, then on straight past the end into the sea.
+            List<double[]> s = new ArrayList<>();
+            for (var p : path) {
+                double dx = p.ex() - p.x(), dz = p.ez() - p.z(), len = Math.hypot(dx, dz);
+                int n = Math.max(1, (int) Math.ceil(len));
+                for (int k = 0; k < n; k++) {
+                    double t = (double) k / n;
+                    s.add(new double[]{p.x() + dx * t, p.z() + dz * t, dx / Math.max(len, 1e-6), dz / Math.max(len, 1e-6),
+                            p.halfWidth(), p.water() + (p.waterEnd() - p.water()) * t, p.bed() + (p.bedEnd() - p.bed()) * t});
+                }
+            }
+            if (s.isEmpty()) continue;
+            double[] end = s.get(s.size() - 1);
+            var lastP = path.get(path.size() - 1);
+            int out = (int) Math.ceil(32 * h);
+            for (int k = 1; k <= out; k++) {
+                s.add(new double[]{lastP.ex() + end[2] * k, lastP.ez() + end[3] * k, end[2], end[3], end[4], Double.NaN, Double.NaN});
+            }
+            int n = s.size();
+            int[] bed = new int[n], water = new int[n], left = new int[n], right = new int[n], sideFloor = new int[n];
+            boolean[] seaBoth = new boolean[n];
+            for (int i = 0; i < n; i++) {
+                double[] q = s.get(i);
+                int x = (int) Math.floor(q[0]), z = (int) Math.floor(q[1]);
+                bed[i] = floorAt(level, x, z);
+                water[i] = waterTop(level, x, z);
+                // The ground either side, highest within four blocks past the channel's edge; and the floor further out.
+                double nx = -q[3], nz = q[2], edge = q[4] + 1.0;
+                int lo = Integer.MIN_VALUE, ro = Integer.MIN_VALUE;
+                for (double d = edge; d <= edge + 4.0; d += 1.0) {
+                    lo = Math.max(lo, floorAt(level, (int) Math.floor(q[0] + nx * d), (int) Math.floor(q[1] + nz * d)));
+                    ro = Math.max(ro, floorAt(level, (int) Math.floor(q[0] - nx * d), (int) Math.floor(q[1] - nz * d)));
+                }
+                left[i] = lo;
+                right[i] = ro;
+                double far = edge + 6.0 * h;
+                int fl = floorAt(level, (int) Math.floor(q[0] + nx * far), (int) Math.floor(q[1] + nz * far));
+                int fr = floorAt(level, (int) Math.floor(q[0] - nx * far), (int) Math.floor(q[1] - nz * far));
+                sideFloor[i] = Math.min(fl, fr);
+                seaBoth[i] = waterTop(level, (int) Math.floor(q[0] + nx * far), (int) Math.floor(q[1] + nz * far)) == seaTop
+                        && waterTop(level, (int) Math.floor(q[0] - nx * far), (int) Math.floor(q[1] - nz * far)) == seaTop
+                        && water[i] == seaTop;
+            }
+            int shore = -1;
+            for (int i = 0; i < n; i++) if (seaBoth[i]) { shore = i; break; }
+            mouths++;
+            var head = s.get(0);
+            if (shore < 0) {
+                sb.append(String.format(Locale.ROOT, "  %.0f %.0f: no open sea along it%n", end[0], end[1]));
+                continue;
+            }
+            int from = Math.max(0, shore - (int) (48 * h)), to = Math.min(n - 1, shore + (int) (24 * h));
+            int rise = 0, riseAt = 0;
+            for (int i = from; i < to; i++) {
+                for (int j = i + 1; j <= Math.min(to, i + 6); j++) {
+                    if (bed[j] - bed[i] > rise) { rise = bed[j] - bed[i]; riseAt = i - shore; }
+                }
+            }
+            int low = Integer.MAX_VALUE, lowAt = 0;
+            for (int i = Math.max(0, shore - (int) (24 * h)); i <= Math.min(n - 1, shore + (int) (8 * h)); i++) {
+                if (bed[i] < low) { low = bed[i]; lowAt = i - shore; }
+            }
+            List<Integer> outer = new ArrayList<>();
+            for (int i = shore + (int) (16 * h); i < n; i++) outer.add(bed[i]);
+            outer.sort(Integer::compare);
+            int outBed = outer.isEmpty() ? bed[n - 1] : outer.get(outer.size() / 2);
+            int pit = outBed - low;
+            double trench = 0;
+            int tn = 0;
+            for (int i = shore; i < Math.min(n, shore + (int) (16 * h)); i++) { trench += sideFloor[i] - bed[i]; tn++; }
+            trench = tn == 0 ? 0 : trench / tn;
+            int walls = 0, dry = 0;
+            for (int i = Math.max(0, shore - (int) (32 * h)); i < shore; i++) {
+                if (water[i] == Integer.MIN_VALUE) { dry++; continue; }
+                if (left[i] >= water[i] + 4 && right[i] >= water[i] + 4) walls++;
+            }
+            riseHist[Math.min(7, rise)]++;
+            pitSum += pit;
+            trenchSum += trench;
+            trenchN++;
+            if (walls >= 4) walledMouths++;
+            if (dry >= 4) dryMouths++;
+            // The bed every two blocks from 24 before the shore to 16 past it, the shore marked.
+            StringBuilder prof = new StringBuilder();
+            for (int i = Math.max(0, shore - (int) (24 * h)); i <= Math.min(n - 1, shore + (int) (16 * h)); i += 2) {
+                if (i == shore || i == shore + 1) prof.append('|');
+                prof.append(bed[i] == Integer.MIN_VALUE ? "?" : Integer.toString(bed[i])).append(' ');
+            }
+            sb.append(String.format(Locale.ROOT,
+                    "  %.0f %.0f (from %.0f %.0f, half %.1f): shore %d blocks along, rise %d at %+d, low %d at %+d, sea floor past %d, pit %d, trench %.1f, walls %d, dry %d; bed %s%n",
+                    s.get(shore)[0], s.get(shore)[1], head[0], head[1], s.get(shore)[4], shore, rise, riseAt, low, lowAt,
+                    outBed, pit, trench, walls, dry, prof));
+        }
+        sb.append(String.format(Locale.ROOT,
+                "summary: %d mouths, rise within 6 blocks 0..7+ %s, mean pit %.1f, mean trench %.1f, walled %d, dry %d",
+                mouths, java.util.Arrays.toString(riseHist), trenchN == 0 ? 0 : pitSum / trenchN, trenchN == 0 ? 0 : trenchSum / trenchN,
+                walledMouths, dryMouths));
+        String text = sb.toString();
+        com.jeladastudios.ftsgeology.GeysersMod.LOGGER.info(text);
+        ctx.getSource().sendSuccess(() -> Component.literal(text), false);
+        return mouths;
+    }
+
+    /** The highest block that is not a liquid or a plant: the bed under water, the ground on land. Builds the chunk. */
+    private static int floorAt(ServerLevel level, int x, int z) {
+        var chunk = level.getChunk(x >> 4, z >> 4);
+        int y = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR, x & 15, z & 15);
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos(x, y, z);
+        while (y > level.getMinBuildHeight()) {
+            p.setY(y);
+            var st = chunk.getBlockState(p);
+            if (st.isAir() || !st.getFluidState().isEmpty() || st.is(net.minecraft.tags.BlockTags.LEAVES)
+                    || st.is(net.minecraft.tags.BlockTags.LOGS) || st.canBeReplaced()) {
+                y--;
+                continue;
+            }
+            return y;
+        }
+        return y;
+    }
+
+    /** The top of the water in this column, or MIN_VALUE where there is none. */
+    private static int waterTop(ServerLevel level, int x, int z) {
+        var chunk = level.getChunk(x >> 4, z >> 4);
+        int y = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x & 15, z & 15);
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos(x, y, z);
+        for (int k = 0; k < 24 && y > level.getMinBuildHeight(); k++, y--) {
+            p.setY(y);
+            var st = chunk.getBlockState(p);
+            if (!st.getFluidState().isEmpty()) return y;
+            if (!st.isAir() && !st.canBeReplaced() && !st.is(net.minecraft.tags.BlockTags.LEAVES)) return Integer.MIN_VALUE;
+        }
+        return Integer.MIN_VALUE;
+    }
+
     /** A fingerprint of the rivers round here, to check that the same world gives the same rivers every time. */
     public static int terrainRiversHash(CommandContext<CommandSourceStack> ctx, int half) {
         BlockPos at = BlockPos.containing(ctx.getSource().getPosition());
