@@ -6,12 +6,13 @@ A Minecraft mod that builds the world from plate tectonics. Plates drift, and th
 
 **Minecraft 1.21.1, NeoForge 21.1 or newer. No other mods needed.** A Forge 1.20.1 version is available too.
 
-The [wiki](https://github.com/Jelada-Studios/fts-geology/wiki) explains everything in detail. In game, a 52-page field guide (book + copper ingot) does the same.
+The [wiki](https://github.com/Jelada-Studios/fts-geology/wiki) explains everything in detail. In game, a 53-page field guide (book + copper ingot) does the same.
 
 ## What it adds
 
 - **Terrain.** A new default world type, 960 blocks tall and wider to match: 10 m to a block both ways. Mountain belts are cut from real elevation data of the Alps, the Caucasus, the Himalaya, the Karakoram and the Appalachians, and the tall world has one Everest, one K2 and one Matterhorn. A normal-height version is under World Type.
 - **Plate boundaries.** Rifts, subduction zones, collision belts and transform faults, each with its own landforms, rock layers and ore deposits.
+- **Ores.** Ore bodies you can find from the surface: porphyry copper under a rusty gossan cap and gold-bearing quartz reefs, with float and placer gold in the streams below them. Ores take the look of the rock they sit in (gold in schist, lapis in marble, diamond in peridotite), coal lies in the basins where it forms, and the mountain belts are folded.
 - **Earthquakes.** Each stretch of a fault builds up strain and breaks in its own time. P and S waves, aftershocks, liquefaction on wet sand, landslides and rockfall. How badly a build is hit depends on what it is made of and what it stands on.
 - **Volcanoes.** Stratovolcanoes, shields, calderas and fissure eruptions, in three sizes and three states. They warn before they erupt with quake swarms and swelling ground. Eruptions bring lava, bombs, pyroclastic flows, gas and ashfall.
 - **Hot springs and geysers.** Geothermal basins with springs in four stages, mud pots, fumaroles and geysers on a cycle.
