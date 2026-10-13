@@ -31,6 +31,17 @@ public abstract class RiverFlowRenderMixin {
         return fluid.getType() instanceof RiverWaterFluid ? fluid.getFlow(level, pos) : flow;
     }
 
+    /**
+     * No face between a river's water and the sea's. Water takes the river's for another fluid, so every river block
+     * beside the sea drew a side against it: where a river's water reaches out over the top of the sea at its mouth,
+     * the edge of it stood in the sea as a pane of glass, two walls running out from the banks and round. The river's
+     * own side is the only one drawn (the river takes water for its own), so that is the side let off.
+     */
+    @Inject(method = "isNeighborSameFluid", at = @At("HEAD"), cancellable = true, require = 0)
+    private static void fts_geology$riverMeetsWater(FluidState first, FluidState second, CallbackInfoReturnable<Boolean> cir) {
+        if (RiverWaterFluid.seamless(first.getType(), second.getType())) cir.setReturnValue(true);
+    }
+
     /** A river block's water as high as a registered hook says it stands (see the API's {@code registerSurface}). */
     @Inject(method = "getHeight(Lnet/minecraft/world/level/BlockAndTintGetter;Lnet/minecraft/world/level/material/Fluid;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/world/level/material/FluidState;)F",
             at = @At("HEAD"), cancellable = true, require = 0)
