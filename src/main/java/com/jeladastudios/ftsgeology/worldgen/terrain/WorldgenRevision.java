@@ -118,17 +118,29 @@ public final class WorldgenRevision {
 
     private static final class Stamp extends SavedData {
         int revision;
+        /** Whose rivers the world has ({@link RiverSystem}): absent in worlds made before it, which are the mod's. */
+        RiverSystem.Kind rivers = RiverSystem.Kind.OURS;
 
         static Stamp load(CompoundTag tag) {
             Stamp s = new Stamp();
             s.revision = tag.getInt("revision");
+            s.rivers = riversOf(tag);
             return s;
         }
 
         @Override
         public CompoundTag save(CompoundTag tag) {
             tag.putInt("revision", revision);
+            tag.putString("rivers", rivers.name());
             return tag;
+        }
+    }
+
+    private static RiverSystem.Kind riversOf(CompoundTag tag) {
+        try {
+            return tag.contains("rivers") ? RiverSystem.Kind.valueOf(tag.getString("rivers")) : RiverSystem.Kind.OURS;
+        } catch (IllegalArgumentException e) {
+            return RiverSystem.Kind.OURS;
         }
     }
 
@@ -136,18 +148,25 @@ public final class WorldgenRevision {
     static void open(MinecraftServer server) {
         if (!server.getWorldData().overworldData().isInitialized()) {
             revision = CURRENT;
+            RiverSystem.set(RiverSystem.forNewWorld());
+            GeysersMod.LOGGER.info("A new world, made with worldgen revision {} and {} rivers", revision,
+                    RiverSystem.current() == RiverSystem.Kind.STREAMS ? "Streams Reflowing's" : "the mod's own");
             return;
         }
         int r = 0;
+        RiverSystem.Kind rivers = RiverSystem.Kind.OURS;
         File file = server.getWorldPath(LevelResource.ROOT).resolve("data").resolve(DATA + ".dat").toFile();
         if (file.isFile()) {
             try {
-                r = NbtIo.readCompressed(file).getCompound("data").getInt("revision");
+                CompoundTag data = NbtIo.readCompressed(file).getCompound("data");
+                r = data.getInt("revision");
+                rivers = riversOf(data);
             } catch (Exception e) {
                 GeysersMod.LOGGER.warn("Could not read {}; the world is generated as one made before it: {}", file, e.toString());
             }
         }
         revision = r;
+        RiverSystem.set(rivers);
     }
 
     @SubscribeEvent
@@ -156,6 +175,7 @@ public final class WorldgenRevision {
         level.getDataStorage().computeIfAbsent(Stamp::load, () -> {
             Stamp s = new Stamp();
             s.revision = revision;
+            s.rivers = RiverSystem.current();
             s.setDirty();
             return s;
         }, DATA);

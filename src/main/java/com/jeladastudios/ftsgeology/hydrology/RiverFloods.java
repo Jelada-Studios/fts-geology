@@ -55,7 +55,7 @@ public final class RiverFloods {
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END || event.getServer() == null) return;
         ServerLevel level = event.getServer().overworld();
-        if (level == null || !GeyserConfig.RIVER_FLOODS.get()) return;
+        if (level == null || !GeyserConfig.RIVER_FLOODS.get() || !com.jeladastudios.ftsgeology.worldgen.terrain.RiverSystem.ourWater()) return;
         long now = level.getGameTime();
         if (!FLASHES.isEmpty()) push(level, now);
         if (now % EVERY != 0) return;

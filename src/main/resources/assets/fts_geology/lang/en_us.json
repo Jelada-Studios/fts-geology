@@ -1008,5 +1008,10 @@
   "block.fts_geology.rhyolite_gold_ore": "Rhyolite Gold Ore",
   "block.fts_geology.rhyolite_copper_ore": "Rhyolite Copper Ore",
   "block.fts_geology.rhyolite_redstone_ore": "Rhyolite Redstone Ore",
-  "block.fts_geology.chert_iron_ore": "Chert Iron Ore"
+  "block.fts_geology.chert_iron_ore": "Chert Iron Ore",
+  "fts_geology.rivers.label": "Rivers",
+  "fts_geology.rivers.streams": "Streams Reflowing",
+  "fts_geology.rivers.ours": "FT's Geology",
+  "fts_geology.rivers.streams.tooltip": "FT's Geology lays out the big rivers and lakes, Streams Reflowing draws the streams. The world keeps this choice.",
+  "fts_geology.rivers.ours.tooltip": "FT's Geology's own rivers. Streams Reflowing still adds its streams beside them. The world keeps this choice."
 }

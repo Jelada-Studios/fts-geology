@@ -110,7 +110,7 @@ public final class RiverWater {
     public static int generate(WorldGenLevel level, ChunkPos cp) {
         ServerLevel server = level.getLevel();
         if (TfcCompat.active() || !GeologyWorld.isOwn(server) || !RiverNetwork.ready()) return 0;
-        if (!GeyserConfig.RIVERS.get()) return 0;
+        if (!GeyserConfig.RIVERS.get() || !com.jeladastudios.ftsgeology.worldgen.terrain.RiverSystem.ourWater()) return 0;
         int sea = level.getSeaLevel();
         BlockState water = ModBlocks.RIVER_WATER.get().defaultBlockState();
         int placed = 0;
@@ -631,7 +631,7 @@ public final class RiverWater {
     public static void clearReeds(WorldGenLevel level, ChunkPos cp) {
         ServerLevel server = level.getLevel();
         if (TfcCompat.active() || !GeologyWorld.isOwn(server) || !RiverNetwork.ready()) return;
-        if (!GeyserConfig.RIVERS.get()) return;
+        if (!GeyserConfig.RIVERS.get() || !com.jeladastudios.ftsgeology.worldgen.terrain.RiverSystem.ourWater()) return;
         int sea = level.getSeaLevel();
         BlockState water = ModBlocks.RIVER_WATER.get().defaultBlockState();
         BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();

@@ -105,7 +105,7 @@ public final class RiverRepair {
     private static final double DRY_AT = 2.0, WET_AT = 1.0;
 
     private static boolean enabled(ServerLevel level) {
-        return GeyserConfig.RIVERS.get() && GeyserConfig.RIVERS_REFILL.get() && !TfcCompat.active()
+        return GeyserConfig.RIVERS.get() && com.jeladastudios.ftsgeology.worldgen.terrain.RiverSystem.ourWater() && GeyserConfig.RIVERS_REFILL.get() && !TfcCompat.active()
                 && Level.OVERWORLD.equals(level.dimension()) && GeologyWorld.isOwn(level) && RiverNetwork.ready()
                 && !HydraulicsHooks.active(level);
     }

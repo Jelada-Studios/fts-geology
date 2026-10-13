@@ -59,7 +59,7 @@ public final class KarstCaves {
 
     public static int generate(WorldGenLevel level, ChunkPos cp) {
         if (TfcCompat.active() || !GeologyWorld.isOwn(level.getLevel()) || !RiverNetwork.ready()) return 0;
-        if (!GeyserConfig.RIVERS.get() || !GeyserConfig.KARST.get()) return 0;
+        if (!GeyserConfig.RIVERS.get() || !com.jeladastudios.ftsgeology.worldgen.terrain.RiverSystem.ourWater() || !GeyserConfig.KARST.get()) return 0;
         double h = RiverNetwork.horizontal();
         int x0 = cp.getMinBlockX(), z0 = cp.getMinBlockZ();
         int m = (int) Math.ceil(MARGIN * h);
