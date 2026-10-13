@@ -150,7 +150,7 @@ final class RiverPieces {
     final LongAdder channels = new LongAdder(), joins = new LongAdder(), fallbacks = new LongAdder(),
             dams = new LongAdder(), gorges = new LongAdder(), eyes = new LongAdder(), pools = new LongAdder(), inlets = new LongAdder(), inletOpen = new LongAdder(), inletBig = new LongAdder(), inletShut = new LongAdder(), bankClamps = new LongAdder(), lakeMasks = new LongAdder(), sinks = new LongAdder(),
             mouths = new LongAdder(), dryJoins = new LongAdder(), gridReads = new LongAdder(), backwater = new LongAdder(),
-            sunk = new LongAdder(), plainLakes = new LongAdder(), berms = new LongAdder();
+            sunk = new LongAdder(), plainLakes = new LongAdder(), berms = new LongAdder(), ramped = new LongAdder();
 
     RiverPieces(DrainageLattice lat, DrainageLattice.Ground ground, double horizontal, int areaMin) {
         this.lat = lat;
@@ -610,9 +610,85 @@ final class RiverPieces {
                     out.addAll(through);
                     segments(through, segs);
                 }
+                if (com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.has(
+                        com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.MOUTH_RAMPS)) {
+                    ramp(out, before, false);
+                }
             }
         }
         return out.toArray(NONE);
+    }
+
+    /**
+     * How far back from where its ground goes under the sea a river's bed comes up to the sea's floor, in blocks at the
+     * normal world's layout (MOUTH_RAMPS).
+     */
+    static final double MOUTH_RAMP = 16.0;
+
+    /**
+     * A river's last lengths brought up to the sea's floor (MOUTH_RAMPS). Laid at its own depth to the end, a channel
+     * reached the shore several blocks under the sea's floor in the tall world, with the plunge pool at the foot of
+     * its last fall deeper still, and the water fill dug the shallow floor off the shore down to it: a trench out from
+     * the mouth that stopped where the sea floor fell away out of the fill's reach, so the bed dropped into a pit at
+     * the mouth and rose again a little way out. Now, from the shore back, the river runs no deeper than a ramp from
+     * the sea's floor at the shore up to its own depth, and past the shore its floor is the sea's. Beds are only ever
+     * raised, never under the water by less than a rill's depth.
+     */
+    private void ramp(List<RiverNetwork.Point> out, int from, boolean onlyAtShore) {
+        int n = out.size() - from;
+        if (n <= 0) return;
+        // Raw ground under this is the sea's floor: the line the channel's cut stops at (RiverDensity's SEA_FLOOR).
+        double floorLine = lat.sea + 1.0;
+        double[] start = new double[n], end = new double[n];
+        double run = 0, shore = Double.NaN, shoreFloor = Double.NaN;
+        for (int i = 0; i < n; i++) {
+            RiverNetwork.Point p = out.get(from + i);
+            double len = Math.hypot(p.ex() - p.x(), p.ez() - p.z());
+            start[i] = run;
+            if (Double.isNaN(shore)) {
+                int steps = Math.max(1, (int) Math.ceil(len));
+                for (int k = 0; k <= steps; k++) {
+                    double t = (double) k / steps;
+                    double g = read(p.x() + (p.ex() - p.x()) * t, p.z() + (p.ez() - p.z()) * t);
+                    if (g < floorLine) {
+                        shore = run + len * t;
+                        shoreFloor = g - 1.0;
+                        break;
+                    }
+                }
+            }
+            run += len;
+            end[i] = run;
+        }
+        if (Double.isNaN(shore)) {
+            if (onlyAtShore) return;
+            RiverNetwork.Point last = out.get(out.size() - 1);
+            shore = run;
+            shoreFloor = read(last.ex(), last.ez()) - 1.0;
+        }
+        // A shore near the top of these lengths ramps over what is left, so the bed meets the river above it level.
+        double reach = Math.max(1.0, Math.min(MOUTH_RAMP * h, shore));
+        for (int i = 0; i < n; i++) {
+            RiverNetwork.Point p = out.get(from + i);
+            double bedS = rampBed(p.bed(), p.water(), p.halfWidth(), p.x(), p.z(), shore - start[i], reach, shoreFloor);
+            double bedE = rampBed(p.bedEnd(), p.waterEnd(), p.halfWidth(), p.ex(), p.ez(), shore - end[i], reach, shoreFloor);
+            if (bedS == p.bed() && bedE == p.bedEnd()) continue;
+            out.set(from + i, new RiverNetwork.Point(p.x(), p.z(), p.ex(), p.ez(), p.water(), p.waterEnd(), (float) bedS,
+                    (float) bedE, p.halfWidth(), p.fromHead(), p.cut(), p.cutEnd(), p.kind(), p.under(), p.node()));
+            ramped.increment();
+        }
+    }
+
+    /** The bed at a point {@code before} blocks up from the shore (under 0: past it), for {@link #ramp}. */
+    private double rampBed(double bed, double water, double half, double x, double z, double before, double reach,
+                           double shoreFloor) {
+        double most = water - DEPTH_LEAST;
+        if (before <= 0) return Math.max(bed, Math.min(most, read(x, z) - 1.0));
+        if (before >= reach) return bed;
+        double full = depthFor(half), atShore = Math.max(DEPTH_LEAST, water - shoreFloor);
+        if (atShore >= full) return bed;
+        double t = before / reach, s = t * t * (3.0 - 2.0 * t);
+        return Math.max(bed, water - (atShore + (full - atShore) * s));
     }
 
     /**
@@ -842,6 +918,12 @@ final class RiverPieces {
                 r == Long.MIN_VALUE ? Double.NEGATIVE_INFINITY : level(r) - 1.0,
                 main != Long.MIN_VALUE && underLake(main) ? LAKE_HOLD : 0), u);
         if (main == Long.MIN_VALUE) eye(pts);
+        // A river whose own length reaches the shore before it runs into the sea's node comes up to the sea floor in it
+        // (MOUTH_RAMPS); one whose shore lies further on is brought up in the sea's node (see sea).
+        if (r != Long.MIN_VALUE && lat.isSea(r) && com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.has(
+                com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.MOUTH_RAMPS)) {
+            ramp(pts, 0, true);
+        }
         if (r == Long.MIN_VALUE) {
             // A river the ground closes round: it ends in a pond of its own.
             sinks.increment();

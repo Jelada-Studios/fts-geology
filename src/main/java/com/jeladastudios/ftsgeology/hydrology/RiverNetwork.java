@@ -455,6 +455,12 @@ public final class RiverNetwork {
 
     /** How far over the water the cut wall is carried before the hillside is left alone: enough to hold the water. */
     private static final double BANK_RISE = RiverPieces.BANK_RISE;
+    /**
+     * Banks at the sea (MOUTH_RAMPS): a river whose water is within MOUTH_SPAN blocks of the sea's level (at the normal
+     * world's layout) has its wall climb MOUTH_WALL blocks a block, carried MOUTH_RISE blocks further over the water;
+     * between, the two blend.
+     */
+    private static final double MOUTH_SPAN = 2.0, MOUTH_WALL = 0.6, MOUTH_RISE = 4.0;
 
     /** The floor a channel or lake cuts here, in blocks, or {@link Double#MAX_VALUE} where it cuts nothing. */
     public static double floorAt(int x, int z) {
@@ -464,6 +470,25 @@ public final class RiverNetwork {
         // Over a river gone underground the valley is left as it was: the cave is cut under it afterwards (KarstCaves).
         if (a.sunk) return Double.MAX_VALUE;
         double top = a.water + BANK_RISE * horizontal;
+        // Down at the sea the banks lie back (MOUTH_RAMPS). The channel's wall climbs two blocks for every block out
+        // and stops a few blocks over the water, which is a river's bank inland; where a river came out through a
+        // raised coast it ran to the sea between two cliffs. Near the sea's level the wall climbs gently, and further.
+        if (!a.lake && com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.has(
+                com.jeladastudios.ftsgeology.worldgen.terrain.WorldgenRevision.MOUTH_RAMPS)) {
+            double m = Math.max(0.0, Math.min(1.0, (SEA + MOUTH_SPAN * horizontal - a.water) / (MOUTH_SPAN * horizontal)));
+            if (m > 0) {
+                // The wall still climbs to a lip a block over the water, so the bank holds the river; only past that
+                // does it lie back. Laid back from the bed, the ground beside a river a few blocks over the sea was taken
+                // down under its water, and the water stood over the bank.
+                double over = Math.max(0.0, a.distance - a.halfWidth);
+                double lip = a.water + 1.0;
+                if (f > lip) {
+                    double wall = RiverPieces.WALL + (MOUTH_WALL - RiverPieces.WALL) * m;
+                    f = lip + wall * (over - (lip - a.bed) / RiverPieces.WALL);
+                }
+                top += MOUTH_RISE * horizontal * m;
+            }
+        }
         // Through a hill the wall climbs on up the gorge, as far as the cut the trace allowed there.
         if (a.cut > 0) top = Math.max(top, a.bed + a.cut);
         if (f > top) return Double.MAX_VALUE;
@@ -802,10 +827,10 @@ public final class RiverNetwork {
         if (l == null || pc == null) return "no river network";
         return String.format(Locale.ROOT,
                 "%d channel nodes (%d joins, %d with nothing to join, %d not traced, %d dam samples, %d gorge lengths, %d spring eyes, %d inlets cut through a bar (%d open, %d big, %d shut), %d plunge pools, %d backwater points, %d held under a "
-                        + "bank), %d lakes drawn (%d on a plain cut through), %d mouths (%d cut through a berm), %d sinks, %d cells sunk into a cave; %d hollows (%d closed), %d lakes, %d ground reads "
+                        + "bank), %d lakes drawn (%d on a plain cut through), %d mouths (%d cut through a berm, %d lengths ramped to the sea floor), %d sinks, %d cells sunk into a cave; %d hollows (%d closed), %d lakes, %d ground reads "
                         + "and %d on the grid; %d squares in %.0f ms, slowest %.0f ms",
                 pc.channels.sum(), pc.joins.sum(), pc.dryJoins.sum(), pc.fallbacks.sum(), pc.dams.sum(), pc.gorges.sum(), pc.eyes.sum(), pc.inlets.sum(), pc.inletOpen.sum(), pc.inletBig.sum(), pc.inletShut.sum(), pc.pools.sum(), pc.backwater.sum(),
-                pc.bankClamps.sum(), pc.lakeMasks.sum(), pc.plainLakes.sum(), pc.mouths.sum(), pc.berms.sum(), pc.sinks.sum(), pc.sunk.sum(), l.pitsFoundCount(),
+                pc.bankClamps.sum(), pc.lakeMasks.sum(), pc.plainLakes.sum(), pc.mouths.sum(), pc.berms.sum(), pc.ramped.sum(), pc.sinks.sum(), pc.sunk.sum(), l.pitsFoundCount(),
                 l.closedCount(), l.lakesCount(), l.readsCount(), pc.gridReads.sum(), SQUARES.sum(),
                 SQUARE_NANOS.sum() / 1e6, SLOWEST.get() / 1e6);
     }
@@ -853,6 +878,93 @@ public final class RiverNetwork {
             }
         }
         return String.format(Locale.ROOT, "rivers hash within %d of %d,%d: %d lengths, %016x", half, cx, cz, n, h);
+    }
+
+    /**
+     * Where the rivers round here reach the sea, biggest first: the end of each river's last channel length, its water
+     * there and its drainage area in nodes. For test commands.
+     */
+    public static List<String> mouths(int cx, int cz, int half, int max) {
+        DrainageLattice l = lattice;
+        RiverPieces pc = pieces;
+        List<String> out = new ArrayList<>();
+        if (l == null || pc == null) return out;
+        int i0 = (int) Math.floor((cx - half) / l.cell), i1 = (int) Math.floor((cx + half) / l.cell);
+        int j0 = (int) Math.floor((cz - half) / l.cell), j1 = (int) Math.floor((cz + half) / l.cell);
+        List<double[]> found = new ArrayList<>();
+        for (int j = j0; j <= j1; j++) {
+            for (int i = i0; i <= i1; i++) {
+                long k = DrainageLattice.key(i, j);
+                if (l.isSea(k) || !pc.isRiver(k)) continue;
+                long r = l.receiver(k);
+                if (r == Long.MIN_VALUE || !l.isSea(r)) continue;
+                Point last = null;
+                for (Point p : pc.of(k)) if (p.kind == RiverPieces.CHANNEL) last = p;
+                if (last == null) continue;
+                found.add(new double[]{last.ex, last.ez, last.waterEnd, l.area(k)});
+            }
+        }
+        found.sort((a, b) -> Double.compare(b[3], a[3]));
+        for (int n = 0; n < Math.min(max, found.size()); n++) {
+            double[] f = found.get(n);
+            out.add(String.format(Locale.ROOT, "%.0f %.0f (water %.1f, area %.0f)", f[0], f[1], f[2], f[3]));
+        }
+        return out;
+    }
+
+    /**
+     * The last lengths of the rivers round here that reach the sea, biggest first: the river's own channel through
+     * the node before the sea, then on through the sea node as far as it was carried, each length in the order the
+     * water runs. For measuring what a mouth looks like once built.
+     */
+    public static List<List<Point>> mouthPaths(int cx, int cz, int half, int max) {
+        DrainageLattice l = lattice;
+        RiverPieces pc = pieces;
+        List<List<Point>> out = new ArrayList<>();
+        if (l == null || pc == null) return out;
+        int i0 = (int) Math.floor((cx - half) / l.cell), i1 = (int) Math.floor((cx + half) / l.cell);
+        int j0 = (int) Math.floor((cz - half) / l.cell), j1 = (int) Math.floor((cz + half) / l.cell);
+        List<long[]> found = new ArrayList<>();
+        for (int j = j0; j <= j1; j++) {
+            for (int i = i0; i <= i1; i++) {
+                long k = DrainageLattice.key(i, j);
+                if (l.isSea(k) || !pc.isRiver(k)) continue;
+                long r = l.receiver(k);
+                if (r == Long.MIN_VALUE || !l.isSea(r)) continue;
+                found.add(new long[]{k, r, Double.doubleToLongBits(l.area(k))});
+            }
+        }
+        found.sort((a, b) -> Double.compare(Double.longBitsToDouble(b[2]), Double.longBitsToDouble(a[2])));
+        for (long[] f : found) {
+            if (out.size() >= max) break;
+            List<Point> own = new ArrayList<>();
+            for (Point p : pc.of(f[0])) if (p.kind == RiverPieces.CHANNEL && !p.sunk()) own.add(p);
+            if (own.isEmpty()) continue;
+            // Back from the last length as far as the lengths join up, then on through the sea node's.
+            List<Point> path = new ArrayList<>();
+            Point last = own.get(own.size() - 1);
+            path.add(last);
+            for (int n = own.size() - 2; n >= 0; n--) {
+                Point p = own.get(n), next = path.get(0);
+                if (Math.abs(p.ex - next.x) > 0.05f || Math.abs(p.ez - next.z) > 0.05f) break;
+                path.add(0, p);
+            }
+            Point[] sea = pc.of(f[1]);
+            for (int guard = 0; guard < sea.length; guard++) {
+                Point end = path.get(path.size() - 1), hit = null;
+                for (Point p : sea) {
+                    if (Math.abs(p.x - end.ex) <= 0.05f && Math.abs(p.z - end.ez) <= 0.05f
+                            && (Math.abs(p.ex - p.x) > 1e-3f || Math.abs(p.ez - p.z) > 1e-3f)) {
+                        hit = p;
+                        break;
+                    }
+                }
+                if (hit == null) break;
+                path.add(hit);
+            }
+            out.add(path);
+        }
+        return out;
     }
 
     /**

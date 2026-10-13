@@ -95,8 +95,14 @@ public final class WorldgenRevision {
     /** A fold belt's layers folded into upright folds along its boundary and laid by metamorphic grade, and a
      * foreland's beds folding as they near the range (round 161). */
     public static final int FOLDED_BELTS = 21;
+    /** A river's bed brought up to the sea's floor over its last stretch to the shore: no trench and pit at the mouth
+     * (round 162). */
+    public static final int MOUTH_RAMPS = 22;
+    /** Mountain rivers floored with gravel, sand and their own bedrock, not cobblestone, and the sea's floor by a mouth
+     * with what a river brings down (round 162). */
+    public static final int RIVER_BEDS = 22;
     /** What a world made now gets. */
-    public static final int CURRENT = 21;
+    public static final int CURRENT = 22;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;

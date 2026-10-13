@@ -80,7 +80,7 @@ public final class RiverWater {
     /** Lake floor columns taken down to a block over their lowest neighbour. */
     private static final LongAdder EASED = new LongAdder();
     /** Channel floors under the water dug down to the drawn floor ({@link WorldgenRevision#DRAWN_BEDS}). */
-    private static final LongAdder DEEPENED = new LongAdder();
+    private static final LongAdder DEEPENED = new LongAdder(), SEA_FLOORS = new LongAdder();
     /** How many times a chunk's lake floor is eased: a step is taken down a block a pass, at most this many. */
     private static final int EASE_PASSES = 4;
 
@@ -141,7 +141,12 @@ public final class RiverWater {
                 // water, before the mouth drops it to the sea's: a stream's floor is a block and a half under its water,
                 // so against the sea's level every narrow stream came out dry for its last few blocks, and where the
                 // ground stood a block over the line it kept its grass in the middle of the river.
-                if (a.floor() > w - 0.5) continue;
+                if (a.floor() > w - 0.5) {
+                    // The sea's floor round a river's mouth is what the river brings down, not soil (RIVER_BEDS): the
+                    // shallow floor off a raised coast came out as dirt, half of it in front of some mouths.
+                    if (!a.lake() && w <= sea && WorldgenRevision.has(WorldgenRevision.RIVER_BEDS)) seaFloor(level, at, x, z, sea);
+                    continue;
+                }
                 boolean mouth = w <= sea;
                 if (mouth) w = sea - 1;
                 CANDIDATES.increment();
@@ -248,9 +253,9 @@ public final class RiverWater {
         if (CHUNKS.incrementAndGet() % 100 == 0) {
             com.jeladastudios.ftsgeology.util.Diagnostics.info("River water over {} chunks: {} columns in a channel, {} kept, {} of them wet, "
                             + "{} levelled, {} let go, {} springs, {} blocks, {} banks built up, {} left as cliffs, "
-                            + "{} lake columns iced, {} glacier columns, {} hollows stopped up, {} steps hung with falling water, {} lake shore columns taken down, {} lake necks filled, {} plants cleared off the water, {} lake floor columns eased, {} floors under the water dug to the drawn floor; {}; {}; {}",
+                            + "{} lake columns iced, {} glacier columns, {} hollows stopped up, {} steps hung with falling water, {} lake shore columns taken down, {} lake necks filled, {} plants cleared off the water, {} lake floor columns eased, {} floors under the water dug to the drawn floor, {} sea floor columns by a mouth laid with sand; {}; {}; {}",
                     CHUNKS.get(), CANDIDATES.sum(), KEPT.sum(), WET.sum(), LEVELLED.sum(), DROPPED.sum(),
-                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(), PLUGGED.sum(), CURTAINS.sum(), SHORED.sum(), GAPS.sum(), REEDS.sum(), EASED.sum(), DEEPENED.sum(),
+                    SPRINGS.sum(), BLOCKS.sum(), BANKED.sum(), CLIFFS.sum(), ICED.sum(), GLACIERS.sum(), PLUGGED.sum(), CURTAINS.sum(), SHORED.sum(), GAPS.sum(), REEDS.sum(), EASED.sum(), DEEPENED.sum(), SEA_FLOORS.sum(),
                     RiverNetwork.summary(), GeologyChunkGenerator.summary(), SnowCover.summary() + "; " + SnowLineSpawns.summary() + "; " + KarstCaves.summary() + "; " + Dolines.summary());
         }
         return placed;
@@ -555,7 +560,13 @@ public final class RiverWater {
                                  boolean lake, double half) {
         double n = ValueNoise.noise(x, z, 5.0);
         BlockState lay;
+        // In a world made since RIVER_BEDS a mountain river's floor is gravel and sand over the rock it cut, with the
+        // rock itself showing in patches, as in a stream that runs on its bedrock. It used to be gravel and cobblestone:
+        // a quarter of every river over twelve blocks above the sea -- in the tall world nearly all of them -- floored
+        // with mortared rubble.
+        boolean beds = WorldgenRevision.has(WorldgenRevision.RIVER_BEDS);
         if (lake) lay = n > 0.1 ? Blocks.CLAY.defaultBlockState() : overSea > 12 ? Blocks.GRAVEL.defaultBlockState() : Blocks.SAND.defaultBlockState();
+        else if (overSea > 12 && beds) lay = n > 0.45 ? null : n < -0.5 ? Blocks.SAND.defaultBlockState() : Blocks.GRAVEL.defaultBlockState();
         else if (overSea > 12) lay = n > 0.45 ? Blocks.COBBLESTONE.defaultBlockState() : Blocks.GRAVEL.defaultBlockState();
         else lay = n > 0.4 ? Blocks.CLAY.defaultBlockState() : n < -0.55 ? Blocks.GRAVEL.defaultBlockState() : Blocks.SAND.defaultBlockState();
         int deep = half >= 4.0 ? 2 : 1;
@@ -563,14 +574,52 @@ public final class RiverWater {
             BlockState was = level.getBlockState(at.set(x, y, z));
             // An ore the cut came down on is covered too: no ore shows on the surface, a river's floor included. The floor
             // dug to its drawn depth (DRAWN_BEDS) reached one in a column in seventy in the tall world's mountains.
-            boolean ore = was.is(net.minecraftforge.common.Tags.Blocks.ORES) && WorldgenRevision.has(WorldgenRevision.DRAWN_BEDS);
+            boolean ore = (was.is(net.minecraftforge.common.Tags.Blocks.ORES) || beds && looksLikeOre(was))
+                    && WorldgenRevision.has(WorldgenRevision.DRAWN_BEDS);
+            // Snow and ice the cut came down through are no floor for running water either (RIVER_BEDS): a snowy
+            // valley's river ran over snow blocks, a fifth of its floor.
+            boolean frozen = beds && (was.is(Blocks.SNOW_BLOCK) || was.is(Blocks.POWDER_SNOW) || was.is(BlockTags.ICE));
             if (!was.is(BlockTags.DIRT) && !was.is(BlockTags.BASE_STONE_OVERWORLD) && !was.is(BlockTags.TERRACOTTA)
-                    && !was.is(Blocks.SANDSTONE) && !was.is(Blocks.RED_SANDSTONE) && !ore) break;
+                    && !was.is(Blocks.SANDSTONE) && !was.is(Blocks.RED_SANDSTONE) && !ore && !frozen) break;
             if (EruptionHandler.isPlayerPlaced(was)) break;
+            // A patch of bare bedrock keeps its rock; soil, or an ore, there is still covered with gravel.
+            BlockState put = lay != null ? lay : was.is(BlockTags.BASE_STONE_OVERWORLD) && !ore && !frozen ? null : Blocks.GRAVEL.defaultBlockState();
+            if (put == null) break;
             // Sand and gravel fall: never over a hole.
             if (!level.getBlockState(at.set(x, y - 1, z)).isSolidRender(level, at)) break;
-            level.setBlock(at.set(x, y, z), lay, FLAGS);
+            level.setBlock(at.set(x, y, z), put, FLAGS);
         }
+    }
+
+    /**
+     * An ore block of a mod that leaves it out of {@code forge:ores}: by its name. In a pack, other mods' ores stood bare
+     * on river floors where the cut came down on them.
+     */
+    private static boolean looksLikeOre(BlockState s) {
+        String path = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath();
+        return path.endsWith("_ore") || path.startsWith("ore_");
+    }
+
+    /**
+     * The sea's floor beside a river's mouth laid with what a river brings down (RIVER_BEDS): sand, with clay and gravel
+     * in patches, where the ground under the sea's water is soil. Only soil is taken, never anything a player put there.
+     */
+    private static void seaFloor(WorldGenLevel level, BlockPos.MutableBlockPos at, int x, int z, int sea) {
+        int y = sea - 1;
+        int least = Math.max(level.getMinBuildHeight() + 1, sea - 40);
+        BlockState s = level.getBlockState(at.set(x, y, z));
+        if (!s.is(Blocks.WATER)) return;
+        while (y > least) {
+            s = level.getBlockState(at.set(x, y, z));
+            if (!s.is(Blocks.WATER) && !seaPlant(s)) break;
+            y--;
+        }
+        if (!s.is(BlockTags.DIRT) || EruptionHandler.isPlayerPlaced(s)) return;
+        if (!level.getBlockState(at.set(x, y - 1, z)).isSolidRender(level, at)) return;
+        double n = ValueNoise.noise(x, z, 5.0);
+        BlockState lay = n > 0.4 ? Blocks.CLAY.defaultBlockState() : n < -0.55 ? Blocks.GRAVEL.defaultBlockState() : Blocks.SAND.defaultBlockState();
+        level.setBlock(at.set(x, y, z), lay, FLAGS);
+        SEA_FLOORS.increment();
     }
 
     /**
