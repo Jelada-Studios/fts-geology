@@ -370,6 +370,17 @@ public final class FtsGeologyApi {
     }
 
     /**
+     * Whether a world's streams are another mod's: a world made with Streams Reflowing's streams. The mod keeps only its
+     * big rivers (as wide as the river biome is painted on) and its lakes there, in its own river water, and
+     * {@link #channel} answers for those alone; the streams are Streams', plain water. {@link #sources} still lists the
+     * inflows of the whole network traced, the streams Streams draws in its place among them. False outside the mod's
+     * world. Since 0.11.4.
+     */
+    public static boolean streamsByOtherMod(ServerLevel level) {
+        return isGeologyWorld(level) && com.jeladastudios.ftsgeology.worldgen.terrain.RiverSystem.trunksOnly();
+    }
+
+    /**
      * Whether the mod's regional weather runs in a level: its storms, highs and lows. Only the overworld, with
      * {@code regionalRain} on and not under TerraFirmaCraft. Where it does not, {@link #rainAt} is the level's one
      * weather and {@link #windAt} the prevailing wind alone. Any thread.

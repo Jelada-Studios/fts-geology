@@ -998,5 +998,10 @@
   "block.fts_geology.rhyolite_gold_ore": "Riyolit Altın Cevheri",
   "block.fts_geology.rhyolite_copper_ore": "Riyolit Bakır Cevheri",
   "block.fts_geology.rhyolite_redstone_ore": "Riyolit Kızıltaş Cevheri",
-  "block.fts_geology.chert_iron_ore": "Çört Demir Cevheri"
+  "block.fts_geology.chert_iron_ore": "Çört Demir Cevheri",
+  "fts_geology.rivers.label": "Nehirler",
+  "fts_geology.rivers.streams": "Streams Reflowing",
+  "fts_geology.rivers.ours": "FT's Geology",
+  "fts_geology.rivers.streams.tooltip": "Büyük nehirleri ve gölleri FT's Geology yerleştirir, dereleri Streams Reflowing çizer. Dünya bu seçimi korur.",
+  "fts_geology.rivers.ours.tooltip": "FT's Geology'nin kendi nehirleri. Streams Reflowing kendi derelerini yine de yanlarına ekler. Dünya bu seçimi korur."
 }

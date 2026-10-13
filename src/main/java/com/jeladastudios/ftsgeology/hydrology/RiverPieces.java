@@ -1119,6 +1119,14 @@ final class RiverPieces {
         return HALF_MIN + (HALF_GROWN * h - HALF_MIN) * Math.pow(t, WIDEN);
     }
 
+    /**
+     * Whether the river a length carries is a trunk: laid as wide as a river the biome is painted on, before a steep
+     * stretch narrows it, so a trunk is a trunk all the way down and does not stop where it runs down a slope.
+     */
+    boolean trunk(long node) {
+        return node == Long.MIN_VALUE || halfFor(lat.area(node)) >= RiverNetwork.RIVER_BIOME_HALF;
+    }
+
     /** How deep a channel this wide runs: a rill a block, a grown river the full depth. */
     private double depthFor(double half) {
         return Math.max(DEPTH_LEAST, Math.min(DEPTH * h, DEPTH_BASE + DEPTH_PER_HALF * half));

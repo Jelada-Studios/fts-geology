@@ -218,6 +218,8 @@ public final class GeyserConfig {
     // --- Hydrology (groundwater) ---------------------------------------------
     public static final ModConfigSpec.BooleanValue RIVERS;                 // default ON, experimental
     public static final ModConfigSpec.BooleanValue RIVERS_REFILL;          // lost river water comes back
+    public static final ModConfigSpec.BooleanValue RIVER_WATER;            // water in the channels (off: dry, for another mod)
+    public static final ModConfigSpec.EnumValue<com.jeladastudios.ftsgeology.worldgen.terrain.RiverSystem.Kind> NEW_WORLD_RIVERS; // with Streams: whose rivers
     public static final ModConfigSpec.BooleanValue SOIL_WATER;             // the ground's water, kept per chunk
     public static final ModConfigSpec.BooleanValue SOIL_WATER_TINT;        // grass coloured by the water in the ground
     public static final ModConfigSpec.BooleanValue SOIL_WATER_GROUND;      // grass dying back, mud, rain-fed farmland
@@ -1299,6 +1301,18 @@ public final class GeyserConfig {
                         "drained away by another mod flows back in from the water beside it, a little at a time.",
                         "A stretch walled off from the rest of the river stays dry.")
                 .define("riversRefill", true);
+        RIVER_WATER = b
+                .comment("Lay the rivers' water in the channels traced. Off, the channels, gorges and lake hollows are",
+                        "still cut, but left dry, with no springs and no cave rivers, for a mod that runs water of its",
+                        "own. New chunks only.")
+                .define("riverWater", true);
+        NEW_WORLD_RIVERS = b
+                .comment("With Streams Reflowing installed, whose rivers a new world gets: STREAMS, the mod's big",
+                        "rivers and lakes in its own water with Streams' streams drawn round them, or OURS, the mod's",
+                        "own rivers with Streams' streams beside them. In single player the world creation screen",
+                        "asks; this is what a dedicated server uses. A world keeps the rivers it was made with.",
+                        "Without Streams every world has the mod's own.")
+                .defineEnum("newWorldRivers", com.jeladastudios.ftsgeology.worldgen.terrain.RiverSystem.Kind.STREAMS);
         SOIL_WATER = b
                 .comment("Keep account of the water in the ground across the overworld: how wet the soil is at the top,",
                         "in the root zone and deep down, water standing on it, and how far the groundwater stands over",

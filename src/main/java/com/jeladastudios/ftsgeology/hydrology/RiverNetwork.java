@@ -251,7 +251,7 @@ public final class RiverNetwork {
      * How wide a channel has to be before the river biome follows it, in blocks either side of its middle. A rill a
      * block across is a stream in the meadow, not a river; the biome would have painted a sandy stripe down every one.
      */
-    private static final double RIVER_BIOME_HALF = 2.5;
+    static final double RIVER_BIOME_HALF = 2.5;
 
     // === Queries ============================================================
 
@@ -802,10 +802,13 @@ public final class RiverNetwork {
         java.util.Set<Long> seen = new java.util.HashSet<>();
         double lx0 = bx * (double) BLOCK, lx1 = (bx + 1) * (double) BLOCK;
         double lz0 = bz * (double) BLOCK, lz1 = (bz + 1) * (double) BLOCK;
+        // Where Streams draws the streams, only the trunks are the network's (RiverSystem.trunksOnly).
+        boolean trunks = com.jeladastudios.ftsgeology.worldgen.terrain.RiverSystem.trunksOnly();
         for (int j = j0; j <= j1; j++) {
             for (int i = i0; i <= i1; i++) {
                 long k = DrainageLattice.key(i, j);
                 for (Point p : pc.of(k)) {
+                    if (trunks && !pc.trunk(p.node)) continue;
                     if (p.x >= x0 && p.x < x1 && p.z >= z0 && p.z < z1) out.add(p);
                 }
                 RiverPieces.LakeMask mask = pc.maskOf(k);

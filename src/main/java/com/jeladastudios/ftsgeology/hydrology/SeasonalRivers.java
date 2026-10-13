@@ -58,7 +58,7 @@ public final class SeasonalRivers {
     public static void onServerTick(ServerTickEvent.Post event) {
         if (event.getServer() == null) return;
         ServerLevel level = event.getServer().overworld();
-        if (level == null || !GeyserConfig.SEASONAL_RIVERS.get() || !SereneSeasons.active() || HydraulicsHooks.active(level)) return;
+        if (level == null || !GeyserConfig.SEASONAL_RIVERS.get() || !com.jeladastudios.ftsgeology.worldgen.terrain.RiverSystem.ourWater() || !SereneSeasons.active() || HydraulicsHooks.active(level)) return;
         long now = level.getGameTime();
         if (now % EVERY == 0 && PENDING.isEmpty()) {
             LongOpenHashSet seen = new LongOpenHashSet();
@@ -119,7 +119,7 @@ public final class SeasonalRivers {
      * bars of gravel and sand along the banks.
      */
     public static boolean low(ServerLevel level, int x, int z) {
-        if (!GeyserConfig.SEASONAL_RIVERS.get() || !SereneSeasons.active()) return false;
+        if (!GeyserConfig.SEASONAL_RIVERS.get() || !com.jeladastudios.ftsgeology.worldgen.terrain.RiverSystem.ourWater() || !SereneSeasons.active()) return false;
         double phase = SereneSeasons.phase(level);
         return !Double.isNaN(phase) && stage(level, x, z, phase) < 0;
     }
