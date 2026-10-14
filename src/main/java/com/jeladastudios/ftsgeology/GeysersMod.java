@@ -86,6 +86,10 @@ public class GeysersMod {
         modContainer.registerConfig(ModConfig.Type.SERVER, com.jeladastudios.ftsgeology.gas.GasConfig.SPEC, "fts_geology-gases.toml");
         // The player's own sound and sky settings, on their machine.
         modContainer.registerConfig(ModConfig.Type.CLIENT, com.jeladastudios.ftsgeology.config.ClientConfig.SPEC, "fts_geology-client.toml");
+        // and a screen for them behind the mod list's Config button.
+        if (net.neoforged.fml.loading.FMLEnvironment.dist == net.neoforged.api.distmarker.Dist.CLIENT) {
+            com.jeladastudios.ftsgeology.client.ClientConfigScreen.register(modContainer);
+        }
 
         // The geology advancements' trigger, registered before advancements are read.
         com.jeladastudios.ftsgeology.advancement.GeologyTrigger.register(modBus);
