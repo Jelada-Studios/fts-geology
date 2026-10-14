@@ -1013,5 +1013,16 @@
   "fts_geology.rivers.streams": "Streams Reflowing",
   "fts_geology.rivers.ours": "FT's Geology",
   "fts_geology.rivers.streams.tooltip": "FT's Geology lays out the big rivers and lakes, Streams Reflowing draws the streams. The world keeps this choice.",
-  "fts_geology.rivers.ours.tooltip": "FT's Geology's own rivers. Streams Reflowing still adds its streams beside them. The world keeps this choice."
+  "fts_geology.rivers.ours.tooltip": "FT's Geology's own rivers. Streams Reflowing still adds its streams beside them. The world keeps this choice.",
+  "screen.fts_geology.client_config": "FT's Geology: your settings",
+  "screen.fts_geology.client_config.riverFoam": "River foam",
+  "screen.fts_geology.client_config.riverFoam.tooltip": "Foam where a river comes down a step, and a little on fast water and in rain. Turn it off if the rivers cost you frames.",
+  "screen.fts_geology.client_config.riverFoamSheet": "Foam as a sheet on the water",
+  "screen.fts_geology.client_config.riverFoamSheet.tooltip": "Draw the foam as a sheet lying on the water. Off, it is drawn as particles.",
+  "screen.fts_geology.client_config.riverDebris": "Leaves and twigs on the rivers",
+  "screen.fts_geology.client_config.riverDebris.tooltip": "Leaves and bits of twig drifting down the rivers, more under trees and in wind and rain. Turn them off if the rivers cost you frames.",
+  "screen.fts_geology.client_config.stormClouds": "Storm clouds",
+  "screen.fts_geology.client_config.stormClouds.tooltip": "The weather's own clouds, drifting with the wind and gathering into storms, in place of vanilla's flat clouds.",
+  "screen.fts_geology.client_config.shaderOvercast": "Overcast sky under shaders",
+  "screen.fts_geology.client_config.shaderOvercast.tooltip": "Under a shader pack, the sky is fully overcast wherever it really rains where you stand."
 }

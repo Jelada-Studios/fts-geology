@@ -1003,5 +1003,16 @@
   "fts_geology.rivers.streams": "Streams Reflowing",
   "fts_geology.rivers.ours": "FT's Geology",
   "fts_geology.rivers.streams.tooltip": "Büyük nehirleri ve gölleri FT's Geology yerleştirir, dereleri Streams Reflowing çizer. Dünya bu seçimi korur.",
-  "fts_geology.rivers.ours.tooltip": "FT's Geology'nin kendi nehirleri. Streams Reflowing kendi derelerini yine de yanlarına ekler. Dünya bu seçimi korur."
+  "fts_geology.rivers.ours.tooltip": "FT's Geology'nin kendi nehirleri. Streams Reflowing kendi derelerini yine de yanlarına ekler. Dünya bu seçimi korur.",
+  "screen.fts_geology.client_config": "FT's Geology: senin ayarların",
+  "screen.fts_geology.client_config.riverFoam": "Nehir köpüğü",
+  "screen.fts_geology.client_config.riverFoam.tooltip": "Nehrin basamaktan indiği yerlerde köpük, hızlı suda ve yağmurda biraz. Nehirler kare hızını düşürüyorsa kapat.",
+  "screen.fts_geology.client_config.riverFoamSheet": "Köpük suyun üstünde örtü olarak",
+  "screen.fts_geology.client_config.riverFoamSheet.tooltip": "Köpüğü suyun üstünde yatan bir örtü olarak çiz. Kapalıyken parçacık olarak çizilir.",
+  "screen.fts_geology.client_config.riverDebris": "Nehirde yaprak ve dal",
+  "screen.fts_geology.client_config.riverDebris.tooltip": "Nehirlerde sürüklenen yapraklar ve dal parçaları; ağaç altında, rüzgârda ve yağmurda daha çok. Nehirler kare hızını düşürüyorsa kapat.",
+  "screen.fts_geology.client_config.stormClouds": "Fırtına bulutları",
+  "screen.fts_geology.client_config.stormClouds.tooltip": "Vanilyanın düz bulutları yerine havanın kendi bulutları: rüzgârla sürüklenir, fırtınalarda toplanır.",
+  "screen.fts_geology.client_config.shaderOvercast": "Shader altında kapalı gökyüzü",
+  "screen.fts_geology.client_config.shaderOvercast.tooltip": "Shader paketi açıkken, bulunduğun yerde gerçekten yağmur yağıyorsa gökyüzü tamamen kapalı olur."
 }
