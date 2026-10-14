@@ -1,10 +1,16 @@
 {
   "homepage": "https://github.com/Jelada-Studios/fts-geology/releases",
   "promos": {
-    "1.20.1-latest": "0.11.0",
-    "1.20.1-recommended": "0.11.0"
+    "1.20.1-latest": "0.11.3",
+    "1.20.1-recommended": "0.11.3",
+    "1.21.1-latest": "0.11.3",
+    "1.21.1-recommended": "0.11.3"
   },
   "1.20.1": {
+    "0.11.3": "Ore bodies at the surface, shallower and more natural rivers, Streams Reflowing support, a settings screen, fixes.",
     "0.11.0": "See the release notes on GitHub."
+  },
+  "1.21.1": {
+    "0.11.3": "First NeoForge release, with everything in Forge 0.11.3."
   }
 }
