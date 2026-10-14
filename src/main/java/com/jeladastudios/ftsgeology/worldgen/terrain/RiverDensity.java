@@ -79,6 +79,25 @@ public final class RiverDensity implements DensityFunction {
         BARE.get()[0] = on;
     }
 
+    /**
+     * In a world whose streams are Streams Reflowing's (RIVER_LEVELS): a channel over the sea is cut only down to its
+     * water's top here, and the river's water fill digs the rest when it lays the water (RiverWater). Streams plans its
+     * streams off this ground before the water is in, so it found every channel empty and brought its streams down to
+     * the floors, many blocks under the river's water, which stood over them as a wall where they met; now it finds
+     * the floor where the water's top will be. Lakes and mouths are cut as before.
+     */
+    private static double surfaceCut(int x, int z, double floor) {
+        if (!WorldgenRevision.has(WorldgenRevision.RIVER_LEVELS) || !RiverSystem.trunksOnly()) return floor;
+        RiverNetwork.At a = RiverNetwork.at(x, z);
+        if (a.lake() || a.water() <= SEA_FLOOR + 1.0 || floor >= Math.floor(a.water())) return floor;
+        return Math.floor(a.water());
+    }
+
+    /** Whether this thread is reading the ground with no channel cut ({@link #bare}). */
+    static boolean isBare() {
+        return BARE.get()[0];
+    }
+
     public RiverDensity(DensityFunction raw, String mode) {
         this(raw, Mode.valueOf(mode.toUpperCase(Locale.ROOT)));
     }
@@ -99,6 +118,7 @@ public final class RiverDensity implements DensityFunction {
             case FLOOR -> {
                 double y = RiverNetwork.floorAt(x, z);
                 if (y == Double.MAX_VALUE) yield NONE_HIGH;
+                y = surfaceCut(x, z, y);
                 // The raw ground is a flat cache the chunk filled when it was built, and the router hands the same
                 // function to both this and the offset's min, so reading it here is an array lookup.
                 double ground = 128.0 + 128.0 * raw.compute(ctx);

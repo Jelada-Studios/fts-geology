@@ -104,8 +104,11 @@ public final class WorldgenRevision {
     /** Rivers shallower (a grown river four blocks deep in the tall world, three in the normal one) and of a steadier
      * width; a mouth's bed brought up to a shallow shore (round 165). */
     public static final int RIVER_SHAPES = 23;
+    /** In a world whose streams are Streams Reflowing's, channels cut in the terrain only down to their water's top, the
+     * rest dug as the water is laid, so its streams meet the rivers at their water (round 165). */
+    public static final int RIVER_LEVELS = 24;
     /** What a world made now gets. */
-    public static final int CURRENT = 23;
+    public static final int CURRENT = 24;
 
     private static final String DATA = "fts_geology_worldgen";
     private static volatile int revision = CURRENT;
